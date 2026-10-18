@@ -25,9 +25,9 @@ function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan:
 function fbmSyncPreflight() { var state = FbmSync.stateRead(); return typeof FbmSync.runPreflight === 'function' ? FbmSync.runPreflight({ mode: state.mode || 'read', scan: state.scan || 'full' }) : { ok: true, issues: [] }; }
 /** API nhận response Extension và trả request kế tiếp. */
 function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
-/** Dừng phiên lỗi; chỉ nhả khóa sync, giữ khóa user đang sửa. */
+/** Dừng phiên lỗi và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận. */
 function fbmSyncCancel() {
-  var state = FbmSync.stateRead(), locks = state.locks || {}, kept = {}, failed = String(state.phase || '') === 'error';
+  var state = FbmSync.stateRead(), failed = String(state.phase || '') === 'error';
   // Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng".
   if (state.activeRequestId && !failed) {
     state.metadata = state.metadata || {};
@@ -37,32 +37,32 @@ function fbmSyncCancel() {
     FbmSync.stateWrite(state);
     return { ok: true, code: 'SYNC_CANCEL_PENDING', pending: true, status: FbmSync.statusView() };
   }
-  Object.keys(locks).forEach(function (key) { if (locks[key] && locks[key].owner === 'user') { kept[key] = locks[key]; } });
-  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0; state.locks = kept;
+  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
+  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0;
   if (!failed) { state.phase = 'paused'; state.message = 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.'; state.lastError = ''; }
   return FbmSync.stateWrite(state);
 }
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
 function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
 
-/** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. */
+/** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
 function fbmSyncRetryPushFailures() {
-  var state = FbmSync.stateRead(), failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures), byEntity = { customer: [], activity: [] }, recordsByEntity = { customer: {}, activity: {} }, reset = [], missing = [];
+  var state = FbmSync.stateRead(), failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures);
   if (!keys.length) { return { ok: false, code: 'PUSH_FAILURES_NOT_FOUND', message: 'Không có nhóm bản ghi lỗi đẩy cần mở lại.' }; }
-  ['customer', 'activity'].forEach(function (entity) {
-    (FbmSync.readLocal(entity) || []).forEach(function (record) { recordsByEntity[entity][String(record && record.id || '')] = record; });
-  });
-  keys.forEach(function (key) {
-    var split = key.indexOf(':'), entity = split < 0 ? '' : key.slice(0, split), id = split < 0 ? '' : key.slice(split + 1);
-    if (!byEntity[entity] || !id) { missing.push(key); return; }
-    if (!recordsByEntity[entity][id]) { missing.push(key); return; }
-    byEntity[entity].push({ id: id, syncStatus: FbmSync.SYNC_STATUS.pending });
-  });
-  ['customer', 'activity'].forEach(function (entity) {
-    if (!byEntity[entity].length) { return; }
-    FbmSync.sheetSave(entity, byEntity[entity], 'pull');
-    byEntity[entity].forEach(function (record) { reset.push(entity + ':' + record.id); });
-  });
+  var opened = FbmSync.recordChange(function (gate) {
+    var byEntity = { customer: [], activity: [] }, present = { customer: {}, activity: {} }, reset = [], missing = [];
+    ['customer', 'activity'].forEach(function (entity) {
+      gate.read(entity, FbmSync.recordSchemas()).forEach(function (record) { present[entity][String(record && record.id || '')] = true; });
+    });
+    keys.forEach(function (key) {
+      var split = key.indexOf(':'), entity = split < 0 ? '' : key.slice(0, split), id = split < 0 ? '' : key.slice(split + 1);
+      if (!byEntity[entity] || !id || !present[entity][id]) { missing.push(key); return; }
+      if (gate.busy(entity, [id])[id]) { return; }
+      byEntity[entity].push({ id: id, syncStatus: FbmSync.SYNC_STATUS.pending });
+      reset.push(key);
+    });
+    return { save: ['customer', 'activity'].map(function (entity) { return { entity: entity, records: byEntity[entity], source: 'pull' }; }), value: { reset: reset, missing: missing } };
+  }).value, reset = opened.reset, missing = opened.missing;
   // Bản ghi không còn trên Sheet thì dấu chặn gửi lại vô nghĩa; giữ lại thì nó chiếm chỗ của cầu dao lỗi đẩy mãi mãi.
   FbmSync.pushFailuresRemove(reset.concat(missing));
   state.message = 'Đã mở lại ' + reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.';

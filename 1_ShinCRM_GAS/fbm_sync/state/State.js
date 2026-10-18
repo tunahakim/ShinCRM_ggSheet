@@ -220,7 +220,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false, locks: {} };
+  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -274,7 +274,9 @@ FbmSync.stateRead = function () {
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
-  var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}), locks: parsed.locks || {} });
+  var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}) });
+  // Khóa bản ghi cũ trong state đã chuyển sang sổ bận của lõi; bản state cũ còn mang thì bỏ, không ai đọc nữa.
+  delete read.locks;
   if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(read); }
   FbmSync.requestWatchNote(read);
   return read;
@@ -353,7 +355,7 @@ FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái 
 FbmSync.stateWriteMinimal = function (full, failure) {
   var cut = function (text) { return String(text || '').slice(0, FbmSync.STATE_MINIMAL_TEXT_LIMIT); };
   var base = { version: full.version, runId: full.runId, origin: full.origin, mode: full.mode, scan: full.scan, phase: full.phase, entity: full.entity, startedAt: full.startedAt, updatedAt: full.updatedAt, retryable: false, lastFailureCode: String(full.lastFailureCode || failure.code || ''), lastError: cut(full.lastError), message: cut(full.message || full.lastError) + FbmSync.STATE_MINIMAL_NOTE, metadata: { conflictCount: Number(full.metadata && full.metadata.conflictCount || 0) } };
-  var tiers = [Object.assign({}, base, { cursor: full.cursor || {}, locks: full.locks || {} }), base];
+  var tiers = [Object.assign({}, base, { cursor: full.cursor || {} }), base];
   for (var i = 0; i < tiers.length; i += 1) {
     if (!FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(tiers[i]), 'state_minimal').ok) { continue; }
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write_minimal', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Không lưu được đầy đủ trạng thái phiên (' + String(failure.code || '') + '); đã lưu bản rút gọn để đóng phiên ở "' + String(full.phase || '') + '"' + (i ? ', bỏ cả con trỏ và khóa ghi.' : '.'), detail: { runId: String(full.runId || ''), phase: String(full.phase || '') } }); }
@@ -398,8 +400,9 @@ FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(
  */
 FbmSync.stateStart = function (entity, phase, total, identity) {
   var who = identity || {};
-  var now = Date.now(), previous = FbmSync.stateRead(), userLocks = {}, freshSession = FbmSync.stateDefault().session;
-  Object.keys(previous.locks || {}).forEach(function (key) { if (previous.locks[key] && previous.locks[key].owner === 'user') { userLocks[key] = previous.locks[key]; } });
+  var now = Date.now(), previous = FbmSync.stateRead(), freshSession = FbmSync.stateDefault().session;
+  // Lượt mới nhả mọi bản ghi lượt trước còn giữ trong sổ bận (kể cả lượt kết thúc `SYNC_STALE_WRITE`): mỗi lúc chỉ một lượt đồng bộ chạy.
+  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
   ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
   // Danh sách đọc chỉ sống trong một lượt: lượt trước hỏng giữa chừng cũng không để lại mã hay ghi chú nào cho lượt này.
   if (typeof FbmSync.readListClear === 'function') { FbmSync.readListClear(); }
@@ -409,7 +412,7 @@ FbmSync.stateStart = function (entity, phase, total, identity) {
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, chain: previous.chain || null, origin: who.origin || 'manual', mode: who.mode || 'read', scan: who.scan || 'full', current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false, locks: userLocks });
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, chain: previous.chain || null, origin: who.origin || 'manual', mode: who.mode || 'read', scan: who.scan || 'full', current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false });
   return next;
 };
 /**
@@ -439,11 +442,8 @@ FbmSync.recoverStaleRun = function (state, now, options) {
   current.retryable = false;
   current.lastError = message;
   current.message = message;
-  if (!waitingWrite) {
-    var kept = {};
-    Object.keys(current.locks || {}).forEach(function (key) { if (current.locks[key] && current.locks[key].owner === 'user') { kept[key] = current.locks[key]; } });
-    current.locks = kept;
-  }
+  // Lượt mất phản hồi khi đang chờ lệnh ghi vẫn giữ bản ghi trong sổ bận để người dùng kiểm tra trên FBM trước; lượt kẹt khác thì nhả.
+  if (!waitingWrite) { recordGateReleaseOwner(FbmSync.RECORD_HOLDER); }
   var written = FbmSync.stateWrite(current);
   // Lượt bị thu hồi có thể không còn bước nào đang mở để tự ghi Log kết thúc, nên ghi riêng một dòng: không có lỗi im lặng.
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: message, detail: { code: current.lastFailureCode, runId: String(current.runId || ''), cursor: String(cursor.kind || '') } }); }
@@ -500,21 +500,3 @@ FbmSync.stateFailRun = function (reason, code) {
   if (typeof FbmSync.readListClear === 'function') { FbmSync.readListClear(); }
   return { state: FbmSync.stateWrite(state), failed: true };
 };
-/** Khóa một record khi Sidebar đang sửa hoặc sync chuẩn bị ghi. */
-FbmSync.lockRecord = function (entity, id, revision, owner) {
-  return FbmSync.stateWrite(FbmSync.lockRecordIn(FbmSync.stateRead(), entity, id, revision, owner));
-};
-/** Khóa trên object state mà phiên đang giữ: đọc lại kho thì hàm gọi vẫn cầm object cũ, lần ghi sau của nó đè mất cursor `push_wait` (FBM-045). */
-FbmSync.lockRecordIn = function (state, entity, id, revision, owner) {
-  state.locks = state.locks || {};
-  state.locks[String(entity) + ':' + String(id)] = { revision: String(revision || ''), owner: owner || 'sync', at: Date.now() };
-  return state;
-};
-/** Bỏ khóa record sau khi kết thúc chỉnh sửa. */
-FbmSync.unlockRecord = function (entity, id) {
-  var state = FbmSync.stateRead();
-  delete state.locks[String(entity) + ':' + String(id)];
-  return FbmSync.stateWrite(state);
-};
-/** Kiểm tra nhanh record có đang bị khóa hay không. */
-FbmSync.isRecordLocked = function (entity, id) { var state = FbmSync.stateRead(); return !!state.locks[String(entity) + ':' + String(id)]; };

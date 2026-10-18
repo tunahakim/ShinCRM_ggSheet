@@ -15,7 +15,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
-  'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'sheetSave', 'previewRecords',
+  'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'canonical',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanRecord', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',

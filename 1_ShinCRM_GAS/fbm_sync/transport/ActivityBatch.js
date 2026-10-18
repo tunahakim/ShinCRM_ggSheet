@@ -78,15 +78,22 @@ FbmSync.activityBatchMismatch = function (state, message, failureCode) {
 };
 
 /**
- * Ghi cờ của cửa ghi: "không thấy bên FBM", "đã chuyển cho người khác" và đổi khách cha khi khách mới bị chặn. Bỏ dòng người dùng đang sửa và dòng đang chờ quyết xung đột; dòng đã mang đúng cờ thì không ghi và không Log lại, nhưng vẫn đếm vì lượt này vẫn thấy nó vắng.
- * `flags`: `[{ record, status, patch, reason }]`, mỗi bản ghi một lần.
+ * Ghi cờ của cửa ghi: "không thấy bên FBM", "đã chuyển cho người khác" và đổi khách cha khi khách mới bị chặn. Hàm quyết đọc lại bản ghi trong Cửa bản ghi theo mã; bỏ dòng đã vắng, dòng tiến trình khác đang giữ và dòng đang chờ quyết xung đột; dòng đã mang đúng cờ thì không ghi và không Log lại, nhưng vẫn đếm vì lượt này vẫn thấy nó vắng.
+ * `flags`: `[{ record, status, patch, reason }]`, mỗi bản ghi một lần; `record` chỉ dùng để lấy mã.
  */
 FbmSync.gateFlagWrite = function (state, entity, flags) {
-  var writes = [], sync = FbmSync.SYNC_STATUS, counted = { missing: entity === 'activity' ? 'missingActivity' : 'missingCustomer', transferred: entity === 'activity' ? 'transferredActivity' : 'transferredCustomer' }, done = {};
+  if (!(flags || []).length) { return 0; }
+  return FbmSync.recordChange(function (gate) { return FbmSync.gateFlagDecide(gate, state, entity, flags); }).value;
+};
+
+/** Hàm quyết của `gateFlagWrite`. */
+FbmSync.gateFlagDecide = function (gate, state, entity, flags) {
+  var writes = [], sync = FbmSync.SYNC_STATUS, counted = { missing: entity === 'activity' ? 'missingActivity' : 'missingCustomer', transferred: entity === 'activity' ? 'transferredActivity' : 'transferredCustomer' }, done = {}, fresh = {};
+  gate.read(entity, FbmSync.recordSchemas()).forEach(function (record) { fresh[String(record.id || '').trim()] = record; });
   state.counts = state.counts || {};
   (flags || []).forEach(function (flag) {
-    var record = flag.record, id = String(record && record.id || ''), lock = state.locks && state.locks[entity + ':' + id];
-    if (!id || done[id] || (lock && lock.owner === 'user') || FbmSync.isConflictPending(record)) { return; }
+    var id = String(flag.record && flag.record.id || '').trim(), record = fresh[id];
+    if (!id || done[id] || !record || gate.busy(entity, [id])[id] || FbmSync.isConflictPending(record)) { return; }
     done[id] = true;
     var patch = Object.assign({ id: id }, flag.patch || {}), key = flag.status === sync.missing ? 'missing' : flag.status === sync.transferred ? 'transferred' : '';
     if (key) { state.counts[counted[key]] = Number(state.counts[counted[key]] || 0) + 1; }
@@ -96,9 +103,9 @@ FbmSync.gateFlagWrite = function (state, entity, flags) {
     if (flag.status) { FbmSync.logPullRecord(entity, { fbmId: record.fbmId }, record, flag.status, flag.reason); }
   });
   // Ghi theo gói `CHUNK_ROWS` dòng: khách chuyển quyền kéo theo mọi giao dịch của khách nên một lần có thể vượt một lần qua cửa ghi.
-  var size = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000;
-  for (var start = 0; start < writes.length; start += size) { FbmSync.sheetSave(entity, writes.slice(start, start + size), 'pull'); }
-  return writes.length;
+  var size = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000, save = [];
+  for (var start = 0; start < writes.length; start += size) { save.push({ entity: entity, records: writes.slice(start, start + size), source: 'pull' }); }
+  return { save: save, value: writes.length };
 };
 
 /** Hai lần đọc FBM nói khác nhau về khách đang giữ một giao dịch: không ghi gì, Log để người phụ trách kiểm tra. */

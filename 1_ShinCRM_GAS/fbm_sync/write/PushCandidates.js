@@ -104,7 +104,8 @@ FbmSync.pushCandidates = function (entity, scan) {
   }).map(function (item) {
     var record = item.record, customer = entity === 'activity' ? customers[String(record.customerId || '')] : null;
     var kind = FbmSync.isUnconfirmedCreate(record) ? (entity === 'customer' ? 'recover' : 'stuck') : String(record.fbmId || '').trim() ? 'edit' : 'create';
-    var candidate = { kind: kind, id: String(record.id || ''), record: record, position: item.position };
+    // `raw` là dòng Sheet lúc chọn, chỉ sống trong bộ nhớ: bước đầu so nó với dòng đọc lại trong cửa để không đẩy dòng vừa có người sửa.
+    var candidate = { kind: kind, id: String(record.id || ''), record: record, raw: record, position: item.position };
     if (customer) {
       candidate.record = Object.assign({}, record, { customerFbmCode: customer.fbmCustomerCode || '', stt_rec: customer.fbmId || '' });
     }

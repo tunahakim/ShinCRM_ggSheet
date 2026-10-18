@@ -55,14 +55,14 @@ function fbmSeedFakeDeletedCustomer() {
   fake.companyName = 'Khách giả mã FBM đã xóa';
   fake.fbmId = 'A999999999'; fake.fbmCustomerCode = FBM_FAKE_DELETED_CODE;
   fake.fbmHash = 'baseline-gia'; fake.syncStatus = FbmSync.SYNC_STATUS.synced; fake.recordStatus = 'active';
-  var saved = FbmSync.sheetSave('customer', [fake], 'pull');
+  var saved = fbmFixtureSave('customer', [fake], 'pull');
   fbmDevSetTestCodes([FBM_FAKE_DELETED_CODE]);
   return { ok: true, recordIds: saved.recordIds, scope: FBM_FAKE_DELETED_CODE };
 }
 /** Kết thúc dò mã bị xóa: xóa mềm dòng giả (có ID FBM nên không xóa cứng được) và trả phạm vi live về mặc định ALT00010. */
 function fbmEndFakeDeletedCustomer() {
   var fakes = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === FBM_FAKE_DELETED_CODE; });
-  if (fakes.length) { FbmSync.sheetSave('customer', fakes.map(function (record) { return { id: record.id, recordStatus: 'deleted' }; }), 'pull'); }
+  if (fakes.length) { fbmFixtureSave('customer', fakes.map(function (record) { return { id: record.id, recordStatus: 'deleted' }; }), 'pull'); }
   fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
   return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: FbmSync.syncSettingsRead().scopeCodes };
 }
@@ -71,7 +71,7 @@ function fbmSeedConflict() {
   var source = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === 'ALT00010' && String(record.recordStatus || 'active') !== 'deleted'; })[0];
   if (!source) { return { ok: false, reason: 'Chưa có khách ALT00010 trên Sheet DEV.' }; }
   var website = 'Website xung đột ShinCRM ' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'HH:mm');
-  FbmSync.sheetSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  fbmFixtureSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
   return { ok: true, id: source.id, website: website };
 }
 /** Dò ca "FBM đổi giữa chừng" (G10.7f): sau khi Sidebar đã mở xem xung đột, làm lệch hash FBM chốt lúc mở; bước Lưu kế tiếp phải thấy khác và trả về xem lại thay vì chốt. Không chạm FBM. */
@@ -92,8 +92,8 @@ function fbmSeedActivityPush() {
   var created = {};
   Object.keys(source).forEach(function (key) { if (['id', 'fbmId', 'fbmHash', 'syncStatus', 'syncedAt'].indexOf(key) < 0) { created[key] = source[key]; } });
   created.id = ''; created.content = 'Activity tạo từ ShinCRM ' + stamp; created.syncStatus = FbmSync.SYNC_STATUS.pending; created.recordStatus = 'active';
-  FbmSync.sheetSave('activity', [{ id: source.id, content: 'Sửa từ ShinCRM ' + stamp, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
-  var saved = FbmSync.sheetSave('activity', [created], 'pull');
+  fbmFixtureSave('activity', [{ id: source.id, content: 'Sửa từ ShinCRM ' + stamp, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  var saved = fbmFixtureSave('activity', [created], 'pull');
   return { ok: true, edited: source.id, created: saved.recordIds };
 }
 /** Khách chủ dự án cho phép tạo thật trên FBM (G10.8c, 2026-10-07). */
@@ -118,12 +118,12 @@ function fbmAllowTestCreateCustomer() {
 }
 /** Đưa CUS-020061 về `chờ đối soát` để lượt hai chiều đẩy lại và Log ghi tên trường FBM không nhận. */
 function fbmRequeueCreateCustomerPush() {
-  FbmSync.sheetSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  fbmFixtureSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
   return fbmProbeCreateCustomer();
 }
 /** Trả CUS-020061 về hàng đợi xung đột sau khi FBM-052 chuyển nhầm sang `không thấy bên FBM`; bản FBM vẫn còn, cần đọc lại để xem trường lệch. */
 function fbmRequeueCreateCustomerConflict() {
-  FbmSync.sheetSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'pull');
+  fbmFixtureSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'pull');
   var state = FbmSync.stateRead();
   state.phase = 'conflict'; state.metadata.conflictCount = FbmSync.conflictQueue().length; state.message = 'Có xung đột chờ quyết.';
   FbmSync.stateWrite(state);
@@ -174,7 +174,12 @@ function fbmRepairFalseMissing(apply) {
     return String(record.syncStatus || '') === sync.missing && String(record.fbmHash || '').trim() && String(record.fbmId || '').trim();
   }).map(function (record) { return { id: record.id, syncStatus: sync.synced }; });
   if (apply !== true || !targets.length) { return { apply: apply === true, count: targets.length, sample: targets.slice(0, 3).map(function (item) { return item.id; }) }; }
-  var saved = FbmSync.sheetSave('customer', targets, 'pull');
+  var saved = fbmFixtureSave('customer', targets, 'pull');
   return { apply: true, count: targets.length, ok: saved && saved.ok !== false };
 }
 function fbmRepairFalseMissingApply() { return fbmRepairFalseMissing(true); }
+
+/** Ghi dữ liệu thử qua Cửa bản ghi với chủ `fbm`: dữ liệu thử đặt thẳng giá trị đã biết, không cần đọc lại dòng. Chỉ DEV. */
+function fbmFixtureSave(entity, records, source) {
+  return FbmSync.recordChange(function () { return { save: [{ entity: entity, records: records, source: source }] }; }).saves[0];
+}

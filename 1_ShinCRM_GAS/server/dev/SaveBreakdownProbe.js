@@ -24,7 +24,7 @@ function saveBreakdownProbeWrap(names, times) {
 
 var SAVE_BREAKDOWN_PROBE_PARTS = [
   'saveRecord',
-  'FbmSync.withOrchestrationLock', 'fbmSyncSaveAllowed',
+  'recordGateRun', 'recordHoldsRead',
   'documentLockRun', 'documentLockSettle',
   'entityReadContext', 'entityReadByIds', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
   'writeGateConflicts', 'writeGateApply', 'entityWriteRecords', 'writeGateConfirm', 'logEvent',
