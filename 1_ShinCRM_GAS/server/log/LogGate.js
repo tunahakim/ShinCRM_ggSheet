@@ -333,7 +333,7 @@ function flushLog() {
 }
 
 /**
- * Trần số dòng: cắt cũ nhất trước bằng `deleteRows`, kiểm mỗi lần nhả.
+ * Trần số dòng: cắt cũ nhất trước bằng công cụ xóa dòng, kiểm mỗi lần nhả.
  *
  * Kiểm mỗi lần vì nó miễn phí — `getLastRow()` đã có sẵn trong tay lúc tính dòng đích. Vai trò thật của trần này là lưới an toàn cho một vòng lặp lỗi chạy hoang, không phải cái cắt log trong ngày thường.
  *
@@ -343,7 +343,7 @@ function logTrimRows(sheet) {
   var firstDataRow = SHEET_LAYOUT.Log.firstDataRow;
   var excess = sheet.getLastRow() - firstDataRow + 1 - SETTINGS.LOG_MAX_ROWS;
   if (excess > 0) {
-    sheet.deleteRows(firstDataRow, excess);
+    sheetRowsDelete(sheet, logRowRange(firstDataRow, excess));
   }
 }
 
@@ -378,8 +378,15 @@ function logTrimAge(sheet) {
   }
 
   if (tooOld > 0) {
-    sheet.deleteRows(firstDataRow, tooOld);
+    sheetRowsDelete(sheet, logRowRange(firstDataRow, tooOld));
   }
+}
+
+/** Danh sách `count` số dòng liền nhau từ `firstRow`, cho công cụ xóa dòng (nó gom lại thành một lệnh). */
+function logRowRange(firstRow, count) {
+  var rows = [];
+  for (var i = 0; i < count; i++) { rows.push(firstRow + i); }
+  return rows;
 }
 
 /**
@@ -431,12 +438,7 @@ function probeLogGate() {
   } finally {
     var now = sheet.getLastRow();
     if (now > before) {
-      // Google từ chối xóa hết các hàng không đóng băng, nên nếu vùng cần xóa đúng bằng phần còn lại của lưới thì phải chèn bù trước.
-      // Ca này có thật và đã nổ đúng ở dòng này: sheet Log mới dựng có lưới sát dữ liệu, xóa phần phép kiểm vừa thêm là xóa tới hàng cuối.
-      var soXoa = now - before;
-      var conLai = sheet.getMaxRows() - sheet.getFrozenRows() - soXoa;
-      if (conLai < 1) { sheet.insertRowsAfter(sheet.getMaxRows(), 1 - conLai); }
-      sheet.deleteRows(before + 1, soXoa);
+      sheetRowsDelete(sheet, logRowRange(before + 1, now - before));
     }
     logResetBuffers();
     report.push(sheet.getLastRow() === before ? '✅ Đã xóa hết dòng của phép kiểm, sheet Log về đúng ' + before + ' dòng' : '❌ CHƯA dọn hết: sheet Log còn ' + sheet.getLastRow() + ' dòng, đáng ra ' + before + '.');
