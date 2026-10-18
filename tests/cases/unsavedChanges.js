@@ -584,6 +584,33 @@ async function testSaveFlowPopup(so) {
     moD, chuD, nutD, kqD.focusId, d.bo.calls.filter((x) => x.name === 'alert').length, d.ghi.dong
   ], [true, ['Một chỗ cần sửa:', '• Tên không được trống'], ['Quay lại sửa'], 'f-ten', 0, 0]);
 
+  const voiMat = (choice) => {
+    const x = taoLuongLuu({ ok: false, gone: ['KH1'] });
+    x.ghi.bo = []; x.ghi.mo = 0; x.ghi.dongHuy = 0;
+    x.top.record.id = 'KH1';
+    Object.assign(x.hop, {
+      Store: { removeRecord: (e, id) => x.ghi.bo.push(e + ':' + id) },
+      screenStateMarkNew: () => { x.top.themMoi = true; },
+      saveFlowRecord: (t, thu) => Object.assign({}, thu, { id: t.themMoi ? '' : t.record.id }),
+      screenFormSyncUnlock: (e, r) => { x.ghi.mo += 1; },
+      screenViewDropStale: () => null,
+      screenFormClose: () => { x.ghi.dongHuy += 1; return 'view'; }
+    });
+    const hua = x.hop.saveFlowSubmit();
+    return bamPopup(x.hop, choice).then((mo) => {
+      const chu = Array.from(x.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+      return hua.then((kq) => ({ x, mo, chu, kq }));
+    });
+  };
+  const e1 = await voiMat('new');
+  check(so, 'khách đang sửa vừa bị xóa trên Sheet: bỏ khỏi RAM, popup ba lựa chọn; chọn lưu thành khách mới thì gửi lại với mã rỗng rồi đóng form', [
+    e1.mo, e1.chu, e1.x.ghi.bo, e1.x.ghi.gui.length, e1.x.ghi.gui[1].id, e1.x.ghi.dong, e1.x.ghi.mo
+  ], [true, ['Lưu thành khách mới với nội dung đang nhập', 'Bỏ và đóng form', 'Quay lại form, chưa lưu gì'], ['customer:KH1'], 2, '', 1, 1]);
+  const e2 = await voiMat('discard');
+  check(so, 'chọn bỏ và đóng form: không gửi thêm, đóng form qua đường nút Hủy', [e2.x.ghi.gui.length, e2.x.ghi.dongHuy], [1, 1]);
+  const e3 = await voiMat('cancel');
+  check(so, 'chọn quay lại form: không gửi thêm, form vẫn mở với chữ đang nhập', [e3.x.ghi.gui.length, e3.x.ghi.dongHuy, e3.x.ghi.dong, e3.x.bo.dom.document.getElementById('f-ghiChu').value], [1, 0, 0, 'của tôi']);
+
   check(so, 'luồng lưu form không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/saveFlow.html')), false);
 }
 

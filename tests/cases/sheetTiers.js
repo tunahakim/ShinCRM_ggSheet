@@ -78,17 +78,55 @@ function chay(so) {
 
   section('Tầng 3 ghi bản ghi');
   const ctx = trongLanGoi(hop, () => hop.documentLockRun(() => hop.entityReadContext('customer')));
-  check(so, 'định vị mã không có trên sheet thì ném lỗi, không coi là bản ghi mới', /Không tìm thấy mã "KH999"/.test(loiCua(() => trongLanGoi(hop, () => hop.documentLockRun(() => hop.entityPlace(hop.entityReadContext('customer'), ['KH999']))))), true);
-  check(so, 'ghi bản ghi ngoài khóa thì ném lỗi', /ngoài khóa tài liệu/.test(loiCua(() => hop.entityWriteRecords(ctx, { note: hop.DATA_SCHEMA.customer.note }, { sheetName: 'Customer', rows: { KH000002: 4 } }, [{ id: 'KH000002', values: { note: 'x' } }]))), true);
+  const vang = trongLanGoi(hop, () => hop.documentLockRun(() => {
+    const c = hop.entityReadContext('customer');
+    const doc = hop.entityReadByIds(c, ['KH000002', 'KH999']);
+    const ghi = hop.entityWriteRecords(c, { note: hop.DATA_SCHEMA.customer.note }, [{ id: 'KH000002', values: { note: 'không được ghi' } }, { id: 'KH999', values: { note: 'x' } }]);
+    return [doc.rows.length, doc.gone, ghi.gone, hop.entityReadByIds(c, ['KH000002']).rows[0][c.names.indexOf('note')]];
+  }));
+  check(so, 'mã không còn trên sheet thì vào gone, không ném; lô có mã vắng thì không ghi dòng nào', vang, [1, ['KH999'], ['KH999'], '']);
+  check(so, 'ghi bản ghi ngoài khóa thì ném lỗi', /ngoài khóa tài liệu/.test(loiCua(() => hop.entityWriteRecords(ctx, { note: hop.DATA_SCHEMA.customer.note }, [{ id: 'KH000002', values: { note: 'x' } }]))), true);
   const doc = trongLanGoi(hop, () => hop.documentLockRun(() => {
     const c = hop.entityReadContext('customer');
     const fields = { id: hop.DATA_SCHEMA.customer.id, note: hop.DATA_SCHEMA.customer.note };
-    const placement = hop.entityPlace(c, ['KH000002']);
-    const written = hop.entityWriteRecords(c, fields, placement, [{ id: 'KH000002', values: { note: 'sửa' } }, { id: 'KH000300', values: { id: 'KH000300', note: '0123' }, append: true }]);
+    const written = hop.entityWriteRecords(c, fields, [{ id: 'KH000002', values: { note: 'sửa' } }, { id: 'KH000300', values: { id: 'KH000300', note: '0123' }, append: true }]);
     const at = c.names.indexOf('note');
-    return hop.entityReadPlaced(c, written, ['KH000300', 'KH000002']).rows.map((row) => row[c.idAt] + ':' + row[at]);
+    return written.rows.map((row) => row[c.idAt] + ':' + row[at]);
   }));
-  check(so, 'ghi sửa và nối thêm rồi đọc lại theo vị trí, đúng thứ tự mã, cột chữ giữ số 0 đầu', doc, ['KH000300:0123', 'KH000002:sửa']);
+  check(so, 'ghi sửa và nối thêm trả bản đọc lại theo vị trí, đúng thứ tự lô, cột chữ giữ số 0 đầu', doc, ['KH000002:sửa', 'KH000300:0123']);
+  const dichDong = trongLanGoi(hop, () => hop.documentLockRun(() => {
+    const c = hop.entityReadContext('customer');
+    hop.entityReadByIds(c, ['KH000300']);
+    hop.sheetRowsDelete(c.sheet, [4]);
+    const written = hop.entityWriteRecords(c, { note: hop.DATA_SCHEMA.customer.note }, [{ id: 'KH000300', values: { note: 'sau xóa' } }]);
+    return written.rows.map((row) => row[c.idAt] + ':' + row[c.names.indexOf('note')]);
+  }));
+  check(so, 'dòng phía trên bị xóa giữa lần đọc và lần ghi: tra mã lúc ghi nên ghi đúng dòng mới', dichDong, ['KH000300:sau xóa']);
+  const goiCot = trongLanGoi(hop, () => hop.documentLockRun(() => {
+    const c = hop.entityReadContext('customer');
+    hop.entityReadByIds(c, ['KH000300']);
+    let doc = 0;
+    const goc = c.sheet.getRange;
+    c.sheet.getRange = function () { doc += 1; return goc.apply(this, arguments); };
+    try {
+      hop.entityWriteRecords(c, { note: hop.DATA_SCHEMA.customer.note }, [{ id: 'KH000300', values: { note: 'lần 2' } }]);
+      const truoc = doc;
+      hop.entityPresentIds(c, ['KH000300']);
+      return doc - truoc;
+    } finally { c.sheet.getRange = goc; }
+  }));
+  check(so, 'ghi ô ngoài cột mã không làm mất cột mã đã nhớ: tra mã lần sau không đọc lại Sheet', goiCot, 0);
+
+  section('Tầng 1 xóa dòng');
+  const xoaHet = trongLanGoi(hop, () => hop.documentLockRun(() => {
+    const sheet = hop.shinOpenSheet('Customer');
+    const dau = sheet.getFrozenRows() + 1;
+    const rows = [];
+    for (let r = dau; r <= sheet.getMaxRows(); r++) { rows.push(r); }
+    hop.sheetRowsDelete(sheet, rows);
+    return sheet.getMaxRows() - sheet.getFrozenRows() >= 1;
+  }));
+  check(so, 'xóa hết mọi hàng không đóng băng thì tự chèn bù trước, không ném lỗi giữa chừng', xoaHet, true);
 
   section('Cửa ghi: kiểm xung đột bằng giá trị cũ và xác nhận sau ghi');
   let xd;
@@ -120,21 +158,27 @@ function chay(so) {
     [/thiếu giá trị lúc mở form/.test(loiCua(() => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', note: 'x' }], source: 'user' })))), o('@CUS_GHI_CHU')],
     [true, 'ghi chú']);
 
-  const ghiGoc = h.entityWriteRecords;
-  h.entityWriteRecords = function () {
-    const ketQuaGhi = ghiGoc.apply(null, arguments);
-    h.sheetCellsWrite(xd.Customer.sheet, 4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1, [['KH000777']]);
-    return ketQuaGhi;
+  const ghiGoc = h.sheetCellsWrite;
+  let daDoiChu = false;
+  h.sheetCellsWrite = function () {
+    ghiGoc.apply(null, arguments);
+    if (daDoiChu) { return; }
+    daDoiChu = true;
+    ghiGoc(xd.Customer.sheet, 4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1, [['KH000777']]);
   };
   h.pendingChangesBegin();
   let loiDoiChu;
   try { loiDoiChu = loiCua(() => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', note: 'y' }], source: 'pull' }))); } finally { h.pendingChangesEnd(); }
-  h.entityWriteRecords = ghiGoc;
+  h.sheetCellsWrite = ghiGoc;
   h.flushLog();
   const soCuoi = h.reloadJournalRead().entries.slice(-1)[0] || {};
   check(so, 'dòng bị đổi chủ đúng lúc ghi thì báo lỗi bằng tiếng người, đánh dấu nạp lại trọn thực thể và ghi Log mức lỗi',
-    [/vừa bị đổi đúng lúc lưu/.test(loiDoiChu), soCuoi.customer === true, JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('writeGateConfirm') >= 0],
+    [/vừa bị đổi đúng lúc lưu/.test(loiDoiChu) && /rơi vào dòng của KH000777/.test(loiDoiChu), soCuoi.customer === true, JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('writeGateConfirm') >= 0],
     [true, true, true]);
+
+  const ghiChuTruoc = o('@CUS_GHI_CHU');
+  const mat = luu({ id: 'KH000404', note: 'không có chỗ ghi' }, { note: '' });
+  check(so, 'bản ghi đang sửa không còn trên sheet: không ghi gì, trả gone để Sidebar hỏi người dùng', [mat.ok, mat.gone, o('@CUS_GHI_CHU')], [false, ['KH000404'], ghiChuTruoc]);
 }
 
 module.exports = { chay };
