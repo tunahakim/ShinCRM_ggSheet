@@ -481,6 +481,112 @@ function testHopDongTichHop(so) {
   ], [true, true, true, true, true]);
 }
 
+async function testUiDecisionChoose(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  let nem = '';
+  try { hop.uiDecisionChoose({ title: 'x', choices: [{ id: 'ok', label: 'OK' }] }); } catch (err) { nem = err.message; }
+  check(so, 'popup Sidebar thiếu lựa chọn cancel bị chặn ngay, để đóng nền hay Esc không chạy việc nào', nem.indexOf('cancel') >= 0, true);
+
+  const hua = hop.uiDecisionChoose({ title: 'T', message: 'M', lines: ['dòng 1', 'dòng 2'], choices: [{ id: 'a', label: 'Việc A', variant: 'primary' }, { id: 'cancel', label: 'Quay lại' }] });
+  const nut = Array.from(bo.dialog.querySelectorAll('[data-ui-decision-choice]')).map((el) => el.getAttribute('data-ui-decision-choice'));
+  const lan2 = await hop.uiDecisionChoose({ title: 'khác', choices: [{ id: 'cancel', label: 'x' }] });
+  hop.uiDecisionResolve('a');
+  check(so, 'popup Sidebar hiện đủ nút theo danh sách, trả đúng id được bấm; popup thứ hai lúc đang mở trả cancel', [bo.dialog.hidden, nut, lan2, await hua], [true, ['cancel', 'a', 'cancel'], 'cancel', 'a']);
+
+  const hai = hop.uiDecisionOpen({ title: 'Xóa?' });
+  hop.uiDecisionResolve('confirm');
+  const huy = hop.uiDecisionOpen({ title: 'Xóa?' });
+  hop.uiDecisionResolve('cancel');
+  check(so, 'dạng hai nút vẫn trả true/false cho bên gọi cũ', [await hai, await huy], [true, false]);
+}
+
+/** Dựng luồng Lưu với GAS giả: lần gọi đầu trả `firstRes`, các lần sau lưu được. */
+function taoLuongLuu(firstRes) {
+  const bo = taoBoTest(), hop = bo.hop;
+  napClient(hop, 'client/ui/fieldInvalid.html');
+  ['ten', 'ghiChu'].forEach((name) => {
+    const el = bo.dom.document.createElement('input');
+    el.id = 'f-' + name;
+    el.setAttribute('data-field', 'customer.' + name);
+    bo.dom.root.appendChild(el);
+  });
+  const top = { entity: 'customer', themMoi: false, record: { ten: 'An', ghiChu: 'cũ' }, draft: {} };
+  const ghi = { gui: [], dong: 0, stash: 0, baseline: null };
+  const manHinh = () => ({ ten: bo.dom.document.getElementById('f-ten').value, ghiChu: bo.dom.document.getElementById('f-ghiChu').value });
+  bo.dom.document.getElementById('f-ten').value = 'An Mới';
+  bo.dom.document.getElementById('f-ghiChu').value = 'của tôi';
+  Object.assign(hop, {
+    screenStateTop: () => top,
+    screenStateSetDraft: (d) => { top.draft = d; },
+    screenStateSetBaseline: (b) => { ghi.baseline = b; Object.assign(top.record, b); },
+    formCollectAll: () => ({}),
+    formCollectEntity: () => manHinh(),
+    saveFlowRecord: (t, thu) => thu,
+    saveFlowOld: (t) => Object.assign({}, t.record),
+    saveFlowClearErrors: () => {},
+    saveFlowStashDraft: () => { ghi.stash += 1; top.draft = manHinh(); },
+    renderFieldId: (f) => 'f-' + f.name,
+    sidebarBusyRun: (label, fn) => Promise.resolve().then(fn),
+    callServer: (name, args) => { ghi.gui.push(args[1]); return Promise.resolve(ghi.gui.length === 1 ? firstRes : { ok: true }); },
+    saveFlowApply: () => null,
+    saveFlowClose: () => { ghi.dong += 1; return { daDong: true }; }
+  });
+  return { bo, hop, top, ghi };
+}
+
+/** Chờ popup Sidebar mở (luồng Lưu mở nó sau vài nhịp Promise) rồi bấm lựa chọn `id`. */
+async function bamPopup(hop, id) {
+  for (let i = 0; i < 20 && !hop.UI_DECISION_DIALOG.open; i += 1) { await Promise.resolve(); }
+  const mo = hop.UI_DECISION_DIALOG.open;
+  hop.uiDecisionResolve(id);
+  return mo;
+}
+
+async function testSaveFlowPopup(so) {
+  const xungDot = { ok: false, conflicts: [{ field: 'ghiChu', label: 'Ghi chú', old: 'cũ', current: 'Sheet sửa', mine: 'của tôi' }] };
+
+  const a = taoLuongLuu(xungDot);
+  const huaA = a.hop.saveFlowSubmit();
+  const moA = await bamPopup(a.hop, 'mine');
+  const chuA = Array.from(a.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
+  const nutA = Array.from(a.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  await huaA;
+  check(so, 'xung đột khi lưu mở popup Sidebar ba lựa chọn, ghi rõ giá trị Sheet, giá trị đang nhập và lúc mở form; không còn alert', [
+    moA, a.bo.calls.filter((c) => c.name === 'alert').length, chuA[1], nutA
+  ], [true, 0, 'Ghi chú: trên Sheet là "Sheet sửa", bạn đang nhập "của tôi" (lúc mở form: "cũ")', [
+    'Lưu giá trị bạn đang nhập, thay giá trị trên Sheet', 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang nhập', 'Quay lại form, chưa lưu gì'
+  ]]);
+  check(so, 'chọn lưu giá trị đang nhập: gửi lại với mốc là giá trị trên Sheet rồi đóng form', [a.ghi.gui.length, a.ghi.gui[1].ghiChu, a.ghi.baseline, a.ghi.dong], [2, 'của tôi', { ghiChu: 'Sheet sửa' }, 1]);
+
+  const b = taoLuongLuu(xungDot);
+  const huaB = b.hop.saveFlowSubmit();
+  await bamPopup(b.hop, 'sheet');
+  const kqB = await huaB;
+  check(so, 'chọn dùng giá trị trên Sheet: ô xung đột nhận giá trị Sheet, ô khác giữ chữ đang nhập, bản nháp cất lại, form vẫn mở, không gửi thêm', [
+    b.bo.dom.document.getElementById('f-ghiChu').value, b.bo.dom.document.getElementById('f-ten').value, b.top.draft, b.ghi.gui.length, b.ghi.dong, kqB.focusId
+  ], ['Sheet sửa', 'An Mới', { ten: 'An Mới', ghiChu: 'Sheet sửa' }, 1, 0, 'f-ghiChu']);
+
+  const c = taoLuongLuu(xungDot);
+  const huaC = c.hop.saveFlowSubmit();
+  await bamPopup(c.hop, 'cancel');
+  const kqC = await huaC;
+  check(so, 'chọn quay lại form: không lưu, giữ chữ đang nhập, tô đỏ ô xung đột', [
+    c.bo.dom.document.getElementById('f-ghiChu').value, c.ghi.gui.length, c.ghi.dong, kqC.focusId, c.bo.dom.document.getElementById('f-ghiChu').classList.contains('shin-input-error')
+  ], ['của tôi', 1, 0, 'f-ghiChu', true]);
+
+  const d = taoLuongLuu({ ok: false, invalid: [{ field: 'ten', reason: 'Tên không được trống' }] });
+  const huaD = d.hop.saveFlowSubmit();
+  const moD = await bamPopup(d.hop, 'cancel');
+  const chuD = Array.from(d.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
+  const nutD = Array.from(d.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  const kqD = await huaD;
+  check(so, 'trường nhập sai khi lưu mở popup Sidebar một nút quay lại sửa, ô sai tô đỏ, không còn alert', [
+    moD, chuD, nutD, kqD.focusId, d.bo.calls.filter((x) => x.name === 'alert').length, d.ghi.dong
+  ], [true, ['Một chỗ cần sửa:', '• Tên không được trống'], ['Quay lại sửa'], 'f-ten', 0, 0]);
+
+  check(so, 'luồng lưu form không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/saveFlow.html')), false);
+}
+
 async function chay(so) {
   section('Dirty guard Sidebar - compare, modal va scope');
   await testSoSanhVaLazy(so);
@@ -495,6 +601,8 @@ async function chay(so) {
   await testAllFbmSurfaceActionMatrix(so);
   await testProviderSaveResultMatrix(so);
   testHopDongTichHop(so);
+  await testUiDecisionChoose(so);
+  await testSaveFlowPopup(so);
 }
 
 module.exports = { chay };
