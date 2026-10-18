@@ -6,7 +6,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 
 ## 1. Phiên đang làm
 
-- Phiên đang mở: sửa vi phạm luật thao tác đắt, branch `feature/expensive-ops`. Tiến độ duy nhất nằm ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`. Mỗi mục phải đo trên GAS DEV trước khi sửa và ghi số đo vào mục.
+- Phiên đang mở: sửa vi phạm luật thao tác đắt, branch `feature/expensive-ops`. Tiến độ duy nhất nằm ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
 - Việc kế tiếp nằm trong các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
 - Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.
 - ShinCRM độc lập đã xong phần chính. Không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật khi checklist chưa cho phép.
@@ -21,7 +21,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 - **Mỗi state và mỗi quyết định chỉ có một nơi sở hữu.** Mọi thay đổi state đi qua cổng hoặc hợp đồng đã quy định, không có đường tắt.
 - **Tách ba lớp:** thu thập và truyền tin; xử lý nghiệp vụ và state; hiển thị. Module chỉ làm trong ranh giới trách nhiệm của mình; giao tiếp giữa các module có điều kiện, tối thiểu, không thao tác thừa.
 - **Đúng và nhất quán trước.** Cache hay dữ liệu cục bộ không thay được nguồn sự thật.
-- **Thao tác đắt tối ưu theo chi phí thật, không theo cảm giác.** Thao tác đắt là thứ có giá cố định mỗi lần (gọi GAS mất khoảng 2–3 giây đường truyền, gọi FBM, đọc/ghi Sheet, đọc/ghi DocumentProperties, hạn mức nền tảng) hoặc tốn token. Làm theo thứ tự: không làm khi kết quả không được dùng; không làm lại thứ đã có trong cùng lần gọi; gom nhiều việc vào một lần (một lần gọi GAS xử lý nhiều khách, một lần đọc cả Sheet, ghi một lần cuối lời gọi). Đo trước để biết chi phí nằm ở đâu; tối ưu không được đổi lấy dữ liệu sai hay lỗi im lặng.
+- **Thao tác đắt tối ưu theo chi phí thật, không theo cảm giác.** Thao tác đắt là thứ có giá cố định mỗi lần (gọi GAS mất khoảng 2–3 giây đường truyền, gọi FBM, đọc/ghi Sheet, đọc/ghi DocumentProperties, hạn mức nền tảng) hoặc tốn token. Làm theo thứ tự: không làm khi kết quả không được dùng; không làm lại thứ đã có trong cùng lần gọi; gom nhiều việc vào một lần (một lần gọi GAS xử lý nhiều khách, một lần đọc cả Sheet, ghi một lần cuối lời gọi). Chi phí chưa rõ nằm ở đâu thì đo trước; sai về kiến trúc thì đọc là biết, không cần đo. Tối ưu không được đổi lấy dữ liệu sai hay lỗi im lặng.
 
 ## 3. Quy tắc riêng theo loại phiên
 
@@ -42,7 +42,7 @@ Quy tắc mới chỉ áp cho một loại phiên thì ghi vào tệp của lo�
 
 - Trước khi đọc code, viết test hoặc sửa tệp, phải xác định và đọc tài liệu chính thức, checklist và hợp đồng liên quan trực tiếp đến nhiệm vụ. Không suy ra yêu cầu từ code. Chưa biết cần đọc gì thì tìm mục lục trước.
 - Tài liệu 01 (Quy chuẩn nền): đầu mỗi phiên chỉ đọc phần liên quan; đọc toàn bộ khi đổi kiến trúc lõi, Schema, ranh giới module hoặc phải xử lý mâu thuẫn tài liệu.
-- Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị.
+- Chỉ đọc tệp khi dòng code sắp viết cần đến nó; không quét cả codebase để chuẩn bị. Quy tắc đọc ít này áp cho việc chuẩn bị, không áp cho việc tìm gốc lỗi: sửa lỗi hay vi phạm thì phải đọc trọn tiến trình chứa nó (người điều phối và các công cụ nó gọi) và tìm tiến trình, công cụ đã có làm việc tương tự trước khi đề xuất. Đọc một hàm rồi sửa trong hàm đó là đường dẫn tới sửa bề mặt.
 - Sau khi ngữ cảnh bị nén: chỉ đọc lại tệp tiến độ của phiên đang mở, tệp quy tắc theo loại phiên và tài liệu thuộc phạm vi đang làm, rồi tiếp tục từ dòng `[ ]` đầu tiên.
 - Tài liệu trong phạm vi đang làm đã lỗi thời hoặc mâu thuẫn với quyết định mới của chủ dự án thì phải sửa nó trong cùng nhóm thay đổi; không giữ quy tắc cũ chỉ vì tài liệu còn đó.
 - Không viết bản tóm tắt lặp lại quy tắc nền ở nơi khác. Tài liệu điều hướng (nếu có) chỉ trỏ đến nguồn chuẩn, không chứa quyết định nghiệp vụ.
@@ -51,6 +51,7 @@ Quy tắc mới chỉ áp cho một loại phiên thì ghi vào tệp của lo�
 
 - Trao đổi bằng tiếng Việt. Chủ dự án làm bán hàng, tự học code và sẽ tự tiếp quản dự án: giải thích lý do và cạm bẫy bằng lời dễ hiểu; thuật ngữ tiếng Anh kèm nghĩa tiếng Việt trong ngoặc khi cần.
 - Được phép và phải phản biện: nói rõ mâu thuẫn hoặc điểm chưa hợp lý. Quyết định quan trọng phải đưa cho chủ dự án biết trước khi ghi vào code hoặc tài liệu.
+- Mọi phương án sửa đưa cho chủ dự án phải ghi đủ ba phần, thiếu phần nào là chưa đối chiếu và chưa được trình: (a) gốc lỗi là gì, nằm ở kiến trúc nào, không phải triệu chứng; (b) tiến trình hoặc công cụ nào đã có làm việc tương tự và phương án dùng lại nó thế nào; (c) bảng đối chiếu từng quy tắc **[RÀNG BUỘC CỨNG]** ở mục 2 với cách phương án đáp ứng, riêng nguyên tắc "lỗi không có đường xảy ra" phải nói rõ đường nào bị bịt bằng kiến trúc và chỗ nào chỉ còn phép kiểm (kèm lý do không bịt được). Phép kiểm sau khi đã có thể sai không thay được kiến trúc.
 - Tự làm liên tục những mục chỉ cần code, test offline hoặc GAS DEV. Đến mục cần người dùng thao tác hoặc kiểm tra dữ liệu thật thì dừng và ghi rõ người dùng cần làm gì.
 - Khi chủ dự án vắng mặt: ghi điểm mơ hồ vào `0_Documentation/Phiên code/Câu hỏi đêm.md`, chọn phương án an toàn nhất và ghi rõ đó là lựa chọn tạm để làm tiếp. Có câu trả lời rồi thì xóa hẳn mục hỏi; lịch sử đã nằm trong Git.
 - Mỗi kết quả chỉ báo cáo một lần; các lượt sau trỏ đến tài liệu hoặc commit đã ghi, không chép lại bảng số liệu cũ.
