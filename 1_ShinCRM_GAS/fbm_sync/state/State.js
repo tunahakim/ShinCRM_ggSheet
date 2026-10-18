@@ -412,7 +412,7 @@ FbmSync.stateStart = function (entity, phase, total, identity) {
   // Mỗi run phải xác nhận phiên sống lại; cookie và marker của run trước không
   // được dùng làm bằng chứng live cho request đầu tiên của run mới.
   // Số xung đột phản ánh các dòng Sheet đang chờ quyết nên đi theo sang phiên mới; preflight đếm lại từ Sheet.
-  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0) }, chain: previous.chain || null, origin: who.origin || 'manual', mode: who.mode || 'read', scan: who.scan || 'full', current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false });
+  var next = FbmSync.stateWrite({ runId: now.toString(36), entity: entity || '', phase: phase || 'checking_session', cursor: {}, session: freshSession, counts: Object.assign(FbmSync.countsDefault(), { total: Number(total) || 0 }), metadata: { conflictCount: Number(previous.metadata && previous.metadata.conflictCount || 0), conflictLogged: Number(previous.metadata && previous.metadata.conflictLogged || 0) }, chain: previous.chain || null, origin: who.origin || 'manual', mode: who.mode || 'read', scan: who.scan || 'full', current: '', message: '', startedAt: now, updatedAt: now, lastError: '', lastFailureCode: '', retryable: false });
   return next;
 };
 /**
