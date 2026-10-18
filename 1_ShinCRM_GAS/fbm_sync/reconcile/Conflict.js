@@ -5,10 +5,10 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * Hàng đợi xung đột là các dòng Sheet đang `xung đột chờ quyết` (`09/04` "Chế độ xử lý xung đột riêng").
  * State không giữ danh sách hay giá trị hai bên: giá trị Activity dài làm đầy property 9KB sau vài chục xung đột, và danh sách trong state lệch khỏi Sheet khi phiên mới xóa metadata (FBM-024).
  */
-FbmSync.conflictQueue = function () {
-  var queue = [];
+FbmSync.conflictQueue = function (scan) {
+  var queue = [], local = scan || FbmSync.localScan();
   ['customer', 'activity'].forEach(function (entity) {
-    (FbmSync.readLocal(entity) || []).forEach(function (record) {
+    local.records(entity).forEach(function (record) {
       if (FbmSync.isConflictPending(record)) { queue.push({ entity: entity, id: String(record.id || ''), fbmId: String(record.fbmId || '').trim() }); }
     });
   });

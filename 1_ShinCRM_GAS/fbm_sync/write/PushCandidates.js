@@ -68,10 +68,11 @@ FbmSync.extractAutoCustomerCode = function (response) {
 /**
  * Đọc các bản ghi local cần đẩy; không bao giờ chọn bản ghi đã xóa hoặc bị cấm.
  * `position` là vị trí dòng trong Sheet: danh sách được dựng lại sau mỗi bản ghi và co lại khi bản ghi vừa đẩy rời khỏi nó, nên cursor phải nhớ vị trí dòng chứ không nhớ thứ tự trong danh sách (FBM-032).
+ * `scan` là bản đọc `localScan` dùng chung khi bên gọi đã có (kiểm tra trước phiên xét cả hai thực thể trên một bản đọc); thiếu thì tự đọc.
  * Bản ghi `đang đẩy` chưa có ID FBM là lệnh tạo đã phát mà không biết kết quả; tạo lại có thể sinh bản ghi trùng (`09/04`, FBM-027). Customer đi đường tra theo MST (`recover`), Activity không có đường tra nên chỉ báo người dùng (`stuck`).
  */
-FbmSync.pushCandidates = function (entity) {
-  var records = FbmSync.readLocal(entity), customers = {}, state = {}, pushFailures = {};
+FbmSync.pushCandidates = function (entity, scan) {
+  var local = scan || FbmSync.localScan(), records = local.records(entity), customers = {}, state = {}, pushFailures = {};
   var categoryGate = {};
   var scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
   try {
@@ -80,7 +81,7 @@ FbmSync.pushCandidates = function (entity) {
     pushFailures = FbmSync.pushFailuresRead().hashes;
   } catch (ignore) {}
   if (entity === 'activity') {
-    FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
+    local.records('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
   }
   return records.map(function (record, position) { return { record: record, position: position }; }).filter(function (item) {
     var record = item.record;
@@ -95,7 +96,7 @@ FbmSync.pushCandidates = function (entity) {
     var status = String(record.syncStatus || ''), failureKey = entity + ':' + String(record.id || '');
     if (FbmSync.isUnconfirmedCreate(record)) { return true; }
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return false; }
-    var currentHash = FbmSync.hash(record, entity, categoryGate);
+    var currentHash = local.hash(record, entity, categoryGate);
     if (String(pushFailures[failureKey] || '') === currentHash) { return false; }
     var hasFbm = String(record.fbmId || '').trim() !== '';
     var changed = !String(record.fbmHash || '').trim() || currentHash !== String(record.fbmHash || '').trim();

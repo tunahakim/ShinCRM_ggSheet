@@ -8,19 +8,16 @@ FbmSync.preflightIssue = function (issues, code, severity, scope, message, block
 /** Số mã bản ghi tối đa nêu trong một cảnh báo preflight. */
 FbmSync.PREFLIGHT_ID_LIST_MAX = 8;
 
-/**
- * Đọc Sheet Customer/Activity đúng một lần cho preflight, tính hash mỗi bản ghi có baseline đúng một lần; quyền đẩy và tóm tắt hash dùng chung kết quả.
- * Đọc lỗi thì ném lên: coi như Sheet trống thì preflight báo 0 bản ghi và phiên chạy tiếp trên dữ liệu sai (FBM-022).
- */
-FbmSync.preflightLocalScan = function (gate) {
-  var scan = {};
+/** Hash mỗi bản ghi có baseline trên bản đọc chung `localScan`; quyền đẩy và tóm tắt hash dùng chung kết quả. Đọc lỗi đã ném ở `localScan`: coi như Sheet trống thì phiên chạy tiếp trên dữ liệu sai (FBM-022). */
+FbmSync.preflightLocalScan = function (scan, gate) {
+  var result = {};
   ['customer', 'activity'].forEach(function (entity) {
-    scan[entity] = (FbmSync.readLocal(entity) || []).map(function (record) {
+    result[entity] = scan.records(entity).map(function (record) {
       var baseline = String(record && record.fbmHash || '').trim();
-      return { record: record, baseline: baseline, hash: baseline ? String(FbmSync.hash(record, entity, gate || {})) : '' };
+      return { record: record, baseline: baseline, hash: baseline ? scan.hash(record, entity, gate || {}) : '' };
     });
   });
-  return scan;
+  return result;
 };
 
 FbmSync.preflightPushPermissions = function (issues, mode, scan) {
@@ -74,12 +71,13 @@ FbmSync.preflightHashSummary = function (scan) {
   return summary;
 };
 
-FbmSync.preflightCandidates = function (issues, mode) {
+/** `scan` là bản đọc `localScan` của lần kiểm tra; ứng viên đẩy và hàng xung đột đều xét trên đó, không đọc lại Sheet. */
+FbmSync.preflightCandidates = function (issues, mode, scan) {
   var gate = { valid: {} }, candidates = [], settings = {};
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (ignoreSettings) {}
   try {
     // Gộp một issue có số đếm: số dòng xung đột tồn đọng không làm phình danh sách issue hay Log.
-    var pending = FbmSync.conflictQueue().length;
+    var pending = FbmSync.conflictQueue(scan).length;
     if (pending) {
       FbmSync.preflightIssue(issues, 'FBM_RECORD_CONFLICT_PENDING', 'error', 'fbm_sync', 'Có ' + pending + ' bản ghi đang xung đột chờ quyết; mở chế độ xử lý xung đột để quyết từng bản ghi.', mode === 'write');
     }
@@ -98,12 +96,10 @@ FbmSync.preflightCandidates = function (issues, mode) {
   try { if (typeof FbmSync.readCategoryGate === 'function') { gate = FbmSync.readCategoryGate() || gate; } } catch (gateError) {
     FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), mode === 'write');
   }
-  // Chiều Lấy từ FBM → ShinCRM không đẩy gì: dựng ứng viên đẩy chỉ tốn một lượt duyệt cả hai Sheet. "Kiểm tra an toàn" (check) và chiều ghi vẫn dựng.
-  if (mode === 'read') { return { candidates: candidates, gate: gate, settings: settings }; }
   try {
     if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings }; }
     ['customer', 'activity'].forEach(function (entity) {
-      (FbmSync.pushCandidates(entity) || []).forEach(function (candidate) {
+      (FbmSync.pushCandidates(entity, scan) || []).forEach(function (candidate) {
         candidate.entity = entity;
         candidates.push(candidate);
         var record = candidate.record || {};
@@ -132,13 +128,31 @@ FbmSync.preflightCandidates = function (issues, mode) {
   return { candidates: candidates, gate: gate, settings: settings };
 };
 
-/** Quét điều kiện local; lookup live/owner vẫn được đối chiếu sau response FBM. */
+/**
+ * Kiểm tra trước phiên tách theo chi phí (tài liệu 09/02 Phần 3 "Thứ tự trong một kỳ"): phần rẻ (`preflightGates`) chạy trước mọi request FBM vì cấu hình sai thì không được chạm FBM; phần đắt (`preflightLocal`) đọc cả hai Sheet và tính hash, chỉ chạy khi chiều chạy cần và sau khi phiên FBM đã xác thực, để FBM lỗi thì không phí công tính.
+ * Lệnh chẩn đoán gọi hàm này để chạy cả hai liền nhau.
+ */
 FbmSync.runPreflight = function (options) {
-  return FbmSync.withLocalSnapshot(function () { return FbmSync.preflightEvaluate(options); });
+  return FbmSync.withLocalSnapshot(function () {
+    var gates = FbmSync.preflightGates(options);
+    return FbmSync.preflightNeedsLocal(options) ? FbmSync.preflightLocal(options, gates.issues) : gates;
+  });
 };
 
-/** Thân preflight; chỉ đọc Sheet nên chạy trong một bản chụp. */
-FbmSync.preflightEvaluate = function (options) {
+/** Kết quả quét local chỉ có người dùng ở chiều đẩy lên FBM và Kiểm tra an toàn; chiều Lấy và hai lệnh kiểm liên kết không đẩy gì nên không quét. */
+FbmSync.preflightNeedsLocal = function (options) {
+  var opt = options || {};
+  return FbmSync.modeOf(opt.mode) !== 'read' && opt.scan !== 'identity_check' && opt.scan !== 'identity_probe';
+};
+
+/** Gói kết quả kiểm tra; `local` là số liệu của phần đắt nếu đã chạy. */
+FbmSync.preflightResult = function (mode, issues, local) {
+  var blocking = issues.filter(function (item) { return item.blocking; });
+  return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: local ? local.candidateCount : 0, hashSummary: local ? local.hashSummary : null };
+};
+
+/** Phần rẻ: Config, Category lõi, liên kết tài khoản, phạm vi khách; không đọc bản ghi Customer/Activity. */
+FbmSync.preflightGates = function (options) {
   var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
   if (typeof FbmSync.identityPreflight === 'function') {
     // Both identity actions are recovery tools: they must remain usable when
@@ -157,14 +171,19 @@ FbmSync.preflightEvaluate = function (options) {
     if (scope && scope.notFound.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_CODE_NOT_FOUND', 'warn', 'fbm_sync', 'Mã khách ShinCRM trong danh sách khách chỉ định không còn trên Sheet Customer, lượt này bỏ qua: ' + scope.notFound.join(', ') + '.', false); }
   }
   if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, params, core.category); }
-  var candidateReport = FbmSync.preflightCandidates(issues, writeMode ? 'write' : mode);
-  var local = null;
-  try { local = FbmSync.preflightLocalScan(candidateReport.gate || {}); } catch (localError) {
-    FbmSync.preflightIssue(issues, 'FBM_LOCAL_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được Sheet Customer/Activity trước phiên: ' + String(localError && localError.message || localError), true);
+  return FbmSync.preflightResult(mode, issues, null);
+};
+
+/** Phần đắt; `issues` là vấn đề của phần rẻ để kết quả trả về đủ cả hai. Hai Sheet đọc đúng một lần qua `localScan` và mọi bước dùng chung bản đọc đó. */
+FbmSync.preflightLocal = function (options, issues) {
+  var mode = FbmSync.modeOf(options && options.mode), checkMode = FbmSync.canWriteFbm(mode) ? 'write' : mode, list = (issues || []).slice(), scan = null;
+  try { scan = FbmSync.localScan(); scan.records('customer'); scan.records('activity'); } catch (localError) {
+    FbmSync.preflightIssue(list, 'FBM_LOCAL_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được Sheet Customer/Activity trước phiên: ' + String(localError && localError.message || localError), true);
+    return FbmSync.preflightResult(mode, list, null);
   }
-  if (local) { FbmSync.preflightPushPermissions(issues, writeMode ? 'write' : mode, local); }
-  var blocking = issues.filter(function (item) { return item.blocking; });
-  return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: candidateReport.candidates.length, hashSummary: local ? FbmSync.preflightHashSummary(local) : null };
+  var report = FbmSync.preflightCandidates(list, checkMode, scan), local = FbmSync.preflightLocalScan(scan, report.gate || {});
+  FbmSync.preflightPushPermissions(list, checkMode, local);
+  return FbmSync.preflightResult(mode, list, { candidateCount: report.candidates.length, hashSummary: FbmSync.preflightHashSummary(local) });
 };
 
 FbmSync.logPreflight = function (result) {

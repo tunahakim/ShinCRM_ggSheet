@@ -6,6 +6,27 @@ FbmSync.readLocal = function (entity) {
   return FbmSync.recordsOfBlock(entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]));
 };
 
+/**
+ * Bản đọc Customer/Activity cho một bước cần nhiều công cụ cùng xét mọi bản ghi (kiểm tra trước phiên, dựng ứng viên đẩy): mỗi thực thể chỉ đọc và chuyển ô khi có người hỏi tới, và tối đa một lần; hash mỗi bản ghi tính tối đa một lần.
+ * Hash nhớ theo `gate.map` chứ không theo object gate, vì gate của phiên là bản chép nông của gate Category chung và chỉ khác phần `blocked` mà hash không dùng. Bản đọc chỉ sống trong lần gọi, không lưu đi đâu.
+ */
+FbmSync.localScan = function () {
+  var hashes = new WeakMap(), read = {};
+  return {
+    records: function (entity) {
+      if (!read[entity]) { read[entity] = FbmSync.readLocal(entity) || []; }
+      return read[entity];
+    },
+    hash: function (record, entity, gate) {
+      var map = gate && gate.map || null, memo = hashes.get(record);
+      if (memo && memo.map === map) { return memo.hash; }
+      var hash = String(FbmSync.hash(record, entity, gate));
+      hashes.set(record, { map: map, hash: hash });
+      return hash;
+    }
+  };
+};
+
 /** Một bản ghi cục bộ theo mã, chỉ đọc cột mã và dòng của nó; không có thì trả `null`. */
 FbmSync.readLocalRecord = function (entity, id) {
   return FbmSync.recordsOfBlock(entityReadRecordById(entity, [DATA_SCHEMA, SYNC_SCHEMA], id))[0] || null;

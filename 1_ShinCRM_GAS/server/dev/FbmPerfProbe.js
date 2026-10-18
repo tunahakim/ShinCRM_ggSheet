@@ -328,3 +328,14 @@ function fbmDevAlignSheetTimezone() {
   book.setSpreadsheetTimeZone(script);
   return 'Đã đổi múi giờ tệp từ ' + before + ' sang ' + book.getSpreadsheetTimeZone();
 }
+
+/** Chi phí kiểm tra trước phiên tách theo phần rẻ (chạy trước request FBM đầu) và phần đắt (chạy sau khi phiên FBM xác thực, chỉ chiều có đẩy); mỗi phép xóa tờ nháp trước để đo như lần gọi mới. Chỉ đọc. */
+function fbmProbePreflightCost() {
+  function timed(label, fn) { sheetReadCopyClear(); var a = Date.now(), result = FbmSync.withLocalSnapshot(fn); return label + ": " + (Date.now() - a) + " ms" + (result && result.candidateCount !== undefined ? " (ứng viên " + result.candidateCount + ", chặn " + result.blocking.length + ")" : ""); }
+  return [
+    timed("Phần rẻ, chiều Lấy", function () { return FbmSync.preflightGates({ mode: "read", origin: "background", scan: "full" }); }),
+    timed("Phần rẻ, chiều hai chiều", function () { return FbmSync.preflightGates({ mode: "write", origin: "background", scan: "full" }); }),
+    timed("Phần đắt, chiều hai chiều", function () { return FbmSync.preflightLocal({ mode: "write", origin: "background", scan: "full" }, []); }),
+    timed("Cả hai liền nhau (lệnh chẩn đoán), chiều hai chiều", function () { return FbmSync.runPreflight({ mode: "write", origin: "background", scan: "full" }); })
+  ].join(' | ');
+}

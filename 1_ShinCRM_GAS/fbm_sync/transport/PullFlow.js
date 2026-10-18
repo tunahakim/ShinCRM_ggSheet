@@ -46,7 +46,6 @@ FbmSync.startRun = function (options) {
   });
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
-    FbmSync.businessStepStart(state, 'preflight_hash', { mode: state.mode, scan: state.scan, origin: state.origin });
   }
   // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
   state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
@@ -56,35 +55,11 @@ FbmSync.startRun = function (options) {
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(Number(opt.detail && opt.detail.customersPerRun || FbmSync.backgroundScheduleDefault().detail.customersPerRun))) : 0; }
-  if (typeof FbmSync.runPreflight === 'function') {
-    var preflight = FbmSync.runPreflight({ mode: state.mode, origin: state.origin, scan: state.scan });
-    state.metadata = state.metadata || {};
-    state.metadata.preflightIssues = preflight.issues || [];
-    if (typeof FbmSync.logPreflight === 'function') { FbmSync.logPreflight(preflight); }
-    if (typeof FbmSync.businessStepFinish === 'function') {
-      FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking && preflight.blocking.length || 0), skipped: Number(preflight.warnings && preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
-    }
-    if (!preflight.ok) {
-      var first = preflight.blocking[0] || {};
-      state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = 'SYNC_PREFLIGHT_FAILED';
-      state.lastError = 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.');
-      state.message = state.lastError;
-      FbmSync.stateWrite(state);
-      return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
-    }
-    // A large push requires an explicit human approval before GAS gives out
-    // even the first FBM request. The candidate count comes from the same
-    // server-side preflight that will guard the actual push.
-    if (FbmSync.canWriteFbm(state.mode) && Number(preflight.candidateCount || 0) > 0 && Number(preflight.candidateCount || 0) >= FbmSync.approvalThreshold()) {
-      state.phase = 'awaiting_approval';
-      state.entity = '';
-      state.cursor = { kind: 'push_approval', candidateCount: Number(preflight.candidateCount || 0) };
-      state.message = 'Có ' + Number(preflight.candidateCount || 0) + ' bản ghi thay đổi; cần người dùng chấp thuận trước khi ghi FBM.';
-      state.metadata.approvalRequired = true;
-      state.metadata.approvalCount = Number(preflight.candidateCount || 0);
-      FbmSync.stateWrite(state);
-      return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
-    }
+  // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).
+  if (typeof FbmSync.preflightGates === 'function') {
+    var gates = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightGates({ mode: state.mode, origin: state.origin, scan: state.scan }); });
+    var stopped = FbmSync.preflightApply(state, gates);
+    if (stopped) { return stopped; }
   }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan }); }
   if (state.scan === 'identity_probe') {
@@ -125,6 +100,52 @@ FbmSync.pullRecords = function (entity, records, mode) {
   return result;
 };
 
+/**
+ * Áp kết quả một phần kiểm tra trước phiên vào state: thêm vấn đề vào kết quả lượt, ghi Log, dừng lượt khi có lỗi chặn, chờ chấp thuận khi số bản ghi sắp đẩy chạm ngưỡng. Trả kết quả dừng lượt, hoặc `null` để chạy tiếp.
+ * Chấp thuận hỏi một lần mỗi lượt: người dùng đồng ý thì lượt kiểm lại phiên và dữ liệu nhưng không hỏi lại.
+ */
+FbmSync.preflightApply = function (state, preflight) {
+  state.metadata = state.metadata || {};
+  var known = {};
+  (state.metadata.preflightIssues || []).forEach(function (item) { known[item.code + '' + item.message] = true; });
+  state.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat((preflight.issues || []).filter(function (item) { return !known[item.code + '' + item.message]; }));
+  if (typeof FbmSync.logPreflight === 'function') { FbmSync.logPreflight(preflight); }
+  if (!preflight.ok) {
+    var first = preflight.blocking[0] || {};
+    state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = 'SYNC_PREFLIGHT_FAILED';
+    state.lastError = 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.');
+    state.message = state.lastError;
+    FbmSync.stateWrite(state);
+    return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
+  }
+  var count = Number(preflight.candidateCount || 0);
+  if (FbmSync.canWriteFbm(state.mode) && count > 0 && count >= FbmSync.approvalThreshold() && state.metadata.approvalGranted !== true) {
+    state.phase = 'awaiting_approval'; state.entity = '';
+    state.cursor = { kind: 'push_approval', candidateCount: count };
+    state.message = 'Có ' + count + ' bản ghi thay đổi; cần người dùng chấp thuận trước khi ghi FBM.';
+    state.metadata.approvalRequired = true;
+    state.metadata.approvalCount = count;
+    FbmSync.stateWrite(state);
+    return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
+  }
+  return null;
+};
+
+/**
+ * Phần đắt của kiểm tra trước phiên (đọc và hash cả hai Sheet, dựng ứng viên đẩy), chạy ngay sau khi phiên FBM xác thực xong và trước request dữ liệu đầu tiên. Chiều chạy không cần thì không làm gì.
+ * Đặt ở đây chứ không ở đầu lượt: tab FBM treo hay phiên hỏng thì lượt dừng ở bước xác thực mà ShinCRM chưa tốn công tính; lượt nền lỗi liền nhiều lần không lặp lại việc tính.
+ */
+FbmSync.preflightLocalStep = function (state) {
+  var options = { mode: state.mode, origin: state.origin, scan: state.scan };
+  if (typeof FbmSync.preflightLocal !== 'function' || !FbmSync.preflightNeedsLocal(options)) { return null; }
+  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'preflight_hash', options); }
+  var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
+  if (typeof FbmSync.businessStepFinish === 'function') {
+    FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking.length || 0), skipped: Number(preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
+  }
+  return FbmSync.preflightApply(state, preflight);
+};
+
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
 FbmSync.authContinue = function (entity, response) {
   // Token gắn với phiên và phải lưu trước mọi request ghi.
@@ -159,8 +180,9 @@ FbmSync.authContinue = function (entity, response) {
     FbmSync.stateWrite(state);
     return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' });
   }
-  // Category là cấu hình của người dùng; đồng bộ chỉ đọc và đối chiếu. Chiều Lấy không nạp danh mục FBM (`needsFbmLookups`).
   if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'session', 'ok', {}); }
+  if (FbmSync.preflightLocalStep(state)) { return null; }
+  // Category là cấu hình của người dùng; đồng bộ chỉ đọc và đối chiếu. Chiều Lấy không nạp danh mục FBM (`needsFbmLookups`).
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'category', { mode: state.mode, scan: state.scan }); }
   if (!FbmSync.needsFbmLookups(state)) {
     var pullRequest = FbmSync.beginCustomerPull(state);
@@ -524,8 +546,11 @@ FbmSync.continueStep = function (rawResponse) {
   if (cursor.kind === 'authorize_customer') {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('customer', response)), status: FbmSync.statusView() };
   }
+  // Sau xác thực Activity lượt có thể dừng (liên kết sai, kiểm tra dữ liệu chặn, chờ chấp thuận): trả đúng lý do dừng chứ không trả "không có request".
   if (cursor.kind === 'authorize_activity') {
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('activity', response)), status: FbmSync.statusView() };
+    var activityRequest = FbmSync.authContinue('activity', response), after = activityRequest ? null : FbmSync.stateRead();
+    if (after && after.phase === 'error') { return { ok: false, code: after.lastFailureCode, request: null, status: FbmSync.statusView(), error: after.lastError }; }
+    return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), approvalRequired: !!after && after.phase === 'awaiting_approval' };
   }
   if (cursor.kind === 'identity_user_grid') {
     var identityUser = FbmSync.identityUser(response);
