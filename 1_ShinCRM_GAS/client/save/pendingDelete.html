@@ -110,9 +110,11 @@ function pendingDeleteFire() {
   PENDING_DELETE.dangGui = PENDING_DELETE.dangGui.concat(ids);
   pendingDeletePaint();
 
+  var res = null;
   return sidebarBusyRun('Đang xóa ' + ids.length + ' ' + (PENDING_DELETE_LABEL[entity] || 'bản ghi') + '…', function () {
-    return callServer('deleteRecords', [entity, ids]).then(function (res) {
-      pendingDeleteDone(entity, ids, res);
+    return callServer('deleteRecords', [entity, ids]).then(function (ra) {
+      res = ra;
+      pendingDeleteDone(entity, ids, ra);
       return pendingDeleteRedraw(entity);
     }, function (err) {
       pendingDeleteUnmask(ids);
@@ -120,7 +122,10 @@ function pendingDeleteFire() {
       if (typeof dispatchError === 'function') { dispatchError(err); }
       return null;
     });
-  }, { block: true });
+  }, { block: true }).then(function (html) {
+    var hoi = pendingDeleteShowSoft(res);
+    return hoi ? hoi.then(function () { return html; }) : html;
+  });
 }
 
 /** Bỏ mặt nạ của một lô mã. Tách ra vì cả đường thành công và đường thất bại đều phải làm đúng việc này. */
@@ -128,20 +133,30 @@ function pendingDeleteUnmask(ids) {
   PENDING_DELETE.dangGui = PENDING_DELETE.dangGui.filter(function (id) { return ids.indexOf(id) === -1; });
 }
 
-/** Đổ câu trả lời của cửa xóa vào RAM. `reasons` là những bản ghi chỉ xóa mềm được — hiện bằng `alert` vì một bản ghi tưởng đã xóa mà vẫn còn trên sheet không được để trôi qua im lặng. */
+/** Đổ câu trả lời của cửa xóa vào RAM: bỏ mã xóa hẳn và mã đã không còn trên sheet (`gone`), ghi đè dòng xóa mềm. */
 function pendingDeleteDone(entity, ids, res) {
   pendingDeleteUnmask(ids);
 
-  (res.hard || []).forEach(function (id) { Store.removeRecord(entity, id); });
+  (res.hard || []).concat(res.gone || []).forEach(function (id) { Store.removeRecord(entity, id); });
 
   if (res.soft && res.soft.rows && res.soft.rows.length) {
     ingestUnpack(res.soft.fields, res.soft.rows).forEach(function (r) { Store.upsertRecord(entity, r); });
   }
-  var ly = Object.keys(res.reasons || {});
-  if (ly.length) {
-    alert('Có ' + ly.length + ' bản ghi chỉ xóa mềm được — dòng vẫn còn trên sheet:\n' + ly.map(function (id) { return '• ' + id + ': ' + res.reasons[id]; }).join('\n'));
-  }
   return res;
+}
+
+/**
+ * Báo những bản ghi chỉ xóa mềm được bằng popup của Sidebar: một bản ghi tưởng đã xóa mà vẫn còn trên sheet không được để trôi qua im lặng. Mở sau khi lớp phủ bận đã gỡ, vì lớp phủ khóa cả Sidebar.
+ */
+function pendingDeleteShowSoft(res) {
+  var ly = Object.keys((res && res.reasons) || {});
+  if (!ly.length) { return null; }
+  return uiDecisionChoose({
+    title: ly.length === 1 ? 'Bản ghi chỉ xóa mềm được' : ly.length + ' bản ghi chỉ xóa mềm được',
+    message: 'Dòng vẫn còn trên Sheet, được đánh dấu đã xóa:',
+    lines: ly.map(function (id) { return id + ': ' + res.reasons[id]; }),
+    choices: [{ id: 'cancel', label: 'Đã hiểu', variant: 'primary' }]
+  });
 }
 
 /** Vẽ lại chỗ vừa đổi. Giao dịch thì chỉ card lịch sử, vì khối thông tin chung và card ghi chú không đổi theo một dòng lịch sử. */
