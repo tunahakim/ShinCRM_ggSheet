@@ -31,9 +31,11 @@ async function chay(so) {
   coreXacThuc.params.FBM_VERIFY_STATUS_DEFAULT = 'Chưa xác thực';
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight write khong dung Config ten tai khoan cu lam cong chan', write.issues.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING'), false);
-  check(so, 'preflight write báo conflict và mapping theo mã riêng', [write.issues.some((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING'), write.issues.some((item) => item.code === 'FBM_CATEGORY_MAPPING_MISSING')], [true, true]);
-  const pendingConflicts = write.issues.filter((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING');
-  check(so, 'FBM-024: preflight gộp mọi dòng xung đột chờ quyết thành một issue có số đếm, chặn chế độ ghi', [pendingConflicts.length, /Có 2 bản ghi/.test(pendingConflicts[0] && pendingConflicts[0].message), pendingConflicts[0] && pendingConflicts[0].blocking], [1, true, true]);
+  const perRecordCodes = ['FBM_RECORD_CONFLICT_PENDING', 'FBM_PREVIOUS_PUSH_FAILURE', 'FBM_CATEGORY_MAPPING_MISSING', 'FBM_ACTIVITY_OWNER_MISMATCH'];
+  const mappingIssues = write.issues.filter((item) => item.code === 'FBM_CATEGORY_MAPPING_MISSING');
+  check(so, 'thiếu ánh xạ danh mục của một bản ghi là cảnh báo nêu mã bản ghi, không chặn phiên', [mappingIssues.length > 0, mappingIssues.every((item) => !item.blocking && item.severity === 'warn'), /ACT-1/.test(mappingIssues[0] && mappingIssues[0].message), write.blocking.some((item) => perRecordCodes.indexOf(item.code) >= 0)], [true, true, true, false]);
+  check(so, 'FBM-024: hai dòng xung đột chờ quyết không chặn phiên ghi; preflight chỉ trả số đếm (không issue) để người điều phối ghi Log một lần', [write.conflictPending, write.issues.some((item) => item.code === 'FBM_RECORD_CONFLICT_PENDING'), write.blocking.some((item) => perRecordCodes.indexOf(item.code) >= 0)], [2, false, false]);
+  check(so, 'bản ghi bị cảnh báo thiếu ánh xạ danh mục không tính vào số ứng viên đẩy', write.candidateCount, 0);
   check(so, 'preflight báo Activity đổi nhưng chưa bật quyền đẩy', write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'), true);
   {
     const allow = hop.FbmSync.pullDefaultPermission(), sync = hop.FbmSync.SYNC_STATUS, readBefore = hop.FbmSync.readLocal;
@@ -103,7 +105,34 @@ async function chay(so) {
     ? 'Activity ' + candidate.id + ' thuộc owner FBM khác.' : '';
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng' });
   const owner = hop.FbmSync.runPreflight({ mode: 'write' });
-  check(so, 'preflight chặn toàn bộ ứng viên Activity lệch owner trước khi cấp request', [owner.ok, owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH')], [false, true]);
+  const ownerWarn = owner.warnings.filter((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH');
+  check(so, 'Activity lệch owner: preflight cảnh báo không chặn và loại khỏi số ứng viên; việc bỏ qua thật do markPushSkipped lúc đẩy', [owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH'), ownerWarn.length, owner.candidateCount], [false, 1, 0]);
+  // Bản ghi hợp lệ cạnh bản ghi lỗi riêng vẫn vào danh sách đẩy.
+  hop.FbmSync.pushCandidates = (entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-LECH', record: { id: 'ACT-LECH', taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }, { entity: 'activity', kind: 'edit', id: 'ACT-OK', record: { id: 'ACT-OK', owner: 'Owner đúng' } }] : [];
+  check(so, 'một Activity lệch owner bị loại riêng, Activity khác vẫn là ứng viên đẩy', hop.FbmSync.runPreflight({ mode: 'write' }).candidateCount, 1);
+  // Lỗi chung vẫn chặn: đọc cài đặt hỏng không còn bị nuốt, đọc sổ lỗi đẩy hỏng chặn.
+  const settingsBefore = hop.FbmSync.scriptSettings;
+  hop.FbmSync.scriptSettings = () => { throw new Error('Không đọc được Config'); };
+  const settingsBroken = hop.FbmSync.runPreflight({ mode: 'write' }).blocking.filter((item) => item.code === 'FBM_SETTINGS_READ_FAILED');
+  hop.FbmSync.scriptSettings = settingsBefore;
+  check(so, 'đọc cài đặt đồng bộ hỏng: preflight chặn bằng FBM_SETTINGS_READ_FAILED nêu nguyên nhân, không coi cài đặt là rỗng', [settingsBroken.length, /Không đọc được Config/.test(settingsBroken[0] && settingsBroken[0].message)], [1, true]);
+  const failuresBefore = hop.FbmSync.pushFailuresRead;
+  hop.FbmSync.pushFailuresRead = () => { throw new Error('Sổ lỗi hỏng'); };
+  check(so, 'đọc sổ lỗi đẩy hỏng: preflight chặn bằng FBM_FAILURE_STATE_READ_FAILED', hop.FbmSync.runPreflight({ mode: 'write' }).blocking.some((item) => item.code === 'FBM_FAILURE_STATE_READ_FAILED'), true);
+  hop.FbmSync.pushFailuresRead = () => ({ hashes: { 'activity:ACT-LOI': 'h' }, details: { 'activity:ACT-LOI': { reason: 'Lỗi cũ' } } });
+  const oldFailure = hop.FbmSync.runPreflight({ mode: 'write' }).issues.filter((item) => item.code === 'FBM_PREVIOUS_PUSH_FAILURE');
+  hop.FbmSync.pushFailuresRead = failuresBefore;
+  check(so, 'bản ghi từng đẩy lỗi: cảnh báo nêu mã bản ghi, không chặn phiên', [oldFailure.length, oldFailure[0] && oldFailure[0].blocking, /ACT-LOI/.test(oldFailure[0] && oldFailure[0].message)], [1, false, true]);
+  // Log xung đột chỉ khi số đổi so với lượt trước.
+  const conflictLogs = [];
+  hop.logEvent = (event) => conflictLogs.push(event);
+  const conflictState = { runId: 'r1', metadata: {} };
+  const conflictNotes = [2, 2, 2, 1, 0].map((count) => hop.FbmSync.conflictPendingNote(conflictState, count));
+  check(so, 'Log xung đột chỉ ghi khi số khác lượt trước (2, 2, 2, 1, 0), số hiện cho Sidebar luôn cập nhật', [conflictNotes, conflictLogs.map((event) => event.detail.count), conflictState.metadata.conflictCount, conflictState.metadata.conflictLogged], [[true, false, false, true, true], [2, 1, 0], 0, 0]);
+  const quiet = { runId: 'r2', metadata: {} };
+  conflictLogs.length = 0;
+  hop.FbmSync.conflictPendingNote(quiet, 0);
+  check(so, 'chưa từng có xung đột thì không ghi Log', conflictLogs.length, 0);
 
   // FBM-022: đọc Sheet lỗi thì preflight chặn có mã, không báo 0 bản ghi như Sheet trống; Sheet và hash chỉ tính một lần mỗi lượt preflight.
   const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash;
