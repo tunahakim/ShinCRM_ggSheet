@@ -184,7 +184,7 @@ function chay(so) {
   ghi.nen.FbmSync.canWriteSheet = () => true;
   ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};
   ghi.nen.writeGateSave = () => ({ ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] });
-  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.sheetSave(entity, records, 'pull'); return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
   const cursorGhi = JSON.stringify(ghi.nen.FbmSync.stateRead().cursor || {});
   ghi.nen.FbmSync.continue = () => { ghi.nen.FbmSync.pullRecords('customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;

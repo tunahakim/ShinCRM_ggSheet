@@ -38,6 +38,7 @@ const NHOM_CA = [
   require('./cases/sheetReadCopy'),
   require('./cases/sheetTiers'),
   require('./cases/reloadDecision'),
+  require('./cases/recordGate'),
   require('./cases/reloadGates'),
   require('./cases/writeGateAudit'),
   require('./cases/userPrefs'),

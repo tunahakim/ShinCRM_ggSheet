@@ -586,13 +586,12 @@ async function testSaveFlowPopup(so) {
 
   const voiMat = (choice) => {
     const x = taoLuongLuu({ ok: false, gone: ['KH1'] });
-    x.ghi.bo = []; x.ghi.mo = 0; x.ghi.dongHuy = 0;
+    x.ghi.bo = []; x.ghi.dongHuy = 0;
     x.top.record.id = 'KH1';
     Object.assign(x.hop, {
       Store: { removeRecord: (e, id) => x.ghi.bo.push(e + ':' + id) },
       screenStateMarkNew: () => { x.top.themMoi = true; },
       saveFlowRecord: (t, thu) => Object.assign({}, thu, { id: t.themMoi ? '' : t.record.id }),
-      screenFormSyncUnlock: (e, r) => { x.ghi.mo += 1; },
       screenViewDropStale: () => null,
       screenFormClose: () => { x.ghi.dongHuy += 1; return 'view'; }
     });
@@ -604,8 +603,8 @@ async function testSaveFlowPopup(so) {
   };
   const e1 = await voiMat('new');
   check(so, 'khách đang sửa vừa bị xóa trên Sheet: bỏ khỏi RAM, popup ba lựa chọn; chọn lưu thành khách mới thì gửi lại với mã rỗng rồi đóng form', [
-    e1.mo, e1.chu, e1.x.ghi.bo, e1.x.ghi.gui.length, e1.x.ghi.gui[1].id, e1.x.ghi.dong, e1.x.ghi.mo
-  ], [true, ['Lưu thành khách mới với nội dung đang nhập', 'Bỏ và đóng form', 'Quay lại form, chưa lưu gì'], ['customer:KH1'], 2, '', 1, 1]);
+    e1.mo, e1.chu, e1.x.ghi.bo, e1.x.ghi.gui.length, e1.x.ghi.gui[1].id, e1.x.ghi.dong
+  ], [true, ['Lưu thành khách mới với nội dung đang nhập', 'Bỏ và đóng form', 'Quay lại form, chưa lưu gì'], ['customer:KH1'], 2, '', 1]);
   const e2 = await voiMat('discard');
   check(so, 'chọn bỏ và đóng form: không gửi thêm, đóng form qua đường nút Hủy', [e2.x.ghi.gui.length, e2.x.ghi.dongHuy], [1, 1]);
   const e3 = await voiMat('cancel');
@@ -629,6 +628,44 @@ async function testSaveFlowPopup(so) {
   check(so, 'xóa: bỏ khỏi RAM cả mã xóa hẳn lẫn mã đã không còn trên Sheet, ghi đè dòng xóa mềm, báo xóa mềm bằng popup Sidebar không dùng alert', [
     ram, moXoa, await huaXoa, xoa.calls.filter((c) => c.name === 'alert').length, chuXoa.indexOf('• GD2: Bản ghi đã có ID FBM') >= 0 || chuXoa.join('|').indexOf('GD2: Bản ghi đã có ID FBM') >= 0
   ], [['bỏ GD1', 'bỏ GD9', 'ghi GD2'], true, 'vẽ', 0, true]);
+  const banLuu = { ok: false, busy: { id: 'KH1', by: 'fbm', reason: 'Đồng bộ đang đẩy bản ghi này lên FBM.' } };
+  const f1 = taoLuongLuu(banLuu);
+  const huaF1 = f1.hop.saveFlowSubmit();
+  const moF1 = await bamPopup(f1.hop, 'retry');
+  const nutF1 = Array.from(f1.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  const chuF1 = Array.from(f1.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent).join('|');
+  await huaF1;
+  check(so, 'lưu gặp bản ghi bận: popup hai lựa chọn nêu lý do; chọn thử lại thì gửi lại đúng nội dung rồi đóng form', [
+    moF1, nutF1, chuF1.indexOf('Đồng bộ đang đẩy bản ghi này lên FBM.') >= 0, f1.ghi.gui.length, f1.ghi.gui[1].ghiChu, f1.ghi.dong
+  ], [true, ['Thử lại', 'Quay lại form, chưa lưu gì'], true, 2, 'của tôi', 1]);
+  const f2 = taoLuongLuu(banLuu);
+  const huaF2 = f2.hop.saveFlowSubmit();
+  await bamPopup(f2.hop, 'cancel');
+  await huaF2;
+  check(so, 'lưu gặp bản ghi bận, chọn quay lại form: không gửi thêm, form vẫn mở với chữ đang nhập', [f2.ghi.gui.length, f2.ghi.dong, f2.bo.dom.document.getElementById('f-ghiChu').value], [1, 0, 'của tôi']);
+
+  const banXoa = (choice) => {
+    const t = taoBoTest(), gui = [];
+    napClient(t.hop, 'client/save/pendingDelete.html');
+    Object.assign(t.hop, {
+      Store: { removeRecord: () => {}, upsertRecord: () => {} },
+      sidebarBusyRun: (label, fn) => Promise.resolve().then(fn),
+      pendingDeleteRedraw: () => 'vẽ',
+      callServer: (name, args) => { gui.push(args[1].slice()); return Promise.resolve(gui.length === 1 ? { ok: true, hard: ['GD1'], busy: { GD2: 'Đồng bộ đang đẩy bản ghi này lên FBM.' } } : { ok: true, hard: args[1] }); }
+    });
+    t.hop.PENDING_DELETE.entity = 'activity';
+    t.hop.PENDING_DELETE.ids = ['GD1', 'GD2'];
+    const hua = t.hop.pendingDeleteFire();
+    return bamPopup(t.hop, choice).then((mo) => {
+      const nut = Array.from(t.dialog.querySelectorAll('button')).map((el) => el.textContent);
+      return hua.then(() => ({ mo, nut, gui, conCho: t.hop.PENDING_DELETE.ids.slice() }));
+    });
+  };
+  const g1 = await banXoa('retry');
+  check(so, 'xóa gặp bản ghi bận: popup Thử lại / Để sau; chọn thử lại thì gửi lại đúng mã bận', [g1.mo, g1.nut, g1.gui], [true, ['Thử lại', 'Để sau'], [['GD1', 'GD2'], ['GD2']]]);
+  const g2 = await banXoa('cancel');
+  check(so, 'xóa gặp bản ghi bận, chọn để sau: không gửi lại, không còn mã chờ xóa', [g2.gui.length, g2.conCho], [1, []]);
+
   check(so, 'luồng xóa không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/pendingDelete.html')), false);
 
   check(so, 'luồng lưu form không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/saveFlow.html')), false);

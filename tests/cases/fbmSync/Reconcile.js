@@ -1,6 +1,6 @@
 /** Kiểm tra missing, tombstone, khóa và ứng viên push. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhi } = require("../../lib/load-gas");
 const { taoBoTest } = require('./Sidebar');
 
 async function chay(so) {
@@ -25,17 +25,19 @@ async function chay(so) {
   edges.FbmSync.scope = () => ({ fbm: ['ALT00010'], shin: [] });
   const customerRefresh = edges.FbmSync.conflictRefreshRequest('customer', { id: 'CUS-NEW', fbmId: 'A000080352' });
   check(so, 'FBM-052: conflict đọc lại Customer đích danh theo ID FBM, không gắn lọc mã khách thử nên khách mới tạo mã khác vẫn đọc được', customerRefresh.body.externalKey.map((key) => key.Name + '=' + key.Value), ['stt_rec_kh=A000080352', "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1=1"]);
-  edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
+  const khoReconcile = {};
+  edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: (k) => khoReconcile[k] || '', setProperty: (k, v) => { khoReconcile[k] = String(v); }, deleteProperty: (k) => { delete khoReconcile[k]; } }) };
 
   let lockedWrite = false;
-  const lockedState = { mode: 'write', metadata: { seen: { customer: {}, activity: {} } }, locks: { 'customer:CUS-000010': { owner: 'user', revision: 'r1' } } };
+  const lockedState = { mode: 'write', metadata: { seen: { customer: {}, activity: {} } } };
   edges.FbmSync.stateRead = () => lockedState;
   edges.FbmSync.stateWrite = () => {};
   edges.FbmSync.validateIncomingCategories = () => [];
   edges.FbmSync.readLocal = () => [{ id: 'CUS-000010', fbmId: 'FBM-LOCK', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmHash: '' }];
+  giuBanGhi(edges, 'khac', 'customer', 'CUS-000010');
   edges.writeGateSave = () => { lockedWrite = true; return { ok: true }; };
   const lockedPull = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, {})]);
-  check(so, 'pull khong ghi record dang bi user khoa', [lockedPull.written, lockedPull.skipped, lockedWrite], [0, 1, false]);
+  check(so, 'pull bỏ qua bản ghi tiến trình khác đang giữ trong sổ bận, để lượt sau', [lockedPull.written, lockedPull.skipped, lockedWrite], [0, 1, false]);
 
   let activityPullWrite;
   edges.FbmSync.stateRead = () => ({ metadata: { seen: { customer: {}, activity: {} } }, locks: {} });

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
+const { giuBanGhi } = require('../../lib/load-gas');
 const { scanHarness, gdSo } = require('./ScanJob');
 
 const EXECUTOR = path.join(__dirname, '..', '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
@@ -129,18 +130,17 @@ async function chay(so) {
     nen.state.phase, nen.log('activity_bulk_done').length, nen.act(2).syncStatus, sauBulk
   ], ['done', 1, nen.h.F.SYNC_STATUS.missing, ['batch', 'batch', 'customer_count']]);
 
-  // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng người dùng đang sửa không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
+  // Lớp 1 gắn cờ qua cùng chỗ với lượt quét theo khách: số vào thẻ kết quả đúng một lần, dòng tiến trình khác đang giữ không bị gắn cờ, lượt sau không ghi lại dòng đã mang cờ.
   const lop1 = await luotKy(['2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20', '2026-09-20'], (fbm, h) => {
     fbm.list = fbm.list.filter((item) => ['C1', 'C4', 'C5'].map(gdSo).indexOf(item.id) < 0);
-    const s = h.F.stateRead(), dangSua = h.local.activity.find((item) => String(item.fbmId) === gdSo('C4'));
-    s.locks = Object.assign({}, s.locks, { ['activity:' + dangSua.id]: { owner: 'user' } });
-    h.F.stateWrite(s);
+    const dangSua = h.local.activity.find((item) => String(item.fbmId) === gdSo('C4'));
+    giuBanGhi(h.flow.hop, 'khac', 'activity', dangSua.id);
   });
   const demLan1 = lop1.state.counts.missingActivity;
   const daMangCo = [lop1.act(1).id, lop1.act(5).id], docTheoKhach = lop1.h.trace.activityCustomers.slice(), ghiTruoc = lop1.h.writes.length;
   await lop1.h.run({ pack: 'deep' });
   const ghiLaiC5 = lop1.h.writes.slice(ghiTruoc).filter((item) => item.entity === 'activity').flatMap((item) => item.records || []).filter((item) => daMangCo.indexOf(item.id) >= 0).length;
-  check(so, 'Quét kỹ: giao dịch FBM đã xóa được đếm đúng một lần vào "Không thấy bên FBM" kể cả khi khách của nó vừa được đọc theo khách, giao dịch người dùng đang sửa không bị gắn cờ, lượt sau vẫn đếm nhưng không ghi lại dòng đã mang cờ', [
+  check(so, 'Quét kỹ: giao dịch FBM đã xóa được đếm đúng một lần vào "Không thấy bên FBM" kể cả khi khách của nó vừa được đọc theo khách, giao dịch tiến trình khác đang giữ không bị gắn cờ, lượt sau vẫn đếm nhưng không ghi lại dòng đã mang cờ', [
     lop1.state.phase, docTheoKhach.indexOf('FBM-C1') >= 0, demLan1, lop1.act(1).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.act(5).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.act(4).syncStatus === lop1.h.F.SYNC_STATUS.missing, lop1.h.F.stateRead().counts.missingActivity, ghiLaiC5
   ], ['done', true, 2, true, true, false, 2, 0]);
 

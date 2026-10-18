@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
-const { taoHopCat, napServer } = require('../../lib/load-gas');
+const { taoHopCat, napServer, soBan } = require('../../lib/load-gas');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -457,7 +457,7 @@ async function chay(so) {
     });
     ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { F[name] = () => ''; });
     F.pushEligibilityErrors = () => [];
-    F.isRecordLocked = () => false;
+    F.readLocal = (entity) => F.pushCandidates(entity).map((candidate) => candidate.record);
     // Mỗi lệnh đẩy giả lập đều lỗi để đi tiếp hàng đợi; nâng trần cầu dao để không cắt ngang 25 bản ghi.
     if (!(options && options.realBreaker)) { F.BUDGET = Object.assign({}, F.BUDGET, { pushFailuresMax: 100 }); }
     F.validatePushCategories = (record, entity, gate) => {
@@ -601,7 +601,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.pushOwnerError = () => '';
   compactLookupFlow.hop.FbmSync.validatePushCategories = () => [];
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
-  compactLookupFlow.hop.FbmSync.isRecordLocked = () => false;
+  compactLookupFlow.hop.FbmSync.readLocal = (entity) => compactLookupFlow.hop.FbmSync.pushCandidates(entity).map((candidate) => candidate.record);
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.stopPushOnConflicts = () => false;
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
@@ -661,7 +661,7 @@ async function chay(so) {
   orderFlow.hop.FbmSync.pushOwnerError = () => '';
   orderFlow.hop.FbmSync.validatePushCategories = () => [];
   orderFlow.hop.FbmSync.pushEligibilityErrors = () => [];
-  orderFlow.hop.FbmSync.isRecordLocked = () => false;
+  orderFlow.hop.FbmSync.readLocal = (entity) => orderFlow.hop.FbmSync.pushCandidates(entity).map((candidate) => candidate.record);
   orderFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   let orderSheetWrites = 0;
   orderFlow.hop.writeGateSave = () => { orderSheetWrites += 1; return { ok: true }; };
@@ -680,13 +680,14 @@ async function chay(so) {
   aliasFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'CUS-ALIAS', position: 0, record: { id: 'CUS-ALIAS', fbmId: 'FBM-CUS-ALIAS', fbmHash: 'h0', fbmSyncPermission: 'Cho phép' } }];
   ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => ''; });
   ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
+  aliasFlow.hop.FbmSync.readLocal = (entity) => aliasFlow.hop.FbmSync.pushCandidates(entity).map((candidate) => candidate.record);
   aliasFlow.hop.writeGateSave = () => ({ ok: true });
   aliasFlow.hop.FbmSync.customerEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_edit_open' } });
   const aliasRequest = aliasFlow.hop.FbmSync.nextPushRequest(aliasState);
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
   const aliasStored = aliasFlow.hop.FbmSync.stateRead();
-  check(so, 'FBM-045: hàm gọi ghi lại object state sau khi phát lệnh đẩy vẫn giữ cursor push_wait và khóa bản ghi',
-    [aliasRequest && aliasRequest.meta.kind, aliasState.cursor.kind, aliasStored.cursor.kind, !!(aliasStored.locks || {})['customer:CUS-ALIAS']], ['customer_edit_open', 'push_wait', 'push_wait', true]);
+  check(so, 'FBM-045: hàm gọi ghi lại object state sau khi phát lệnh đẩy vẫn giữ cursor push_wait; bản ghi nằm trong sổ bận nên ghi đè state không thả nó',
+    [aliasRequest && aliasRequest.meta.kind, aliasState.cursor.kind, aliasStored.cursor.kind, (soBan(aliasFlow.hop)['customer:CUS-ALIAS'] || {}).by], ['customer_edit_open', 'push_wait', 'push_wait', 'fbm']);
   // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
   const pushingFlow = workflowGas();
   const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
@@ -697,7 +698,7 @@ async function chay(so) {
   ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
   ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => []; });
   pushingFlow.hop.FbmSync.pushCandidates = () => [{ kind: 'edit', id: 'ACT-PUSHING', position: 0, record: { id: 'ACT-PUSHING', fbmId: 'FBM-ACT-PUSHING', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', fbmSyncPermission: 'Cho phép', fbmHash: 'old' } }];
-  pushingFlow.hop.FbmSync.isRecordLocked = () => false;
+  pushingFlow.hop.FbmSync.readLocal = (entity) => pushingFlow.hop.FbmSync.pushCandidates(entity).map((candidate) => candidate.record);
   pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
   let pushingRequest = 'chưa gọi', pushingError = null;
@@ -705,6 +706,7 @@ async function chay(so) {
   check(so, 'không ghi được trạng thái "đang đẩy" thì không phát lệnh ghi FBM và báo lỗi có tên bản ghi',
     [pushingError && pushingError.code, pushingRequest, /ACT-PUSHING/.test(pushingError && pushingError.message)],
     ['FBM_SHEET_WRITE_FAILED', 'chưa gọi', true]);
+  pushingFlow.hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-MARK' }] : [];
   ['markPushError', 'markPushSkipped'].forEach((name) => {
     let markError = null;
     const candidate = { kind: 'edit', entity: 'activity', id: 'ACT-MARK', record: { id: 'ACT-MARK' } };
@@ -818,7 +820,7 @@ async function chay(so) {
     deleteProperty(key) { delete quotaData[key]; }
   };
   const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
-  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {}, locks: { 'customer:CUS-LOCK': { owner: 'sync', revision: 'r7' } } });
+  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {} });
   quotaFull = true;
   const quotaResult = quotaFlow.hop.FbmSync.controlDispatchLocked('cancel', {});
   const quotaLog = quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED').slice(-1)[0] || quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA').slice(-1)[0] || {};
@@ -1207,15 +1209,13 @@ async function chay(so) {
   privateState.session.cookie = 'private-cookie-FHN_CRM_App';
   privateState.session.customerAuthorized = 'private-authorized';
   privateState.metadata.lookups = { hidden: 'private-lookup' };
-  privateState.locks = { 'customer:CUS-1': { owner: 'sync', oldValues: { hidden: 'private-old-value' } } };
   dto.hop.FbmSync.stateWrite(privateState);
   const publicStatus = dto.hop.FbmSync.statusView();
-  check(so, 'DTO Sidebar: khong lo cookie, Authorized, lookup noi bo hay lock qua bien gioi UI', [
+  check(so, 'DTO Sidebar: khong lo cookie, Authorized, lookup noi bo qua bien gioi UI', [
     JSON.stringify(publicStatus).indexOf('private-cookie') < 0,
     JSON.stringify(publicStatus).indexOf('private-authorized') < 0,
-    JSON.stringify(publicStatus).indexOf('private-lookup') < 0,
-    JSON.stringify(publicStatus).indexOf('private-old-value') < 0
-  ], [true, true, true, true]);
+    JSON.stringify(publicStatus).indexOf('private-lookup') < 0
+  ], [true, true, true]);
   const logged = [];
   dto.hop.LOG_OK = 'ok'; dto.hop.LOG_ERROR = 'error'; dto.hop.LOG_CONFLICT = 'conflict';
   dto.hop.logEvent = (event) => logged.push(event); dto.hop.logTrace = (event) => logged.push(event);

@@ -1,6 +1,6 @@
 /** Kiểm tra state, cursor và status điều phối. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhiDongBo } = require("../../lib/load-gas");
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
@@ -80,7 +80,7 @@ async function chay(so) {
 
   const props = { data: {} };
   let propertyWrites = 0;
-  const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { propertyWrites += 1; props.data[key] = String(value); } };
+  const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { propertyWrites += 1; props.data[key] = String(value); }, deleteProperty: (key) => { delete props.data[key]; } };
   const orchestration = taoHopCat({
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
@@ -124,15 +124,14 @@ async function chay(so) {
   const legacyStored = orchestration.FbmSync.stateRead();
   orchestration.FbmSync.readLocal = () => { throw new Error('stateStart không được đọc Sheet'); };
   const carriedStart = orchestration.FbmSync.stateStart('', 'checking_session', 0);
-  check(so, 'FBM-024: state cũ còn danh sách conflict thì lần ghi state bỏ danh sách; phiên mới giữ số đếm và khóa người dùng, bỏ khóa sync, không đọc Sheet',
-    ['conflicts' in legacyStored.metadata, 'conflicts' in carriedStart.metadata, carriedStart.metadata.conflictCount, carriedStart.counts.conflict, Object.keys(carriedStart.locks)],
-    [false, false, 1, 0, ['customer:CUS-EDIT']]);
+  check(so, 'FBM-024: state cũ còn danh sách conflict thì lần ghi state bỏ danh sách; phiên mới giữ số đếm, bỏ khóa cũ trong state (đã chuyển sang sổ bận), không đọc Sheet',
+    ['conflicts' in legacyStored.metadata, 'conflicts' in carriedStart.metadata, carriedStart.metadata.conflictCount, carriedStart.counts.conflict, 'locks' in carriedStart],
+    [false, false, 1, 0, false]);
   orchestration.FbmSync.readLocal = () => [];
   const restartFromConflict = orchestration.FbmSync.stateRead();
   restartFromConflict.phase = 'conflict';
   restartFromConflict.metadata.conflictCount = 1;
   restartFromConflict.counts.conflict = 1;
-  restartFromConflict.locks = {};
   orchestration.FbmSync.stateWrite(restartFromConflict);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const restartedConflict = orchestration.FbmSync.start({ mode: 'read' });
@@ -181,10 +180,16 @@ async function chay(so) {
   const staleView = orchestration.FbmSync.statusView();
   check(so, 'status chi doc khong tu ghi de phien stale', [staleView.phase, staleView.lastFailureCode, orchestration.FbmSync.stateRead().runId], ['pull_customer', '', 'abandoned-run']);
   const uncertainWrite = orchestration.FbmSync.stateStart('customer', 'push', 1);
-  uncertainWrite.cursor = { kind: 'push_wait' }; uncertainWrite.locks = { 'customer:C-1': { owner: 'sync' } };
+  uncertainWrite.cursor = { kind: 'push_wait' };
   orchestration.FbmSync.stateWrite(uncertainWrite);
+  giuBanGhiDongBo(orchestration, 'customer', 'C-1');
   const recoveredWrite = orchestration.FbmSync.recoverStaleRun(orchestration.FbmSync.stateRead(), Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1);
-  check(so, 'state ghi bi bo roi khong tu retry va giu khoa', [recoveredWrite.state.phase, recoveredWrite.state.lastFailureCode, !!recoveredWrite.state.locks['customer:C-1']], ['error', 'SYNC_STALE_WRITE', true]);
+  check(so, 'Lượt mất phản hồi lúc chờ lệnh ghi: không tự thử lại và vẫn giữ bản ghi trong sổ bận', [recoveredWrite.state.phase, recoveredWrite.state.lastFailureCode, orchestration.recordHoldsPeekOwner('fbm')], ['error', 'SYNC_STALE_WRITE', true]);
+  const stuckRead = orchestration.FbmSync.stateStart('customer', 'pull_customer', 1);
+  orchestration.FbmSync.stateWrite(stuckRead);
+  giuBanGhiDongBo(orchestration, 'customer', 'C-1');
+  orchestration.FbmSync.recoverStaleRun(orchestration.FbmSync.stateRead(), Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1);
+  check(so, 'Lượt kẹt không chờ lệnh ghi thì nhả mọi bản ghi đồng bộ đang giữ', orchestration.recordHoldsPeekOwner('fbm'), false);
   const lookupProps = {};
   const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => lookupProps[key] || null, setProperty: (key, value) => { lookupProps[key] = String(value); } }) } });
   napServer(lookupHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/write/SheetSave.js');
@@ -243,26 +248,6 @@ async function chay(so) {
   check(so, 'push config chan tao Customer khi thieu prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh' }), 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.');
   check(so, 'push config cho phep tao Customer khi du prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' }), '');
   check(so, 'push config cho activity sua khi account co', guards.FbmSync.pushConfigErrors({ entity: 'activity', kind: 'edit' }, { accountName: 'Lê Tuấn Anh' }), '');
-
-  const lockState = { locks: { 'customer:C-1': { owner: 'sync' }, 'customer:C-2': { owner: 'user' } } };
-  guards.FbmSync.unlockRecord = () => ({ locks: { 'customer:C-2': { owner: 'user' }, 'activity:A-1': { owner: 'sync' } } });
-  guards.FbmSync.releasePushLock(lockState, 'customer', 'C-1');
-  check(so, 'nha khoa push giu khoa khac', Object.keys(lockState.locks).sort().join(','), 'activity:A-1,customer:C-2');
-
-  const recordLocks = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => {
-    const data = recordLocks._props || (recordLocks._props = {});
-    return { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
-  } } });
-  napServer(recordLocks, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/RecordLocks.js');
-  recordLocks.FbmSync.stateStart('', 'idle', 0);
-  recordLocks.FbmSync.lockRecord('customer', 'C-1', 'h1', 'sync');
-  check(so, 'save bi chan khi record dang bi sync khoa', recordLocks.FbmSync.saveAllowed('customer', 'C-1', 'h1').code, 'RECORD_BUSY');
-  check(so, 'edit begin bi chan khi record dang bi sync khoa', recordLocks.FbmSync.editBegin('customer', 'C-1', 'h1').code, 'RECORD_BUSY');
-  recordLocks.FbmSync.unlockRecord('customer', 'C-1');
-  check(so, 'save duoc phep sau khi nha khoa sync', recordLocks.FbmSync.saveAllowed('customer', 'C-1', 'h1').ok, true);
-  recordLocks.FbmSync.lockRecord('customer', 'C-2', 'h2', 'user');
-  recordLocks.FbmSync.stateStart('', 'checking_session', 0);
-  check(so, 'phien sync moi giu khoa cua form nguoi dung', recordLocks.FbmSync.stateRead().locks['customer:C-2'].owner, 'user');
 
   const schedulerData = {};
   const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
@@ -401,10 +386,11 @@ async function chay(so) {
   check(so, 'Lát trả hết việc khi lượt còn ở phase đang chạy và không request nào chờ: đóng lượt ngay với RUN_LEFT_OPEN và Log ghi lỗi phía GAS; còn request đang chờ thì không đụng', [
     inFlightReply.ok, inFlightPhase, leftOpenReply.ok, leftOpenReply.code, leftOpenState.phase, leftOpenState.lastFailureCode, leftOpenLogs.filter((entry) => entry.action === 'run_left_open').length
   ], [true, 'pull_customer', false, 'RUN_LEFT_OPEN', 'error', 'RUN_LEFT_OPEN', 1]);
-  heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null, locks: { 'customer:1': { owner: 'push' } } });
+  heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null });
+  giuBanGhiDongBo(heartbeat, 'customer', '1');
   heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   const lostWrite = heartbeat.FbmSync.stateRead();
-  check(so, 'Lần hỏi nền gặp lệnh ghi mất response: kết thúc SYNC_STALE_WRITE, giữ khóa bản ghi, không gửi lại lệnh ghi', [lostWrite.lastFailureCode, Object.keys(lostWrite.locks || {}).length, lostWrite.phase], ['SYNC_STALE_WRITE', 1, 'error']);
+  check(so, 'Lần hỏi nền gặp lệnh ghi mất response: kết thúc SYNC_STALE_WRITE, giữ khóa bản ghi, không gửi lại lệnh ghi', [lostWrite.lastFailureCode, heartbeat.recordHoldsPeekOwner('fbm'), lostWrite.phase], ['SYNC_STALE_WRITE', true, 'error']);
   delete heartbeat.logEvent;
   const activeState = heartbeat.FbmSync.stateRead();
   activeState.phase = 'pull_customer'; activeState.runId = 'heartbeat-run'; activeState.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }; activeState.activeRequestId = 'in-flight-request'; activeState.deadlineAt = Date.now() + 60000;

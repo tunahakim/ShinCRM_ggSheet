@@ -103,6 +103,66 @@ function capMaNguoiDungThu(hopCat) {
   hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
 }
 
+/**
+ * Đồng bộ ghi Sheet qua Cửa bản ghi (`recordGateRun`), còn hộp cát FBM chỉ nạp tệp đồng bộ và tự gán `FbmSync.readLocal`, `writeGateSave`. Nạp cửa và sổ bận thật; phần chỉ có trên Google thay bằng bản tối thiểu, chỉ khi hộp cát chưa có:
+ *   - không có khóa tài liệu (`LockService.getDocumentLock`) hoặc `SETTINGS` thì khóa tài liệu là bộ đếm lồng (đủ để sổ bận biết đang trong khóa);
+ *   - không có `PropertiesService` thì kho tài liệu nằm trong bộ nhớ;
+ *   - không có tầng đọc bản ghi thì `gate.read`/`gate.readById` đọc qua `FbmSync.readLocal` mà test đã gán.
+ */
+function capCuaBanGhi(hopCat) {
+  if (typeof hopCat.recordGateRun === 'function') { return; }
+  if (!hopCat.PropertiesService) {
+    const kho = {};
+    hopCat.PropertiesService = { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, setProperties: (m) => { Object.keys(m).forEach((k) => { kho[k] = String(m[k]); }); }, getProperties: () => Object.assign({}, kho) }) };
+  }
+  // Kho thật luôn có `deleteProperty` (sổ bận rỗng thì xóa khóa); kho giả của test cũ thiếu thì xóa bằng cách ghi chuỗi rỗng, nghĩa như chưa có.
+  const layKho = hopCat.PropertiesService.getDocumentProperties;
+  if (typeof layKho === 'function') {
+    hopCat.PropertiesService.getDocumentProperties = function () {
+      const kho = layKho.apply(this, arguments);
+      if (kho && typeof kho.deleteProperty !== 'function' && typeof kho.setProperty === 'function') { kho.deleteProperty = (k) => kho.setProperty(k, ''); }
+      return kho;
+    };
+  }
+  if (!hopCat.LockService || typeof hopCat.LockService.getDocumentLock !== 'function' || !hopCat.SETTINGS) {
+    // Như bản thật trừ phần Google: vào lớp ngoài cùng thì bỏ bản đọc, ra lớp ngoài cùng thì gửi kho phần ghi chờ trong khóa.
+    vm.runInContext('documentLockRun = function (work) { var outer = DOCUMENT_STORE.docLockDepth === 0; if (outer) { documentStoreRefresh(); } DOCUMENT_STORE.docLockDepth += 1; try { return work(); } finally { DOCUMENT_STORE.docLockDepth -= 1; if (outer) { documentStoreFlush(DOCUMENT_STORE_DIRTY_DOC); if (!documentStoreActive()) { documentStoreClear(); } } } };', hopCat);
+  }
+  if (typeof hopCat.entityReadAllCombined !== 'function') {
+    // `FbmSync.readLocal` thật cũng đọc qua tầng này; test chưa gán Sheet giả thì lần gọi lồng trả Sheet rỗng thay vì đệ quy vô tận.
+    let dangDoc = false;
+    const khoi = (entity, loc) => {
+      if (dangDoc) { return { entity, fields: [], rows: [] }; }
+      dangDoc = true;
+      try {
+        const records = (hopCat.FbmSync.readLocal(entity) || []).filter(loc || (() => true));
+        const fields = [];
+        records.forEach((record) => Object.keys(record).forEach((field) => { if (fields.indexOf(field) < 0) { fields.push(field); } }));
+        return { entity, fields, rows: records.map((record) => fields.map((field) => record[field])) };
+      } finally { dangDoc = false; }
+    };
+    hopCat.entityReadAllCombined = (entity) => khoi(entity);
+    hopCat.entityReadRecordById = (entity, schemas, id) => khoi(entity, (record) => String(record.id || '').trim() === String(id || '').trim());
+  }
+  if (typeof hopCat.entityBlockRecords !== 'function') { vm.runInContext(docTep('server/sheet/EntityRead.js').match(/function entityBlockRecords[\s\S]*?\n}\n/)[0], hopCat); }
+  ['server/state/RecordHolds.js', 'server/gate/RecordGate.js'].forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
+}
+
+/** Ghi một mục giữ của chủ `by` vào sổ bận qua cửa thật. */
+function giuBanGhi(hopCat, by, entity, id, reason) {
+  return hopCat.recordGateRun({ by: by, run: 'run-thu', decide: () => ({ hold: [{ entity: entity, ids: [id], reason: reason || 'Tiến trình ' + by + ' đang giữ bản ghi này.' }] }) });
+}
+
+/** Ghi một mục giữ của đồng bộ vào sổ bận, như lúc đồng bộ đánh dấu "đang đẩy". */
+function giuBanGhiDongBo(hopCat, entity, id) {
+  return giuBanGhi(hopCat, 'fbm', entity, id, 'Đồng bộ đang đẩy bản ghi này lên FBM.');
+}
+
+/** Sổ bận hiện tại `{ "entity:mã": { by, run, reason, at } }`, đọc qua đúng cổng trong khóa tài liệu. */
+function soBan(hopCat) {
+  return hopCat.documentLockRun(() => hopCat.recordHoldsRead());
+}
+
 /** Công cụ đọc/ghi Sheet tầng 1–3 (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
 const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
@@ -118,6 +178,7 @@ function napServer(hopCat, ...duongDans) {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
     if (duongDan === 'fbm_sync/read/GridRead.js') { capMaNguoiDungThu(hopCat); }
+    if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
   return hopCat;
 }
@@ -151,4 +212,4 @@ function dongSoCuoi(hopCat) {
   return hopCat.reloadJournalRead().entries.slice(-1)[0] || {};
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi };
+module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi };

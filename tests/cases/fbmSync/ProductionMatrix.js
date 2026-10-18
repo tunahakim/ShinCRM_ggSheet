@@ -1,6 +1,6 @@
 /** Ma trận offline cho kỳ đồng bộ nhiều Customer/Activity và lỗi vận chuyển. */
 const { section, check } = require('../../lib/assert');
-const { taoHopCat, napServer } = require('../../lib/load-gas');
+const { taoHopCat, napServer, giuBanGhi } = require('../../lib/load-gas');
 
 function propertyStore() {
   const data = {};
@@ -300,6 +300,18 @@ async function chay(so) {
   check(so, 'FBM-024: FBM đổi giữa lúc mở và lúc chốt thì không ghi, trả DTO mới để xem lại, dòng vẫn xung đột chờ quyết',
     [cfChanged.code, nameDiff(cfChanged.conflict).right, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, CF.stateRead().metadata.conflictRefresh.stage],
     ['CONFLICT_CHANGED_REVIEW', 'Tên FBM mới hơn 1', 'Tên Shin 1', 'xung đột chờ quyết', 'review']);
+  cf.local.customer[0].companyName = 'Tên Shin sửa 1';
+  const cfPrepareLocal = CF.prepareConflictResolution('customer', 'CUS-000001', 'fbm');
+  const cfLocalChanged = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, gridResponse(cfPrepareLocal.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]));
+  check(so, 'FBM-024: ShinCRM đổi giữa lúc mở và lúc chốt thì không ghi, trả DTO mới với giá trị ShinCRM vừa sửa để xem lại',
+    [cfLocalChanged.code, nameDiff(cfLocalChanged.conflict).left, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus],
+    ['CONFLICT_CHANGED_REVIEW', 'Tên Shin sửa 1', 'Tên Shin sửa 1', 'xung đột chờ quyết']);
+  giuBanGhi(cf.hop, 'khac', 'customer', 'CUS-000001', 'Tiến trình khác đang giữ.');
+  const cfPrepareBusy = CF.prepareConflictResolution('customer', 'CUS-000001', 'fbm');
+  const cfBusy = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, gridResponse(cfPrepareBusy.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]));
+  check(so, 'FBM-024: bản ghi đang bị tiến trình khác giữ lúc chốt thì báo bận, không ghi gì',
+    [cfBusy.code, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus], ['CONFLICT_RECORD_BUSY', 'Tên Shin sửa 1', 'xung đột chờ quyết']);
+  cf.hop.recordGateRun({ by: 'khac', decide: () => ({ release: [{ entity: 'customer', ids: ['CUS-000001'] }] }) });
   const cfPrepare1b = CF.prepareConflictResolution('customer', 'CUS-000001', 'fbm');
   const cfFbm = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, gridResponse(cfPrepare1b.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]));
   check(so, 'FBM-024 PA1: lấy FBM ghi giá trị FBM vào ShinCRM, baseline là hash FBM mới, trạng thái đã đồng bộ, còn 2 xung đột',

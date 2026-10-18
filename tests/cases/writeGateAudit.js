@@ -159,9 +159,13 @@ function chay(so) {
     if (mutators.length) { syncViolations.push(file + ':' + mutators.map((item) => item.name + '@' + item.line).join(',')); }
   });
   check(so, 'fbm_sync không ghi thẳng Sheet ngoài cửa ghi chung', syncViolations, []);
-  // FBM-001/002/004: kết quả `ok:false` của writeGateSave từng bị bỏ qua ở nhiều chỗ; mọi lần ghi của module đồng bộ phải qua FbmSync.sheetSave.
-  const gateCallers = files.filter((file) => file.startsWith('fbm_sync/') && /\bwriteGateSave\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))));
-  check(so, 'fbm_sync chỉ gọi writeGateSave trong cửa ghi đồng bộ SheetSave.js', gateCallers, ['fbm_sync/write/SheetSave.js']);
+  // Cửa bản ghi là đường duy nhất đổi dòng Customer/Activity (tài liệu 06 Phần 1): gọi thẳng cửa ghi hay cửa xóa là đi vòng sổ bận và đọc ngoài khóa. Quét cả `server/dev/` vì hàm dò cũng ghi lên Sheet DEV.
+  const callersOf = (ten) => files.filter((file) => new RegExp('(?<![\\w.])(?<!function )' + ten + '\\s*\\(').test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))));
+  check(so, 'chỉ Cửa bản ghi gọi cửa ghi và cửa xóa', [callersOf('writeGateSave'), callersOf('deleteGateRemove')], [['server/gate/RecordGate.js'], ['server/gate/RecordGate.js']]);
+  check(so, 'sổ bận chỉ được Cửa bản ghi đọc/ghi, và khóa kho của sổ chỉ nằm trong tệp sổ bận',
+    [['recordHoldsRead', 'recordHoldsWrite', 'recordHoldsApply', 'recordHoldsBusy', 'recordHoldsWithoutOwner', 'recordHoldsPeekOwner'].reduce((out, ten) => out.concat(callersOf(ten).filter((file) => file !== 'server/state/RecordHolds.js' && file !== 'server/gate/RecordGate.js')), []),
+      files.filter((file) => file !== 'server/state/RecordHolds.js' && /SHIN_RECORD_HOLDS_V1|\bRECORD_HOLDS_KEY\b/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))))],
+    [[], []]);
   const fixtureViolation = mutatorsIn("function fixtureViolation(sheet) { sheet.getRange('A1').setValue('x'); }");
   check(so, 'phép quét cửa ghi tự bắt được fixture vi phạm trong fbm_sync', [fixtureViolation.length, fixtureViolation[0] && fixtureViolation[0].name], [1, 'setValue']);
 

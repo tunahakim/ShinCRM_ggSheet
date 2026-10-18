@@ -397,9 +397,10 @@ function quetDuongGan(so) {
     thay,
     ['client/ui/renderEngine.html:3', 'client/ui/search.html:3']);
 
-  check(so, 'thông báo khóa form dùng lớp Notice chung, không tạo lớp Sync generic riêng',
-    [docTep('client/ui/inputs.html').indexOf('shin-sync-lock-notice') >= 0, docTep('client/ui/inputs.html').indexOf('shin-notice-warning') >= 0, docTep('client/screen/formScreen.html').indexOf('shin-sync-lock-notice') >= 0],
-    [false, true, false]);
+  // Mở form không giữ gì: bản ghi chỉ bị giữ trong sổ bận lúc đồng bộ đẩy, và lần lưu gặp bận thì mở popup (saveFlow).
+  check(so, 'form không còn khóa đồng bộ lúc mở hay nhãn khóa',
+    ['client/ui/inputs.html', 'client/screen/formScreen.html', 'client/save/saveFlow.html'].filter((tep) => /shin-sync-lock-notice|screenFormSync(Un)?Lock|ApplySyncLock|fbmSyncEdit(Begin|End)/.test(docTep(tep))),
+    []);
 
   // Hai luật đi kèm của cùng điều khoản: không ai được đặt giá trị, ẩn hiện hay đổi lớp CSS của một phần tử từ bên ngoài bộ máy. Quét ba tệp `screen/` vì đó là chỗ dễ ngứa tay nhất — một màn muốn tự sửa một chữ trên chính nó.
   const tepMan = liet('client/screen', '.html').filter((t) => t.indexOf('statusScreen') === -1);

@@ -47,6 +47,8 @@ const TEP_NEN = [
   'server/view/ViewTabTint.js',
   'server/gate/WriteGate.js',
   'server/gate/DeleteGate.js',
+  'server/state/RecordHolds.js',
+  'server/gate/RecordGate.js',
   'server/service/SelectionService.js',
   'server/service/LoadService.js',
   'server/entry/ErrorReport.js',
