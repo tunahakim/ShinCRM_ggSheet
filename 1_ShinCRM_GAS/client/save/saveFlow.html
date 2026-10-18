@@ -101,6 +101,34 @@ function saveFlowResolveConflict(entity, conflicts) {
   });
 }
 
+/**
+ * Bản ghi đang sửa vừa bị xóa trên Sheet nên chưa lưu gì. Máy không tự thêm lại vì không biết người xóa chủ ý bỏ hay xóa nhầm; người dùng chọn lưu nội dung đang nhập thành bản ghi mới, bỏ và đóng form, hoặc quay lại form (đóng nền, Esc cùng nghĩa).
+ * RAM đã bỏ bản ghi trước khi hỏi, nên đóng form xong màn xem không còn trỏ vào bản ghi đã mất.
+ */
+function saveFlowResolveGone(entity) {
+  var ten = entity === 'customer' ? 'khách' : 'giao dịch';
+  return uiDecisionChoose({
+    title: (entity === 'customer' ? 'Khách' : 'Giao dịch') + ' này vừa bị xóa trên Sheet nên chưa lưu',
+    message: 'Dòng của ' + ten + ' này không còn trên Sheet. Nội dung bạn đang nhập vẫn còn trên form.',
+    choices: [
+      { id: 'new', label: 'Lưu thành ' + ten + ' mới với nội dung đang nhập', variant: 'primary' },
+      { id: 'discard', label: 'Bỏ và đóng form', variant: 'neutral' },
+      { id: 'cancel', label: 'Quay lại form, chưa lưu gì', variant: 'neutral' }
+    ]
+  }).then(function (choice) {
+    if (choice === 'new') {
+      // Khóa sửa của mã cũ nhả ở đường lưu xong hoặc đóng form như mọi form khác, vì `top.record` vẫn là bản ghi cũ.
+      screenStateMarkNew();
+      return saveFlowSubmit();
+    }
+    if (choice === 'discard') {
+      if (typeof screenViewDropStale === 'function') { screenViewDropStale(); }
+      return screenFormClose();
+    }
+    return null;
+  });
+}
+
 /** Popup trường nhập sai khi lưu: ô sai đã tô đỏ, popup liệt kê lỗi, đóng thì con trỏ về ô sai đầu tiên. */
 function saveFlowShowInvalid(entity, invalid) {
   var focusId = saveFlowPaintInvalid(entity, invalid);
@@ -182,6 +210,10 @@ function saveFlowSubmit() {
         screenStateSetBaseline(res.conflicts.reduce(function (acc, c) { acc[c.field] = c.current; return acc; }, {}));
         return { conflicts: res.conflicts };
       }
+      if (!res.ok && res.gone && res.gone.length) {
+        res.gone.forEach(function (id) { Store.removeRecord(entity, id); });
+        return { gone: res.gone };
+      }
       if (!res.ok) { return { invalid: res.invalid }; }
 
       if (typeof screenFormSyncUnlock === 'function') { screenFormSyncUnlock(entity, top.record); }
@@ -195,6 +227,7 @@ function saveFlowSubmit() {
     // Popup mở sau khi lớp phủ bận đã gỡ: lớp phủ khóa cả Sidebar nên nút của popup mở trong lúc bận không bấm được.
     if (outcome && outcome.conflicts) { return saveFlowResolveConflict(entity, outcome.conflicts); }
     if (outcome && outcome.invalid) { return saveFlowShowInvalid(entity, outcome.invalid); }
+    if (outcome && outcome.gone) { return saveFlowResolveGone(entity); }
     return outcome;
   });
 }

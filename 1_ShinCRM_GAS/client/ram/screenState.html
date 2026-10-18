@@ -118,6 +118,15 @@ function screenStateSetBaseline(values) {
   return top;
 }
 
+/** Chuyển form sửa đang hiện thành form thêm mới, giữ nguyên bản nháp: bản ghi đang sửa vừa bị xóa trên Sheet và người dùng chọn lưu nội dung đang nhập thành bản ghi mới. */
+function screenStateMarkNew() {
+  var top = screenStateTop();
+  if (!top) { throw new Error('Không có form nào đang mở để chuyển thành thêm mới.'); }
+
+  top.themMoi = true;
+  return top;
+}
+
 /**
  * Đóng form đang hiện. Trả về form cần vẽ lại, hoặc `null` khi đã về màn `view`.
  *
