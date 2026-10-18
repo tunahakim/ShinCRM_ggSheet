@@ -97,6 +97,12 @@ async function chay(so) {
   builders.writeGateSave = (request) => { markerConflictWrite = request; return { ok: true }; };
   const markerConflict = builders.FbmSync.pullWrite('activity', [builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate, { sttRec: 'S9' })]);
   check(so, 'Activity marker trỏ FBM ID khác ghi trạng thái xung đột chờ quyết lên Sheet, không cất bản ghi vào state', [markerConflict.conflicts, 'conflicts' in markerState.metadata, markerConflictWrite.records[0].syncStatus], [1, false, builders.FbmSync.SYNC_STATUS.conflict]);
+  // Xung đột định danh không so được bằng hash: lượt sau bản FBM của chính dòng về khớp hai phía vẫn không được gỡ xung đột, vì một FBM ID khác vẫn mang dấu trỏ vào dòng đó.
+  const markerOwnFbm = builders.FbmSync.activityRecord({ id: 'OLD-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung cũ' }, gate, { sttRec: 'S9' });
+  builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash', syncStatus: builders.FbmSync.SYNC_STATUS.conflict }];
+  markerConflictWrite = null;
+  const markerAgain = builders.FbmSync.pullWrite('activity', [markerOwnFbm, builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate, { sttRec: 'S9' })]);
+  check(so, 'Activity đang xung đột định danh (dấu của FBM ID khác trỏ vào) không bị nhánh so ba chiều gỡ, không ghi trạng thái khác lên dòng', [markerAgain.conflicts, ((markerConflictWrite && markerConflictWrite.records) || []).filter((r) => r.id === 'ACT-9' && r.syncStatus !== builders.FbmSync.SYNC_STATUS.conflict).length], [0, 0]);
   // G12: giao dịch đã đồng bộ của chính tài khoản mà FBM còn dấu #SC thì xếp đẩy sửa để bỏ dấu; của tài khoản khác thì không đụng.
   const settingsBeforeMarker = builders.FbmSync.scriptSettings;
   gate.map['@CAT_CONG_VIECGọi'] = 'GOI'; gate.valid['@CAT_CONG_VIEC'] = { 'Gọi': true, GOI: true };
