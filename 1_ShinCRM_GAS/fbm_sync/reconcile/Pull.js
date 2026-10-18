@@ -74,7 +74,14 @@ FbmSync.pullWrite = function (entity, records) {
     if (entity === 'customer' && record.fbmCustomerCode) { var code = String(record.fbmCustomerCode).trim(); (localByCode[code] || (localByCode[code] = [])).push(record); }
     if (entity === 'customer') { var tax = FbmSync.customerTaxKey(record.taxNumber || record.ma_so_thue); if (tax) { (localByTaxNumber[tax] || (localByTaxNumber[tax] = [])).push(record); } }
   });
-  var writes = [], statusWrites = [], pendingClears = [], conflicts = 0, skipped = 0;
+  var writes = [], statusWrites = [], pendingClears = [], conflicts = 0, skipped = 0, markerClaims = {};
+  // Activity bị dấu nhận diện của một FBM ID khác trỏ tới là xung đột định danh, không so được bằng hash; giữ chờ người quyết, không cho nhánh so ba chiều gỡ rồi nhánh dấu đặt lại trong cùng lượt.
+  if (entity === 'activity') {
+    records.forEach(function (incoming) {
+      var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null, key = String(incoming.fbmId || '').trim();
+      if (marked && String(marked.fbmId || '').trim() && String(marked.fbmId).trim() !== key) { markerClaims[String(marked.id || '').trim()] = true; }
+    });
+  }
   records.filter(function (incoming) { return !FbmSync.isTemporaryRecord(entity, incoming); }).forEach(function (incoming) {
     var key = String(incoming.fbmId || '').trim();
     var current = local[key];
@@ -113,8 +120,9 @@ FbmSync.pullWrite = function (entity, records) {
       }
       if (markerId) { skipped += 1; FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.skipped, 'Marker không trỏ tới Activity nội bộ.', { issue: true }); return; }
     }
-    // `09/04`: dòng đang chờ quyết bị khóa đồng bộ, không lấy về; nó đã nằm trong hàng đợi xung đột nên không ghi Log lặp mỗi kỳ.
-    if (current && FbmSync.isConflictPending(current)) { skipped += 1; return; }
+    // Dòng đang chờ quyết vẫn so ba chiều lại với baseline cũ (xung đột không bao giờ ghi baseline): hai phía đã khớp hoặc một phía đã quay về gốc thì xử như mọi dòng; còn xung đột thì giữ nguyên, không ghi lại và không Log lặp mỗi kỳ.
+    var wasConflict = !!current && FbmSync.isConflictPending(current);
+    if (wasConflict && markerClaims[String(current.id || '').trim()]) { skipped += 1; return; }
     var currentBusy = current && gate.busy(entity, [current.id])[String(current.id || '').trim()];
     if (currentBusy) { skipped += 1; FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Hoãn tới lượt sau: ' + currentBusy.reason, { issue: true }); return; }
     var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
@@ -205,6 +213,7 @@ FbmSync.pullWrite = function (entity, records) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Không có thay đổi giữa FBM và ShinCRM.');
       return;
     }
+    if (decision.conflict && wasConflict) { skipped += 1; return; }
     if (decision.conflict) {
       conflicts += 1;
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
@@ -214,11 +223,11 @@ FbmSync.pullWrite = function (entity, records) {
     if (decision.shinChanged && !decision.fbmChanged) {
       skipped += 1;
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.pending });
-      FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.pending, 'Chỉ ShinCRM thay đổi; chờ chiều đẩy.');
+      FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.pending, wasConflict ? 'FBM đã quay về giá trị gốc, chỉ ShinCRM khác; gỡ xung đột, chờ chiều đẩy.' : 'Chỉ ShinCRM thay đổi; chờ chiều đẩy.');
       return;
     }
     writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmHash: decision.hFBM, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
-    FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Chỉ FBM thay đổi; cập nhật nội dung ShinCRM.');
+    FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, !wasConflict ? 'Chỉ FBM thay đổi; cập nhật nội dung ShinCRM.' : decision.hFBM === decision.hSHIN ? 'Hai phía đã khớp nhau; gỡ xung đột.' : 'ShinCRM đã quay về giá trị gốc, chỉ FBM khác; gỡ xung đột, cập nhật nội dung ShinCRM.');
   });
   // Dòng chỉ được sửa trường FBM sở hữu vẫn là dữ liệu đổi trên Sheet, nên tính vào số đã ghi; không thì Log báo "0 bản ghi đã ghi Sheet" cạnh một lần ghi thật.
   var ownedOnly = 0;

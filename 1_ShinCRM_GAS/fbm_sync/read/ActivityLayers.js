@@ -173,10 +173,10 @@ FbmSync.lastActivityDiff = function (row, last, categoryGate) {
   return last.records.some(function (record) { return !FbmSync.diff('activity', fbm, record, categoryGate, FbmSync.LAST_ACTIVITY_FIELDS).length; }) ? [] : ['ma_cv'];
 };
 
-/** Trạng thái làm khách hoặc giao dịch phải đọc lại dù nội dung FBM không đổi: cờ vắng mặt, chuyển quyền được xét lại, bản đã đẩy chờ xác nhận. */
+/** Trạng thái làm khách hoặc giao dịch phải đọc lại dù nội dung FBM không đổi: cờ vắng mặt, chuyển quyền được xét lại, bản đã đẩy chờ xác nhận, xung đột chờ quyết (FBM quay về gốc thì danh sách không lộ thay đổi mà dòng vẫn phải so lại). */
 FbmSync.readAgainStatus = function (record) {
   var status = String(record && record.syncStatus || ''), sync = FbmSync.SYNC_STATUS;
-  return status === sync.missing || status === sync.transferred || status === sync.pushed;
+  return status === sync.missing || status === sync.transferred || status === sync.pushed || status === sync.conflict;
 };
 
 /**
