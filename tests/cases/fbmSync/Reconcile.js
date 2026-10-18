@@ -117,8 +117,9 @@ async function chay(so) {
   check(so, 'Customer thiếu FBM ID chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
 
   pushed.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-KEEP', fbmId: 'FBM-1' }] : [];
-  check(so, 'beforeHardDelete chan xoa cung record co FBM ID', pushed.beforeHardDelete('customer', 'CUS-KEEP').allowed, false);
-  check(so, 'beforeHardDelete cho xoa cung record chua co FBM ID', pushed.beforeHardDelete('customer', 'CUS-MISSING').allowed, true);
+  const giu = pushed.beforeHardDelete('customer', ['CUS-KEEP', 'CUS-MISSING']).soft;
+  check(so, 'beforeHardDelete chan xoa cung record co FBM ID', Object.prototype.hasOwnProperty.call(giu, 'CUS-KEEP'), true);
+  check(so, 'beforeHardDelete cho xoa cung record chua co FBM ID', Object.prototype.hasOwnProperty.call(giu, 'CUS-MISSING'), false);
 }
 
 module.exports = { chay };

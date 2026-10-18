@@ -179,6 +179,28 @@ function chay(so) {
   const ghiChuTruoc = o('@CUS_GHI_CHU');
   const mat = luu({ id: 'KH000404', note: 'không có chỗ ghi' }, { note: '' });
   check(so, 'bản ghi đang sửa không còn trên sheet: không ghi gì, trả gone để Sidebar hỏi người dùng', [mat.ok, mat.gone, o('@CUS_GHI_CHU')], [false, ['KH000404'], ghiChuTruoc]);
+
+  section('Cửa xóa: người điều phối thuần, điểm cắm hỏi một lần cho cả danh sách');
+  ghiO(xd, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
+  ghiO(xd, 'Customer', 6, '@CUS_MA_KH', 'KH000003');
+  const hoi = [];
+  h.beforeHardDelete = (entity, ids) => { hoi.push(ids.slice()); return { soft: { KH000002: 'FBM còn giữ' } }; };
+  const xoa = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000777', ' KH000002 ', 'KH000404', 'KH000002', 'KH000003'] }));
+  const trangThai = xoa.soft.rows.map((row) => row[xoa.soft.fields.indexOf('id')] + ':' + row[xoa.soft.fields.indexOf('recordStatus')]);
+  const conLai = xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1, 3, 1).getValues().map((r) => r[0]);
+  check(so, 'xóa lô lẫn mã trùng, mã vắng: hỏi điểm cắm đúng một lần với các mã còn trên sheet; xóa hẳn, xóa mềm ghi deleted, mã vắng trả gone',
+    [hoi, xoa.hard, trangThai, xoa.gone, Object.keys(xoa.reasons), conLai],
+    [[['KH000777', 'KH000002', 'KH000003']], ['KH000777', 'KH000003'], ['KH000002:deleted'], ['KH000404'], ['KH000002'], ['KH000002', '', '']]);
+
+  h.beforeHardDelete = () => { throw new Error('module hỏng'); };
+  h.flushLog();
+  const xoaLoi = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
+  h.flushLog();
+  check(so, 'điểm cắm lỗi thì giữ lại bản ghi (xóa mềm), báo lý do và ghi Log mức lỗi',
+    [xoaLoi.hard, xoaLoi.soft.rows.length, /module hỏng/.test(xoaLoi.reasons.KH000002), JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('beforeHardDelete') >= 0],
+    [[], 1, true, true]);
+  delete h.beforeHardDelete;
+  check(so, 'hàm thuần chia nhóm', h.deleteGateSplit(['A', 'B', 'C'], ['C'], { B: 'giữ' }), { hard: ['A'], soft: ['B'], gone: ['C'] });
 }
 
 module.exports = { chay };

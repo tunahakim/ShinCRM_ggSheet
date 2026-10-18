@@ -611,6 +611,26 @@ async function testSaveFlowPopup(so) {
   const e3 = await voiMat('cancel');
   check(so, 'chọn quay lại form: không gửi thêm, form vẫn mở với chữ đang nhập', [e3.x.ghi.gui.length, e3.x.ghi.dongHuy, e3.x.ghi.dong, e3.x.bo.dom.document.getElementById('f-ghiChu').value], [1, 0, 0, 'của tôi']);
 
+  const xoa = taoBoTest();
+  napClient(xoa.hop, 'client/save/pendingDelete.html');
+  const ram = [];
+  Object.assign(xoa.hop, {
+    Store: { removeRecord: (e, id) => ram.push('bỏ ' + id), upsertRecord: (e, r) => ram.push('ghi ' + r.id) },
+    ingestUnpack: (fields, rows) => rows.map((row) => ({ id: row[0] })),
+    sidebarBusyRun: (label, fn) => Promise.resolve().then(fn),
+    pendingDeleteRedraw: () => 'vẽ',
+    callServer: () => Promise.resolve({ ok: true, hard: ['GD1'], gone: ['GD9'], soft: { fields: ['id'], rows: [['GD2']] }, reasons: { GD2: 'Bản ghi đã có ID FBM' } })
+  });
+  xoa.hop.PENDING_DELETE.entity = 'activity';
+  xoa.hop.PENDING_DELETE.ids = ['GD1', 'GD2', 'GD9'];
+  const huaXoa = xoa.hop.pendingDeleteFire();
+  const moXoa = await bamPopup(xoa.hop, 'cancel');
+  const chuXoa = Array.from(xoa.bo ? [] : xoa.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
+  check(so, 'xóa: bỏ khỏi RAM cả mã xóa hẳn lẫn mã đã không còn trên Sheet, ghi đè dòng xóa mềm, báo xóa mềm bằng popup Sidebar không dùng alert', [
+    ram, moXoa, await huaXoa, xoa.calls.filter((c) => c.name === 'alert').length, chuXoa.indexOf('• GD2: Bản ghi đã có ID FBM') >= 0 || chuXoa.join('|').indexOf('GD2: Bản ghi đã có ID FBM') >= 0
+  ], [['bỏ GD1', 'bỏ GD9', 'ghi GD2'], true, 'vẽ', 0, true]);
+  check(so, 'luồng xóa không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/pendingDelete.html')), false);
+
   check(so, 'luồng lưu form không còn gọi alert của trình duyệt', /\balert\(/.test(docClient('save/saveFlow.html')), false);
 }
 

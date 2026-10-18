@@ -15,7 +15,6 @@ const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 
 const RUNTIME_WRITERS = {
   'server/config/ConfigSheetSetup.js': 'config/setup',
-  'server/gate/DeleteGate.js': 'record/delete',
   'server/log/LogGate.js': 'infrastructure/log',
   'server/sheet/SheetCellWrite.js': 'sheet/cell-write',
   'server/sheet/SheetGrid.js': 'helper/grid',
@@ -31,7 +30,6 @@ const RUNTIME_WRITERS = {
  */
 const READ_COPY_RELATION = {
   'server/config/ConfigSheetSetup.js': 'drop',
-  'server/gate/DeleteGate.js': 'drop',
   'server/log/LogGate.js': 'none',
   'server/sheet/SheetCellWrite.js': 'forget',
   'server/sheet/SheetGrid.js': 'format',

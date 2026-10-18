@@ -111,7 +111,7 @@ function chay(so) {
     [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 0]);
 
   const softEnv = taoHop();
-  softEnv.hop.beforeHardDelete = () => ({ allowed: false, reason: 'FBM còn giữ bản ghi' });
+  softEnv.hop.beforeHardDelete = (entity, ids) => ({ soft: { [ids[0]]: 'FBM còn giữ bản ghi' } });
   const softDeleted = trongLanChay(softEnv.hop, () => softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate soft delete cũng phát signal cho mã bị đổi trạng thái',
     [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, dongSoCuoi(softEnv.hop).customer, (softEnv.hop.reloadStateRead().viewsStaleRevision === softEnv.hop.reloadStateRead().revision)],

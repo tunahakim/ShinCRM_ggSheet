@@ -96,7 +96,7 @@ function chay(so) {
   });
   check(so, 'cửa ghi thêm dòng xong thì lần đọc sau trong cùng lần gọi thấy số dòng mới', sauGhi, [true, 3, 4, 4]);
 
-  hop.beforeHardDelete = (entity, id) => ({ allowed: id !== 'KH000002', reason: 'thử xóa mềm' });
+  hop.beforeHardDelete = (entity, ids) => ({ soft: ids.indexOf('KH000002') >= 0 ? { KH000002: 'thử xóa mềm' } : {} });
   const sauXoa = trongLanGoi(hop, () => {
     const kq = hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001', 'KH000002'] });
     return [kq.ok, kq.hard, kq.soft.rows.length, hop.entityRowCount('customer')];
