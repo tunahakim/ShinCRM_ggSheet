@@ -10,7 +10,7 @@ function sheetCellsWrite(sheet, firstRow, firstColumn, matrix) {
   try {
     sheet.getRange(firstRow, firstColumn, matrix.length, matrix[0].length).setValues(matrix);
   } finally {
-    sheetReadCopyForget(sheet, firstRow, matrix.length, true);
+    sheetReadCopyForget(sheet, firstRow, matrix.length, true, firstColumn, matrix[0].length);
   }
 }
 
@@ -50,12 +50,19 @@ function sheetColumnsInsertBefore(sheet, column, count) {
   }
 }
 
-/** Xóa hẳn các dòng theo số dòng, gom dải liền nhau thành một lệnh và xóa từ dưới lên để số dòng chưa xóa không trượt. Dòng dưới dịch lên nên bỏ cả phần tờ nháp của sheet. */
+/**
+ * Xóa hẳn các dòng theo số dòng, gom dải liền nhau thành một lệnh và xóa từ dưới lên để số dòng chưa xóa không trượt. Dòng dưới dịch lên nên bỏ cả phần tờ nháp của sheet.
+ * Google từ chối xóa hết các hàng không đóng băng và ném lỗi giữa chừng, khi đã xóa xong vài dải: lưới sát dữ liệu (sheet mới dựng, sheet vừa bị dọn) gặp đúng ca này. Nên tính trước, sắp xóa hết thì chèn bù hàng trống ở cuối lưới rồi mới xóa.
+ */
 function sheetRowsDelete(sheet, rowNumbers) {
   if (!rowNumbers.length) { return; }
   sheetPolicyAssertWritable(sheet);
+  var spans = sheetRegionsSpans(rowNumbers);
+  var count = spans.reduce(function (sum, span) { return sum + span.length; }, 0);
   try {
-    sheetRegionsSpans(rowNumbers).reverse().forEach(function (span) { sheet.deleteRows(span[0], span.length); });
+    var left = sheet.getMaxRows() - sheet.getFrozenRows() - count;
+    if (left < 1) { sheet.insertRowsAfter(sheet.getMaxRows(), 1 - left); }
+    spans.reverse().forEach(function (span) { sheet.deleteRows(span[0], span.length); });
   } finally {
     sheetReadCopyForget(sheet, 1, null, false);
   }

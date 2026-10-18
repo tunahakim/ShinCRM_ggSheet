@@ -26,8 +26,8 @@ var SAVE_BREAKDOWN_PROBE_PARTS = [
   'saveRecord',
   'FbmSync.withOrchestrationLock', 'fbmSyncSaveAllowed',
   'documentLockRun', 'documentLockSettle',
-  'entityReadContext', 'entityPlace', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
-  'writeGateConflicts', 'writeGateRowSnapshot', 'entityWriteRecords', 'writeGateConfirm', 'writeGateReadBack', 'logEvent',
+  'entityReadContext', 'entityReadByIds', 'writeGateSelectCatalog', 'writeGateUniqueCheck', 'idGateIssue',
+  'writeGateConflicts', 'writeGateApply', 'entityWriteRecords', 'writeGateConfirm', 'logEvent',
   'recordChangesAfterWrite', 'reloadStateRead'
 ];
 

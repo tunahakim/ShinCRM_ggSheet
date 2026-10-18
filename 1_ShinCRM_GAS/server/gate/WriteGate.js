@@ -132,7 +132,7 @@ function writeGateInvalid(plan, field, spec, reason) {
 }
 
 /**
- * Xếp từng bản ghi vào một trong hai đường: thêm mới hay sửa. Mã đang sửa có trên sheet hay không do `entityPlace` kiểm ngay sau bước này.
+ * Xếp từng bản ghi vào một trong hai đường: thêm mới hay sửa. Mã đang sửa có trên sheet hay không do lần đọc `entityReadByIds` ngay sau bước này trả lời.
  *
  * **Mã rỗng là bản ghi mới**, và mã do cửa cấp mã cấp bên trong khóa. Client tuyệt đối không được gửi mã xem trước lên đây: mã xem trước tính lúc mở form, mà giữa lúc mở form và lúc bấm Lưu thì người khác hoàn toàn có thể đã dùng đúng mã đó.
  *
@@ -325,26 +325,31 @@ function writeGateConfirm(entity, plans, fields, context, rows) {
     reason: 'Đọc lại sau ghi không khớp trên sheet "' + context.sheetName + '"',
     detail: { lech: mismatches }
   });
-  throw new Error('Sheet "' + context.sheetName + '" vừa bị đổi đúng lúc lưu (sắp xếp, chèn hoặc xóa hàng), hoặc Google tự đổi giá trị: dòng vừa ghi không còn khớp ở ' + mismatches.map(function (item) { return item.id + ' / ' + item.field; }).join(', ') + '. Sidebar sẽ nạp lại; kiểm tra lại các bản ghi này trên Sheet.');
-}
-
-/** Giá trị trường RAM hiện có trên Sheet của các bản ghi, theo mã, cùng bộ đổi kiểu với `writeGateReadBack` để so được với bản đọc lại. */
-function writeGateRowSnapshot(plans, context, placement) {
-  var snap = {};
-  if (!plans.length) { return snap; }
-  entityReadPlaced(context, placement, plans.map(function (plan) { return plan.id; })).rows.forEach(function (row) { snap[String(row[context.idAt]).trim()] = JSON.stringify(row); });
-  return snap;
+  var moved = mismatches.filter(function (item) { return item.field === 'id'; });
+  throw new Error('Sheet "' + context.sheetName + '" vừa bị đổi đúng lúc lưu (sắp xếp, chèn hoặc xóa hàng), hoặc Google tự đổi giá trị: dòng vừa ghi không còn khớp ở ' + mismatches.map(function (item) { return item.id + ' / ' + item.field; }).join(', ') + '.'
+    + (moved.length ? ' Nội dung định lưu cho ' + moved.map(function (item) { return item.id + ' đã rơi vào dòng của ' + (item.onSheet || 'một dòng không mã'); }).join(', ') + '; mở Lịch sử phiên bản của Sheet để lấy lại giá trị cũ của dòng đó.' : '')
+    + ' Sidebar sẽ nạp lại; kiểm tra lại các bản ghi này trên Sheet.');
 }
 
 /**
- * Đọc lại đúng những dòng vừa ghi, trả về đúng hình dạng của đường nạp: `{ fields, rows }`.
- *
- * Đọc lại chứ không trả về thứ vừa gửi lên. Bên gọi chỉ gửi vài trường, mà `Store.upsertRecord` thay **cả** bản ghi trong bộ nhớ — trả về một bản ghi thiếu trường là xóa trắng phần còn lại của nó trong bộ nhớ. Đọc lại còn trả lời luôn câu "sheet thật sự đang giữ gì", nên bộ nhớ và sheet không thể lệch nhau sau một lượt lưu.
- *
- * Đọc qua tờ nháp của lần gọi; công cụ ghi ô đã quên các dòng vừa ghi và ép lệnh ghi xuống trước lần đọc này, nên dòng đọc lại là giá trị thật và cũng thành bản nhớ mới của các dòng đó cho phần còn lại của lần gọi. Dùng chung bộ đổi kiểu với đường nạp, nên giá trị về client đi qua đúng một bộ đổi kiểu — ngày ra chữ, số ra số. Hai bộ đổi kiểu là hai cơ hội lệch nhau.
+ * Tiến trình con "ghi giá trị đã kiểm": ghi → nhận bản đọc lại → xác nhận sau ghi. Cửa ghi gọi sau khi kiểm xong; cửa xóa gọi cho xóa mềm, vì xóa mềm là một lượt ghi. Phải đang cầm khóa tài liệu.
+ * `plans` là `[{ id, values, moi }]` với `values` đã ép kiểu theo `fields`. Trả `{ gone }` khi có mã sửa không còn trên sheet (không ghi gì), hoặc `{ gone: [], fields, rows }` với `rows` cùng thứ tự `plans`.
+ * Trả bản đọc lại chứ không trả thứ vừa gửi: bên gọi chỉ gửi vài trường mà `Store.upsertRecord` thay cả bản ghi trong bộ nhớ, và bản đọc lại đi qua đúng bộ đổi kiểu của đường nạp.
  */
-function writeGateReadBack(plans, context, placement) {
-  return { fields: context.names, rows: entityReadPlaced(context, placement, plans.map(function (plan) { return plan.id; })).rows };
+function writeGateApply(entity, context, fields, plans) {
+  var written = entityWriteRecords(context, fields, plans.map(function (plan) { return { id: plan.id, values: plan.values, append: plan.moi }; }));
+  if (written.gone.length) { return { gone: written.gone }; }
+  writeGateConfirm(entity, plans, fields, context, written.rows);
+  return { gone: [], fields: context.names, rows: written.rows };
+}
+
+/** Mã đang sửa không còn trên sheet (có người vừa xóa dòng): không ghi gì, trả `gone` để Sidebar hỏi người dùng lưu thành bản ghi mới hay bỏ. */
+function writeGateGone(entity, gone, batDau) {
+  logEvent({
+    source: 'core', action: 'writeGateSave', outcome: LOG_WARN, entity: entity, recordId: gone.join(' '),
+    reason: 'Bản ghi đang sửa không còn trên sheet, không ghi gì'
+  });
+  return { ok: false, entity: entity, gone: gone, ms: Date.now() - batDau };
 }
 
 /**
@@ -357,7 +362,10 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
   var names = Object.keys(fields);
 
   var plans = writeGatePlans(records, olds);
-  var placement = entityPlace(context, plans.filter(function (plan) { return !plan.moi; }).map(function (plan) { return plan.id; }));
+  var edits = plans.filter(function (plan) { return !plan.moi; });
+  // Một lần đọc dòng hiện có của bản ghi sửa, dùng cho cả kiểm xung đột lẫn so trường RAM sau ghi.
+  var current = entityReadByIds(context, edits.map(function (plan) { return plan.id; }));
+  if (current.gone.length) { return writeGateGone(entity, current.gone, batDau); }
   var invalid = [];
 
   // Đọc bảng danh mục một lần cho cả lô, chỉ khi nguồn là `user` — nguồn `pull` bỏ qua mọi phép kiểm giá trị. `Category` đọc từ sheet chứ không từ bộ nhớ, vì giá trị danh mục có thể đã đổi giữa hai lượt mở sidebar.
@@ -365,8 +373,7 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
   if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields); }
 
   plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid, selectAllowed); });
-  var edits = plans.filter(function (plan) { return !plan.moi; });
-  var conflicts = source === 'user' && edits.length ? writeGateConflicts(edits, entityReadPlaced(context, placement, edits.map(function (plan) { return plan.id; })).rows, fields, context) : [];
+  var conflicts = source === 'user' && edits.length ? writeGateConflicts(edits, current.rows, fields, context) : [];
   writeGateUniqueCheck(plans, names, fields, source, context, invalid);
 
   if (invalid.length) {
@@ -403,13 +410,13 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
     });
   });
 
-  // Chụp giá trị cũ của bản ghi sửa có chạm trường RAM, để chỉ bản ghi đổi thật mới báo Sidebar nạp lại.
+  // Giá trị cũ của bản ghi sửa có chạm trường RAM, để chỉ bản ghi đổi thật mới báo Sidebar nạp lại.
   var touched = cu.filter(function (plan) { return Object.keys(plan.values).some(function (ten) { return context.names.indexOf(ten) >= 0; }); });
-  var before = writeGateRowSnapshot(touched, context, placement);
+  var before = {};
+  current.rows.forEach(function (row) { before[String(row[context.idAt]).trim()] = JSON.stringify(row); });
 
-  var written = entityWriteRecords(context, fields, placement, plans.map(function (plan) { return { id: plan.id, values: plan.values, append: plan.moi }; }));
-  var doc = writeGateReadBack(plans, context, written);
-  writeGateConfirm(entity, plans, fields, context, doc.rows);
+  var doc = writeGateApply(entity, context, fields, plans);
+  if (doc.gone.length) { return writeGateGone(entity, doc.gone, batDau); }
   var after = {};
   doc.rows.forEach(function (row) { after[String(row[context.idAt]).trim()] = JSON.stringify(row); });
   var ms = Date.now() - batDau;
@@ -444,7 +451,9 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
  *
  * Trả về `{ ok: true, entity, fields, rows, ms }` — đúng hình dạng của đường nạp, để client dùng lại đúng một bộ đổi hàng-thành-bản-ghi. Có trường không đạt thì trả về `{ ok: false, entity, invalid: [ { index, id, field, label, reason } ], ms }` và **không ghi gì**. Trường bị đổi trên Sheet trong lúc người dùng sửa thì trả `{ ok: false, entity, conflicts: [ { index, id, field, label, old, current, mine } ], ms }` và cũng không ghi gì.
  *
- * Ném lỗi chỉ ở chuyện hạ tầng: không lấy được khóa, mã đang sửa biến mất khỏi sheet, sheet có hai dòng cùng mã, bảng khai sai, thiếu `old`, dòng vừa ghi đọc lại không khớp. Lỗi người dùng gõ thì không bao giờ ném — nó đi về theo `invalid` để hiện đỏ ngay tại ô đó.
+ * Mã đang sửa không còn trên sheet (có người vừa xóa dòng) thì trả `{ ok: false, entity, gone: [mã], ms }` và không ghi gì; không âm thầm thêm dòng mới, vì người dùng tin mình đang sửa bản ghi cũ.
+ *
+ * Ném lỗi chỉ ở chuyện hạ tầng: không lấy được khóa, sheet có hai dòng cùng mã, bảng khai sai, thiếu `old`, dòng vừa ghi đọc lại không khớp. Lỗi người dùng gõ thì không bao giờ ném — nó đi về theo `invalid` để hiện đỏ ngay tại ô đó.
  *
  * `tryLock` chứ không `waitLock`, để câu báo hết giờ là câu tiếng người của dự án chứ không phải câu tiếng Anh của Google. Mười lăm giây là con số bản cũ đã chạy thật.
  */

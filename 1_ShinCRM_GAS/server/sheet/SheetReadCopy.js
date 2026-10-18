@@ -190,17 +190,23 @@ function sheetReadColumnValues(sheet, column, firstDataRow) {
 }
 
 /**
- * Chỉ `SheetCellWrite` gọi, ngay sau mỗi lệnh ghi: đánh dấu chờ `flush` và quên `rowCount` dòng từ `firstRow` cùng bản nhớ theo cột, để lần đọc sau lấy giá trị thật từ Sheet (và nhớ luôn); dòng khác giữ nguyên. Đụng hàng 1 thì quên hàng mã. `rowCount` là `null` khi dòng đã dịch chỗ (xóa dòng): bỏ cả phần của sheet.
+ * Chỉ `SheetCellWrite` gọi, ngay sau mỗi lệnh ghi: đánh dấu chờ `flush` và quên `rowCount` dòng từ `firstRow`, để lần đọc sau lấy giá trị thật từ Sheet (và nhớ luôn); dòng khác giữ nguyên. Đụng hàng 1 thì quên hàng mã. `rowCount` là `null` khi dòng đã dịch chỗ (xóa dòng): bỏ cả phần của sheet.
  * `grew`: lệnh ghi giá trị có thể nối dài sheet nên nâng dòng cuối đã nhớ; xóa nội dung có thể làm dòng cuối co lại nên quên dòng cuối đã nhớ.
+ * Cột nhớ riêng dài đúng số dòng lúc đọc: ghi giá trị trong vùng dữ liệu cũ (có `firstColumn`, `columnCount`, dòng cuối không đổi) chỉ quên các cột vừa ghi, để cột mã còn dùng được cho lần tra mã kế tiếp mà không đọc lại; ca khác quên mọi cột.
  */
-function sheetReadCopyForget(sheet, firstRow, rowCount, grew) {
+function sheetReadCopyForget(sheet, firstRow, rowCount, grew, firstColumn, columnCount) {
   SHEET_READ_COPY.pendingFlush = true;
   var slot = sheetReadCopySlotOf(sheet);
   if (!slot) { return; }
   if (rowCount === null) { sheetReadCopyDrop(sheet.getName()); return; }
   var lastRow = firstRow + rowCount - 1;
   if (slot.rows) { for (var row = firstRow; row <= lastRow; row++) { delete slot.rows[row]; } }
-  delete slot.columns;
+  var inside = grew && firstColumn && slot.lastRow !== undefined && lastRow <= slot.lastRow;
+  if (inside && slot.columns) {
+    for (var column = firstColumn; column < firstColumn + columnCount; column++) { delete slot.columns[column]; }
+  } else {
+    delete slot.columns;
+  }
   if (firstRow <= 1) { delete slot.header; }
   if (!grew) { delete slot.lastRow; } else if (slot.lastRow !== undefined && lastRow > slot.lastRow) { slot.lastRow = lastRow; }
 }
