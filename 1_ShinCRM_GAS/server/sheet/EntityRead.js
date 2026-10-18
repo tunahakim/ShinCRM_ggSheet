@@ -227,6 +227,15 @@ function entityReadAllCombined(entity, schemas) {
   return entityReadAll(entity, entityReadCombinedFields(entity, schemas));
 }
 
+/** Khối `{ fields, rows }` của đường nạp thành mảng object theo tên trường; mỗi lần gọi dựng object mới nên bên gọi sửa object không làm bẩn bản đọc. */
+function entityBlockRecords(block) {
+  return block.rows.map(function (row) {
+    var record = {};
+    block.fields.forEach(function (field, index) { record[field] = row[index]; });
+    return record;
+  });
+}
+
 /** Bản ghi mang mã `id` với tập schema mở rộng: tìm dòng qua cột mã rồi đọc đúng dòng đó, qua bản đọc Sheet chung. `rows` rỗng khi không có mã. */
 function entityReadRecordById(entity, schemas, id) {
   var context = entityReadContext(entity, entityReadCombinedFields(entity, schemas));

@@ -11,6 +11,9 @@
 /** Nguồn ghi log của mọi đường trong tệp này. Giống `LoadService.gs`: sidebar gọi qua `google.script.run` nên nguồn là `sidebar` và kênh báo lỗi là ném lại. */
 var SAVE_SOURCE = 'sidebar';
 
+/** Chủ trong sổ bận của mọi lần lưu/xóa từ Sidebar (tài liệu 06 Phần 2). */
+var SAVE_HOLDER = 'user';
+
 /**
  * Lưu một bản ghi. `record.id` rỗng là thêm mới, có mã là sửa dòng mang mã đó.
  *
@@ -20,14 +23,18 @@ var SAVE_SOURCE = 'sidebar';
  *
  * `invalid` là mảng `{ index, id, field, label, reason }`. Client tô đỏ đúng những `field` ấy rồi cuộn tới cái đầu tiên `[RÀNG BUỘC CỨNG]` tài liệu 06 Phần 4.
  *
- * Sửa bản ghi cũ thì hỏi khóa đồng bộ FBM và ghi trong **cùng một lời gọi** qua `fbmSaveGuarded`: tách thành hai lời gọi là tốn thêm một vòng đường truyền và để hở khoảng giữa lúc hỏi với lúc ghi. Bị chặn thì trả `{ ok: false, blocked: true, code, message }`, không ghi gì.
+ * Lưu đi qua Cửa bản ghi (tài liệu 06 Phần 1): hỏi sổ bận và ghi trong cùng một lần cầm khóa, không hở khoảng giữa lúc hỏi và lúc ghi. Bản ghi đang bị tiến trình khác giữ (thường là đồng bộ đang đẩy nó) thì trả `{ ok: false, entity, busy: { id, by, reason } }` và không ghi gì; Sidebar mở popup "Thử lại" / "Quay lại form". Bản ghi đang "xung đột chờ quyết" vẫn lưu được: màn xung đột tự thấy phía ShinCRM đã đổi.
  */
 function saveRecord(entity, record, old) {
   return runEntryPoint('saveRecord', SAVE_SOURCE, 'throw', function () {
     var batDau = Date.now();
     var id = String(record && record.id || '').trim();
-    var write = function () { return writeGateSave({ entity: entity, records: [record], source: 'user', old: [old] }); };
-    var ra = id ? fbmSaveGuarded(entity, id, record.fbmHash || '', write) : write();
+    var run = recordGateRun({ by: SAVE_HOLDER, decide: function (gate) {
+      var busy = id ? gate.busy(entity, [id])[id] : null;
+      if (busy) { return { value: { ok: false, entity: entity, busy: { id: id, by: busy.by, reason: busy.reason } } }; }
+      return { save: [{ entity: entity, records: [record], source: 'user', old: [old] }] };
+    } });
+    var ra = run.value || run.saves[0];
 
     // Ghi nhận thay đổi trước khi trả để phản hồi mang revision đã gồm lượt lưu này; Sidebar đã áp bản đọc lại nên không phải hỏi nạp thêm.
     recordChangesAfterWrite();
@@ -40,14 +47,21 @@ function saveRecord(entity, record, old) {
 /**
  * Xóa một hoặc nhiều bản ghi. Nhận mảng mã vì phép hoàn tác gom mấy lần bấm Xóa liền nhau thành một lời gọi.
  *
- * Trả về `{ ok: true, entity, hard, soft, gone, reasons, dirty, ms }`. Client bỏ mọi mã trong `hard` và `gone` khỏi bộ nhớ bằng `Store.removeRecord`, ghi đè mọi dòng trong `soft` bằng `Store.upsertRecord`, rồi hiện `reasons` nếu có — mỗi câu trong đó nói vì sao một bản ghi chỉ được xóa mềm.
+ * Trả về `{ ok: true, entity, hard, soft, gone, reasons, busy, dirty, ms }`. `busy` là `{ mã: lý do }` của mã đang bị tiến trình khác giữ trong sổ bận: chưa xóa, client hiện lại dòng và mở popup "Thử lại" / "Để sau". Client bỏ mọi mã trong `hard` và `gone` khỏi bộ nhớ bằng `Store.removeRecord`, ghi đè mọi dòng trong `soft` bằng `Store.upsertRecord`, rồi hiện `reasons` nếu có — mỗi câu trong đó nói vì sao một bản ghi chỉ được xóa mềm.
  *
  * Đây là đường ghi duy nhất mà mảng đi tới tầng này, và nó khác `saveRecord` ở chỗ mảng mã có nguồn thật: dải hoàn tác đếm ngược một lần cho nhiều lần bấm.
  */
 function deleteRecords(entity, ids) {
   return runEntryPoint('deleteRecords', SAVE_SOURCE, 'throw', function () {
     var batDau = Date.now();
-    var ra = deleteGateRemove({ entity: entity, ids: ids });
+    var run = recordGateRun({ by: SAVE_HOLDER, decide: function (gate) {
+      var held = Array.isArray(ids) ? gate.busy(entity, ids) : {}, busy = {};
+      Object.keys(held).forEach(function (id) { busy[id] = held[id].reason; });
+      var free = Array.isArray(ids) ? ids.filter(function (id) { return !Object.prototype.hasOwnProperty.call(held, String(id === null || id === undefined ? '' : id).trim()); }) : ids;
+      return { remove: [{ entity: entity, ids: free }], value: busy };
+    } });
+    var ra = run.removes[0];
+    ra.busy = run.value;
 
     recordChangesAfterWrite();
     ra.reload = reloadStateRead();
@@ -93,6 +107,19 @@ function probeSaveGate() {
   var sua = saveRecord('customer', { id: ma, phone: '0987000111' }, { phone: '0912345678' });
   report.push('Sửa một trường: ok=' + sua.ok + ', ' + sua.ms + 'ms, điện thoại đọc lại: "' + sua.rows[0][sua.fields.indexOf('phone')] + '"');
   report.push('  tên công ty vẫn nguyên sau khi chỉ gửi một trường? ' + (sua.rows[0][sua.fields.indexOf('companyName')] === 'THỬ CỬA GHI — xóa được'));
+
+  // Sổ bận: chủ giả giữ bản ghi thì lưu và xóa từ Sidebar phải trả bận, không ghi gì; nhả trong finally để lần chạy lỗi giữa chừng không để lại mục giữ.
+  recordGateRun({ by: 'probe', run: 'probeSaveGate', decide: function () { return { hold: [{ entity: 'customer', ids: [ma], reason: 'Phép thử sổ bận đang giữ.' }] }; } });
+  try {
+    var luuBan = saveRecord('customer', { id: ma, phone: '0987000333' }, { phone: '0987000111' });
+    report.push((luuBan.ok === false && luuBan.busy && luuBan.busy.by === 'probe' ? '✅' : '❌') + ' Lưu khi bản ghi bận: trả busy ' + JSON.stringify(luuBan.busy) + ', ' + luuBan.ms + 'ms');
+    var xoaBan = deleteRecords('customer', [ma]);
+    report.push((xoaBan.ok && xoaBan.busy && xoaBan.busy[ma] && !xoaBan.hard.length ? '✅' : '❌') + ' Xóa khi bản ghi bận: trả busy ' + JSON.stringify(xoaBan.busy) + ', không xóa dòng nào');
+  } finally {
+    recordGateRun({ by: 'probe', run: 'probeSaveGate', decide: function () { return { release: [{ entity: 'customer', ids: [ma] }] }; } });
+  }
+  var luuNha = saveRecord('customer', { id: ma, phone: '0987000111' }, { phone: '0987000111' });
+  report.push((luuNha.ok ? '✅' : '❌') + ' Nhả xong thì lưu lại được: ok=' + luuNha.ok);
 
   var trung = saveRecord('customer', { id: '', companyName: 'THỬ TRÙNG MST', taxNumber: '0101243150', leadSource: nguon, verifyStatus: xacThuc, fbmSyncPermission: 'Chỉ lấy từ FBM' });
   report.push('Thêm bản ghi trùng mã số thuế: ok=' + trung.ok + ' (phải là false), lý do: ' + (trung.ok ? '(không có)' : trung.invalid[0].reason));
