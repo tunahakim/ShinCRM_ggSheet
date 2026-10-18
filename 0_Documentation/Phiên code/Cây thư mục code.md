@@ -77,12 +77,14 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── state\
 │   │   ├── ReloadDecision.js    Hàm thuần nhận thay đổi, ReloadState, chính sách và localDraft tùy chọn rồi trả quyết định signal, reload RAM và render view.
 │   │   ├── DocumentStore.js      Cửa duy nhất vào DocumentProperties và khóa: bản đọc theo một lần gọi, lõi ghi thẳng, đồng bộ FBM ghi gộp trong khóa điều phối; lấy khóa xong thì đọc lại kho.
+│   │   ├── RecordHolds.js        Sổ bận: bản ghi nào đang bị tiến trình nào giữ, vì sao. Chỉ Cửa bản ghi gọi và chỉ trong khóa; phiên ngắn không ghi kho, sổ hỏng thì ném lỗi.
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: tập trung điểm vào theo từng bề mặt, kiểm rồi mới ghi, hậu xử lý reload dùng chung.
 │   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
 │   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
 │   │   ├── WriteCommit.js        Hậu xử lý chung sau ghi thành công: phát signal trong lock, render sau khi nhả lock; fail-fast nếu thiếu module reload, không ghi dữ liệu nguồn.
+│   │   ├── RecordGate.js         Cửa bản ghi: mọi thay đổi dòng Customer/Activity đi qua đây. Bên gọi đưa hàm quyết; cửa giữ khóa, đọc mới, quyết, ghi qua WriteGate/DeleteGate rồi cập nhật sổ bận.
 │   │   ├── WriteGate.js          Cửa ghi nghiệp vụ duy nhất của Customer và Activity: khóa, cấp mã, kiểm tra, ghi đúng cột đã khai, flush rồi nhả khóa.
 │   │   └── DeleteGate.js         Một nút Xóa, hai kết cục: xóa hẳn khi không tầng nào cản, xóa mềm khi có. Xóa nhiều dòng thì xóa từ dưới lên và đọc lại bản ghi mềm.
 │   ├── service\
@@ -238,7 +240,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties, migration Config một lần.
     ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity; migration Config một lần.
-    ├── state\RecordLocks.js      Khóa bản ghi và kiểm tra revision.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
@@ -304,6 +305,7 @@ tests\
     ├── sheetReadCopy.js          Bản đọc Sheet chung: chỉ nhớ trong một lần gọi, bỏ khi cầm khóa, cửa ghi và cửa xóa bỏ để lần đọc sau thấy số dòng mới.
     ├── documentStore.js          Cửa kho dùng chung: một lần ghi khách mới đọc kho thật tối đa 3 lần, tín hiệu reload vào kho trước khi nhả khóa, không tệp nào gọi thẳng kho hay khóa.
     ├── reloadDecision.js         Bảng luật thuần dùng chung cho signal, reload RAM, localDraft và render toàn bộ view.
+    ├── recordGate.js              Sổ bận và Cửa bản ghi: đọc ngoài khóa, nhả sai chủ, sổ hỏng, phiên ngắn không ghi kho, mã bận, lần ghi lỗi không đổi sổ.
     ├── reloadGates.js             Cổng ghi/xóa phát signal sau đọc lại thành công và chứng minh render không phụ thuộc Sidebar.
     ├── userPrefs.js              Ba núm chọn phía máy chủ: giá trị lạ đều rơi về ngầm định, và ghi một núm KHÔNG được để lại dấu vết nào ở DocumentProperties.
     ├── schemaAccess.js           Cửa đọc bảng khai: tên gõ sai nổ ngay kèm gợi ý, còn tên máy như toJSON thì phải đi qua.
