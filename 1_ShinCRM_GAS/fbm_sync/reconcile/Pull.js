@@ -248,10 +248,14 @@ FbmSync.pullWrite = function (entity, records) {
   return result;
 };
 
-/** Giữ tombstone có FBM ID; bản ghi chưa từng đẩy vẫn được xóa cứng bình thường. */
-function beforeHardDelete(entity, id) {
-  var target = String(id || '').trim(), records = FbmSync.readLocal(entity);
-  var found = records.filter(function (record) { return String(record.id || '').trim() === target; })[0];
-  if (found && String(found.fbmId || '').trim()) { return { allowed: false, reason: 'Bản ghi đã có ID FBM nên chỉ được xóa mềm để giữ tombstone.' }; }
-  return { allowed: true, reason: '' };
+/** Giữ tombstone có FBM ID; bản ghi chưa từng đẩy vẫn được xóa cứng bình thường. Đọc bản ghi cục bộ một lần cho cả danh sách mã; trả `{ soft: { mã: lý do } }`, mã vắng trong `soft` là được xóa hẳn. */
+function beforeHardDelete(entity, ids) {
+  var wanted = {};
+  (ids || []).forEach(function (id) { wanted[String(id || '').trim()] = true; });
+  var soft = {};
+  FbmSync.readLocal(entity).forEach(function (record) {
+    var id = String(record.id || '').trim();
+    if (wanted[id] && String(record.fbmId || '').trim()) { soft[id] = 'Bản ghi đã có ID FBM nên chỉ được xóa mềm để giữ tombstone.'; }
+  });
+  return { soft: soft };
 }
