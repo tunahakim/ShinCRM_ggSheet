@@ -6,7 +6,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 
 ## 1. Phiên đang làm
 
-- Phiên đang mở: sửa vi phạm luật thao tác đắt, branch `feature/expensive-ops`. Tiến độ duy nhất nằm ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
+- Phiên đang mở: sửa vi phạm luật thao tác đắt, branch `feature/expensive-ops`. Tiến độ duy nhất nằm ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.14 Vi phạm luật thao tác đắt.md`; chặng Cửa bản ghi và sổ bận theo dõi riêng ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.18 Cửa bản ghi và sổ bận.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
 - Việc kế tiếp nằm trong các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
 - Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.
 - ShinCRM độc lập đã xong phần chính. Không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật khi checklist chưa cho phép.
