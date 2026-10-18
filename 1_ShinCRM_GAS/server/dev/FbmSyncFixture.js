@@ -74,6 +74,26 @@ function fbmSeedConflict() {
   fbmFixtureSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
   return { ok: true, id: source.id, website: website };
 }
+/** Nghiệm thu "khách đang xung đột chờ quyết vẫn lưu được và xóa được từ Sidebar": tạo một khách thử quyền "Chỉ lấy từ FBM" (không bao giờ đi lên FBM) rồi đặt nó sang "xung đột chờ quyết". Sidebar không xóa khách, nên dọn bằng `fbmDevClearConflict`. */
+var FBM_DEV_CONFLICT_NAME = 'THỬ XUNG ĐỘT — xóa được';
+function fbmDevMarkConflict() {
+  var danhMuc = categoryReadAll().categories;
+  var them = saveRecord('customer', { id: '', companyName: FBM_DEV_CONFLICT_NAME, taxNumber: '0101243150', phone: '0912345678', leadSource: danhMuc[DATA_SCHEMA.customer.leadSource.source][0] || '', verifyStatus: danhMuc[DATA_SCHEMA.customer.verifyStatus.source][0] || '', fbmSyncPermission: 'Chỉ lấy từ FBM' });
+  if (!them.ok) { return { ok: false, reason: 'Không tạo được khách thử', invalid: them.invalid }; }
+  var id = them.rows[0][them.fields.indexOf('id')];
+  fbmFixtureSave('customer', [{ id: id, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'pull');
+  return { ok: true, id: id };
+}
+/** Báo lại khách thử của `fbmDevMarkConflict` (trạng thái, Website, giao dịch còn lại) để nghiệm thu, rồi xóa khách và giao dịch còn sót. */
+function fbmDevClearConflict() {
+  var khach = FbmSync.readLocal('customer').filter(function (record) { return record.companyName === FBM_DEV_CONFLICT_NAME; });
+  var ids = khach.map(function (record) { return record.id; });
+  var giaoDich = FbmSync.readLocal('activity').filter(function (record) { return ids.indexOf(record.customerId) >= 0; });
+  var seen = khach.map(function (record) { return { id: record.id, syncStatus: record.syncStatus, website: record.website }; });
+  var xoaGd = giaoDich.length ? deleteRecords('activity', giaoDich.map(function (record) { return record.id; })) : { ok: true };
+  var xoaKh = ids.length ? deleteRecords('customer', ids) : { ok: true };
+  return { seen: seen, activitiesLeft: giaoDich.map(function (record) { return record.id; }), activityDelete: xoaGd.ok, customerDelete: xoaKh.ok };
+}
 /** Dò ca "FBM đổi giữa chừng" (G10.7f): sau khi Sidebar đã mở xem xung đột, làm lệch hash FBM chốt lúc mở; bước Lưu kế tiếp phải thấy khác và trả về xem lại thay vì chốt. Không chạm FBM. */
 function fbmTamperConflictOpenedHash() {
   var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh;
