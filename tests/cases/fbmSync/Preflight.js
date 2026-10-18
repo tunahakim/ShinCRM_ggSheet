@@ -56,9 +56,9 @@ async function chay(so) {
     [quyen('Cho phép', 'activity', { fbmSyncPermission: 'Chỉ lấy từ FBM' }), quyen('Cho phép', 'activity', { fbmSyncPermission: 'Cấm đồng bộ' })], [[false, true, false], [false, false, false]]);
   const docCu = hop.FbmSync.readLocal;
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [] : [{ id: 'CUS-TRONG', fbmSyncPermission: '' }, { id: 'CUS-SAI', fbmSyncPermission: 'Ngừng đồng bộ' }, { id: 'CUS-DUNG', fbmSyncPermission: 'Cho phép' }];
-  const sai = hop.FbmSync.runPreflight({ mode: 'read' }).issues.filter((item) => item.code === 'FBM_SYNC_PERMISSION_INVALID');
+  const sai = hop.FbmSync.runPreflight({ mode: 'write' }).issues.filter((item) => item.code === 'FBM_SYNC_PERMISSION_INVALID');
   hop.FbmSync.readLocal = docCu;
-  check(so, 'preflight cảnh báo ô Cho phép đồng bộ FBM trống hoặc sai, nêu đúng mã bản ghi, không chặn phiên', [sai.length, sai[0] && sai[0].severity, sai[0] && sai[0].blocking, /CUS-TRONG, CUS-SAI./.test(sai[0] && sai[0].message), /CUS-DUNG/.test(sai[0] && sai[0].message)], [1, 'warn', false, true, false]);
+  check(so, 'preflight chiều có đẩy cảnh báo ô Cho phép đồng bộ FBM trống hoặc sai, nêu đúng mã bản ghi, không chặn phiên', [sai.length, sai[0] && sai[0].severity, sai[0] && sai[0].blocking, /CUS-TRONG, CUS-SAI./.test(sai[0] && sai[0].message), /CUS-DUNG/.test(sai[0] && sai[0].message)], [1, 'warn', false, true, false]);
 
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmSyncPermission: 'Cho phép' }];
   const read = hop.FbmSync.runPreflight({ mode: 'read' });
@@ -108,10 +108,10 @@ async function chay(so) {
   // FBM-022: đọc Sheet lỗi thì preflight chặn có mã, không báo 0 bản ghi như Sheet trống; Sheet và hash chỉ tính một lần mỗi lượt preflight.
   const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash;
   hop.FbmSync.readLocal = () => { throw new Error('Exception: Service Spreadsheets timed out'); };
-  const readFailed = hop.FbmSync.runPreflight({ mode: 'read' });
+  const readFailed = hop.FbmSync.runPreflight({ mode: 'write' }), readModeSkips = hop.FbmSync.runPreflight({ mode: 'read' });
   const readFailedIssue = readFailed.blocking.find((item) => item.code === 'FBM_LOCAL_READ_FAILED');
-  check(so, 'FBM-022: đọc Sheet Customer/Activity lỗi thì preflight chặn bằng FBM_LOCAL_READ_FAILED (kể cả chế độ đọc), không trả tóm tắt 0 bản ghi',
-    [readFailed.ok, !!readFailedIssue, /timed out/.test(readFailedIssue && readFailedIssue.message), readFailed.hashSummary], [false, true, true, null]);
+  check(so, 'FBM-022: đọc Sheet Customer/Activity lỗi thì preflight chiều có đẩy chặn bằng FBM_LOCAL_READ_FAILED, không trả tóm tắt 0 bản ghi; chiều Lấy không quét hai Sheet này nên không có lỗi quét',
+    [readFailed.ok, !!readFailedIssue, /timed out/.test(readFailedIssue && readFailedIssue.message), readFailed.hashSummary, readModeSkips.issues.some((item) => item.code === 'FBM_LOCAL_READ_FAILED'), readModeSkips.hashSummary], [false, true, true, null, false, null]);
   const localReads = { customer: 0, activity: 0 };
   let hashCalls = 0;
   hop.FbmSync.readLocal = (entity) => { localReads[entity] += 1; return entity === 'activity'
@@ -120,10 +120,10 @@ async function chay(so) {
   hop.FbmSync.pushCandidates = () => [];
   hop.FbmSync.hash = (...args) => { hashCalls += 1; return savedHash(...args); };
   const scanned = hop.FbmSync.runPreflight({ mode: 'write' });
-  // Customer: quét preflight + hàng đợi xung đột + kiểm tra liên kết tài khoản; Activity: quét preflight + hàng đợi xung đột. Trước FBM-022 là 5 và 3.
+  // Customer: bản đọc chung của phần quét + kiểm tra liên kết tài khoản; Activity: bản đọc chung. Hàng đợi xung đột và ứng viên đẩy dùng chung bản đọc. Trước FBM-022 là 5 và 3.
   check(so, 'FBM-022: một lượt preflight đọc Sheet một lần cho cả quyền đẩy lẫn tóm tắt hash, tính hash một lần cho mỗi bản ghi có baseline',
     [localReads, hashCalls, scanned.hashSummary.localRecords, scanned.hashSummary.changed, scanned.hashSummary.newRecords, scanned.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length],
-    [{ customer: 3, activity: 2 }, 2, 3, 2, 1, 1]);
+    [{ customer: 2, activity: 1 }, 2, 3, 2, 1, 1]);
   const sheetReads = { customer: 0, activity: 0 };
   hop.DATA_SCHEMA = { customer: { verifyStatus: { source: '@CAT_XAC_THUC' } } }; hop.SYNC_SCHEMA = {};
   hop.entityReadAllCombined = (entity) => { sheetReads[entity] += 1; return { fields: ['id', 'fbmSyncPermission'], rows: [[entity === 'activity' ? 'ACT-1' : 'CUS-1', 'Cho phép']] }; };

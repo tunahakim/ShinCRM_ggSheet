@@ -1162,13 +1162,19 @@ async function chay(so) {
   ], [0, 'batch', 2]);
 
   const approval = workflowGas();
-  approval.hop.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [], candidateCount: 11 });
-  const awaitingApproval = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
+  approval.hop.FbmSync.preflightGates = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
+  approval.hop.FbmSync.preflightLocal = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 11 });
+  approval.hop.FbmSync.preflightNeedsLocal = () => true;
+  approval.hop.FbmSync.extractAuthorized = () => 'auth-token';
+  const sessionFirst = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
+  approval.hop.FbmSync.authContinue('customer', {});
+  approval.hop.FbmSync.authContinue('activity', {});
+  const awaitingApproval = { approvalRequired: approval.hop.FbmSync.stateRead().metadata.approvalRequired, status: approval.hop.FbmSync.statusView() };
   const approved = approval.hop.fbmSyncApprovePush();
-  check(so, 'push lon: GAS khong cap request truoc chap thuan, sau chap thuan moi cap authorize', [
-    awaitingApproval.approvalRequired, awaitingApproval.request || null, awaitingApproval.status.phase,
+  check(so, 'push lon: chỉ kiểm phiên FBM trước, xác thực xong mới đếm bản ghi và dừng chờ chấp thuận, không cấp request dữ liệu; sau chap thuan moi cap authorize', [
+    sessionFirst.request.meta.kind, awaitingApproval.approvalRequired, awaitingApproval.request || null, awaitingApproval.status.phase,
     approved.ok, approved.request.meta.kind, approved.status.phase
-  ], [true, null, 'awaiting_approval', true, 'session_probe', 'checking_session']);
+  ], ['session_probe', true, null, 'awaiting_approval', true, 'session_probe', 'checking_session']);
 
   const stopAfterResponse = workflowGas();
   stopAfterResponse.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
