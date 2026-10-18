@@ -124,7 +124,8 @@ function pendingDeleteFire() {
     });
   }, { block: true }).then(function (html) {
     var hoi = pendingDeleteShowSoft(res);
-    return hoi ? hoi.then(function () { return html; }) : html;
+    var sau = function () { return pendingDeleteShowBusy(entity, res) || html; };
+    return hoi ? hoi.then(sau) : sau();
   });
 }
 
@@ -156,6 +157,29 @@ function pendingDeleteShowSoft(res) {
     message: 'Dòng vẫn còn trên Sheet, được đánh dấu đã xóa:',
     lines: ly.map(function (id) { return id + ': ' + res.reasons[id]; }),
     choices: [{ id: 'cancel', label: 'Đã hiểu', variant: 'primary' }]
+  });
+}
+
+/**
+ * Mã đang bị tiến trình khác giữ (thường là đồng bộ đang đẩy nó lên FBM) thì máy chủ chưa xóa: dòng đã hiện lại vì mặt nạ đã bỏ. Thử lại là gửi lại đúng các mã đó, không qua đếm ngược lần nữa vì người dùng vừa chọn xong; Để sau là để dòng ở đó.
+ */
+function pendingDeleteShowBusy(entity, res) {
+  var ma = Object.keys((res && res.busy) || {});
+  if (!ma.length) { return null; }
+  return uiDecisionChoose({
+    title: ma.length === 1 ? 'Bản ghi đang bận nên chưa xóa' : ma.length + ' bản ghi đang bận nên chưa xóa',
+    message: 'Dòng vẫn còn trên Sheet:',
+    lines: ma.map(function (id) { return id + ': ' + res.busy[id]; }),
+    choices: [
+      { id: 'retry', label: 'Thử lại', variant: 'primary' },
+      { id: 'cancel', label: 'Để sau', variant: 'neutral' }
+    ]
+  }).then(function (choice) {
+    if (choice !== 'retry') { return null; }
+    if (PENDING_DELETE.ids.length && PENDING_DELETE.entity !== entity) { pendingDeleteFire(); }
+    PENDING_DELETE.entity = entity;
+    ma.forEach(function (id) { if (PENDING_DELETE.ids.indexOf(id) === -1) { PENDING_DELETE.ids.push(id); } });
+    return pendingDeleteFire();
   });
 }
 

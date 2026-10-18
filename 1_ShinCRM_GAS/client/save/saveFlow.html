@@ -117,7 +117,6 @@ function saveFlowResolveGone(entity) {
     ]
   }).then(function (choice) {
     if (choice === 'new') {
-      // Khóa sửa của mã cũ nhả ở đường lưu xong hoặc đóng form như mọi form khác, vì `top.record` vẫn là bản ghi cũ.
       screenStateMarkNew();
       return saveFlowSubmit();
     }
@@ -127,6 +126,18 @@ function saveFlowResolveGone(entity) {
     }
     return null;
   });
+}
+
+/** Bản ghi đang bị tiến trình khác giữ (thường là đồng bộ đang đẩy nó lên FBM) nên chưa lưu gì; nội dung đang nhập còn nguyên trên form. Thử lại là gửi lại đúng lệnh lưu. */
+function saveFlowResolveBusy(entity, busy) {
+  return uiDecisionChoose({
+    title: (entity === 'customer' ? 'Khách' : 'Giao dịch') + ' này đang bận nên chưa lưu',
+    message: String(busy && busy.reason || 'Một tiến trình khác đang xử lý bản ghi này.') + ' Nội dung bạn đang nhập vẫn còn trên form.',
+    choices: [
+      { id: 'retry', label: 'Thử lại', variant: 'primary' },
+      { id: 'cancel', label: 'Quay lại form, chưa lưu gì', variant: 'neutral' }
+    ]
+  }).then(function (choice) { return choice === 'retry' ? saveFlowSubmit() : null; });
 }
 
 /** Popup trường nhập sai khi lưu: ô sai đã tô đỏ, popup liệt kê lỗi, đóng thì con trỏ về ô sai đầu tiên. */
@@ -204,7 +215,7 @@ function saveFlowSubmit() {
     return callServer('saveRecord', [entity, record, saveFlowOld(top, record)]).then(function (res) {
       SAVE_FLOW.dangGui = false;
 
-      if (res.blocked) { throw new Error(res.message || 'Bản ghi đang được đồng bộ.'); }
+      if (!res.ok && res.busy) { return { busy: res.busy }; }
       if (!res.ok && res.conflicts) {
         // Người dùng sắp được cho xem giá trị trên Sheet: nhận nó làm mốc mới, nên lưu lại sau đó là chủ ý ghi đè.
         screenStateSetBaseline(res.conflicts.reduce(function (acc, c) { acc[c.field] = c.current; return acc; }, {}));
@@ -216,7 +227,6 @@ function saveFlowSubmit() {
       }
       if (!res.ok) { return { invalid: res.invalid }; }
 
-      if (typeof screenFormSyncUnlock === 'function') { screenFormSyncUnlock(entity, top.record); }
       var ban = saveFlowApply(entity, res);
       return saveFlowClose(entity, ban, themMoi);
     }, function (err) {
@@ -228,6 +238,7 @@ function saveFlowSubmit() {
     if (outcome && outcome.conflicts) { return saveFlowResolveConflict(entity, outcome.conflicts); }
     if (outcome && outcome.invalid) { return saveFlowShowInvalid(entity, outcome.invalid); }
     if (outcome && outcome.gone) { return saveFlowResolveGone(entity); }
+    if (outcome && outcome.busy) { return saveFlowResolveBusy(entity, outcome.busy); }
     return outcome;
   });
 }
