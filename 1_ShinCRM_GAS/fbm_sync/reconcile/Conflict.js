@@ -48,6 +48,8 @@ FbmSync.conflictFail = function (code, message) {
 FbmSync.openConflict = function () {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
   var state = FbmSync.stateRead();
+  // Mở xung đột phải đọc FBM qua kênh duy nhất của phiên: lượt nền đang chạy thì để Sidebar hỏi người dùng dừng hay chờ, lượt tay thì báo chờ.
+  if (FbmSync.runInProgress(state) && String(state.origin || '') === 'background') { return FbmSync.backgroundRunningResult(); }
   if (FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0) { return FbmSync.conflictFail('SYNC_RUNNING', 'Phiên đồng bộ đang chạy; chờ phiên dừng rồi mới xử lý xung đột.'); }
   var queue = FbmSync.conflictQueue();
   state.metadata.conflictCount = queue.length;

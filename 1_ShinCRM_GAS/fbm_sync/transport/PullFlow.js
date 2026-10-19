@@ -2,6 +2,25 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
+/** Trả lời chung khi thao tác của người dùng gặp lượt nền đang chạy: không dừng gì, kèm `status` để Sidebar nêu bước và giờ bắt đầu trong popup hỏi. */
+FbmSync.backgroundRunningResult = function () {
+  return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.', status: FbmSync.statusView() };
+};
+
+/**
+ * Nơi duy nhất đặt cờ dừng lượt nền, chỉ gọi khi người dùng chọn "Dừng đồng bộ nền" ở popup. Lượt nền dừng sau response FBM đang bay (dữ liệu đã nhận vẫn được ghi).
+ * Lượt đang chạy là lượt tay, hoặc không có lượt nào, thì không đặt gì: lượt tay chỉ người dùng tự dừng bằng nút Dừng.
+ */
+FbmSync.stopBackground = function () {
+  var current = FbmSync.stateRead();
+  if (!FbmSync.runInProgress(current) || String(current.origin || '') !== 'background') { return { ok: true, code: 'SYNC_BACKGROUND_IDLE', status: FbmSync.statusView() }; }
+  current.metadata = current.metadata || {};
+  current.metadata.manualPending = { requestedAt: Date.now() };
+  current.message = 'Đã nhận yêu cầu dừng; phiên nền sẽ dừng sau response FBM hiện tại.';
+  FbmSync.stateWrite(current);
+  return { ok: true, code: 'SYNC_BACKGROUND_STOPPING', status: FbmSync.statusView() };
+};
+
 FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
 FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
@@ -14,13 +33,8 @@ FbmSync.startRun = function (options) {
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
   if (FbmSync.runInProgress(current)) {
-    if (opt.manual === true && String(current.origin || '') === 'background') {
-      current.metadata = current.metadata || {};
-      current.metadata.manualPending = { mode: opt.mode || 'read', requestedAt: Date.now() };
-      current.message = 'Đã nhận yêu cầu thủ công; phiên nền sẽ dừng sau response FBM hiện tại.';
-      FbmSync.stateWrite(current);
-      return { ok: false, code: 'SYNC_BACKGROUND_STOPPING', status: FbmSync.statusView() };
-    }
+    // Lượt nền không tự nhường: Sidebar hỏi người dùng, chỉ lệnh `stop_background` mới dừng nó.
+    if (opt.manual === true && String(current.origin || '') === 'background') { return FbmSync.backgroundRunningResult(); }
     if (current.activeRequestId) {
       return { ok: false, code: 'REQUEST_IN_FLIGHT', request: null, message: 'Đã có request FBM đang chờ response; không cấp request chồng.', status: FbmSync.statusView() };
     }

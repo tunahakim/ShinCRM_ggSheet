@@ -39,6 +39,8 @@ FbmSync.controlDispatch = function (command, payload) {
       return fbmSyncApprovePush();
     case 'cancel':
       return fbmSyncCancel();
+    case 'stop_background':
+      return FbmSync.stopBackground();
     case 'reset_state':
       return FbmSync.controlResetState();
     case 'retry_push_failures':
@@ -72,7 +74,7 @@ FbmSync.controlDispatch = function (command, payload) {
 FbmSync.controlDispatchLocked = function (command, payload) {
   // transport_failure tự giữ orchestration lock để cả Sidebar và relay nền dùng chung
   // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
-  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'reset_state', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'confirm_conflict'];
+  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'stop_background', 'reset_state', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
   try {
     return FbmSync.withOrchestrationLock(function () {
