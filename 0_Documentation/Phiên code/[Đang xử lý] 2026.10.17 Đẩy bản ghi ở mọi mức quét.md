@@ -87,18 +87,26 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B7.8. `node tests/run.js` đạt hết.
   - [x] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
   - [x] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
-- [ ] B8. Nút chạy ở màn Chạy đồng bộ theo cùng luật B7 (chủ dự án chốt 2026-10-19): lượt nền đang chạy thì nút vẫn là "Bắt đầu đồng bộ", bấm vào thì hiện popup hỏi dừng hay chờ; không còn đường hủy lượt nền mà không hỏi. Gốc: nút chọn "Dừng đồng bộ" theo `phase` mà không biết lượt đó của ai, nên lượt nền cũng hiện nút dừng và bấm là gọi `fbmCancelSync`.
+- [x] B8. Nút chạy ở màn Chạy đồng bộ theo cùng luật B7 (chủ dự án chốt 2026-10-19): lượt nền đang chạy thì nút vẫn là "Bắt đầu đồng bộ", bấm vào thì hiện popup hỏi dừng hay chờ; không còn đường hủy lượt nền mà không hỏi. Gốc: nút chọn "Dừng đồng bộ" theo `phase` mà không biết lượt đó của ai, nên lượt nền cũng hiện nút dừng và bấm là gọi `fbmCancelSync`.
   Vai trò dữ liệu: `status.origin` (GAS tạo từ `state.origin`, chỉ để Sidebar biết lượt đang chạy là của ai; GAS vẫn tự quyết `SYNC_BACKGROUND_RUNNING`); `FBM_SYNC_CLIENT.backgroundWait` (Sidebar, việc đang chờ lượt nền xong; khóa nút chạy để bấm thêm không bị bỏ qua im lặng).
   - [x] B8.1. GAS `statusView` thêm `origin`.
   - [x] B8.2. `fbmSyncRunActionBlock`: chỉ lượt tay đang chạy mới hiện "Dừng đồng bộ"; lượt nền đang chạy hiện "Bắt đầu đồng bộ" (bấm đi qua `fbmSyncRun` → popup B7); đang chờ lượt nền (`backgroundWait`) thì nút khóa với nhãn "Đang chờ đồng bộ nền xong...", nhãn đặt trong schema.
   - [x] B8.3. Test: nút với lượt nền, lượt tay, lúc đang chờ; `statusView` có `origin`.
-  - [ ] B8.4. Sửa 09/08 đoạn "Thao tác gặp lượt nền"; `node tests/run.js`; commit, đẩy DEV, nghiệm thu: lượt nền chạy thì nút là "Bắt đầu đồng bộ", bấm hiện popup.
+  - [x] B8.4. Sửa 09/08 đoạn "Thao tác gặp lượt nền"; `node tests/run.js`; commit, đẩy DEV, nghiệm thu: lượt nền chạy thì nút là "Bắt đầu đồng bộ", bấm hiện popup.
 - [ ] B9. Nút X của popup lượt nền đưa màn về như vừa mở, coi như chưa bấm nút gây ra popup (chủ dự án chốt 2026-10-19), áp chung cho mọi thao tác. Gốc: mỗi thao tác đổi màn trước khi gọi GAS (vẽ "Đang chuẩn bị...", dòng báo "Đang kiểm tra liên kết...", chuyển sang tab Xung đột), còn nhánh X lại tự viết thêm dòng báo riêng ở từng nơi và vẽ lại bằng status giả vừa vẽ.
   Vai trò dữ liệu: `started.status` (GAS, trạng thái thật lúc trả `SYNC_BACKGROUND_RUNNING`; là thứ màn hiện nếu vừa mở, dùng để vẽ lại khi X); các giá trị lúc mở màn (`running=false`, `mode='read'`, `identityAction=''`, `identityLastAction=''`, `resultsTab='summary'`, `conflictNote=''`, dòng báo tài khoản rỗng) là đích của X.
   - [x] B9.1. Một công cụ `fbmSyncScreenFresh(status)` đưa các giá trị hiển thị về lúc mở rồi vẽ bằng status thật; `fbmSyncAfterBackground` gọi nó khi X và trả `SYNC_BACKGROUND_SKIPPED`. Bỏ ba nhánh X tự viết dòng báo ở kiểm liên kết, tự điền và thẻ xung đột; nút mở xung đột mở lại khi X.
   - [x] B9.2. Test: X ở kiểm liên kết, tự điền, tab Xung đột đều về đúng giá trị lúc mở, vẽ status thật, chỉ một lần gọi lệnh gốc.
   - [x] B9.3. Sửa 09/08 câu nút X; `node tests/run.js` 2642 đạt.
   - [ ] B9.4. Nghiệm thu trên Sheet DEV cùng B8.4.
+
+- [ ] B10. Extension đọc đúng ô khi sheet có hàng, cột ẩn hoặc bộ lọc (chủ dự án yêu cầu 2026-10-19: không gõ cứng, Extension tự dò khi Google đổi). Gốc: bộ đọc coi chỉ số lưới live là tọa độ thật, trong khi lưới chỉ chứa hàng và cột đang hiện; ở `!lead` ẩn A–B gây `LIVE_GRID_CONFLICT`, ẩn hàng thì trả `ok` sai hàng. Căn cứ: `Nghiên cứu Google Sheet/2026.09.09 ...` mục 14, tài liệu 05 Phần 10.
+  Vai trò dữ liệu: bảng quy đổi hàng/cột (Google, nguồn sự thật về vị trí đang hiện; Extension chỉ đọc, kiểm lại mỗi lần đọc); mảng đánh dấu (Google, dùng đối chiếu bảng quy đổi); lưới đầy đủ (Google, giá trị ô theo vị trí gọn); đường dẫn đã nhớ tới object chứa bảng theo gid (Extension, chỉ là lối tắt, sai thì dò lại); `rawHeaderRow` (Extension trả, địa chỉ thật; Sidebar dựng `readPlan['!']` theo mã cột như cũ).
+  - [x] B10.1. Dò trên DEV: ẩn cột, ẩn hàng, bộ lọc; ghi tài liệu nghiên cứu mục 14, tài liệu 05, mở lại mục cột ẩn trong `Checklist reload RAM và sheet quản trị.md`.
+  - [ ] B10.2. `live_model_reader.js`: nhận object chứa bảng quy đổi theo hình dạng trong lượt dò sẵn có, giữ object có gid gần nhất đúng gid; ghép bảng hàng/cột với lưới theo kích thước, loại lưới không khớp; đọc ô qua bảng quy đổi; `rawHeaderRow` địa chỉ thật; mỗi lần đọc kiểm lại ràng buộc, sai thì dò lại và trả `LIVE_AXIS_NOT_FOUND`.
+  - [ ] B10.3. Sidebar `sheetLink.html`: `LIVE_AXIS_NOT_FOUND` vào danh sách lỗi bộ đọc (hỏi GAS, băng cảnh báo, Log một lần mỗi phiên); không coi là sheet không có cột mã.
+  - [ ] B10.4. Test `tests/cases/liveModelReader.js`: ẩn hàng giữa, hai cột ẩn không liền nhau, cột mã nằm giữa, bộ lọc; bản sao vùng đang hiện bị loại; ô thật đang ẩn trả không đọc được; thiếu bảng, bảng sai độ dài, không tăng dần, lệch mảng đánh dấu, số hàng bằng số cột, gid gần nhất là sheet khác đều không trả `ok`. Test Sidebar cho `LIVE_AXIS_NOT_FOUND`. `node tests/run.js`.
+  - [ ] B10.5. Commit Extension và Sidebar; chủ dự án tải lại Extension; nghiệm thu trên DEV: `!lead` ẩn A–B đọc được ngay không băng cảnh báo, ẩn thêm hàng 3 và một cột giữa đọc đúng khách, Customer có bộ lọc đọc đúng; hiện lại và gỡ bộ lọc.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
