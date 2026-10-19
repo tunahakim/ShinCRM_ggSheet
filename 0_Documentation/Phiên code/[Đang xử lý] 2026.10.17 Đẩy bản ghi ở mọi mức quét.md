@@ -39,13 +39,33 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 - [x] B2. Test: giá trị gửi lại khác bản đã mở thì không ghi; ShinCRM đổi từ lúc mở thì trả màn xem lại; ba lựa chọn ghi đúng baseline.
 - [x] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
 - [x] B5. Màn xung đột dùng chung luật với form sửa (chủ dự án duyệt 2026-10-19): ảnh chụp lúc mở nằm ở Sidebar; cửa ghi so trường được quyết với giá trị lúc mở (`writeGateConflicts` nhận `old` của nguồn máy); popup xung đột và popup bận dùng chung `client/ui/recordDecision.html`; sửa 06 Phần 4, 09/04 bước 4, 09/08.
+- [ ] B6. Sửa lỗi B5: chọn "Lưu giá trị bạn đang chọn" sau khi Sheet đổi lại ghi giá trị Sheet (nghiệm thu ca 4, Website 14:05 thành 14:06). Gốc: `snapshot.old` mang hai vai, vừa là mốc so vừa là giá trị ghi khi chọn ShinCRM (`Conflict.js:184,185`). Chờ chủ dự án duyệt phương án.
+  - Vai trò dữ liệu sau khi sửa (mỗi dữ liệu một vai):
+
+    | Dữ liệu | Ai tạo | Ai được đổi | Vai duy nhất |
+    |---|---|---|---|
+    | `field.left` | GAS lúc mở (giá trị ShinCRM lúc mở) | Chỉ người dùng: chọn "Dùng giá trị trên Sheet" ở popup | Giá trị ShinCRM đang hiện, cũng là giá trị ghi khi chọn ShinCRM |
+    | `field.right` | GAS lúc mở (giá trị FBM lúc mở) | Không ai | Giá trị FBM đang hiện, gửi lại thành `fbmValues` |
+    | `snapshot.old` | GAS lúc mở | Sidebar khi cửa ghi trả `conflicts` (mốc mới = giá trị Sheet người dùng vừa thấy ở popup), như `top.record` của form | Mốc so ở cửa ghi; không bao giờ là giá trị ghi |
+    | `snapshot.openedHash` | GAS lúc mở | Không ai | Hash FBM lúc mở, kiểm `fbmValues` và làm baseline |
+    | `merged` (Tùy chỉnh) | Người dùng gõ | Người dùng | Giá trị ghi của trường tự nhập |
+
+  - [ ] B6.1. Sidebar `fbmSyncResolveConflict`: dựng `shinValues[field] = field.left` cùng vòng với `fbmValues`, gửi kèm lệnh chốt.
+  - [ ] B6.2. `FbmSyncService.fbmConfirmConflict` và `ControlPort` `confirm_conflict`: truyền thêm `shinValues`.
+  - [ ] B6.3. `Conflict.js` `confirmConflict`: chọn ShinCRM thì ghi `shinValues[field]`; `snapshot.old` chỉ còn làm `old`. Thiếu `shinValues` của trường nào có trong `fbmValues` thì trả `CONFLICT_REOPEN`, không ghi. Sửa docstring.
+  - [ ] B6.4. Test GAS (ProductionMatrix): chọn ShinCRM, Sheet đổi, gửi lại với mốc mới thì ghi đúng giá trị đang hiện; thiếu `shinValues` thì mở lại, không ghi.
+  - [ ] B6.5. Test Sidebar: chọn "giữ giá trị của tôi" thì lần gửi lại mang `shinValues` là giá trị đang hiện (không phải giá trị Sheet); chọn "Quay lại" rồi Lưu cũng vậy; chọn "Dùng giá trị Sheet" thì `shinValues` là giá trị Sheet.
+  - [ ] B6.6. `node tests/run.js` đạt hết.
+  - [ ] B6.7. Sửa 09/04 bước 4: lệnh chốt gửi giá trị hai phía đang hiện; ảnh chụp chỉ là mốc.
+  - [ ] B6.8. Commit (lõi GAS, Sidebar, test, tài liệu), đẩy DEV, tải lại tab Sheet, làm lại ca 4 từ đầu.
 - [ ] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
   - [x] Ca 1 Lấy FBM: CUS-020075 nhận Website FBM, về "đã đồng bộ", baseline mới.
   - [ ] Ca 2 Lấy ShinCRM (ACT-011377) rồi Chỉ đẩy: FBM nhận nội dung ShinCRM.
   - [ ] Ca 3 Tùy chỉnh (ACT-011402) rồi Chỉ đẩy: FBM nhận giá trị gõ tay.
   - [ ] Ca 4 ShinCRM đổi lúc đang xem (`fbmDevEditAltWebsite`): Lưu hiện popup xung đột của form; chọn giá trị Sheet thì màn cập nhật phía ShinCRM, chọn giữ lựa chọn thì ghi.
   - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
-  - Dừng 2026-10-19 12:20: fbo.com.vn không phản hồi (máy này hết giờ kết nối, Google vẫn vào được); chạy tiếp khi FBM vào lại được.
+  - Ca 2 và ca 3 lúc 13:4x chạy trên code V33 (V33 đã đẩy đè DEV): FBM đã nhận đúng giá trị (ACT-011377 nội dung ShinCRM, ACT-011402 "Nội dung tùy chỉnh B4 ca 3", đã đồng bộ 13:56), nhưng chưa chứng minh code phiên này; làm lại hai ca sau B6. Từ 13:58 DEV là code phiên này (@942), phiên V33 tạm dừng tới khi gộp.
+  - Ca 4 trên code phiên này: popup chung hiện đúng, nhánh "Dùng giá trị trên Sheet" đúng, nhánh "Lưu giá trị bạn đang chọn" sai, thành mục B6.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
