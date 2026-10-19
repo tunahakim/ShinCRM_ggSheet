@@ -57,5 +57,5 @@ Chủ dự án thấy ACT-011387 vẫn "xung đột chờ quyết" dù FBM đã 
 - [x] 14. Cửa gắn cờ (`gateFlagDecide`) không còn bỏ dòng chờ quyết: FBM đã xóa hoặc đổi chủ thì dòng nhận cờ, rời hàng đợi xung đột, số chờ quyết giảm theo.
 - [x] 15. Bộ đếm: dòng chỉ ShinCRM đổi chuyển "chờ đối soát" không tính Bỏ qua; dòng cũ so lại vẫn xung đột tính vào ô Xung đột của phiên (một lần mỗi dòng), không cộng vào số chờ quyết; dòng tự gỡ trừ khỏi số chờ quyết. Sửa định nghĩa hai ô ở `09/08`.
 - [x] 16. Test cho 14 và 15.
-- [ ] 17. Cảnh báo mã khách chỉ định, không chặn lưu: lúc lưu cấu hình, mã đúng tiền tố mà sai độ dài thì cảnh báo; lúc chạy, mã chỉ định mà FBM không trả về thì cảnh báo trên Sidebar và ghi Log.
+- [x] 17. Cảnh báo mã khách chỉ định, không chặn lưu: lúc lưu cấu hình, mã đúng tiền tố mà sai độ dài thì cảnh báo; lúc chạy, mã chỉ định mà FBM không trả về thì cảnh báo trên Sidebar và ghi Log.
 - [ ] 18. Chủ dự án nghiệm thu trên Sheet DEV: chạy lại với ACT-011387 (FBM đã xóa) thấy dòng chuyển "không thấy bên FBM"; ô Bỏ qua không đếm dòng chờ đối soát; gõ thử một mã chỉ định sai độ dài thấy cảnh báo.
