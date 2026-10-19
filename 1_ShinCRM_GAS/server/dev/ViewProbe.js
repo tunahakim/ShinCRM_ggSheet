@@ -57,6 +57,27 @@ function viewProbeAutoRender() {
   }
 }
 
+/** Probe đường tạo sheet quản trị thật (`createViewSheet`): tạo, đọc lại khung, rồi xóa. */
+function viewProbeCreateSheet() {
+  var book = shinOpenBook();
+  if (book.getSheetByName(VIEW_PROBE_SHEET_NAME)) {
+    throw new Error('Đã có sheet ' + VIEW_PROBE_SHEET_NAME + '. Không tự xóa sheet probe cũ để tránh chạm dữ liệu ngoài ý muốn.');
+  }
+  var created = createViewSheet(VIEW_PROBE_SHEET_NAME);
+  var sheet = book.getSheetByName(VIEW_PROBE_SHEET_NAME);
+  try {
+    var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    return [
+      'createViewSheet: ' + JSON.stringify(created),
+      'Hàng đóng băng: ' + sheet.getFrozenRows() + ' (phải là ' + SHEET_HEADER_ROWS + ')',
+      'Hàng 1: ' + JSON.stringify(header),
+      'Ô sắp xếp có danh sách chọn: ' + !!sheet.getRange(SHEET_FIRST_DATA_ROW, header.indexOf('@VIEW_SORT_COL') + 1).getDataValidation(),
+      'Sheet đang chọn: ' + book.getActiveSheet().getName()
+    ];
+  } finally {
+    book.deleteSheet(sheet);
+  }
+}
 
 /** In cờ tô cam đã lưu và màu tab thật của từng sheet quản trị, để nghiệm thu tab cam mà không phải nhìn ảnh. */
 function viewProbeTabTint() {

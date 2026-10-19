@@ -144,7 +144,7 @@ function configParams() {
   var valueColumn = columnIndex(columnMap, '@CFG_THAM_SO_GIA_TRI');
   var firstDataRow = SHEET_LAYOUT.Config.firstDataRow;
   var sheet = shinOpenSheet('Config');
-  var lastRow = sheet.getLastRow();
+  var lastRow = sheetReadLastRow(sheet);
   var params = {};
 
   // Sheet mới dựng thì chưa có hàng dữ liệu nào, và đó là trạng thái bình thường chứ không phải hỏng.
@@ -153,7 +153,7 @@ function configParams() {
     return params;
   }
 
-  var rows = sheet.getRange(firstDataRow, 1, lastRow - firstDataRow + 1, columnMap.lastColumn).getValues();
+  var rows = sheetGridReadBlock(sheet, firstDataRow, lastRow - firstDataRow + 1, columnMap.lastColumn);
   var duplicates = [];
 
   rows.forEach(function (row) {

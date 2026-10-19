@@ -57,9 +57,8 @@ function cellBudgetCeiling() {
 function cellBudgetMeasure(book) {
   var tran = cellBudgetCeiling();
   var sheets = book.getSheets().map(function (sheet) {
-    var rows = sheet.getMaxRows();
-    var columns = sheet.getMaxColumns();
-    return { name: sheet.getName(), rows: rows, columns: columns, cells: rows * columns };
+    var size = sheetGridSize(sheet);
+    return { name: sheet.getName(), rows: size.rows, columns: size.columns, cells: size.rows * size.columns };
   });
 
   sheets.sort(function (a, b) { return b.cells - a.cells; });

@@ -64,7 +64,7 @@ function logClientTiming(timing) {
 function probeClientTiming() {
   var report = [];
   var raSheet = logTraceCoversSource(LOAD_SOURCE);
-  var truoc = logSheet().getLastRow();
+  var truoc = sheetReadLastRow(logSheet());
 
   report.push('Công tắc LOG_TRACE phủ nguồn "' + LOAD_SOURCE + '": ' + raSheet + (raSheet ? ' — ba dòng dưới đây sẽ ra sheet Log.' : ' — ba dòng dưới đây CHỈ nằm trong vòng đệm, sheet Log không có dòng nào. Muốn thấy thì chạy devLogTraceOn.'));
 
@@ -82,7 +82,7 @@ function probeClientTiming() {
   logClientTiming(null);
   report.push('Gọi với null không ném: đã đệm một dòng toàn null.');
 
-  var soDong = logSheet().getLastRow() - truoc;
+  var soDong = sheetReadLastRow(logSheet()) - truoc;
   report.push('Sheet Log nhận thêm ' + soDong + ' dòng' + (raSheet ? ' — phải là 3, mở sheet Log xem ba dòng sidebarBoot.' : ', phải là 0 vì công tắc đang tắt.'));
 
   report.forEach(function (line) { Logger.log(line); });

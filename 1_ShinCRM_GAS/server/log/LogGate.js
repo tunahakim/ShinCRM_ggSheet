@@ -262,10 +262,10 @@ function logSheet() {
   var sheet = book.getSheetByName('Log');
   if (sheet) { return sheet; }
 
-  sheet = book.insertSheet('Log');
-  sheet.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS])
-    .setFontWeight('bold').setBackground(SHEET_LAYOUT.Log.headerColor);
-  sheet.setFrozenRows(SHEET_LAYOUT.Log.headerRows);
+  sheet = sheetBookCreate('Log');
+  sheetCellsWrite(sheet, 1, 1, [LOG_HEADERS]);
+  sheetCellsStyle(sheet, 1, 1, 1, LOG_HEADERS.length, { bold: true, background: SHEET_LAYOUT.Log.headerColor });
+  sheetFrozenRowsSet(sheet, SHEET_LAYOUT.Log.headerRows);
   console.error('Sheet Log không tồn tại nên đã dựng lại. Lịch sử log trước đó đã mất.');
   return sheet;
 }
@@ -315,10 +315,10 @@ function flushLog() {
 
     var rows = lines.map(function (line) { return logRowCells(line); });
     var sheet = logSheet();
-    var startRow = Math.max(sheet.getLastRow() + 1, SHEET_LAYOUT.Log.firstDataRow);
+    var startRow = Math.max(sheetReadLastRow(sheet) + 1, SHEET_LAYOUT.Log.firstDataRow);
 
     logEnsureRoom(sheet, startRow + rows.length - 1);
-    sheet.getRange(startRow, 1, rows.length, LOG_HEADERS.length).setValues(rows);
+    sheetCellsWrite(sheet, startRow, 1, rows);
     LOG_WRITE_CALLS += 1;
 
     logTrimRows(sheet);
@@ -335,13 +335,13 @@ function flushLog() {
 /**
  * Trần số dòng: cắt cũ nhất trước bằng công cụ xóa dòng, kiểm mỗi lần nhả.
  *
- * Kiểm mỗi lần vì nó miễn phí — `getLastRow()` đã có sẵn trong tay lúc tính dòng đích. Vai trò thật của trần này là lưới an toàn cho một vòng lặp lỗi chạy hoang, không phải cái cắt log trong ngày thường.
+ * Kiểm mỗi lần vì rẻ: chỉ một lệnh `getLastRow()`. Vai trò thật của trần này là lưới an toàn cho một vòng lặp lỗi chạy hoang, không phải cái cắt log trong ngày thường.
  *
  * `deleteRows` là một lệnh gọi API bất kể xóa bao nhiêu dòng. Đã đo trên sheet `Log` 5.000 dòng thật: xóa 1 dòng mất 309 ms, xóa 1.000 dòng mất 374 ms. Chi phí phẳng.
  */
 function logTrimRows(sheet) {
   var firstDataRow = SHEET_LAYOUT.Log.firstDataRow;
-  var excess = sheet.getLastRow() - firstDataRow + 1 - SETTINGS.LOG_MAX_ROWS;
+  var excess = sheetReadLastRow(sheet) - firstDataRow + 1 - SETTINGS.LOG_MAX_ROWS;
   if (excess > 0) {
     sheetRowsDelete(sheet, logRowRange(firstDataRow, excess));
   }
@@ -363,16 +363,16 @@ function logTrimAge(sheet) {
   props.setProperty(LOG_CLEANUP_KEY, today);
 
   var firstDataRow = SHEET_LAYOUT.Log.firstDataRow;
-  var lastRow = sheet.getLastRow();
+  var lastRow = sheetReadLastRow(sheet);
   if (lastRow < firstDataRow) { return; }
 
   var cutoffMs = new Date().getTime() - SETTINGS.LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   var cutoff = Utilities.formatDate(new Date(cutoffMs), LOG_TIMEZONE, LOG_TIME_FORMAT);
-  var stamps = sheet.getRange(firstDataRow, 1, lastRow - firstDataRow + 1, 1).getValues();
+  var stamps = sheetReadColumnValues(sheet, 1, firstDataRow);
   var tooOld = 0;
 
   for (var i = 0; i < stamps.length; i += 1) {
-    var stamp = String(stamps[i][0] === null || stamps[i][0] === undefined ? '' : stamps[i][0]).trim();
+    var stamp = sheetReadCellText(stamps[i]);
     if (stamp.length !== LOG_TIME_FORMAT.length || stamp >= cutoff) { break; }
     tooOld += 1;
   }
@@ -403,7 +403,7 @@ function logRowRange(firstRow, count) {
 function probeLogGate() {
   var report = [];
   var sheet = logSheet();
-  var before = sheet.getLastRow();
+  var before = sheetReadLastRow(sheet);
   var biMat = 'ASP.NET_SessionId=abc123def456';
 
   try {
@@ -417,13 +417,13 @@ function probeLogGate() {
 
     var written = flushLog();
     var writes = logGateWriteCount() - writesBefore;
-    var grew = sheet.getLastRow() - before;
+    var grew = sheetReadLastRow(sheet) - before;
 
     report.push(written === 3 ? '✅ Nhả bộ đệm ghi đúng 3 dòng, dòng vết bị bỏ đi đúng luật' : '❌ Nhả bộ đệm ghi ' + written + ' dòng, đáng ra 3. Dòng vết có thể đã lọt ra sheet.');
-    report.push(grew === 3 ? '✅ Sheet Log tăng đúng 3 dòng' : '❌ Sheet Log tăng ' + grew + ' dòng, đáng ra 3 (trước ' + before + ', sau ' + sheet.getLastRow() + '). Nếu luật cắt log vừa xóa dòng cũ thì con số này lệch mà không phải lỗi.');
+    report.push(grew === 3 ? '✅ Sheet Log tăng đúng 3 dòng' : '❌ Sheet Log tăng ' + grew + ' dòng, đáng ra 3 (trước ' + before + ', sau ' + sheetReadLastRow(sheet) + '). Nếu luật cắt log vừa xóa dòng cũ thì con số này lệch mà không phải lỗi.');
     report.push(writes === 1 ? '✅ Cả lượt tốn đúng 1 lệnh ghi' : '❌ Cả lượt tốn ' + writes + ' lệnh ghi, đáng ra 1.');
 
-    var detailCell = String(sheet.getRange(before + 2, 9).getValue());
+    var detailCell = String(sheetGridReadBlock(sheet, before + 2, 1, 1, 9)[0][0]);
     report.push(detailCell.indexOf(biMat) === -1 ? '✅ Bí mật không ra sheet nguyên văn' : '❌ Bí mật RA SHEET NGUYÊN VĂN: ' + detailCell);
     report.push(detailCell.indexOf('ký tự') !== -1 ? '✅ Có nhãn che: ' + detailCell : '❌ Không thấy nhãn che ở ô chi tiết: ' + detailCell);
     report.push(detailCell.indexOf('ghiChu') !== -1 ? '✅ Khóa thường vẫn nguyên vẹn' : '❌ Khóa thường bị che oan: ' + detailCell);
@@ -436,12 +436,12 @@ function probeLogGate() {
     var writtenWithError = flushLog();
     report.push(writtenWithError === 3 ? '✅ Lượt có lỗi nhả kèm cả 2 dòng vết' : '❌ Lượt có lỗi nhả ' + writtenWithError + ' dòng, đáng ra 3. Vòng đệm vết không được ghi kèm — mất đúng thứ đáng giá nhất của thiết kế.');
   } finally {
-    var now = sheet.getLastRow();
+    var now = sheetReadLastRow(sheet);
     if (now > before) {
       sheetRowsDelete(sheet, logRowRange(before + 1, now - before));
     }
     logResetBuffers();
-    report.push(sheet.getLastRow() === before ? '✅ Đã xóa hết dòng của phép kiểm, sheet Log về đúng ' + before + ' dòng' : '❌ CHƯA dọn hết: sheet Log còn ' + sheet.getLastRow() + ' dòng, đáng ra ' + before + '.');
+    report.push(sheetReadLastRow(sheet) === before ? '✅ Đã xóa hết dòng của phép kiểm, sheet Log về đúng ' + before + ' dòng' : '❌ CHƯA dọn hết: sheet Log còn ' + sheetReadLastRow(sheet) + ' dòng, đáng ra ' + before + '.');
   }
 
   report.forEach(function (line) { Logger.log(line); });

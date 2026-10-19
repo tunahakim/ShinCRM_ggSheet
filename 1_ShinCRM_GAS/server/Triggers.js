@@ -1,11 +1,11 @@
-/** Trigger cài đặt cho dữ liệu kho và sheet quản trị. */
+/** Trigger cài đặt cho dữ liệu kho và sheet quản trị. Tham số `range` của các hàm dưới đây là tọa độ vùng sửa từ `sheetRangeBounds`, không phải đối tượng vùng của Google. */
 
 function shinRangeTouchesRow(range, row) {
-  return range.getRow() <= row && range.getLastRow() >= row;
+  return range.row <= row && range.lastRow >= row;
 }
 
 function shinRangeTouchesColumn(range, column) {
-  return column > 0 && range.getColumn() <= column && range.getLastColumn() >= column;
+  return column > 0 && range.column <= column && range.lastColumn >= column;
 }
 
 function shinHeaderSnapshotKey(sheetName) { return 'SHIN_HEADER_SNAPSHOT_' + String(sheetName || ''); }
@@ -31,12 +31,12 @@ function shinHeaderSnapshotWrite(sheet) {
 
 function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
   if (!shinRangeTouchesRow(range, 1)) { return false; }
-  var first = range.getColumn();
-  var last = range.getLastColumn();
+  var first = range.column;
+  var last = range.lastColumn;
   var current = shinHeaderValues(sheet);
   var previous = shinHeaderSnapshotRead(sheet);
   if (!previous) { return true; }
-  var rowCount = typeof range.getNumRows === 'function' ? range.getNumRows() : range.getLastRow() - range.getRow() + 1;
+  var rowCount = range.lastRow - range.row + 1;
   var single = first === last && rowCount === 1;
   for (var column = first; column <= last; column++) {
     var oldValue = previous && previous[column - 1];
@@ -51,13 +51,13 @@ function shinHeaderRangeHasValidCode(sheet, range, event, validCode) {
  * Ô dưới cột ShinCRM vẽ (mã nguồn `@CUS_`/`@ACT_`) ở hàng lọc hoặc hàng dữ liệu. Hàng lọc là cấu hình. Hàng dữ liệu do ShinCRM sở hữu: sửa tay (thêm công thức, xóa hay đổi giá trị) phải được vẽ lại hoặc báo lỗi ngay, không để sheet sai âm thầm hay lỗi hiện trễ tới lần kho đổi. Hàng nhãn và cột không mã không tính.
  */
 function shinRangeTouchesDrawnCell(sheet, range) {
-  if (range.getLastRow() < sheetControlRow(sheet.getName(), 'filter')) { return false; }
-  return viewDrawnColumns(shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn())).length > 0;
+  if (range.lastRow < sheetControlRow(sheet.getName(), 'filter')) { return false; }
+  return viewDrawnColumns(shinHeaderSlice(sheet, range.column, range.lastColumn)).length > 0;
 }
 
 /** Cột module (mã @ có thật trên sheet kho nhưng ngoài DATA_SCHEMA): sheet `!` đọc được cột đó dù RAM không giữ. */
 function shinRangeTouchesViewSource(sheet, range) {
-  return shinHeaderSlice(sheet, range.getColumn(), range.getLastColumn()).some(shinViewCodeIsValid);
+  return shinHeaderSlice(sheet, range.column, range.lastColumn).some(shinViewCodeIsValid);
 }
 
 function shinViewCodeIsValid(code) {
@@ -122,7 +122,7 @@ function shinViewEditMarksControls(sheet, range, event) {
   }
   if (shinRangeTouchesDrawnCell(sheet, range)) { return true; }
   var lastSortRow = SHEET_FIRST_DATA_ROW + VIEW_SORT_MAX_LEVELS - 1;
-  if (range.getLastRow() < SHEET_FIRST_DATA_ROW || range.getRow() > lastSortRow) { return false; }
+  if (range.lastRow < SHEET_FIRST_DATA_ROW || range.row > lastSortRow) { return false; }
   return shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_COL'))
     || shinRangeTouchesColumn(range, selectionColumnIndex(sheet, '@VIEW_SORT_LEVEL'));
 }
@@ -143,8 +143,8 @@ function shinViewSheetArrived(name) {
 
 function shinOnEdit(event) {
   if (!event || !event.range) { return; }
-  var range = event.range;
-  var sheet = range.getSheet();
+  var range = sheetRangeBounds(event.range);
+  var sheet = event.range.getSheet();
   var result;
   try {
     result = runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
@@ -159,22 +159,22 @@ function shinOnEdit(event) {
       return shinReloadDecision({ source: 'edit', surface: 'schema', schema: true });
     }
     if (name === 'Config' || name === 'Category') {
-      if (range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
-      if (!shinDefaultCodeIsValid(sheet, name.toLowerCase(), range.getColumn(), range.getLastColumn())) { return; }
+      if (range.row < SHEET_FIRST_DATA_ROW) { return; }
+      if (!shinDefaultCodeIsValid(sheet, name.toLowerCase(), range.column, range.lastColumn)) { return; }
       return shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase() });
     }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
-    if (!entity || range.getRow() < SHEET_FIRST_DATA_ROW) { return; }
-    if (!shinDefaultCodeIsValid(sheet, entity, range.getColumn(), range.getLastColumn())) {
+    if (!entity || range.row < SHEET_FIRST_DATA_ROW) { return; }
+    if (!shinDefaultCodeIsValid(sheet, entity, range.column, range.lastColumn)) {
       return shinRangeTouchesViewSource(sheet, range) ? shinReloadDecision({ source: 'edit', surface: 'view-source' }) : undefined;
     }
     var column = selectionColumnIndex(sheet, DATA_SCHEMA[entity].id.code);
     if (!column) { return; }
-    var last = range.getLastRow();
-    var ids = sheet.getRange(range.getRow(), column, last - range.getRow() + 1, 1).getValues().map(function (row) { return String(row[0] === null || row[0] === undefined ? '' : row[0]).trim(); });
+    var last = range.lastRow;
+    var ids = sheetGridReadBlock(sheet, range.row, last - range.row + 1, 1, column).map(function (row) { return sheetReadCellText(row[0]); });
     // Xóa trắng ô mã thì trigger chỉ thấy ô rỗng sau sửa: một ô đơn còn `oldValue` để đánh dấu đúng mã cũ, vùng nhiều ô thì không biết mã nào đã mất nên nạp trọn thực thể.
     if (shinRangeTouchesColumn(range, column) && ids.indexOf('') >= 0) {
-      var single = range.getRow() === last && range.getColumn() === range.getLastColumn();
+      var single = range.row === last && range.column === range.lastColumn;
       var oldId = single && event && event.oldValue !== undefined && event.oldValue !== null ? String(event.oldValue).trim() : '';
       if (oldId) { ids = [oldId]; }
       else { return shinReloadDecision({ source: 'edit', surface: 'entity', entities: [entity] }); }

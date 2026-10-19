@@ -21,6 +21,22 @@ function sheetCellsFormat(sheet, firstRow, firstColumn, rowCount, columnCount, f
   sheet.getRange(firstRow, firstColumn, rowCount, columnCount).setNumberFormat(format);
 }
 
+/** Chữ đậm và màu nền cho một vùng (hàng mã, hàng nhãn). `style.bold` và `style.background` thiếu khóa nào thì không đổi thứ đó. Không đổi giá trị đọc về nên không phải quên tờ nháp. */
+function sheetCellsStyle(sheet, firstRow, firstColumn, rowCount, columnCount, style) {
+  if (rowCount <= 0 || columnCount <= 0) { return; }
+  sheetPolicyAssertWritable(sheet);
+  var range = sheet.getRange(firstRow, firstColumn, rowCount, columnCount);
+  if (style.bold !== undefined) { range.setFontWeight(style.bold ? 'bold' : 'normal'); }
+  if (style.background !== undefined) { range.setBackground(style.background); }
+}
+
+/** Gắn quy tắc kiểm dữ liệu (danh sách chọn) cho một vùng; `rule` là `null` thì gỡ. Không đổi giá trị đọc về nên không phải quên tờ nháp. */
+function sheetCellsValidate(sheet, firstRow, firstColumn, rowCount, columnCount, rule) {
+  if (rowCount <= 0 || columnCount <= 0) { return; }
+  sheetPolicyAssertWritable(sheet);
+  sheet.getRange(firstRow, firstColumn, rowCount, columnCount).setDataValidation(rule);
+}
+
 /** Xóa nội dung (giữ khuôn) một vùng. Có thể làm dòng cuối co lại nên quên luôn số dòng cuối đã nhớ. */
 function sheetCellsClear(sheet, firstRow, firstColumn, rowCount, columnCount) {
   if (rowCount <= 0 || columnCount <= 0) { return; }

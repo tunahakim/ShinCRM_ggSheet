@@ -3,7 +3,7 @@
  *
  * Tờ nháp sống cùng bản đọc kho DocumentProperties: chỉ có khi `documentStoreActive()`; vừa cầm khóa (`documentStoreRefresh`) thì bỏ phần của các sheet, hết lần gọi (`documentStoreClear`) thì bỏ hết. Ngoài lần gọi mọi hàm đọc thẳng Sheet. Sheet nào được nhớ do `sheetPolicy` quyết.
  * Công cụ ghi ô (`SheetCellWrite`) tự quên vùng vừa ghi và đánh dấu chờ `flush`; lần đọc Sheet kế tiếp `flush` trước, để Apps Script không trả về giá trị cũ của lệnh ghi còn gộp chờ.
- * Cạm bẫy: lệnh ghi còn gọi thẳng Google (chưa qua `SheetCellWrite`) chạm sheet được nhớ mà không gọi `sheetReadCopyDrop` thì phần còn lại của lần gọi đọc giá trị cũ; test kiểm kê writer chặn việc này.
+ * Cạm bẫy: lệnh ghi gọi thẳng Google (không qua `SheetCellWrite`) chạm sheet được nhớ thì phần còn lại của lần gọi đọc giá trị cũ; test quét mã chặn mọi lệnh Google chạm ô ngoài tầng 1.
  * Hàm trả mảng thì trả bản sao, để bên gọi sửa mảng không làm bẩn tờ nháp.
  */
 var SHEET_READ_COPY = { timezone: null, sheets: {}, pendingFlush: false };
@@ -225,6 +225,13 @@ function sheetReadFormulas(sheet, firstRow, firstColumn, rowCount, columnCount) 
   if (rowCount <= 0 || columnCount <= 0) { return []; }
   sheetReadCopyBeforeRead();
   return sheet.getRange(firstRow, firstColumn, rowCount, columnCount).getFormulas();
+}
+
+/** Khuôn số của một vùng, đọc thẳng Sheet, không nhớ: khuôn không phải giá trị và người dùng đổi khuôn không phát trigger để ai quên hộ. */
+function sheetReadNumberFormats(sheet, firstRow, firstColumn, rowCount, columnCount) {
+  if (rowCount <= 0 || columnCount <= 0) { return []; }
+  sheetReadCopyBeforeRead();
+  return sheet.getRange(firstRow, firstColumn, rowCount, columnCount).getNumberFormats();
 }
 
 /** Múi giờ tệp Sheet, hỏi một lần cho mỗi lần gọi. */

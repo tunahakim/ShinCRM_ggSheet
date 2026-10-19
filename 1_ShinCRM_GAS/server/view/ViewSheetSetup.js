@@ -106,11 +106,11 @@ function viewPrepareLocked(sheet, name) {
   if (typeof SpreadsheetApp.newDataValidation === 'function') {
     var codeRule = SpreadsheetApp.newDataValidation().requireValueInList(viewSetupSourceCodes(), true).setAllowInvalid(false).setHelpText(VIEW_CONTROL_COLUMNS[0].note).build();
     var levelRule = SpreadsheetApp.newDataValidation().requireValueInList(SORT_LEVEL_OPTIONS, true).setAllowInvalid(false).setHelpText(VIEW_CONTROL_COLUMNS[1].note).build();
-    sheet.getRange(SHEET_FIRST_DATA_ROW, headerMap['@VIEW_SORT_COL'], VIEW_SORT_MAX_LEVELS, 1).setDataValidation(codeRule);
-    sheet.getRange(SHEET_FIRST_DATA_ROW, headerMap['@VIEW_SORT_LEVEL'], VIEW_SORT_MAX_LEVELS, 1).setDataValidation(levelRule);
+    sheetCellsValidate(sheet, SHEET_FIRST_DATA_ROW, headerMap['@VIEW_SORT_COL'], VIEW_SORT_MAX_LEVELS, 1, codeRule);
+    sheetCellsValidate(sheet, SHEET_FIRST_DATA_ROW, headerMap['@VIEW_SORT_LEVEL'], VIEW_SORT_MAX_LEVELS, 1, levelRule);
   }
 
-  sheet.setFrozenRows(SHEET_HEADER_ROWS);
+  sheetFrozenRowsSet(sheet, SHEET_HEADER_ROWS);
   return {
     ok: true,
     sheetName: name,
@@ -131,17 +131,18 @@ function createViewSheet(requestedName) {
   if (file.getSheetByName(name)) { throw new Error('Đã có sheet tên "' + name + '". Hãy chọn tên khác.'); }
 
   var columns = viewStarterColumns();
-  var sheet = file.insertSheet(name);
+  var sheet;
   documentLockRun(function () {
+    sheet = sheetBookCreate(name);
     sheetCellsWrite(sheet, 1, 1, [
       columns.map(function (column) { return column.code; }),
       columns.map(function (column) { return column.label; })
     ]);
-    sheet.getRange(1, 1, 1, columns.length).setFontWeight('bold').setBackground('#d9ead3');
-    sheet.getRange(2, 1, 1, columns.length).setFontWeight('bold');
+    sheetCellsStyle(sheet, 1, 1, 1, columns.length, { bold: true, background: '#d9ead3' });
+    sheetCellsStyle(sheet, 2, 1, 1, columns.length, { bold: true });
     viewPrepareLocked(sheet, name);
   });
   var rendered = renderViewSheet(name);
-  if (typeof file.setActiveSheet === 'function') { file.setActiveSheet(sheet); }
+  sheetActivate(sheet);
   return { ok: rendered.ok, sheetName: name, rows: rendered.rows, problems: rendered.problems };
 }
