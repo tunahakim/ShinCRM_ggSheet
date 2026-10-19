@@ -870,20 +870,18 @@ function fbmSyncSaveConflict(button) {
     fbmSyncPaintError(error, 'Không xử lý được xung đột.');
   });
 }
+/**
+ * Chốt xung đột đang mở bằng một lần gọi GAS, không đọc lại FBM: gửi kèm giá trị FBM của các trường lệch đúng như màn đã hiện để GAS so hash với bản FBM lúc mở.
+ * GAS trả `CONFLICT_REOPEN` khi không ghi được theo bản đã mở (ShinCRM vừa đổi): mở lại xung đột, lúc đó FBM được đọc mới.
+ */
 function fbmSyncResolveConflict(entity, id, choice) {
-  var merged = arguments.length > 3 ? arguments[3] : undefined;
-  return callServer('fbmPrepareConflictResolution', [entity, id, choice]).then(function (prepared) {
-    if (!prepared || prepared.ok === false || !prepared.request) { throw new Error(prepared && (prepared.message || prepared.code) || 'Không chuẩn bị được lượt đọc lại conflict.'); }
-    fbmSyncPaint(fbmSyncWaitingStatus(prepared.status, 'Đang đọc lại FBM để xác nhận xung đột...'));
-    return fbmSyncExtensionRequest(prepared.request).then(function (response) {
-      return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmSyncRelayResponse(response)]);
-    });
-  }).then(function (result) {
-    if (result && result.code === 'CONFLICT_CHANGED_REVIEW') {
-      // FBM đổi từ lúc mở: hiện diff mới để người dùng xem lại, không chốt.
-      fbmSyncShowConflict(result.conflict);
-      fbmSyncPaint(Object.assign({}, result.status || FBM_SYNC_CLIENT.lastStatus, { message: result.message || 'FBM vừa đổi; xem lại bản ghi trước khi chốt.' }));
-      return result;
+  var merged = arguments.length > 3 ? arguments[3] : undefined, fbmValues = {};
+  ((FBM_SYNC_CLIENT.conflict && FBM_SYNC_CLIENT.conflict.id === id && FBM_SYNC_CLIENT.conflict.fields) || []).forEach(function (field) { fbmValues[field.field] = field.right; });
+  return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues]).then(function (result) {
+    if (result && result.code === 'CONFLICT_REOPEN') {
+      fbmSyncShowConflict(null);
+      fbmSyncPaint(Object.assign({}, result.status || FBM_SYNC_CLIENT.lastStatus, { message: result.message }));
+      return fbmSyncOpenConflict();
     }
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không giải quyết được conflict.'); }
     fbmSyncShowConflict(null);

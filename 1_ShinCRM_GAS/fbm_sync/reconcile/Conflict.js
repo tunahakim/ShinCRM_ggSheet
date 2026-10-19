@@ -1,6 +1,7 @@
 /**
  * Chế độ xử lý xung đột: hàng đợi lấy từ Sheet, diff tính lại khi mở, quyết định ghi qua Cửa bản ghi.
- * Người dùng quyết trên thứ đang thấy, nên lệnh chốt chỉ ghi khi cả hai bên còn nguyên như lúc mở: FBM so hash bản đọc lại với hash lúc mở, ShinCRM so hash dòng đọc lại trong cửa với hash lúc mở; bên nào đổi thì trả màn xung đột mới để xem lại (tài liệu 09/04 bước 4).
+ * Người dùng quyết trên thứ đang thấy, nên lệnh chốt chỉ ghi theo đúng bản đã mở: ShinCRM so hash dòng đọc lại trong cửa với hash lúc mở, FBM so hash bản ghép từ giá trị Sidebar gửi lại với hash FBM lúc mở (tài liệu 09/04 bước 4).
+ * Lệnh chốt không đọc lại FBM: baseline ghi bằng hash FBM lúc mở, nên FBM đổi sau lúc mở thì kỳ so sau thấy cả ba khác nhau và báo xung đột lại; lệnh chốt chỉ ghi ShinCRM nên không có gì bị ghi đè.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
@@ -77,8 +78,6 @@ FbmSync.conflictRefreshRead = function (state, stage, rawResponse) {
     return { failure: FbmSync.conflictFail('STALE_RESPONSE', 'Response đọc lại xung đột đã cũ hoặc không thuộc request đang chờ.') };
   }
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now(); state.cursor = {};
-  // Đọc lại ở bước chốt mà hỏng thì quay về bước xem để người dùng bấm chốt lại được.
-  if (stage === 'confirm') { refresh.stage = 'review'; refresh.choice = ''; }
   var entity = refresh.entity, target = String(refresh.id || ''), success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
     state.message = 'Không đọc lại được FBM; xung đột ' + target + ' vẫn giữ nguyên để thử lại.'; FbmSync.stateWrite(state);
@@ -147,46 +146,43 @@ FbmSync.conflictOpened = function (rawResponse) {
   return { ok: true, conflict: FbmSync.conflictView(read, Number(state.metadata.conflictCount || 0)), status: FbmSync.statusView() };
 };
 
-/** Bước chốt 1: phát request đọc lại FBM ngay lúc bấm nút (`09/04`: hFBM phải lấy mới tại thời điểm bấm). */
-FbmSync.prepareConflictResolution = function (entity, id, choice) {
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
+/**
+ * Chốt xung đột theo bản đã mở, không đọc lại FBM. `merged` là lựa chọn từng trường `{ field: { choice, value } }`; `fbmValues` là `{ field: value }`, giá trị FBM của các trường lệch mà màn xung đột đã hiện, theo tên trường FBM.
+ * Cả hai gửi thẳng trong lệnh chốt, không cất vào state vì giá trị có thể dài. `fbmValues` chỉ nhận trường fingerprint: trường ngoài fingerprint không được hash kiểm nên không được đi vào dòng ghi.
+ */
+FbmSync.confirmConflict = function (entity, id, choice, merged, fbmValues) {
+  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
   var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh || {}, target = String(id || '').trim();
   if (refresh.stage !== 'review' || refresh.entity !== entity || String(refresh.id || '') !== target) { return FbmSync.conflictFail('CONFLICT_NOT_OPEN', 'Xung đột này chưa được mở để xem; mở lại chế độ xử lý xung đột.'); }
   if (['fbm', 'shin', 'manual'].indexOf(choice) < 0) { return FbmSync.conflictFail('CONFLICT_CHOICE_INVALID', 'Cách xử lý conflict không hợp lệ.'); }
-  var local = (FbmSync.readLocal(entity) || []).filter(function (record) { return String(record && record.id || '') === target; })[0];
-  var request = local ? FbmSync.conflictRefreshRequest(entity, { id: target, fbmId: String(local.fbmId || '').trim() }) : null;
-  if (!request) { return FbmSync.conflictFail('CONFLICT_REFRESH_UNAVAILABLE', 'Không dựng được request đọc lại FBM cho ' + target + '.'); }
-  refresh.stage = 'confirm'; refresh.choice = choice;
-  state.metadata.conflictRefresh = refresh;
-  state.cursor = { kind: 'conflict_refresh', entity: entity, id: target };
-  state.message = 'Đang đọc lại FBM trước khi chốt conflict ' + target + '...';
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
-};
-
-/**
- * Bước chốt 2: FBM đổi so với lúc mở thì trả DTO mới để xem lại; khớp thì giao Cửa bản ghi, nơi ShinCRM được so như vậy và quyết định được dựng trên dòng đọc lại, với baseline là hash FBM mới.
- * `merged` là lựa chọn từng trường `{ field: { choice, value } }` gửi thẳng trong lệnh chốt, không cất vào state vì giá trị nhập tay có thể dài.
- */
-FbmSync.confirmConflict = function (entity, id, choice, merged, rawResponse) {
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
-  var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh || {};
-  if (refresh.entity !== entity || String(refresh.id || '') !== String(id || '').trim() || refresh.choice !== choice) { return FbmSync.conflictFail('CONFLICT_REFRESH_NOT_FOUND', 'Không còn lượt đọc lại conflict tương ứng.'); }
-  var read = FbmSync.conflictRefreshRead(state, 'confirm', rawResponse);
-  if (read.failure) { return read.failure; }
-  if (read.latestHash !== String(refresh.openedHash || '')) { return FbmSync.conflictReview(state, read, 'FBM đã thay đổi trong lúc xử lý; xung đột đã được cập nhật, hãy xem lại.'); }
-  return FbmSync.conflictSettle(state, read, String(refresh.openedLocalHash || ''), function (local) {
+  var allowed = (FbmSync.FINGERPRINT_FIELDS[entity] || []).filter(function (field) { return !(entity === 'activity' && field === 'id'); });
+  var values = fbmValues && typeof fbmValues === 'object' && !Array.isArray(fbmValues) ? fbmValues : null;
+  var stray = values ? Object.keys(values).filter(function (field) { return allowed.indexOf(field) < 0; }) : ['không có giá trị'];
+  if (stray.length) { return FbmSync.conflictReject(state, entity, target, 'Giá trị FBM gửi kèm lệnh chốt ' + target + ' không hợp lệ (' + stray.join(', ') + '); chưa ghi gì, mở lại xung đột.'); }
+  var read = { entity: entity, id: target, gate: FbmSync.stateCategoryGate(state), latestHash: String(refresh.openedHash || ''), latestFor: function (local) {
+    var latest = Object.assign({}, local);
+    Object.keys(values).forEach(function (field) { latest[FbmSync.conflictLocalField(entity, field)] = values[field] === undefined || values[field] === null ? '' : values[field]; });
+    return latest;
+  } };
+  return FbmSync.conflictSettle(state, read, String(refresh.openedLocalHash || ''), function (local, latest) {
     // Giữ FBM vẫn giữ các trường chỉ ShinCRM có (xác thực, cho phép đẩy...) như chiều pull.
-    var record = choice === 'fbm' ? FbmSync.preserveLocalFields(entity, local, read.latest) : Object.assign({}, local);
+    var record = choice === 'fbm' ? FbmSync.preserveLocalFields(entity, local, latest) : Object.assign({}, local);
     if (choice === 'manual') {
       Object.keys(merged && typeof merged === 'object' ? merged : {}).forEach(function (field) {
         var pick = merged[field] || {}, localField = FbmSync.conflictLocalField(entity, field);
-        if (pick.choice === 'fbm') { record[localField] = read.latest[localField]; }
+        if (pick.choice === 'fbm') { record[localField] = latest[localField]; }
         else if (pick.choice === 'manual') { record[localField] = pick.value === undefined || pick.value === null ? '' : pick.value; }
       });
     }
     return record;
-  }, choice, 'Đã quyết conflict ' + entity + ' ' + read.id + ' theo ' + choice + '.');
+  }, choice, 'Đã quyết conflict ' + entity + ' ' + target + ' theo ' + choice + '.');
+};
+
+/** Lệnh chốt không ghi được theo bản đã mở: bỏ bản đang mở, ghi Log và trả `CONFLICT_REOPEN` để Sidebar mở lại xung đột, lúc đó FBM được đọc mới. */
+FbmSync.conflictReject = function (state, entity, id, message) {
+  state.metadata.conflictRefresh = null; state.message = message; FbmSync.stateWrite(state);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'conflict_reopen', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: entity, recordId: id, cycleId: String(state.runId || ''), reason: message }); }
+  return { ok: false, code: 'CONFLICT_REOPEN', message: message, status: FbmSync.statusView() };
 };
 
 /** Một bên đã đổi từ lúc mở: chốt lại cả hai hash theo bản vừa đọc và trả màn xung đột mới để người dùng xem lại, không ghi gì. */
@@ -198,8 +194,9 @@ FbmSync.conflictReview = function (state, read, message) {
 };
 
 /**
- * Ghi quyết định xung đột qua Cửa bản ghi với baseline là hash FBM vừa đọc lại; bước chốt và bước mở (khi không còn trường lệch) dùng chung.
- * Hàm quyết đọc lại dòng: dòng đã rời trạng thái chờ quyết thì báo, dòng đang bị tiến trình khác giữ thì báo bận, hash ShinCRM khác `localHash` (lúc người dùng mở) thì trả màn xem lại; khớp thì `build(local)` dựng bản ghi từ chính dòng đọc lại.
+ * Ghi quyết định xung đột qua Cửa bản ghi với baseline là `read.latestHash` (hash FBM lúc mở); bước chốt và bước mở (khi không còn trường lệch) dùng chung.
+ * Hàm quyết đọc lại dòng: dòng đã rời trạng thái chờ quyết thì báo, dòng đang bị tiến trình khác giữ thì báo bận, hash ShinCRM khác `localHash` (lúc người dùng mở) thì cho xem lại.
+ * Bản FBM là `read.latest`, hoặc `read.latestFor(local)` ghép từ dòng đọc lại; hash bản FBM khác `latestHash` thì không ghi. Khớp thì `build(local, latest)` dựng bản ghi.
  */
 FbmSync.conflictSettle = function (state, read, localHash, build, choice, message) {
   var entity = read.entity;
@@ -209,11 +206,14 @@ FbmSync.conflictSettle = function (state, read, localHash, build, choice, messag
     var busy = gate.busy(entity, [read.id])[read.id];
     if (busy) { return { value: { status: 'busy', busy: busy } }; }
     if (String(FbmSync.hash(local, entity, read.gate)) !== localHash) { return { value: { status: 'changed', local: local } }; }
-    var record = build(local);
+    var latest = read.latestFor ? read.latestFor(local) : read.latest;
+    if (String(FbmSync.hash(latest, entity, read.gate)) !== read.latestHash) { return { value: { status: 'fbmMismatch' } }; }
+    var record = build(local, latest);
     record.id = read.id;
     record.fbmId = local.fbmId;
     record.fbmHash = read.latestHash;
     record.syncStatus = FbmSync.hash(record, entity, read.gate) === read.latestHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
+    if (record.syncStatus === FbmSync.SYNC_STATUS.synced) { record.syncedAt = new Date(); }
     return { save: [{ entity: entity, records: [record], source: 'pull' }], value: { status: 'ok', record: record } };
   }).value;
   if (done.status === 'gone') {
@@ -227,6 +227,8 @@ FbmSync.conflictSettle = function (state, read, localHash, build, choice, messag
     FbmSync.stateWrite(state);
     return FbmSync.conflictFail('CONFLICT_RECORD_BUSY', state.message);
   }
+  if (done.status === 'fbmMismatch') { return FbmSync.conflictReject(state, entity, read.id, 'Giá trị FBM gửi kèm lệnh chốt ' + read.id + ' không khớp bản FBM lúc mở xung đột; chưa ghi gì, mở lại xung đột.'); }
+  if (done.status === 'changed' && !read.latest) { return FbmSync.conflictReject(state, entity, read.id, 'ShinCRM đã thay đổi trong lúc xử lý ' + read.id + '; chưa ghi gì, mở lại xung đột để xem bản mới.'); }
   if (done.status === 'changed') {
     return FbmSync.conflictReview(state, Object.assign({}, read, { local: done.local, localHash: String(FbmSync.hash(done.local, entity, read.gate)) }), 'ShinCRM đã thay đổi trong lúc xử lý; xung đột đã được cập nhật, hãy xem lại.');
   }

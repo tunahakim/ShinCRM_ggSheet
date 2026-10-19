@@ -59,10 +59,8 @@ FbmSync.controlDispatch = function (command, payload) {
       return FbmSync.openConflict();
     case 'conflict_opened':
       return FbmSync.conflictOpened(input.response);
-    case 'prepare_conflict':
-      return FbmSync.prepareConflictResolution(input.entity, input.id, input.choice);
     case 'confirm_conflict':
-      return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.response);
+      return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.fbmValues);
     case 'transport_error':
       return FbmSync.logTransportError(input.message, input.action, input.runId);
     default:
@@ -74,7 +72,7 @@ FbmSync.controlDispatch = function (command, payload) {
 FbmSync.controlDispatchLocked = function (command, payload) {
   // transport_failure tự giữ orchestration lock để cả Sidebar và relay nền dùng chung
   // một handler; không bọc thêm ở đây vì Apps Script Lock không tái nhập.
-  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'reset_state', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'prepare_conflict', 'confirm_conflict'];
+  var name = String(command || ''), mutating = ['start', 'continue', 'approve_push', 'cancel', 'reset_state', 'retry_push_failures', 'set_master_switch', 'set_background_switch', 'save_extension_config', 'save_background_schedule', 'save_login_config', 'set_auto_login', 'identity_status', 'save_identity_binding', 'save_connection', 'open_conflict', 'conflict_opened', 'confirm_conflict'];
   if (mutating.indexOf(name) < 0) { return FbmSync.controlDispatch(name, payload); }
   try {
     return FbmSync.withOrchestrationLock(function () {

@@ -796,6 +796,16 @@ async function chay(so) {
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Lỗi mở lại bản ghi hiện rõ và không khóa nút', [retryButton.disabled, paints.some((item) => String(item.message).indexOf('RETRY_FAILURE') >= 0)], [false, true]);
 
+  const resolveCalls = [], resolveExtension = hop.fbmSyncExtensionRequest, resolveServer = hop.callServer, resolveOpen = hop.fbmSyncOpenConflict;
+  hop.fbmSyncExtensionRequest = (request) => { resolveCalls.push(['extension', request]); return Promise.resolve({}); };
+  hop.fbmSyncOpenConflict = () => { resolveCalls.push(['reopen']); return Promise.resolve(null); };
+  hop.callServer = (name, args) => { resolveCalls.push([name, args]); return Promise.resolve(name === 'fbmConfirmConflict' ? { ok: false, code: 'CONFLICT_REOPEN', message: 'mở lại' } : {}); };
+  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', left: '0901', right: '0902' }, { field: 'ten_kh', left: 'A', right: 'B' }] };
+  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
+  check(so, 'Chốt xung đột gọi GAS một lần, gửi kèm giá trị FBM các trường lệch như màn đã hiện, không nhờ Extension đọc lại FBM; GAS trả mở lại thì mở lại xung đột',
+    [resolveCalls.map((call) => call[0]), resolveCalls[0][1][4]], [['fbmConfirmConflict', 'reopen'], { dien_thoai: '0902', ten_kh: 'B' }]);
+  hop.fbmSyncExtensionRequest = resolveExtension; hop.callServer = resolveServer; hop.fbmSyncOpenConflict = resolveOpen;
+
   hop.fbmSyncResolveConflict = () => Promise.reject(new Error('CONFLICT_FAILURE'));
   hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
   hop.FBM_SYNC_CLIENT.conflictChoices = { phone: 'fbm' }; hop.FBM_SYNC_CLIENT.conflictDraft = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};

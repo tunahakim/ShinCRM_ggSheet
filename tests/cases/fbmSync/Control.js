@@ -15,7 +15,6 @@ async function chay(so) {
       backgroundEnabled: () => true,
       setBackgroundEnabled: (enabled) => { calls.push(['background', enabled]); return { ok: true, enabled }; },
       resolveConflict: (...args) => { calls.push(['resolve', args]); return { ok: true }; },
-      prepareConflictResolution: (...args) => { calls.push(['prepare', args]); return { ok: true }; },
       confirmConflict: (...args) => { calls.push(['confirm', args]); return { ok: true }; },
       heartbeatTransportFailure: (input) => { calls.push(['transport_failure', input]); return { ok: false, code: input.code }; },
       withOrchestrationLock: (callback) => { calls.push(['lock']); return callback(); },
