@@ -25,11 +25,11 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 
 ### Nhóm A — So ba bản trước khi lưu FBM
 
-- [ ] A1. `continuePush` bước mở form sửa: lấy giá trị bằng `verifyFormValues`, quyết bằng `threeWay` theo quyết định 1; nhánh không lưu ghi dòng qua `pushRowChange`.
-- [ ] A2. Tách đoạn liệt kê trường lệch thành công cụ dùng chung, chỉ trả tên trường; dùng ở A1 và `finishPushVerification`.
-- [ ] A3. `finishPushVerification` ra xung đột: đánh dấu dòng, đi tiếp bản ghi sau.
-- [ ] A4. Test: hash từ form = hash từ lưới (Khách, Giao dịch); FBM đổi sau mốc không phát lệnh lưu, dòng thành xung đột, bản ghi sau vẫn đẩy; FBM = ShinCRM không lưu, cập nhật mốc; FBM = mốc vẫn lưu; chỉ FBM đổi không lưu; đọc lại sau lưu ra xung đột không dừng phiên.
-- [ ] A5. Sửa 09/04 (mục "Đẩy xong thì đọc xác nhận" và bảng so ba chiều cho chiều đẩy), 09/02 nếu còn câu ngược.
+- [x] A1. `continuePush` bước mở form sửa: lấy giá trị bằng `verifyFormValues`, quyết bằng `threeWay` theo quyết định 1; nhánh không lưu ghi dòng qua `pushRowChange`.
+- [x] A2. Tách đoạn liệt kê trường lệch thành công cụ dùng chung, chỉ trả tên trường; dùng ở A1 và `finishPushVerification`.
+- [x] A3. `finishPushVerification` ra xung đột: đánh dấu dòng, đi tiếp bản ghi sau.
+- [x] A4. Test: hash từ form = hash từ lưới (Khách, Giao dịch); FBM đổi sau mốc không phát lệnh lưu, dòng thành xung đột, bản ghi sau vẫn đẩy; FBM = ShinCRM không lưu, cập nhật mốc; FBM = mốc vẫn lưu; chỉ FBM đổi không lưu; đọc lại sau lưu ra xung đột không dừng phiên.
+- [x] A5. Sửa 09/04 (mục "Đẩy xong thì đọc xác nhận" và bảng so ba chiều cho chiều đẩy), 09/02 nếu còn câu ngược.
 - [ ] A6. Nghiệm thu GAS DEV bằng `node tests/gas.js <hàm> --push`.
 - [ ] A7. Chủ dự án nghiệm thu với ALT00010: sửa khách trên FBM, sửa khác trên ShinCRM, chạy Chỉ đẩy; FBM giữ nguyên, dòng thành xung đột. Lặp lại với một giao dịch cũ.
 
