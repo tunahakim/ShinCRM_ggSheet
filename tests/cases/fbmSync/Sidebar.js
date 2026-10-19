@@ -48,7 +48,7 @@ function taoBoTest() {
   };
   hop.fbmSyncPaintError = null;
   napClient(hop,
-    'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html',
+    'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
     'client/schema/sync/screens/run.html', 'client/schema/sync/screens/account.html', 'client/schema/sync/screens/results.html', 'client/schema/sync/screens/settings.html', 'client/schema/sync/screens/index.html',
     'client/schema/sync/results/status.html', 'client/schema/sync/results/issues.html', 'client/schema/sync/results/audit.html', 'client/schema/sync/results/conflict.html',
     'client/sync/fbmSyncUiSchema.html', 'client/sync/fbmSyncConfigEditor.html',
@@ -651,14 +651,48 @@ async function chay(so) {
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
-  // Bấm chạy tay khi lượt nền đang chạy: GAS báo SYNC_BACKGROUND_STOPPING, Sidebar chờ lượt nền nhả cursor rồi mới mở lượt tay.
-  const savedStartServer = hop.fbmSyncStartServer, savedWaitStop = hop.fbmSyncWaitForBackgroundStop;
-  let nutKhiCho = null;
-  hop.fbmSyncStartServer = () => Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_STOPPING', status: { phase: 'pull_activity', masterEnabled: true, enabled: true } });
-  hop.fbmSyncWaitForBackgroundStop = () => { const nut = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', masterEnabled: true, enabled: true }); nutKhiCho = [nut.disabled, nut.label]; return Promise.resolve({ ok: true }); };
-  await hop.fbmSyncRunStart('read');
-  hop.fbmSyncStartServer = savedStartServer; hop.fbmSyncWaitForBackgroundStop = savedWaitStop;
-  check(so, 'Bấm chạy tay khi lượt nền đang chạy: nút khóa và hiện "Đang dừng đồng bộ nền..." trong lúc chờ; lượt tay xong thì nút mở lại', [nutKhiCho, hop.FBM_SYNC_CLIENT.backgroundStopping, hop.fbmSyncRunActionBlock({ phase: 'idle', masterEnabled: true, enabled: true }).disabled], [[true, 'Đang dừng đồng bộ nền...'], false, false]);
+  // Bấm chạy tay khi lượt nền đang chạy: GAS trả SYNC_BACKGROUND_RUNNING, Sidebar hỏi người dùng; chỉ khi chọn dừng mới gọi lệnh dừng nền.
+  const savedStartServer = hop.fbmSyncStartServer, savedWaitIdle = hop.fbmSyncWaitForBackgroundIdle, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
+  const nenStatus = { phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };
+  const chayNen = async (choice) => {
+    const ghi = { popup: null, goi: [], cho: null, start: 0 };
+    hop.fbmSyncStartServer = () => { ghi.start += 1; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus }); };
+    hop.uiDecisionChoose = (opts) => { ghi.popup = opts; return Promise.resolve(choice); };
+    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPING' }); };
+    hop.fbmSyncWaitForBackgroundIdle = (task, startCall) => { const nut = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', masterEnabled: true, enabled: true }); ghi.cho = [task, nut.disabled, nut.label]; return Promise.resolve({ ok: false, code: 'TEST_STOP' }); };
+    ghi.ket = await hop.fbmSyncRunStart('read');
+    ghi.sau = [hop.FBM_SYNC_CLIENT.backgroundStopping, hop.FBM_SYNC_CLIENT.running];
+    return ghi;
+  };
+  const xNen = await chayNen('cancel'), dungNen = await chayNen('stop'), choNen = await chayNen('wait');
+  hop.fbmSyncStartServer = savedStartServer; hop.fbmSyncWaitForBackgroundIdle = savedWaitIdle; hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
+  check(so, 'Chạy tay gặp lượt nền: popup nêu bước đang chạy và giờ bắt đầu, hai nút dừng ngay / tự chạy khi nền xong', [xNen.popup.title, xNen.popup.lines, xNen.popup.choices.map((c) => c.id + ':' + c.label)], ['Đồng bộ nền đang chạy', ['Bước đang chạy: Đang đọc giao dịch.', 'Bắt đầu lúc 2026-10-19 15:03.'], ['stop:Dừng đồng bộ nền và chạy đồng bộ ngay', 'wait:Tự chạy đồng bộ khi đồng bộ nền xong']]);
+  check(so, 'Nút X của popup nền: không gọi dừng nền, không chờ, không gọi lại lệnh gốc; nút chạy mở lại', [xNen.goi, xNen.cho, xNen.start, xNen.ket.code, xNen.sau], [[], null, 1, 'SYNC_BACKGROUND_SKIPPED', [false, false]]);
+  check(so, 'Chọn dừng nền: gọi đúng một lệnh dừng nền, trong lúc chờ nút khóa và báo đang dừng; xong thì mở lại', [dungNen.goi, dungNen.cho, dungNen.sau], [['fbmStopBackground'], ['run', true, 'Đang dừng đồng bộ nền...'], [false, false]]);
+  check(so, 'Chọn chờ nền xong: không gọi dừng nền, chỉ chờ rồi chạy lại lệnh gốc', [choNen.goi, choNen.cho && choNen.cho[0], choNen.cho && choNen.cho[2] === 'Đang dừng đồng bộ nền...'], [[], 'run', false]);
+
+  // Hàm chờ dùng chung: chờ GAS nhả lượt nền rồi gọi lệnh gốc; lệnh gốc gặp lượt nền kế tiếp thì chờ tiếp, không hỏi lại; quá hạn thì báo lỗi.
+  const savedTimeout = hop.setTimeout, savedStatusOnce = hop.fbmSyncStatusOnce;
+  hop.setTimeout = (fn) => fn();
+  const trangThai = [{ phase: 'pull_activity', runId: 'nen-1' }, { phase: 'idle', runId: '' }, { phase: 'idle', runId: '' }];
+  hop.fbmSyncStatusOnce = () => Promise.resolve(trangThai.shift() || { phase: 'idle', runId: '' });
+  const lenhGoc = [{ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }, { ok: true, code: 'STARTED' }];
+  let goiLenh = 0;
+  const choXong = await hop.fbmSyncWaitForBackgroundIdle('run', () => { goiLenh += 1; return Promise.resolve(lenhGoc.shift()); }, Date.now() + 60000);
+  let quaHan = '';
+  await hop.fbmSyncWaitForBackgroundIdle('run', () => Promise.resolve({ ok: true }), Date.now() - 1).catch((error) => { quaHan = error.message; });
+  hop.setTimeout = savedTimeout; hop.fbmSyncStatusOnce = savedStatusOnce;
+  check(so, 'Chờ lượt nền: chỉ gọi lệnh gốc khi GAS nhả lượt, gặp lượt nền kế thì chờ tiếp; quá hạn báo lỗi rõ, không chạy lệnh gốc', [goiLenh, choXong.code, quaHan.indexOf('chưa chạy đồng bộ') >= 0], [2, 'STARTED', true]);
+
+  // Thẻ xung đột: còn số đếm mà RAM chưa có bản ghi thì nói lý do, không báo "không có xung đột".
+  const theXungDot = () => JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 2 } }));
+  hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.backgroundWait = 'conflict';
+  const theCho = theXungDot();
+  hop.FBM_SYNC_CLIENT.backgroundWait = null; hop.FBM_SYNC_CLIENT.conflictNote = 'Không mở được bản ghi xung đột: lỗi thử';
+  const theLoi = theXungDot();
+  hop.FBM_SYNC_CLIENT.conflictNote = '';
+  const theRong = JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 0 } }));
+  check(so, 'Thẻ xung đột còn số đếm mà chưa mở được bản ghi hiện đúng lý do (chờ nền, lỗi mở); hết xung đột mới báo không có', [theCho.indexOf('Đang chờ đồng bộ nền') >= 0, theLoi.indexOf('lỗi thử') >= 0, theCho.indexOf('Không có xung đột') < 0, theRong.indexOf('Không có xung đột') >= 0], [true, true, true, true]);
   hop.fbmSyncPaint = cancelPaint;
 
   const loginButton = dom.document.createElement('button');
@@ -738,21 +772,22 @@ async function chay(so) {
   hop.sheetLinkExtensionAlive = () => true;
 
 
-  const waitForIdentityBackground = hop.fbmSyncWaitForIdentityBackground;
-  hop.fbmSyncWaitForIdentityBackground = (startCall) => startCall();
+  const waitForIdentityBackground = hop.fbmSyncWaitForBackgroundIdle, chooseIdentity = hop.uiDecisionChoose;
+  hop.fbmSyncWaitForBackgroundIdle = (task, startCall) => startCall();
+  hop.uiDecisionChoose = () => Promise.resolve('wait');
   let resumedIdentityArgs = null, stoppingIdentityCall = true;
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   hop.callServer = (name, args) => {
     if (name === 'fbmGetIdentityStatus') { return Promise.resolve({ status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } }); }
     if (name === 'fbmStartIdentityCheck') {
       resumedIdentityArgs = args;
-      if (stoppingIdentityCall) { stoppingIdentityCall = false; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_STOPPING' }); }
+      if (stoppingIdentityCall) { stoppingIdentityCall = false; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }); }
       return Promise.resolve({ ok: true, request: {} });
     }
     return Promise.resolve({});
   };
   await hop.fbmSyncCheckIdentity();
-  hop.fbmSyncWaitForIdentityBackground = waitForIdentityBackground;
+  hop.fbmSyncWaitForBackgroundIdle = waitForIdentityBackground; hop.uiDecisionChoose = chooseIdentity;
   check(so, 'Kiểm tra liên kết sau khi chờ phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
 
   const originHop = taoBoTest().hop;

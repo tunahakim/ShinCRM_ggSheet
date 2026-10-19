@@ -418,9 +418,15 @@ async function chay(so) {
   backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.activeRequestId = 'background-request'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
   heartbeat.FbmSync.stateWrite(backgroundState);
   const manualRequest = heartbeat.FbmSync.start({ mode: 'read', manual: true });
-  check(so, 'manual yeu cau dung phien nen sau response hien tai', [manualRequest.ok, manualRequest.code, heartbeat.FbmSync.stateRead().metadata.manualPending.mode], [false, 'SYNC_BACKGROUND_STOPPING', 'read']);
+  check(so, 'chạy tay giữa lượt nền không tự dừng nền mà trả mã để Sidebar hỏi người dùng', [manualRequest.ok, manualRequest.code, !!manualRequest.status, heartbeat.FbmSync.stateRead().metadata.manualPending, heartbeat.FbmSync.stateRead().runId], [false, 'SYNC_BACKGROUND_RUNNING', true, null, 'background-run']);
+  const stopRequest = heartbeat.FbmSync.stopBackground();
+  check(so, 'chỉ lệnh dừng nền mới đặt cờ dừng sau response hiện tại', [stopRequest.ok, stopRequest.code, !!heartbeat.FbmSync.stateRead().metadata.manualPending], [true, 'SYNC_BACKGROUND_STOPPING', true]);
   const stoppedBackground = heartbeat.FbmSync.continue({ d: { Rows: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'background-request' }] } });
   check(so, 'phien nen dung va san sang cho manual sau khi nhan response', [stoppedBackground.manualReady, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().runId], [true, 'idle', '']);
+  const manualRun = heartbeat.FbmSync.stateRead(); manualRun.runId = 'manual-run'; manualRun.origin = 'manual'; manualRun.phase = 'pull_customer'; heartbeat.FbmSync.stateWrite(manualRun);
+  const stopManual = heartbeat.FbmSync.stopBackground();
+  check(so, 'lệnh dừng nền gặp lượt tay thì không đặt cờ dừng', [stopManual.code, heartbeat.FbmSync.stateRead().metadata.manualPending || null], ['SYNC_BACKGROUND_IDLE', null]);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', origin: 'manual' });
   const preservedState = heartbeat.FbmSync.stateRead();
   preservedState.runId = 'preserve-run'; preservedState.phase = 'pull_customer'; preservedState.cursor = { kind: 'customer_grid', pageIndex: 4 }; preservedState.activeRequestId = 'preserve-request';
   heartbeat.FbmSync.stateWrite(preservedState);

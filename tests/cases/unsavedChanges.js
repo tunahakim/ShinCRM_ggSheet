@@ -16,7 +16,7 @@ function taoBoTest() {
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
     alert: (message) => { calls.push({ name: 'alert', message }); }
   });
-  napClient(hop, 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html');
+  napClient(hop, 'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html');
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
   dom.root.appendChild(dialog);
   const wrapper = dom.document.createElement('div'); wrapper.className = 'shin-form-field';
@@ -483,15 +483,20 @@ function testHopDongTichHop(so) {
 
 async function testUiDecisionChoose(so) {
   const bo = taoBoTest(), hop = bo.hop;
-  let nem = '';
-  try { hop.uiDecisionChoose({ title: 'x', choices: [{ id: 'ok', label: 'OK' }] }); } catch (err) { nem = err.message; }
-  check(so, 'popup Sidebar thiếu lựa chọn cancel bị chặn ngay, để đóng nền hay Esc không chạy việc nào', nem.indexOf('cancel') >= 0, true);
+  const dong = hop.uiDecisionChoose({ title: 'x', choices: [{ id: 'ok', label: 'OK' }], detail: ['tham khảo'] });
+  const x = bo.dialog.querySelector('.shin-decision-close');
+  const chiTiet = bo.dialog.querySelector('.shin-decision-detail');
+  const anTruoc = chiTiet.hasAttribute('hidden');
+  hop.uiDecisionShowDetail();
+  check(so, 'popup Sidebar luôn có nút X ở tiêu đề ra cancel; chi tiết gập sẵn, bấm Xem chi tiết mới mở', [!!x, anTruoc, chiTiet.hasAttribute('hidden'), bo.dialog.querySelector('[data-ui-decision-detail]').hasAttribute('hidden')], [true, true, false, true]);
+  hop.uiDecisionResolve('cancel');
+  check(so, 'nút X đóng popup và trả cancel dù danh sách lựa chọn không có cancel', [await dong, bo.dialog.hidden], ['cancel', true]);
 
   const hua = hop.uiDecisionChoose({ title: 'T', message: 'M', lines: ['dòng 1', 'dòng 2'], choices: [{ id: 'a', label: 'Việc A', variant: 'primary' }, { id: 'cancel', label: 'Quay lại' }] });
   const nut = Array.from(bo.dialog.querySelectorAll('[data-ui-decision-choice]')).map((el) => el.getAttribute('data-ui-decision-choice'));
   const lan2 = await hop.uiDecisionChoose({ title: 'khác', choices: [{ id: 'cancel', label: 'x' }] });
   hop.uiDecisionResolve('a');
-  check(so, 'popup Sidebar hiện đủ nút theo danh sách, trả đúng id được bấm; popup thứ hai lúc đang mở trả cancel', [bo.dialog.hidden, nut, lan2, await hua], [true, ['cancel', 'a', 'cancel'], 'cancel', 'a']);
+  check(so, 'popup Sidebar hiện đủ nút theo danh sách, trả đúng id được bấm; popup thứ hai lúc đang mở trả cancel', [bo.dialog.hidden, nut, lan2, await hua], [true, ['cancel', 'cancel', 'a', 'cancel'], 'cancel', 'a']);
 
   const hai = hop.uiDecisionOpen({ title: 'Xóa?' });
   hop.uiDecisionResolve('confirm');
@@ -549,7 +554,7 @@ async function testSaveFlowPopup(so) {
   const huaA = a.hop.saveFlowSubmit();
   const moA = await bamPopup(a.hop, 'mine');
   const chuA = Array.from(a.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
-  const nutA = Array.from(a.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  const nutA = Array.from(a.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
   await huaA;
   check(so, 'xung đột khi lưu mở popup Sidebar ba lựa chọn, ghi rõ giá trị Sheet, giá trị đang nhập và giá trị lần trước bạn thấy; không còn alert', [
     moA, a.bo.calls.filter((c) => c.name === 'alert').length, chuA[1], nutA
@@ -578,7 +583,7 @@ async function testSaveFlowPopup(so) {
   const huaD = d.hop.saveFlowSubmit();
   const moD = await bamPopup(d.hop, 'cancel');
   const chuD = Array.from(d.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
-  const nutD = Array.from(d.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  const nutD = Array.from(d.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
   const kqD = await huaD;
   check(so, 'trường nhập sai khi lưu mở popup Sidebar một nút quay lại sửa, ô sai tô đỏ, không còn alert', [
     moD, chuD, nutD, kqD.focusId, d.bo.calls.filter((x) => x.name === 'alert').length, d.ghi.dong
@@ -597,7 +602,7 @@ async function testSaveFlowPopup(so) {
     });
     const hua = x.hop.saveFlowSubmit();
     return bamPopup(x.hop, choice).then((mo) => {
-      const chu = Array.from(x.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+      const chu = Array.from(x.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
       return hua.then((kq) => ({ x, mo, chu, kq }));
     });
   };
@@ -632,7 +637,7 @@ async function testSaveFlowPopup(so) {
   const f1 = taoLuongLuu(banLuu);
   const huaF1 = f1.hop.saveFlowSubmit();
   const moF1 = await bamPopup(f1.hop, 'retry');
-  const nutF1 = Array.from(f1.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
+  const nutF1 = Array.from(f1.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
   const chuF1 = Array.from(f1.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent).join('|');
   await huaF1;
   check(so, 'lưu gặp bản ghi bận: popup hai lựa chọn nêu lý do; chọn thử lại thì gửi lại đúng nội dung rồi đóng form', [
@@ -657,7 +662,7 @@ async function testSaveFlowPopup(so) {
     t.hop.PENDING_DELETE.ids = ['GD1', 'GD2'];
     const hua = t.hop.pendingDeleteFire();
     return bamPopup(t.hop, choice).then((mo) => {
-      const nut = Array.from(t.dialog.querySelectorAll('button')).map((el) => el.textContent);
+      const nut = Array.from(t.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
       return hua.then(() => ({ mo, nut, gui, conCho: t.hop.PENDING_DELETE.ids.slice() }));
     });
   };

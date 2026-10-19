@@ -333,6 +333,11 @@ async function chay(so) {
   const cfNewRun = CF.stateStart('', 'checking_session', 0);
   cfNewRun.phase = 'done'; CF.stateWrite(cfNewRun);
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
+  const cfBackground = CF.openConflict();
+  const cfAfterBackground = CF.stateRead();
+  check(so, 'Mở xung đột giữa lượt nền trả mã để Sidebar hỏi dừng hay chờ, không phát request và không đụng lượt nền', [cfBackground.code, !!cfBackground.status, cfBackground.request, cfAfterBackground.runId, cfAfterBackground.activeRequestId, cfAfterBackground.metadata.manualPending || null], ['SYNC_BACKGROUND_RUNNING', true, undefined, 'nen-1', 'nen-req', null]);
+  cfAfterBackground.runId = ''; cfAfterBackground.origin = 'manual'; cfAfterBackground.phase = 'done'; cfAfterBackground.activeRequestId = ''; CF.stateWrite(cfAfterBackground);
   const cfOpen = CF.openConflict();
   check(so, 'FBM-024: phiên mới không làm mất hàng đợi xung đột; mở chế độ xung đột chỉ phát request đọc bản ghi FBM đầu hàng đợi',
     [cfOpen.ok, cfOpen.remaining, cfOpen.request && cfOpen.request.meta.kind, cfOpen.request && cfOpen.request.meta.conflictId, JSON.stringify(CF.stateRead().metadata.conflictRefresh)],
