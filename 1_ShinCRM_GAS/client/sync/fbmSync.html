@@ -602,7 +602,7 @@ function fbmSyncInstall() {
       });
     } else if (target.id === 'fbm-sync-open-conflicts') {
       target.disabled = true;
-      fbmSyncOpenConflict().catch(function (error) {
+      fbmSyncOpenConflict().then(function (opened) { if (opened && opened.code === 'SYNC_BACKGROUND_SKIPPED') { target.disabled = false; } }, function (error) {
         target.disabled = false;
         fbmSyncPaintError(error, 'Không mở được bản ghi xung đột.');
       });
@@ -780,7 +780,7 @@ function fbmSyncOpenConflict() {
   var open = function () { return callServer('fbmOpenConflict'); };
   FBM_SYNC_CLIENT.conflictNote = '';
   return open().then(function (first) { return fbmSyncAfterBackground(first, 'conflict', open); }).then(function (opened) {
-    if (opened && opened.code === 'SYNC_BACKGROUND_SKIPPED') { FBM_SYNC_CLIENT.conflictNote = opened.message + ' Bấm lại tab Xung đột để chọn dừng hoặc chờ.'; return fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); }
+    if (opened && opened.code === 'SYNC_BACKGROUND_SKIPPED') { return opened; }
     if (!opened || opened.ok === false) { throw new Error(opened && (opened.message || opened.code) || 'Không mở được chế độ xử lý xung đột.'); }
     if (opened.empty) { fbmSyncShowConflict(null); return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(opened.status, 'Đang đọc bản ghi FBM của xung đột...'));
@@ -1008,7 +1008,7 @@ function fbmSyncCheckIdentityStart(identityTarget) {
     return fbmSyncAfterBackground(started, 'identity', function () { return callServer('fbmStartIdentityCheck', [identityTarget]); }).then(function (next) { if (next && next.code === 'SYNC_BACKGROUND_SKIPPED') { return next; } if (!next || next.ok === false) { throw new Error(next && (next.message || next.code) || 'Không bắt đầu được kiểm tra liên kết.'); } ownRun = true; return fbmSyncLoop(next); });
   }).then(function (value) {
     fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = '';
-    if (value && value.code === 'SYNC_BACKGROUND_SKIPPED') { fbmSyncSetAccountNotice('identity', 'warning', value.message); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); return value; }
+    if (value && value.code === 'SYNC_BACKGROUND_SKIPPED') { return value; }
     var snapshot = value && (value.status || value) || FBM_SYNC_CLIENT.lastStatus || {}, result = snapshot.metadata && snapshot.metadata.identityCheck;
     // Phiên dừng/lỗi ở GAS (vd. cổng đăng nhập chặn) đã có Log phía GAS: hiện đúng lý do GAS, không ghi thêm dòng lỗi chung chung che lý do thật.
     var stopReason = !result && ['paused', 'error'].indexOf(String(snapshot.phase || '')) >= 0 ? String(snapshot.lastError || snapshot.message || '') : '';
@@ -1070,7 +1070,7 @@ function fbmSyncProbeIdentityStart() {
 function fbmSyncAutoFill() {
   fbmSyncSetAccountNotice('identity', 'pending', 'Đang tự động điền thông tin tài khoản FBM...');
   return fbmSyncProbeIdentity().then(function (value) {
-    if (value && value.code === 'SYNC_BACKGROUND_SKIPPED') { fbmSyncSetAccountNotice('identity', 'warning', value.message); fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus || {}); return value; }
+    if (value && value.code === 'SYNC_BACKGROUND_SKIPPED') { return value; }
     var status = FBM_SYNC_CLIENT.lastStatus || {}, probe = status.metadata && status.metadata.identityProbe || {};
     if ((value && value.phase === 'error' || status.phase === 'error') && !probe.spreadsheetId) {
       var failure = String(status.message || value && (value.message || value.error) || 'Không lấy được thông tin tài khoản FBM.');
@@ -1540,7 +1540,7 @@ function fbmSyncForceLogin() {
   });
 }
 /**
- * Lệnh của người dùng gặp lượt nền đang chạy (GAS trả `SYNC_BACKGROUND_RUNNING`): hỏi người dùng dừng nền hay chờ nền xong, rồi gọi lại đúng lệnh gốc `startCall`. Lượt nền không bao giờ bị dừng khi người dùng chưa chọn; nút X trả mã `SYNC_BACKGROUND_SKIPPED` nghĩa là không làm gì, bên gọi báo lại cho người dùng. Kết quả khác mã này đi thẳng qua.
+ * Lệnh của người dùng gặp lượt nền đang chạy (GAS trả `SYNC_BACKGROUND_RUNNING`): hỏi người dùng dừng nền hay chờ nền xong, rồi gọi lại đúng lệnh gốc `startCall`. Lượt nền không bao giờ bị dừng khi người dùng chưa chọn; nút X trả mã `SYNC_BACKGROUND_SKIPPED` nghĩa là không làm gì, màn được đưa về như vừa mở (`fbmSyncScreenFresh`) nên bên gọi không báo gì thêm. Kết quả khác mã này đi thẳng qua.
  */
 function fbmSyncAfterBackground(started, task, startCall) {
   if (!started || started.code !== 'SYNC_BACKGROUND_RUNNING') { return Promise.resolve(started); }
@@ -1555,8 +1555,24 @@ function fbmSyncAfterBackground(started, task, startCall) {
       });
     }
     if (choice === 'wait') { return fbmSyncWaitForBackgroundIdle(task, startCall, Date.now() + FBM_SYNC_BACKGROUND_FINISH_WAIT_MS); }
-    return { ok: false, code: 'SYNC_BACKGROUND_SKIPPED', message: 'Đồng bộ nền đang chạy nên chưa ' + (FBM_SYNC_BACKGROUND_TASKS[task] || task) + '.', status: FBM_SYNC_CLIENT.lastStatus };
+    var status = started.status || {};
+    fbmSyncScreenFresh(status);
+    return { ok: false, code: 'SYNC_BACKGROUND_SKIPPED', status: status };
   }).then(function (value) { settle(); return value; }, function (error) { settle(); throw error; });
+}
+/** Đưa màn đồng bộ về như vừa mở: xóa mọi dấu thao tác dở (dòng báo, cờ đang chạy, tab Xung đột vừa bấm, chế độ kiểm tra) về giá trị lúc mở rồi vẽ bằng `status` thật của GAS. Dùng khi người dùng đóng popup lượt nền, coi như chưa bấm nút gây ra popup. */
+function fbmSyncScreenFresh(status) {
+  fbmSyncSetRunning(false);
+  FBM_SYNC_CLIENT.cancelRequested = false;
+  FBM_SYNC_CLIENT.mode = 'read';
+  FBM_SYNC_CLIENT.identityAction = '';
+  FBM_SYNC_CLIENT.identityLastAction = '';
+  FBM_SYNC_CLIENT.identityProbeSignature = '';
+  FBM_SYNC_CLIENT.conflictNote = '';
+  FBM_SYNC_CLIENT.resultsTab = 'summary';
+  ['identity', 'accountSettings', 'login'].forEach(fbmSyncClearAccountNotice);
+  fbmSyncPaint(status);
+  return status;
 }
 /** Popup "Đồng bộ nền đang chạy". Tóm tắt chỉ có bước đang chạy và giờ bắt đầu lấy từ `status`, đủ để chọn; không kèm tiến trình chạy theo. */
 function fbmSyncAskBackgroundRunning(status, task) {
@@ -1711,6 +1727,7 @@ function fbmSyncRunStart(mode) {
   fbmSyncPaint({ phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var start = function () { return fbmSyncStartServer(mode || 'read', 0); };
   var work = start().then(function (first) { return fbmSyncAfterBackground(first, 'run', start); }).then(function (started) {
+    if (started && started.code === 'SYNC_BACKGROUND_SKIPPED') { return started; }
     if (!started || !started.ok) {
       fbmSyncSetRunning(false);
       if (started && started.status) { fbmSyncPaint(started.status); }
