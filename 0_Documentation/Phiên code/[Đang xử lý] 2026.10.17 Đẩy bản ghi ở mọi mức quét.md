@@ -1,74 +1,47 @@
 # Đẩy bản ghi ở mọi mức quét và so hash trước khi ghi FBM
 
-Trạng thái: đã mở phiên (branch `feature/push-compare`, worktree riêng), đang chờ chủ dự án chốt phương án, chưa sửa code. Chủ dự án quyết mở phiên riêng cho tệp này ngay (2026-10-19), không chờ V33 gộp vào `main`. Tệp này giữ đủ bối cảnh để thảo luận tiếp; khi chốt xong thì viết lại thành checklist trong chính tệp này.
+Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong worktree `.claude/worktrees/push-compare` vì phiên V33 vẫn dùng thư mục chính. Chủ dự án chốt toàn bộ phương án 2026-10-19. Luật chung: **luôn so giá trị hoặc hash trước khi thay đổi một bản ghi, dù ở ShinCRM hay FBM.**
 
-## Vấn đề chủ dự án phát hiện
+## Bối cảnh
 
-- Giữ phiên (nhịp nền rẻ nhất) không bao giờ đẩy bản ghi đã sửa trên ShinCRM lên FBM. Chỉ các lượt Quét nhanh/sâu/toàn bộ mới đẩy, và chỉ khi hướng chạy nền là `push` hoặc `write`. Bản ghi sửa trên ShinCRM phải chờ tới lượt quét kế tiếp mới lên FBM, có khi hàng giờ.
-- Khi đẩy, GAS mở form sửa trên FBM rồi lưu luôn mà không so bản đang có trên FBM với mốc lần đồng bộ trước. Nếu ai đó vừa sửa bản ghi trên FBM thì lần đẩy ghi đè mất bản sửa đó. Điều này trái luật chung của chủ dự án: **luôn so hash trước khi ghi, dù ghi FBM hay ghi ShinCRM** (tài liệu 09/04, bảng ba phía hFBM/hSHIN/hBASE).
+- Bước đẩy (`transport/PushFlow.js`, `customer_edit_open` / `activity_edit_open`) mở form FBM rồi lưu luôn, không so bản FBM với mốc. An toàn chỉ khi lượt lấy về cùng phiên đã đọc lại đúng bản ghi đó. Ghi đè được: giao dịch cũ bị sửa trên FBM ở chiều Hai chiều (không lộ trên danh sách), và mọi bản ghi ở chiều Chỉ đẩy. Áp cả cho dòng vừa quyết xung đột "lấy ShinCRM".
+- Đọc lại sau lưu (`finishPushVerification`) ra xung đột thì dừng cả phiên, trái luật "xung đột không dừng phiên" (09/02 bước 3, 09/04 "Trong lúc chờ quyết").
+- Giữ phiên không bao giờ đẩy; bản ghi sửa trên ShinCRM chờ tới lượt quét kế tiếp. Ý chủ dự án: đã cho phép đẩy thì mọi mức quét đều đẩy; chia mức quét chỉ vì FBM đắt.
 
-## Ý định của chủ dự án (nguyên văn ý)
+## Quyết định đã chốt (2026-10-19)
 
-- Mục đích của Giữ nhịp là đồng bộ kịp thời với chi phí rẻ. Đã cài đặt cho phép đẩy thì mọi mức quét đều phải đẩy.
-- Lý do chia 4 mức quét: làm việc với FBM rất đắt, ShinCRM thì rẻ vì ta kiểm soát toàn bộ. Nếu FBM rẻ thì chỉ có một mức là đồng bộ. Cái gì rẻ làm thường xuyên, cái gì đắt lâu lâu làm một lần. Mục đích duy nhất là đồng bộ kịp thời, ít thời gian lệch giữa ShinCRM và FBM.
-- Không cần đo khi câu hỏi là kiến trúc sai hay đúng; tự phân tích được.
+1. Bước mở form sửa so ba bản bằng `FbmSync.threeWay` (hFBM từ form vừa mở qua `verifyFormValues` + `FbmSync.hash`; hSHIN của đúng bản ghi dùng dựng lệnh lưu; hBASE là mốc):
+   - Bản FBM = mốc: lưu như hiện nay.
+   - Bản FBM khác mốc nhưng = bản ShinCRM: không lưu, cập nhật mốc, "đã đồng bộ", nhả bản ghi.
+   - Cả ba khác nhau, hoặc chưa có mốc mà hai bên khác nhau: không lưu, "xung đột chờ quyết", Log, đi tiếp bản ghi sau, không dừng phiên.
+   - Chỉ bản FBM đổi (bản ShinCRM = mốc): không lưu, trả dòng về "đã đồng bộ" để chiều lấy về kéo bản FBM.
+   - Ngoại lệ: giao dịch còn dấu `#SC` trên FBM vẫn lưu để bỏ dấu khi phép so cho phép.
+2. Đọc lại sau lưu ra xung đột: đánh dấu dòng và đi tiếp, không dừng phiên.
+3. Log xung đột ở chiều đẩy chỉ ghi tên trường lệch, không ghi giá trị.
+4. Bỏ bước đọc lại FBM lúc bấm lưu xung đột: baseline = hash FBM lúc mở. "Lấy FBM" và "tùy chỉnh" lấy giá trị FBM từ Sidebar gửi lại, GAS ghép vào dòng ShinCRM, so hash với hash FBM lúc mở; khác thì không ghi. Phép so phía ShinCRM lúc lưu giữ nguyên. Chỉ làm sau mục 1.
+5. Cổng có/không bằng rev sổ nạp lại; Giữ phiên gọi người điều phối đẩy rồi mới đếm, không giới hạn riêng số bản ghi mỗi nhịp. Làm sau V33 chặng 6 (chạm `pushCandidates` và cách đọc Sheet); V17 (mỗi bước đẩy đọc lại cả Sheet) nên xong trước hoặc cùng lúc.
 
-## Hiện trạng code (đã kiểm 2026-10-17)
+## Checklist
 
-- Đã có sẵn công cụ so ba phía `FbmSync.threeWay` (`fbm_sync/reconcile/Fingerprint.js`), chiều kéo (`reconcile/Pull.js`) đang dùng. Chiều đẩy không gọi: ở `transport/PushFlow.js`, nhánh `customer_edit_open` / `activity_edit_open` chỉ dùng giá trị form FBM (`extractFormValues`) để điền các ô không đổi rồi dựng request lưu. `requireOpenedRecord` chỉ kiểm đúng ID.
-- Bước đọc lại sau lưu (`customer_verify`) đã tính hash từ form FBM, nên tính hFBM từ form lúc mở là làm được, không tốn thêm request.
-- Từ 2026-10-18 kiểm tra dữ liệu trước khi đẩy chạy sau khi phiên FBM xác thực, chỉ ở chiều có đẩy, trên một bản đọc chung `FbmSync.localScan` (quét hash, hàng đợi xung đột và `pushCandidates` dùng chung, hash mỗi bản ghi tối đa một lần); đo DEV khoảng 2,4–2,6 giây cho 4.058 bản ghi, phần lớn là đọc và chuyển ô chứ không phải hash. Mỗi bước đẩy (`nextPushRequest`) vẫn tự đọc lại thực thể đang đẩy vì mỗi bước là một lời gọi GAS mới (V17 trong tệp vi phạm thao tác đắt). Lý do vẫn quét cả Sheet: cửa ghi lõi không được biết cột đồng bộ (ranh giới module) và mọi đường sửa đều phải bị bắt (không sót).
-- Mức quét trong lịch nền chạy với `mode = direction` (`Scheduler.js`, `FbmSync.SCHEDULE_SCANS`), nên các mức quét đã đẩy khi hướng là `push`/`write`. Giữ phiên là một request đếm đơn lẻ, không thuộc lượt nào (`runId` rỗng); khi đếm lệch thì mở Quét nhanh (chỉ với hướng `read`/`write`).
-- Trước 2026-10-17 Giữ phiên có thể bị bỏ đói: tiến trình chạy nền lỗi không ghi giờ chạy xong nên luôn quá hạn và đứng đầu chuỗi, lỗi tiếp thì chuỗi gãy trước khi tới Giữ phiên, kéo theo việc đẩy kịp thời (nếu giao cho Giữ phiên) cũng bị chặn. Đã sửa bằng hẹn thử lại có giãn cách cho tiến trình lỗi (`scheduleMarkFailed` trong `Scheduler.js`, tài liệu 09/02 mục "Tiến trình lỗi không chặn chuỗi"), nên phương án B có thể dựa vào Giữ phiên chạy đúng nhịp.
-- Sổ nạp lại `reloadJournal` (`server/state/DirtyState.js`) giữ rev, floor và danh sách mã bản ghi đổi, hoặc `true` nghĩa là cả sheet; sắp xếp, chèn hàng, onChange hay hạ thành cả sheet; sổ bị cắt bớt theo floor.
+### Nhóm A — So ba bản trước khi lưu FBM
 
-## Lỗ ghi đè đã xác nhận bằng đọc code (2026-10-19)
+- [ ] A1. `continuePush` bước mở form sửa: lấy giá trị bằng `verifyFormValues`, quyết bằng `threeWay` theo quyết định 1; nhánh không lưu ghi dòng qua `pushRowChange`.
+- [ ] A2. Tách đoạn liệt kê trường lệch thành công cụ dùng chung, chỉ trả tên trường; dùng ở A1 và `finishPushVerification`.
+- [ ] A3. `finishPushVerification` ra xung đột: đánh dấu dòng, đi tiếp bản ghi sau.
+- [ ] A4. Test: hash từ form = hash từ lưới (Khách, Giao dịch); FBM đổi sau mốc không phát lệnh lưu, dòng thành xung đột, bản ghi sau vẫn đẩy; FBM = ShinCRM không lưu, cập nhật mốc; FBM = mốc vẫn lưu; chỉ FBM đổi không lưu; đọc lại sau lưu ra xung đột không dừng phiên.
+- [ ] A5. Sửa 09/04 (mục "Đẩy xong thì đọc xác nhận" và bảng so ba chiều cho chiều đẩy), 09/02 nếu còn câu ngược.
+- [ ] A6. Nghiệm thu GAS DEV bằng `node tests/gas.js <hàm> --push`.
+- [ ] A7. Chủ dự án nghiệm thu với ALT00010: sửa khách trên FBM, sửa khác trên ShinCRM, chạy Chỉ đẩy; FBM giữ nguyên, dòng thành xung đột. Lặp lại với một giao dịch cũ.
 
-Bước đẩy không so bản FBM với mốc, nên an toàn chỉ khi lượt lấy về cùng phiên đã đọc lại đúng bản ghi đó và đổi nó sang "xung đột chờ quyết" (`pushCandidates` đọc lại trạng thái lúc đẩy nên bỏ dòng xung đột):
+### Nhóm B — Lưu xung đột không đọc lại FBM
 
-| Trường hợp | Kết quả hiện nay |
-|---|---|
-| Khách, chiều Hai chiều | An toàn: danh sách khách lộ dấu vân FBM khác mốc, khách được đọc chi tiết, lượt lấy về báo xung đột trước bước đẩy |
-| Giao dịch, chiều Hai chiều | Ghi đè được: giao dịch chỉ đọc lại khi có dấu hiệu (chủ yếu giao dịch cuối của khách lệch); FBM sửa một giao dịch cũ thì không lộ, bước đẩy ghi đè |
-| Chiều Chỉ đẩy | Ghi đè được cả khách lẫn giao dịch vì không có bước lấy về |
+- [ ] B1. Sidebar gửi kèm giá trị FBM các trường lệch khi chốt; GAS ghép vào dòng, so hash với hash lúc mở, rồi ghi qua `conflictSettle`; bỏ request đọc lại.
+- [ ] B2. Test: giá trị gửi lại khác bản đã mở thì không ghi; ShinCRM đổi từ lúc mở thì trả màn xem lại; ba lựa chọn ghi đúng baseline.
+- [ ] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
+- [ ] B4. Chủ dự án nghiệm thu trên Sheet DEV ba lựa chọn.
 
-Lỗ này áp cho mọi dòng sửa trên ShinCRM, không riêng dòng vừa quyết xung đột: quyết "lấy ShinCRM" đặt mốc bằng hash FBM lúc bấm lưu và trạng thái "chờ đối soát", nên FBM đổi sau lúc lưu cũng rơi đúng vào lỗ này.
+### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
-Luật chung của chủ dự án (nhắc lại 2026-10-19): **luôn so giá trị hoặc hash trước khi thay đổi một bản ghi, dù ở ShinCRM hay FBM.**
-
-## Thay đổi gần đây cần biết (branch `feature/expensive-ops`, 2026-10-19)
-
-- "Xung đột chờ quyết" không còn là khóa đồng bộ (09/04 đoạn "Trong lúc chờ quyết"): lượt lấy về so ba chiều lại dòng đó mỗi kỳ với baseline cũ; chiều đẩy vẫn bỏ dòng đang chờ quyết, chỉ đẩy sau khi lượt lấy về đổi nó sang "chờ đối soát". Phép so ở bước đẩy đổi dòng sang "xung đột chờ quyết" thì kỳ lấy về sau tự so lại, không cần đường riêng.
-- Cửa bản ghi và sổ bận (tài liệu 06 Phần 1–2): mọi ghi dòng đi qua `FbmSync.recordChange` / `pushRowChange`, đọc và ghi trong cùng một lần cầm khóa.
-
-## Ràng buộc từ nguyên tắc mới (AGENTS.md mục 2, tài liệu 06 Phần 2)
-
-- Công cụ làm đúng một việc (đọc, kiểm, tính hoặc ghi), không tự gọi công cụ khác loại: hàm kiểm không tự đọc Sheet. → `pushCandidates` phải tách: đọc qua tầng 3, công cụ tìm ứng viên chỉ nhận bản ghi và trả danh sách.
-- Tiến trình lớn ghép từ tiến trình nhỏ: chỗ nào cần đúng một tiến trình đã có thì gọi người điều phối của tiến trình đó. → Giữ phiên gọi đúng người điều phối "đẩy" mà các mức quét đang dùng, không xếp lại công cụ.
-- V33 (phiên `feature/expensive-ops`) đổi cách mọi module đọc Sheet sang bốn tầng; chặng 2 chuyển `fbm_sync` sang đọc qua tầng 3.
-
-## Phương án B đang bàn
-
-1. Chiều đẩy gọi `FbmSync.threeWay` sau khi mở form FBM, trước khi lưu.
-2. Bỏ hoặc giảm việc hash cả Sheet mỗi lượt.
-3. Hướng chạy cho phép đẩy thì mọi mức quét, kể cả Giữ phiên, đều đẩy: việc chính → đẩy → đếm.
-4. Sửa tài liệu 09/02 (nhịp chạy), 09/04 (so ba phía), 09/08 và tệp quy tắc `Quy tắc theo loại phiên/Đồng bộ FBM.md` nếu cần.
-
-## Bốn điểm chờ chủ dự án chốt (đề xuất của AI kèm lý do)
-
-1. **Làm trước hay sau V33.** Đề xuất làm sau V33 chặng 2. Làm trước thì luồng đẩy bị sửa hai lần và dễ sửa chồng tệp với phiên V33 đang chạy. Câu hỏi kèm: B phụ thuộc V33 chưa vào `main`, nên tách branch B từ `feature/expensive-ops` hay chờ V33 gộp vào `main` rồi tách từ `main`? Cập nhật 2026-10-19: chủ dự án chọn làm ngay. Đề xuất mới của AI: tách branch từ `feature/expensive-ops` (cần Cửa bản ghi và luật xung đột so lại mỗi kỳ, cả hai chưa vào `main`), làm trong worktree riêng vì phiên V33 vẫn dùng thư mục chính; làm mục 4 trước vì chỉ chạm `PushFlow.js` và phép so, ít chồng tệp với V33 chặng 6; mục 2–3 chạm `pushCandidates` và cách đọc Sheet nên chốt với chủ dự án có chờ V33 chặng 6 hay không.
-2. **Tìm bản ghi cần đẩy.** Đề xuất không dùng sổ nạp lại làm danh sách, chỉ làm cổng có/không: lưu rev của sổ ở lần đẩy gần nhất; tới nhịp mà sổ chưa tăng và không còn bản ghi lỗi chờ đẩy lại thì bỏ qua đẩy, tốn 0 thao tác; có thay đổi thì đọc cả Sheet (qua tờ nháp V33, một lần mỗi lần gọi) và so hash như hiện nay. Lý do: sổ hay hạ thành cả sheet và bị cắt bớt, bản ghi đẩy lỗi lần trước không nằm trong sổ; dùng làm danh sách phải viết nhánh dự phòng và dễ sót, dùng làm cổng thì không có đường sót. Cần test: sửa tay trên Sheet có làm rev tăng. Ghi chú: chính GAS ghi khi kéo về cũng làm rev tăng, nên sau lượt kéo cổng mở và tốn một lần quét không ra gì; chấp nhận được.
-3. **Giữ phiên khi có thứ cần đẩy.** Đề xuất Giữ phiên gọi người điều phối đẩy (thành một lượt thật vì đẩy cần nhiều request mỗi bản ghi: mở form, lưu, đọc lại; cần khóa bản ghi và giới hạn lỗi), xong mới đếm. Đếm sau đẩy vì tạo khách mới làm tổng FBM tăng; đếm trước sẽ báo lệch giả và kéo Quét nhanh vô ích. Không đặt giới hạn riêng số bản ghi mỗi nhịp, dùng chung ngân sách request (`transport/Budget.js`) và giới hạn lỗi; hết ngân sách thì nhịp sau đẩy tiếp. Câu hỏi kèm: có muốn giới hạn riêng (đặt trong config) không?
-4. **Bảng quyết định khi đẩy** (mốc = hash lần đồng bộ trước, bản FBM = hash từ form vừa mở, bản ShinCRM = hash bản ghi hiện tại):
-   - Bản FBM = mốc: lưu bình thường.
-   - Bản FBM khác mốc nhưng giống bản ShinCRM: không lưu, chỉ cập nhật mốc.
-   - Bản FBM khác mốc và khác bản ShinCRM: xung đột, không lưu, chuyển cho đúng luồng xung đột chiều kéo đang dùng (`reconcile/Conflict.js`), ghi Log.
-   Bảng lấy thẳng từ `threeWay`, nên hai chiều xử lý giống nhau. Cần test chứng minh hash tính từ form và hash tính từ lưới cho cùng kết quả, nhất là Hoạt động; lệch thì sẽ báo xung đột giả. Cách tính hFBM từ form đã có ở bước đọc xác nhận (`finishPushVerification`: `verifyFormValues` + `FbmSync.hash`), dùng lại, không viết hàm băm thứ hai. Ghi trạng thái dòng qua `pushRowChange` (Cửa bản ghi), so cả hSHIN của dòng đọc lại trong cửa với hSHIN lúc dựng ứng viên.
-   Đề xuất của AI: làm mục 4 trước cả các mục khác của phương án B và đưa lên `main` sớm, vì đây là lỗ mất dữ liệu FBM đang có thật; mục 2 và 3 là tối ưu nhịp và chi phí.
-
-## Điểm mới cần chốt: bỏ bước đọc lại FBM lúc bấm lưu xung đột (chủ dự án gợi ý 2026-10-19)
-
-- Hiện nay (09/04 bảng sáu bước, bước 4–6): lúc bấm lưu, GAS gửi thêm một request đọc lại bản FBM, so với hash lúc mở; khác thì trả màn xem lại; khớp thì lấy hash vừa đọc làm baseline. Mỗi lần lưu tốn một request FBM, vài giây.
-- Gợi ý của chủ dự án: không đọc lại FBM lúc lưu, đặt baseline bằng đúng **bản FBM người dùng đã thấy lúc mở** (hash lúc mở). FBM đổi sau lúc mở, dù trước hay sau khi bấm lưu, đều làm hFBM khác baseline, nên phép so ở bước đẩy (mục 4) và kỳ lấy về sau báo xung đột. Phép so lúc lưu khi đó chỉ còn tác dụng báo sớm.
-- Đánh giá độc lập của AI: đúng, với hai điều kiện. (1) Chỉ an toàn sau khi mục 4 đã có; trước đó, bỏ phép so lúc lưu mà vẫn lấy baseline bằng bản đọc lại thì một bản FBM người dùng chưa từng thấy thành baseline và bị ghi đè im lặng. (2) Lúc lưu vẫn phải so phía ShinCRM (hash dòng đọc lại trong cửa với hash lúc mở) vì lưu là thay đổi dòng ShinCRM; phần này giữ nguyên. Cái giá: lựa chọn "lấy FBM" và "tùy chỉnh" cần giá trị FBM lúc mở, nên state phải giữ giá trị của đúng một bản ghi đang mở, trái câu hiện có ở 09/04 "state GAS không giữ ... giá trị hai bên"; phải sửa câu đó và hợp đồng state, đặt giới hạn kích thước theo ngân sách payload sẵn có.
-- Câu hỏi cho chủ dự án: làm cùng phiên này (sau mục 4) hay để sau.
+- [ ] C1. Cổng rev sổ nạp lại; test sửa tay trên Sheet làm rev tăng.
+- [ ] C2. Giữ phiên: việc chính → đẩy → đếm.
+- [ ] C3. Sửa 09/02 (nhịp, Giữ phiên), 09/08 nếu cần.
