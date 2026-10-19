@@ -87,6 +87,12 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B7.8. `node tests/run.js` đạt hết.
   - [x] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
   - [x] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
+- [ ] B8. Nút chạy ở màn Chạy đồng bộ theo cùng luật B7 (chủ dự án chốt 2026-10-19): lượt nền đang chạy thì nút vẫn là "Bắt đầu đồng bộ", bấm vào thì hiện popup hỏi dừng hay chờ; không còn đường hủy lượt nền mà không hỏi. Gốc: nút chọn "Dừng đồng bộ" theo `phase` mà không biết lượt đó của ai, nên lượt nền cũng hiện nút dừng và bấm là gọi `fbmCancelSync`.
+  Vai trò dữ liệu: `status.origin` (GAS tạo từ `state.origin`, chỉ để Sidebar biết lượt đang chạy là của ai; GAS vẫn tự quyết `SYNC_BACKGROUND_RUNNING`); `FBM_SYNC_CLIENT.backgroundWait` (Sidebar, việc đang chờ lượt nền xong; khóa nút chạy để bấm thêm không bị bỏ qua im lặng).
+  - [x] B8.1. GAS `statusView` thêm `origin`.
+  - [x] B8.2. `fbmSyncRunActionBlock`: chỉ lượt tay đang chạy mới hiện "Dừng đồng bộ"; lượt nền đang chạy hiện "Bắt đầu đồng bộ" (bấm đi qua `fbmSyncRun` → popup B7); đang chờ lượt nền (`backgroundWait`) thì nút khóa với nhãn "Đang chờ đồng bộ nền xong...", nhãn đặt trong schema.
+  - [x] B8.3. Test: nút với lượt nền, lượt tay, lúc đang chờ; `statusView` có `origin`.
+  - [ ] B8.4. Sửa 09/08 đoạn "Thao tác gặp lượt nền"; `node tests/run.js`; commit, đẩy DEV, nghiệm thu: lượt nền chạy thì nút là "Bắt đầu đồng bộ", bấm hiện popup.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
