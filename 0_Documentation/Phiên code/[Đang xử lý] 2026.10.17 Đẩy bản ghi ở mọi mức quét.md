@@ -50,15 +50,15 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
     | `snapshot.openedHash` | GAS lúc mở | Không ai | Hash FBM lúc mở, kiểm `fbmValues` và làm baseline |
     | `merged` (Tùy chỉnh) | Người dùng gõ | Người dùng | Giá trị ghi của trường tự nhập |
 
-  - [ ] B6.1. Sidebar `fbmSyncResolveConflict`: dựng `shinValues[field] = field.left` cùng vòng với `fbmValues`, gửi kèm lệnh chốt.
-  - [ ] B6.2. `FbmSyncService.fbmConfirmConflict` và `ControlPort` `confirm_conflict`: truyền thêm `shinValues`.
-  - [ ] B6.3. `Conflict.js` `confirmConflict`: chọn ShinCRM thì ghi `shinValues[field]`; `snapshot.old` chỉ còn làm `old`. Thiếu `shinValues` của trường nào có trong `fbmValues` thì trả `CONFLICT_REOPEN`, không ghi. Sửa docstring.
-  - [ ] B6.4. Test GAS (ProductionMatrix): chọn ShinCRM, Sheet đổi, gửi lại với mốc mới thì ghi đúng giá trị đang hiện; thiếu `shinValues` thì mở lại, không ghi.
-  - [ ] B6.5. Test Sidebar: chọn "giữ giá trị của tôi" thì lần gửi lại mang `shinValues` là giá trị đang hiện (không phải giá trị Sheet); chọn "Quay lại" rồi Lưu cũng vậy; chọn "Dùng giá trị Sheet" thì `shinValues` là giá trị Sheet.
-  - [ ] B6.6. Popup chung (`recordDecision.html`): dòng "(lúc mở form: …)" thành "(lần trước bạn thấy: …)" cho cả form và màn xung đột, vì từ popup thứ hai giá trị đó là mốc đã dời; bỏ chữ `opened` khỏi hai bộ chữ.
-  - [ ] B6.7. Màn xung đột chọn "Quay lại": tô đỏ trường bị sửa trên Sheet như form (`saveFlowPaintInvalid`), giữ trong một bảng riêng của RAM, không lẫn với bảng "chưa chọn" (dòng đếm trường chưa chọn không được tính các trường này); chọn hoặc sửa trường đó thì hết đỏ.
-  - [ ] B6.8. `node tests/run.js` đạt hết.
-  - [ ] B6.9. Sửa 09/04 bước 4 và 06 Phần 4: lệnh chốt gửi giá trị hai phía đang hiện, ảnh chụp chỉ là mốc; mốc dời lúc popup hiện, giữ khi Quay lại.
+  - [x] B6.1. Sidebar `fbmSyncResolveConflict`: dựng `shinValues[field] = field.left` cùng vòng với `fbmValues`, gửi kèm lệnh chốt.
+  - [x] B6.2. `FbmSyncService.fbmConfirmConflict` và `ControlPort` `confirm_conflict`: truyền thêm `shinValues`.
+  - [x] B6.3. `Conflict.js` `confirmConflict`: chọn ShinCRM thì ghi `shinValues[field]`; `snapshot.old` chỉ còn làm `old`. Thiếu `shinValues` của trường nào có trong `fbmValues` thì trả `CONFLICT_REOPEN`, không ghi. Sửa docstring.
+  - [x] B6.4. Test GAS (ProductionMatrix): chọn ShinCRM, Sheet đổi, gửi lại với mốc mới thì ghi đúng giá trị đang hiện; thiếu `shinValues` thì mở lại, không ghi.
+  - [x] B6.5. Test Sidebar: chọn "giữ giá trị của tôi" thì lần gửi lại mang `shinValues` là giá trị đang hiện (không phải giá trị Sheet); chọn "Quay lại" rồi Lưu cũng vậy; chọn "Dùng giá trị Sheet" thì `shinValues` là giá trị Sheet.
+  - [x] B6.6. Popup chung (`recordDecision.html`): dòng "(lúc mở form: …)" thành "(lần trước bạn thấy: …)" cho cả form và màn xung đột, vì từ popup thứ hai giá trị đó là mốc đã dời; bỏ chữ `opened` khỏi hai bộ chữ.
+  - [x] B6.7. Màn xung đột chọn "Quay lại": tô đỏ trường bị sửa trên Sheet như form (`saveFlowPaintInvalid`), giữ trong một bảng riêng của RAM, không lẫn với bảng "chưa chọn" (dòng đếm trường chưa chọn không được tính các trường này); chọn hoặc sửa trường đó thì hết đỏ.
+  - [x] B6.8. `node tests/run.js` đạt hết.
+  - [x] B6.9. Sửa 09/04 bước 4 và 06 Phần 4: lệnh chốt gửi giá trị hai phía đang hiện, ảnh chụp chỉ là mốc; mốc dời lúc popup hiện, giữ khi Quay lại.
   - [ ] B6.10. Commit (lõi GAS, Sidebar, test, tài liệu), đẩy DEV, tải lại tab Sheet, làm lại ca 4 từ đầu.
 - [ ] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
   - [x] Ca 1 Lấy FBM: CUS-020075 nhận Website FBM, về "đã đồng bộ", baseline mới.
