@@ -329,6 +329,24 @@ function fbmDevAlignSheetTimezone() {
   return 'Đã đổi múi giờ tệp từ ' + before + ' sang ' + book.getSpreadsheetTimeZone();
 }
 
+/** Chi phí một bước chọn ứng viên đẩy (V17): mỗi phép xóa tờ nháp trước để đo như lần gọi GAS mới; "nóng" là gọi lại trong cùng lần đọc nên chỉ còn phần dựng và băm. Chỉ đọc. */
+function fbmProbePushStepCost() {
+  function cold(label, fn) { sheetReadCopyClear(); var a = Date.now(), out = FbmSync.withLocalSnapshot(fn); return label + ': ' + (Date.now() - a) + ' ms' + (out !== undefined ? ' (' + out + ')' : ''); }
+  function warm(label, before, fn) { sheetReadCopyClear(); return FbmSync.withLocalSnapshot(function () { before(); var a = Date.now(), out = fn(); return label + ': ' + (Date.now() - a) + ' ms' + (out !== undefined ? ' (' + out + ')' : ''); }); }
+  var customerId = 'CUS-020075', activityId = 'ACT-011377';
+  return [
+    cold('Đọc Customer (readLocal)', function () { return FbmSync.readLocal('customer').length + ' dòng'; }),
+    cold('Đọc Activity (readLocal)', function () { return FbmSync.readLocal('activity').length + ' dòng'; }),
+    cold('pushCandidates Customer, lạnh', function () { return FbmSync.pushCandidates('customer').length + ' ứng viên'; }),
+    cold('pushCandidates Activity, lạnh', function () { return FbmSync.pushCandidates('activity').length + ' ứng viên'; }),
+    warm('pushCandidates Customer, nóng', function () { FbmSync.readLocal('customer'); }, function () { return FbmSync.pushCandidates('customer').length + ' ứng viên'; }),
+    warm('pushCandidates Activity, nóng', function () { FbmSync.readLocal('customer'); FbmSync.readLocal('activity'); }, function () { return FbmSync.pushCandidates('activity').length + ' ứng viên'; }),
+    cold('Đọc một Customer theo mã', function () { return entityReadRecordById('customer', [DATA_SCHEMA, SYNC_SCHEMA], customerId).rows.length + ' dòng'; }),
+    cold('Đọc một Activity theo mã', function () { return entityReadRecordById('activity', [DATA_SCHEMA, SYNC_SCHEMA], activityId).rows.length + ' dòng'; }),
+    cold('hydratePushCandidate Activity (hiện nay)', function () { return FbmSync.hydratePushCandidate({ entity: 'activity', id: activityId }).record ? 'có' : 'không'; })
+  ].join(String.fromCharCode(10));
+}
+
 /** Chi phí kiểm tra trước phiên tách theo phần rẻ (chạy trước request FBM đầu) và phần đắt (chạy sau khi phiên FBM xác thực, chỉ chiều có đẩy); mỗi phép xóa tờ nháp trước để đo như lần gọi mới. Chỉ đọc. */
 function fbmProbePreflightCost() {
   function timed(label, fn) { sheetReadCopyClear(); var a = Date.now(), result = FbmSync.withLocalSnapshot(fn); return label + ": " + (Date.now() - a) + " ms" + (result && result.candidateCount !== undefined ? " (ứng viên " + result.candidateCount + ", chặn " + result.blocking.length + ")" : ""); }
