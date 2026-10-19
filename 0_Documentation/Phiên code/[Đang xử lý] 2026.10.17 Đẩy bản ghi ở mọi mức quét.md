@@ -68,7 +68,25 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
   - Ca 2 và ca 3 lúc 13:4x chạy trên code V33 (V33 đã đẩy đè DEV): FBM đã nhận đúng giá trị (ACT-011377 nội dung ShinCRM, ACT-011402 "Nội dung tùy chỉnh B4 ca 3", đã đồng bộ 13:56), nhưng chưa chứng minh code phiên này; làm lại hai ca sau B6. Từ 13:58 DEV là code phiên này (@942), phiên V33 tạm dừng tới khi gộp.
   - Ca 4 sau B6 (15:04): chọn ShinCRM "…14:54", Sheet đổi thành "…15:04", Lưu hiện popup ghi "lần trước bạn thấy: …14:54"; chọn Quay lại thì trường Website tô đỏ, ô giữ "…14:54", không tính là chưa chọn; Lưu lại không hỏi nữa, Sheet nhận "…14:54", chờ đối soát, hết hàng đợi. Nhánh "Lưu giá trị bạn đang chọn" gửi cùng `shinValues` nên chỉ kiểm bằng test Sidebar.
-- [ ] B7. Mở màn xung đột bị chặn cả khi lượt nền đang chạy (Log 15:03:20 `SYNC_RUNNING`), dù bản ghi không tham gia lượt đó; màn lại hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Gốc: bước mở dùng chung con trỏ và cơ chế request của phiên đồng bộ (`state.cursor = conflict_refresh`, `Conflict.js:51,64`). Chờ phương án đủ ba phần trình chủ dự án.
+- [ ] B7. Thao tác của người dùng gặp lượt nền đang chạy thì hỏi bằng popup, không tự dừng lượt nền (chủ dự án duyệt 2026-10-19). Gốc: kênh đọc FBM chỉ có một (một request bay, một cổng kiểm phiên trong state), phần này đúng kiến trúc và giữ nguyên; lỗi là "Đồng bộ ngay" và "Kiểm tra liên kết" tự đặt cờ dừng lượt nền khi người dùng chưa chọn (`PullFlow.js:16-22`), "Mở xung đột" thì chỉ báo lỗi vào Log (`Conflict.js:51`), và thẻ xung đột hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Log 15:03:20 `SYNC_RUNNING`.
+  - Vai trò dữ liệu:
+
+    | Dữ liệu | Ai tạo | Ai được đổi | Vai duy nhất |
+    |---|---|---|---|
+    | `metadata.manualPending` (cờ dừng nền) | Chỉ lệnh `stop_background`, gọi khi người dùng chọn "Dừng đồng bộ nền" ở popup | Lượt nền xóa khi đã dừng (`PullFlow.js:399`) | Báo lượt nền dừng sau response đang bay |
+    | Mã `SYNC_BACKGROUND_RUNNING` kèm `status` | `startRun` và `openConflict` khi lượt nền đang chạy | Không ai | Cho Sidebar biết phải hỏi; `status` cấp bước và giờ bắt đầu cho tóm tắt popup |
+    | Lựa chọn popup `stop` / `wait` / `cancel` | Người dùng | Không ai | `stop` gọi lệnh dừng rồi chờ; `wait` chỉ chờ; `cancel` (nút X, Esc, nền) không làm gì |
+
+  - [ ] B7.1. GAS: lệnh `stop_background` (`ControlPort`, nhóm lệnh giữ khóa, `FbmSyncService.fbmStopBackground`) gọi một hàm duy nhất đặt cờ dừng nền khi lượt đang chạy là lượt nền; lượt tay hoặc không có lượt thì không đặt gì. `startRun` gặp lượt nền thì trả `SYNC_BACKGROUND_RUNNING`, không đặt cờ.
+  - [ ] B7.2. GAS: `openConflict` gặp lượt nền đang chạy trả `SYNC_BACKGROUND_RUNNING`; lượt tay đang chạy giữ `SYNC_RUNNING`.
+  - [ ] B7.3. Popup chung `uiDecisionChoose`: thêm nút X ở tiêu đề (ra `cancel`), vùng `detail` gập lại sau nút hành động với nút "Xem chi tiết"; bỏ luật bắt buộc có lựa chọn `cancel` vì X luôn có. Popup cũ giữ nút quay lại của mình.
+  - [ ] B7.4. Sidebar: một hàm hỏi `fbmSyncAskBackgroundRunning(status, việc)` trên `uiDecisionChoose`: tiêu đề "Đồng bộ nền đang chạy", tóm tắt nêu bước và giờ bắt đầu từ `status`, hai nút "Dừng đồng bộ nền và … ngay" / "Tự … khi đồng bộ nền xong". Hàm chờ dùng chung (đổi tên `fbmSyncWaitForIdentityBackground` thành `fbmSyncWaitForBackgroundIdle`, nhịp hỏi và hạn chờ đặt trong hằng số cấu hình đầu tệp) rồi gọi lại đúng lệnh gốc. Bỏ `backgroundStopping` tự bật khi bấm chạy; chỉ bật khi người dùng chọn dừng.
+  - [ ] B7.5. Ba nơi gọi: chạy tay (`fbmSyncRunStart`), kiểm liên kết (hai chỗ `fbmStartIdentityCheck`/`fbmStartIdentityProbe`), mở xung đột (`fbmSyncOpenConflict`).
+  - [ ] B7.6. Thẻ xung đột: còn xung đột mà chưa có bản ghi trong RAM thì hiện lý do (đang chờ đồng bộ nền, lỗi mở), không hiện "Không có xung đột cần xử lý".
+  - [ ] B7.7. Test GAS (Orchestration, BackgroundChain, Conflict): bấm chạy tay giữa lượt nền không đặt cờ; `stop_background` đặt cờ và lượt nền dừng; mở xung đột giữa lượt nền trả mã mới, không phát request. Test Sidebar: popup ba lựa chọn, X không gọi GAS, `stop` gọi dừng rồi chạy lệnh gốc, `wait` không gọi dừng; popup chung có nút X và chi tiết gập.
+  - [ ] B7.8. `node tests/run.js` đạt hết.
+  - [ ] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
+  - [ ] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
