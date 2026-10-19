@@ -1,6 +1,6 @@
 # Đẩy bản ghi ở mọi mức quét và so hash trước khi ghi FBM
 
-Trạng thái: đang thảo luận, chưa chốt, chưa sửa code. Chủ dự án quyết mở phiên riêng cho tệp này ngay (2026-10-19), không chờ V33 gộp vào `main`. Tệp này giữ đủ bối cảnh để thảo luận tiếp; khi chốt xong thì viết lại thành checklist trong chính tệp này.
+Trạng thái: đã mở phiên (branch `feature/push-compare`, worktree riêng), đang chờ chủ dự án chốt phương án, chưa sửa code. Chủ dự án quyết mở phiên riêng cho tệp này ngay (2026-10-19), không chờ V33 gộp vào `main`. Tệp này giữ đủ bối cảnh để thảo luận tiếp; khi chốt xong thì viết lại thành checklist trong chính tệp này.
 
 ## Vấn đề chủ dự án phát hiện
 
