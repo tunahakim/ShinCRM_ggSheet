@@ -60,13 +60,13 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B6.8. `node tests/run.js` đạt hết.
   - [x] B6.9. Sửa 09/04 bước 4 và 06 Phần 4: lệnh chốt gửi giá trị hai phía đang hiện, ảnh chụp chỉ là mốc; mốc dời lúc popup hiện, giữ khi Quay lại.
   - [x] B6.10. Commit (lõi GAS, Sidebar, test, tài liệu), đẩy DEV, tải lại tab Sheet, làm lại ca 4 từ đầu.
-- [ ] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
+- [x] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
   - [x] Ca 1 Lấy FBM: CUS-020075 nhận Website FBM, về "đã đồng bộ", baseline mới.
-  - [ ] Ca 2 Lấy ShinCRM (ACT-011377) rồi Chỉ đẩy: FBM nhận nội dung ShinCRM.
-  - [ ] Ca 3 Tùy chỉnh (ACT-011402) rồi Chỉ đẩy: FBM nhận giá trị gõ tay.
+  - [x] Ca 2 Lấy ShinCRM (ACT-011377) rồi Chỉ đẩy: FBM nhận nội dung ShinCRM.
+  - [x] Ca 3 Tùy chỉnh (ACT-011402) rồi Chỉ đẩy: FBM nhận giá trị gõ tay.
   - [x] Ca 4 ShinCRM đổi lúc đang xem (`fbmDevEditAltWebsite`): Lưu hiện popup xung đột của form; chọn giá trị Sheet thì màn cập nhật phía ShinCRM, chọn giữ lựa chọn thì ghi.
-  - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
-  - Ca 2 và ca 3 lúc 13:4x chạy trên code V33 (V33 đã đẩy đè DEV): FBM đã nhận đúng giá trị (ACT-011377 nội dung ShinCRM, ACT-011402 "Nội dung tùy chỉnh B4 ca 3", đã đồng bộ 13:56), nhưng chưa chứng minh code phiên này; làm lại hai ca sau B6. Từ 13:58 DEV là code phiên này (@942), phiên V33 tạm dừng tới khi gộp.
+  - [x] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
+  - Ca 2, 3, 5 chạy trên code phiên này (19/10, 23:0x–23:2x): ca 2 FBM nhận nội dung ShinCRM, đã đồng bộ 23:01; ca 3 FBM nhận "Nội dung tùy chỉnh B4 ca 3 lần 2", Chỉ đẩy gặp "Failed to fetch" ở bước đọc xác nhận (Sidebar báo lỗi, Log ghi), Lấy FBM thì xác nhận 23:12; ca 5 Chỉ đẩy báo "không có bản ghi nào được đẩy", FBM giữ "Website FBM sửa giữa chừng B4 ca 5", CUS-020075 quay lại xung đột, chọn FBM thì về đã đồng bộ.
   - Ca 4 sau B6 (15:04): chọn ShinCRM "…14:54", Sheet đổi thành "…15:04", Lưu hiện popup ghi "lần trước bạn thấy: …14:54"; chọn Quay lại thì trường Website tô đỏ, ô giữ "…14:54", không tính là chưa chọn; Lưu lại không hỏi nữa, Sheet nhận "…14:54", chờ đối soát, hết hàng đợi. Nhánh "Lưu giá trị bạn đang chọn" gửi cùng `shinValues` nên chỉ kiểm bằng test Sidebar.
 - [x] B7. Thao tác của người dùng gặp lượt nền đang chạy thì hỏi bằng popup, không tự dừng lượt nền (chủ dự án duyệt 2026-10-19). Gốc: kênh đọc FBM chỉ có một (một request bay, một cổng kiểm phiên trong state), phần này đúng kiến trúc và giữ nguyên; lỗi là "Đồng bộ ngay" và "Kiểm tra liên kết" tự đặt cờ dừng lượt nền khi người dùng chưa chọn (`PullFlow.js:16-22`), "Mở xung đột" thì chỉ báo lỗi vào Log (`Conflict.js:51`), và thẻ xung đột hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Log 15:03:20 `SYNC_RUNNING`.
   - Vai trò dữ liệu:
