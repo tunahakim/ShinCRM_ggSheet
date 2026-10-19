@@ -74,6 +74,16 @@ function fbmSeedConflict() {
   fbmFixtureSave('customer', [{ id: source.id, website: website, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
   return { ok: true, id: source.id, website: website };
 }
+/** Dò so trước khi đẩy với Activity: sửa nội dung một Activity mang ID FBM của ALT00010 và thay baseline bằng giá trị giả, nên bước mở form của lượt "Chỉ đẩy" thấy FBM khác baseline và khác ShinCRM, không được gửi lệnh lưu. Không ghi FBM. */
+function fbmSeedActivityConflict() {
+  var customer = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === 'ALT00010' && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!customer) { return { ok: false, reason: 'Chưa có khách ALT00010 trên Sheet DEV.' }; }
+  var source = FbmSync.readLocal('activity').filter(function (record) { return String(record.customerId || '') === String(customer.id) && String(record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!source) { return { ok: false, reason: 'ALT00010 chưa có Activity mang ID FBM.' }; }
+  var content = 'Nội dung xung đột ShinCRM ' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'HH:mm');
+  fbmFixtureSave('activity', [{ id: source.id, content: content, fbmHash: 'baseline-gia-xung-dot', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  return { ok: true, id: source.id, fbmId: source.fbmId, oldContent: source.content, content: content };
+}
 /** Nghiệm thu "khách đang xung đột chờ quyết vẫn lưu được và xóa được từ Sidebar": tạo một khách thử quyền "Chỉ lấy từ FBM" (không bao giờ đi lên FBM) rồi đặt nó sang "xung đột chờ quyết". Sidebar không xóa khách, nên dọn bằng `fbmDevClearConflict`. */
 var FBM_DEV_CONFLICT_NAME = 'THỬ XUNG ĐỘT — xóa được';
 function fbmDevMarkConflict() {

@@ -30,7 +30,7 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 - [x] A3. `finishPushVerification` ra xung đột: đánh dấu dòng, đi tiếp bản ghi sau.
 - [x] A4. Test: hash từ form = hash từ lưới (Khách, Giao dịch); FBM đổi sau mốc không phát lệnh lưu, dòng thành xung đột, bản ghi sau vẫn đẩy; FBM = ShinCRM không lưu, cập nhật mốc; FBM = mốc vẫn lưu; chỉ FBM đổi không lưu; đọc lại sau lưu ra xung đột không dừng phiên.
 - [x] A5. Sửa 09/04 (mục "Đẩy xong thì đọc xác nhận" và bảng so ba chiều cho chiều đẩy), 09/02 nếu còn câu ngược.
-- [ ] A6. Nghiệm thu GAS DEV bằng `node tests/gas.js <hàm> --push`.
+- [x] A6. Nghiệm thu GAS DEV bằng `node tests/gas.js <hàm> --push`.
 - [ ] A7. Chủ dự án nghiệm thu với ALT00010: sửa khách trên FBM, sửa khác trên ShinCRM, chạy Chỉ đẩy; FBM giữ nguyên, dòng thành xung đột. Lặp lại với một giao dịch cũ.
 
 ### Nhóm B — Lưu xung đột không đọc lại FBM
