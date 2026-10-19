@@ -357,6 +357,7 @@ tests\
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
+    │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
     │   └── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
