@@ -162,10 +162,10 @@ FbmSync.conflictOpened = function (rawResponse) {
 };
 
 /**
- * Chốt xung đột theo ảnh chụp lúc mở, không đọc lại FBM. `merged` là lựa chọn từng trường `{ field: { choice, value } }`; `fbmValues` là `{ field: value }` giá trị FBM của các trường lệch theo tên trường FBM; `snapshot` là ảnh chụp trong DTO lúc mở.
- * Phía ShinCRM kiểm như lưu form: cửa ghi so từng trường được quyết với `snapshot.old` (tài liệu 06 Phần 4) và trả `conflicts` để Sidebar hỏi bằng đúng popup của form. Phía FBM: hash bản ghép từ ảnh chụp và `fbmValues` phải bằng `snapshot.openedHash`.
+ * Chốt xung đột theo ảnh chụp lúc mở, không đọc lại FBM. `merged` là lựa chọn từng trường `{ field: { choice, value } }`; `fbmValues` và `shinValues` là `{ field: value }` giá trị FBM và giá trị ShinCRM màn đang hiện của các trường lệch, theo tên trường FBM; `snapshot` là ảnh chụp trong DTO lúc mở.
+ * Mỗi dữ liệu một vai: chọn ShinCRM thì ghi `shinValues`; `snapshot.old` chỉ là mốc so (giá trị Sheet người dùng thấy gần nhất, Sidebar dời khi popup xung đột hiện), không bao giờ là giá trị ghi. Phía ShinCRM kiểm như lưu form: cửa ghi so từng trường được quyết với mốc (tài liệu 06 Phần 4) và trả `conflicts` để Sidebar hỏi bằng đúng popup của form. Phía FBM: hash bản ghép từ ảnh chụp và `fbmValues` phải bằng `snapshot.openedHash`.
  */
-FbmSync.confirmConflict = function (entity, id, choice, merged, fbmValues, snapshot) {
+FbmSync.confirmConflict = function (entity, id, choice, merged, fbmValues, shinValues, snapshot) {
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
   var state = FbmSync.stateRead(), target = String(id || '').trim();
   if (['customer', 'activity'].indexOf(entity) < 0 || !target) { return FbmSync.conflictFail('CONFLICT_TARGET_INVALID', 'Bản ghi xung đột không hợp lệ.'); }
@@ -175,13 +175,15 @@ FbmSync.confirmConflict = function (entity, id, choice, merged, fbmValues, snaps
   var stray = values ? Object.keys(values).filter(function (field) { return allowed.indexOf(field) < 0; }) : ['không có giá trị FBM'];
   var shot = snapshot && typeof snapshot === 'object' && snapshot.old && typeof snapshot.old === 'object' && String(snapshot.openedHash || '') ? snapshot : null;
   if (!shot) { stray.push('thiếu ảnh chụp lúc mở'); }
+  var shins = shinValues && typeof shinValues === 'object' && !Array.isArray(shinValues) ? shinValues : {};
+  if (values) { Object.keys(values).forEach(function (field) { if (!Object.prototype.hasOwnProperty.call(shins, field)) { stray.push('thiếu giá trị ShinCRM của ' + field); } }); }
   if (stray.length) { return FbmSync.conflictReject(state, entity, target, 'Giá trị gửi kèm lệnh chốt ' + target + ' không hợp lệ (' + stray.join(', ') + '); chưa ghi gì, mở lại xung đột.'); }
   var blank = function (value) { return value === undefined || value === null ? '' : value; };
   var latestFbm = {}, picks = {}, old = {};
   Object.keys(values).forEach(function (field) {
     var localField = FbmSync.conflictLocalField(entity, field), pick = choice === 'manual' ? (merged && merged[field]) || {} : { choice: choice };
     latestFbm[localField] = blank(values[field]);
-    picks[localField] = blank(pick.choice === 'fbm' ? values[field] : pick.choice === 'manual' ? pick.value : shot.old[localField]);
+    picks[localField] = blank(pick.choice === 'fbm' ? values[field] : pick.choice === 'manual' ? pick.value : shins[field]);
     old[localField] = blank(shot.old[localField]);
   });
   var read = { entity: entity, id: target, gate: FbmSync.stateCategoryGate(state), latestHash: String(shot.openedHash), latestFor: function (local) { return Object.assign({}, local, shot.old, latestFbm); }, old: old };
