@@ -551,9 +551,9 @@ async function testSaveFlowPopup(so) {
   const chuA = Array.from(a.bo.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
   const nutA = Array.from(a.bo.dialog.querySelectorAll('button')).map((el) => el.textContent);
   await huaA;
-  check(so, 'xung đột khi lưu mở popup Sidebar ba lựa chọn, ghi rõ giá trị Sheet, giá trị đang nhập và lúc mở form; không còn alert', [
+  check(so, 'xung đột khi lưu mở popup Sidebar ba lựa chọn, ghi rõ giá trị Sheet, giá trị đang nhập và giá trị lần trước bạn thấy; không còn alert', [
     moA, a.bo.calls.filter((c) => c.name === 'alert').length, chuA[1], nutA
-  ], [true, 0, 'Ghi chú: trên Sheet là "Sheet sửa", bạn đang nhập "của tôi" (lúc mở form: "cũ")', [
+  ], [true, 0, 'Ghi chú: trên Sheet là "Sheet sửa", bạn đang nhập "của tôi" (lần trước bạn thấy: "cũ")', [
     'Lưu giá trị bạn đang nhập, thay giá trị trên Sheet', 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang nhập', 'Quay lại form, chưa lưu gì'
   ]]);
   check(so, 'chọn lưu giá trị đang nhập: gửi lại với mốc là giá trị trên Sheet rồi đóng form', [a.ghi.gui.length, a.ghi.gui[1].ghiChu, a.ghi.baseline, a.ghi.dong], [2, 'của tôi', { ghiChu: 'Sheet sửa' }, 1]);

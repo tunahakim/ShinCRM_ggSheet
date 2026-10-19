@@ -802,8 +802,8 @@ async function chay(so) {
   hop.callServer = (name, args) => { resolveCalls.push([name, args]); return Promise.resolve(name === 'fbmConfirmConflict' ? { ok: false, code: 'CONFLICT_REOPEN', message: 'mở lại' } : {}); };
   hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', left: '0901', right: '0902' }, { field: 'ten_kh', left: 'A', right: 'B' }] };
   await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  check(so, 'Chốt xung đột gọi GAS một lần, gửi kèm giá trị FBM các trường lệch như màn đã hiện, không nhờ Extension đọc lại FBM; GAS trả mở lại thì mở lại xung đột',
-    [resolveCalls.map((call) => call[0]), resolveCalls[0][1][4]], [['fbmConfirmConflict', 'reopen'], { dien_thoai: '0902', ten_kh: 'B' }]);
+  check(so, 'Chốt xung đột gọi GAS một lần, gửi kèm giá trị FBM và giá trị ShinCRM các trường lệch như màn đang hiện, không nhờ Extension đọc lại FBM; GAS trả mở lại thì mở lại xung đột',
+    [resolveCalls.map((call) => call[0]), resolveCalls[0][1][4], resolveCalls[0][1][5]], [['fbmConfirmConflict', 'reopen'], { dien_thoai: '0902', ten_kh: 'B' }, { dien_thoai: '0901', ten_kh: 'A' }]);
 
   // Màn xung đột dùng chung luật và popup với form khi Sheet đổi giữa chừng hoặc bản ghi bận.
   const resolveConflictChoose = hop.recordConflictChoose, resolveBusyChoose = hop.recordBusyChoose, resolvePaint = hop.fbmSyncPaint;
@@ -814,15 +814,29 @@ async function chay(so) {
   hop.fbmSyncPaint = () => {};
   hop.callServer = (name, args) => { resolveCalls.push([name, JSON.parse(JSON.stringify(args))]); return Promise.resolve(replies.shift()); };
   const sheetChanged = { ok: false, code: 'CONFLICT_SHEET_CHANGED', conflicts: [{ field: 'phone', label: 'Điện thoại', old: '0901', current: '0905', mine: '0902' }] };
-  const conflictItem = () => ({ entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', localField: 'phone', left: '0901', right: '0902' }], snapshot: { openedHash: 'h1', old: { phone: '0901' } } });
+  const conflictItem = () => ({ entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', localField: 'phone', left: '0903', right: '0902' }], snapshot: { openedHash: 'h1', old: { phone: '0901' } } });
 
   resolveCalls.length = 0; popups.length = 0; popupPick = 'mine';
   replies.push(sheetChanged, { ok: true, remaining: 1 });
   hop.FBM_SYNC_CLIENT.conflict = conflictItem();
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'fbm', null);
-  check(so, 'Sheet đổi ô đang quyết: hỏi bằng popup chung của form với bộ chữ màn xung đột; chọn giữ lựa chọn thì gửi lại với giá trị Sheet làm mốc mới',
-    [popups.map((p) => p[0]), popups[0][2] === hop.FBM_SYNC_CONFLICT_WORDS, resolveCalls.map((c) => c[0]), resolveCalls[1][1][5].old.phone, resolveCalls[1][1][2]],
-    [['conflict'], true, ['fbmConfirmConflict', 'fbmConfirmConflict', 'reopen'], '0905', 'fbm']);
+  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
+  check(so, 'Sheet đổi ô đang quyết: hỏi bằng popup chung của form với bộ chữ màn xung đột; chọn giữ lựa chọn thì gửi lại giá trị ShinCRM đang hiện (không phải giá trị Sheet), giá trị Sheet chỉ làm mốc mới',
+    [popups.map((p) => p[0]), popups[0][2] === hop.FBM_SYNC_CONFLICT_WORDS, resolveCalls.map((c) => c[0]), resolveCalls[1][1][6].old.phone, resolveCalls[1][1][5].dien_thoai, resolveCalls[1][1][2]],
+    [['conflict'], true, ['fbmConfirmConflict', 'fbmConfirmConflict', 'reopen'], '0905', '0903', 'shin']);
+
+  resolveCalls.length = 0; popups.length = 0; popupPick = 'cancel';
+  replies.push(sheetChanged);
+  hop.FBM_SYNC_CLIENT.conflict = conflictItem(); hop.FBM_SYNC_CLIENT.conflictChoices = { dien_thoai: 'shin' }; hop.FBM_SYNC_CLIENT.conflictSheetChanged = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
+  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
+  const cancelState = [resolveCalls.length, hop.FBM_SYNC_CLIENT.conflict.fields[0].left, hop.FBM_SYNC_CLIENT.conflict.snapshot.old.phone, hop.FBM_SYNC_CLIENT.conflictSheetChanged.dien_thoai, Object.keys(hop.FBM_SYNC_CLIENT.conflictInvalid).length];
+  replies.push({ ok: true, remaining: 1 });
+  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
+  check(so, 'Sheet đổi ô đang quyết, chọn Quay lại: không gửi, ô giữ giá trị đang hiện, mốc giữ giá trị Sheet đã thấy, trường được tô đỏ nhưng không tính là chưa chọn; Lưu lại thì gửi giá trị đang hiện với mốc đó',
+    [cancelState, resolveCalls[1][1][5].dien_thoai, resolveCalls[1][1][6].old.phone],
+    [[1, '0903', '0905', true, 0], '0903', '0905']);
+  hop.FBM_SYNC_CLIENT.conflictSheetChanged = { dien_thoai: true }; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
+  hop.fbmSyncConflictUnmark('dien_thoai');
+  check(so, 'Chọn hoặc sửa trường bị tô đỏ vì Sheet đổi thì hết đỏ', hop.fbmSyncConflictMarked({ field: 'dien_thoai' }), false);
 
   resolveCalls.length = 0; popups.length = 0; popupPick = 'sheet';
   replies.push(sheetChanged);
@@ -831,6 +845,9 @@ async function chay(so) {
   check(so, 'Sheet đổi ô đang quyết, chọn dùng giá trị Sheet: không gửi lại, phía ShinCRM hiện giá trị Sheet và được chọn, màn vẫn mở',
     [resolveCalls.map((c) => c[0]), hop.FBM_SYNC_CLIENT.conflict.fields[0].left, hop.FBM_SYNC_CLIENT.conflictChoices.dien_thoai, hop.FBM_SYNC_CLIENT.conflictDraft.dien_thoai.shin, hop.FBM_SYNC_CLIENT.conflict.snapshot.old.phone],
     [['fbmConfirmConflict'], '0905', 'shin', undefined, '0905']);
+  replies.push({ ok: true, remaining: 1 });
+  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
+  check(so, 'Sau khi dùng giá trị Sheet, Lưu gửi giá trị ShinCRM là giá trị Sheet', resolveCalls[1][1][5].dien_thoai, '0905');
 
   resolveCalls.length = 0; popups.length = 0;
   replies.push({ ok: false, code: 'CONFLICT_RECORD_BUSY', entity: 'customer', busy: { id: 'CUS-1', by: 'khac', reason: 'Đang đẩy.' } }, { ok: true, remaining: 1 });
