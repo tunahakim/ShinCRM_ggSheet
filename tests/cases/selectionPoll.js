@@ -196,6 +196,10 @@ async function chay(so) {
     [pickedDown, readerDown._calls[0].args[0].extensionReadFailure], [['CUS-000004'], 'LIVE_GRID_NOT_FOUND']);
   check(so, 'Extension đọc hỏng: băng cảnh báo hiện câu riêng, không nhầm với thiếu Extension',
     [readerDown._banner.hidden, readerDown._banner.textContent], [false, readerDown.SELECTION_POLL_BANNER_TEXT.readerDown]);
+  readerDown.sheetLinkRecordExtensionRead(Object.assign({}, downContext, { readReason: 'LIVE_AXIS_NOT_FOUND' }));
+  check(so, 'Extension có lưới nhưng không ghép được bảng quy đổi hàng/cột cũng là bộ đọc hỏng: hỏi GAS, băng cảnh báo, Log',
+    [readerDown.sheetLinkExtensionReaderDown(5001), readerDown.SHEET_LINK_EXTENSION_READ.reason], [true, 'LIVE_AXIS_NOT_FOUND']);
+  readerDown.sheetLinkRecordExtensionRead(downContext);
   nextGas = gasSelection('CUS-000005', 'C5');
   // syncValue chạy đồng bộ nên mốc "đang bay" được gán sau khi lượt đã xong; Promise thật tự dọn mốc này.
   readerDown.SHEET_LINK_SELECTION_PENDING = null;
