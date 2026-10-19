@@ -18,7 +18,7 @@ FbmSync.conflictQueue = function (scan) {
   return queue;
 };
 
-/** Dòng đang chờ người quyết bị khóa đồng bộ: pull không lấy về, push không đẩy (`09/04`). */
+/** Dòng đang chờ người quyết: hàng đợi của màn xung đột; push không đẩy, pull vẫn so ba chiều lại mỗi kỳ (`09/04`). */
 FbmSync.isConflictPending = function (record) {
   return String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.conflict;
 };

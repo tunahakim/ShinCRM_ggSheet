@@ -52,7 +52,7 @@ FbmSync.compareFbmId = function (a, b) {
 /** Pull chỉ ghi record mới/thay đổi an toàn; không bao giờ xóa. */
 FbmSync.pullWrite = function (entity, records) {
   // Pull không ghi đè thay đổi cục bộ; chỉ đánh dấu pending hoặc conflict.
-  if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, skipped: 0 }; }
+  if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, conflictsKept: 0, conflictsCleared: 0, skipped: 0 }; }
   var state = FbmSync.stateRead();
   var orphaned = 0;
   var categoryGate = FbmSync.stateCategoryGate(state);
@@ -74,7 +74,7 @@ FbmSync.pullWrite = function (entity, records) {
     if (entity === 'customer' && record.fbmCustomerCode) { var code = String(record.fbmCustomerCode).trim(); (localByCode[code] || (localByCode[code] = [])).push(record); }
     if (entity === 'customer') { var tax = FbmSync.customerTaxKey(record.taxNumber || record.ma_so_thue); if (tax) { (localByTaxNumber[tax] || (localByTaxNumber[tax] = [])).push(record); } }
   });
-  var writes = [], statusWrites = [], pendingClears = [], conflicts = 0, skipped = 0, markerClaims = {};
+  var writes = [], statusWrites = [], pendingClears = [], conflicts = 0, skipped = 0, markerClaims = {}, kept = {}, wasPending = {};
   // Activity bị dấu nhận diện của một FBM ID khác trỏ tới là xung đột định danh, không so được bằng hash; giữ chờ người quyết, không cho nhánh so ba chiều gỡ rồi nhánh dấu đặt lại trong cùng lượt.
   if (entity === 'activity') {
     records.forEach(function (incoming) {
@@ -102,7 +102,7 @@ FbmSync.pullWrite = function (entity, records) {
     }
     if (entity === 'activity' && !current) {
       var markerId = String(incoming.markerId || '').trim(), marked = markerId ? localById[markerId] : null;
-      if (marked && FbmSync.isConflictPending(marked)) { skipped += 1; return; }
+      if (marked && FbmSync.isConflictPending(marked)) { kept[String(marked.id || '').trim()] = true; return; }
       if (marked) {
         var markedBusy = gate.busy(entity, [marked.id])[String(marked.id || '').trim()];
         if (markedBusy) { skipped += 1; FbmSync.logPullRecord(entity, incoming, marked, FbmSync.SYNC_STATUS.skipped, 'Hoãn tới lượt sau: ' + markedBusy.reason, { issue: true }); return; }
@@ -122,7 +122,8 @@ FbmSync.pullWrite = function (entity, records) {
     }
     // Dòng đang chờ quyết vẫn so ba chiều lại với baseline cũ (xung đột không bao giờ ghi baseline): hai phía đã khớp hoặc một phía đã quay về gốc thì xử như mọi dòng; còn xung đột thì giữ nguyên, không ghi lại và không Log lặp mỗi kỳ.
     var wasConflict = !!current && FbmSync.isConflictPending(current);
-    if (wasConflict && markerClaims[String(current.id || '').trim()]) { skipped += 1; return; }
+    if (wasConflict) { wasPending[String(current.id || '').trim()] = true; }
+    if (wasConflict && markerClaims[String(current.id || '').trim()]) { kept[String(current.id || '').trim()] = true; return; }
     var currentBusy = current && gate.busy(entity, [current.id])[String(current.id || '').trim()];
     if (currentBusy) { skipped += 1; FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Hoãn tới lượt sau: ' + currentBusy.reason, { issue: true }); return; }
     var mergedIncoming = current ? FbmSync.preserveLocalFields(entity, current, incoming) : incoming;
@@ -213,7 +214,7 @@ FbmSync.pullWrite = function (entity, records) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Không có thay đổi giữa FBM và ShinCRM.');
       return;
     }
-    if (decision.conflict && wasConflict) { skipped += 1; return; }
+    if (decision.conflict && wasConflict) { kept[String(current.id || '').trim()] = true; return; }
     if (decision.conflict) {
       conflicts += 1;
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.conflict });
@@ -221,7 +222,6 @@ FbmSync.pullWrite = function (entity, records) {
       return;
     }
     if (decision.shinChanged && !decision.fbmChanged) {
-      skipped += 1;
       statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.pending });
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.pending, wasConflict ? 'FBM đã quay về giá trị gốc, chỉ ShinCRM khác; gỡ xung đột, chờ chiều đẩy.' : 'Chỉ ShinCRM thay đổi; chờ chiều đẩy.');
       return;
@@ -236,11 +236,16 @@ FbmSync.pullWrite = function (entity, records) {
     if (!written) { ownedOnly += 1; }
     if (patch) { Object.assign(patch, ownedFixes[id]); } else { statusWrites.push(Object.assign({ id: id }, ownedFixes[id])); }
   });
-  var allWrites = writes.concat(statusWrites);
-  return { save: allWrites.length ? [{ entity: entity, records: allWrites, source: 'pull' }] : [], release: recovered.length ? [{ entity: entity, ids: recovered }] : [], value: { written: allWrites.length ? writes.length + ownedOnly : 0, batches: allWrites.length ? 1 : 0, conflicts: conflicts, skipped: skipped + orphaned, pendingClears: pendingClears } };
+  var allWrites = writes.concat(statusWrites), cleared = {};
+  // Dòng chờ quyết được ghi sang trạng thái khác ở bất kỳ nhánh nào là đã rời hàng đợi xung đột; đếm theo bản ghi ghi xuống, không theo từng nhánh, để nhánh mới thêm sau không làm lệch số.
+  allWrites.forEach(function (item) {
+    var id = String(item.id || '').trim();
+    if (wasPending[id] && item.syncStatus && item.syncStatus !== FbmSync.SYNC_STATUS.conflict) { cleared[id] = true; }
+  });
+  return { save: allWrites.length ? [{ entity: entity, records: allWrites, source: 'pull' }] : [], release: recovered.length ? [{ entity: entity, ids: recovered }] : [], value: { written: allWrites.length ? writes.length + ownedOnly : 0, batches: allWrites.length ? 1 : 0, conflicts: conflicts, conflictsKept: Object.keys(kept).length, conflictsCleared: Object.keys(cleared).length, skipped: skipped + orphaned, pendingClears: pendingClears } };
   });
   var outcome = change.value;
-  var result = { ok: true, written: outcome.written, conflicts: outcome.conflicts, skipped: outcome.skipped, sheetWriteBatches: outcome.batches };
+  var result = { ok: true, written: outcome.written, conflicts: outcome.conflicts, conflictsKept: outcome.conflictsKept, conflictsCleared: outcome.conflictsCleared, skipped: outcome.skipped, sheetWriteBatches: outcome.batches };
   if (typeof FbmSync.pendingPushClear === 'function') { outcome.pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
   if (typeof FbmSync.stateWrite === 'function') { FbmSync.stateWrite(state); }
   return result;

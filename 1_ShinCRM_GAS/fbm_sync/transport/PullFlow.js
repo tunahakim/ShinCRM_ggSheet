@@ -90,11 +90,12 @@ FbmSync.pullRecords = function (entity, records, mode) {
   }
   var result = FbmSync.pullWrite(entity, records || []);
   state.counts.succeeded += Number(result.written || 0);
-  state.counts.conflict += Number(result.conflicts || 0);
-  state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0);
+  // Ô Xung đột của phiên đếm cả dòng cũ vẫn còn xung đột; số chờ quyết trên Sidebar chỉ cộng xung đột mới và trừ dòng đã tự gỡ, vì dòng cũ đã nằm trong số đếm lúc preflight.
+  state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
+  state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0) - Number(result.conflictsCleared || 0));
   state.counts.skipped += Number(result.skipped || 0);
   if (typeof FbmSync.businessStepAdd === 'function') {
-    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
+    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0) + Number(result.conflictsKept || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
   }
   FbmSync.stateWrite(state);
   return result;

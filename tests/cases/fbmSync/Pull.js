@@ -102,7 +102,7 @@ async function chay(so) {
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'OLD-FBM', customerId: 'KH-1', content: 'Nội dung cũ', taskType: 'Gọi', workDate: '/Date(1757386800000)/', fbmHash: 'old-hash', syncStatus: builders.FbmSync.SYNC_STATUS.conflict }];
   markerConflictWrite = null;
   const markerAgain = builders.FbmSync.pullWrite('activity', [markerOwnFbm, builders.FbmSync.activityRecord({ id: 'NEW-FBM', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung mới #SC-ACT-9' }, gate, { sttRec: 'S9' })]);
-  check(so, 'Activity đang xung đột định danh (dấu của FBM ID khác trỏ vào) không bị nhánh so ba chiều gỡ, không ghi trạng thái khác lên dòng', [markerAgain.conflicts, ((markerConflictWrite && markerConflictWrite.records) || []).filter((r) => r.id === 'ACT-9' && r.syncStatus !== builders.FbmSync.SYNC_STATUS.conflict).length], [0, 0]);
+  check(so, 'Activity đang xung đột định danh (dấu của FBM ID khác trỏ vào) không bị nhánh so ba chiều gỡ, không ghi trạng thái khác lên dòng; ô Xung đột của phiên đếm dòng đó đúng một lần dù cả nhánh dấu và nhánh so cùng chạm', [markerAgain.conflicts, markerAgain.conflictsKept, markerAgain.skipped, ((markerConflictWrite && markerConflictWrite.records) || []).filter((r) => r.id === 'ACT-9' && r.syncStatus !== builders.FbmSync.SYNC_STATUS.conflict).length], [0, 1, 0, 0]);
   // G12: giao dịch đã đồng bộ của chính tài khoản mà FBM còn dấu #SC thì xếp đẩy sửa để bỏ dấu; của tài khoản khác thì không đụng.
   const settingsBeforeMarker = builders.FbmSync.scriptSettings;
   gate.map['@CAT_CONG_VIECGọi'] = 'GOI'; gate.valid['@CAT_CONG_VIEC'] = { 'Gọi': true, GOI: true };

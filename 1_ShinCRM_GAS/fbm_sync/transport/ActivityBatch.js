@@ -78,7 +78,7 @@ FbmSync.activityBatchMismatch = function (state, message, failureCode) {
 };
 
 /**
- * Ghi cờ của cửa ghi: "không thấy bên FBM", "đã chuyển cho người khác" và đổi khách cha khi khách mới bị chặn. Hàm quyết đọc lại bản ghi trong Cửa bản ghi theo mã; bỏ dòng đã vắng, dòng tiến trình khác đang giữ và dòng đang chờ quyết xung đột; dòng đã mang đúng cờ thì không ghi và không Log lại, nhưng vẫn đếm vì lượt này vẫn thấy nó vắng.
+ * Ghi cờ của cửa ghi: "không thấy bên FBM", "đã chuyển cho người khác" và đổi khách cha khi khách mới bị chặn. Hàm quyết đọc lại bản ghi trong Cửa bản ghi theo mã; bỏ dòng đã vắng và dòng tiến trình khác đang giữ; dòng đang chờ quyết xung đột vẫn nhận cờ vì bản FBM đã vắng hoặc đổi chủ thì không còn gì để quyết, và rời hàng đợi xung đột; dòng đã mang đúng cờ thì không ghi và không Log lại, nhưng vẫn đếm vì lượt này vẫn thấy nó vắng.
  * `flags`: `[{ record, status, patch, reason }]`, mỗi bản ghi một lần; `record` chỉ dùng để lấy mã.
  */
 FbmSync.gateFlagWrite = function (state, entity, flags) {
@@ -93,11 +93,12 @@ FbmSync.gateFlagDecide = function (gate, state, entity, flags) {
   state.counts = state.counts || {};
   (flags || []).forEach(function (flag) {
     var id = String(flag.record && flag.record.id || '').trim(), record = fresh[id];
-    if (!id || done[id] || !record || gate.busy(entity, [id])[id] || FbmSync.isConflictPending(record)) { return; }
+    if (!id || done[id] || !record || gate.busy(entity, [id])[id]) { return; }
     done[id] = true;
     var patch = Object.assign({ id: id }, flag.patch || {}), key = flag.status === sync.missing ? 'missing' : flag.status === sync.transferred ? 'transferred' : '';
     if (key) { state.counts[counted[key]] = Number(state.counts[counted[key]] || 0) + 1; }
     if (flag.status && String(record.syncStatus || '') !== flag.status) { patch.syncStatus = flag.status; }
+    if (patch.syncStatus && FbmSync.isConflictPending(record)) { state.metadata = state.metadata || {}; state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) - 1); }
     if (Object.keys(patch).length === 1) { return; }
     writes.push(patch);
     if (flag.status) { FbmSync.logPullRecord(entity, { fbmId: record.fbmId }, record, flag.status, flag.reason); }
