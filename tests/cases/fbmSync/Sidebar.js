@@ -651,6 +651,12 @@ async function chay(so) {
   const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
+  const nutNen = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
+  const nutTay = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'manual', masterEnabled: true, enabled: true });
+  hop.FBM_SYNC_CLIENT.backgroundWait = 'conflict';
+  const nutCho = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
+  hop.FBM_SYNC_CLIENT.backgroundWait = null;
+  check(so, 'Nút chạy: lượt nền đang chạy vẫn là Bắt đầu đồng bộ (bấm thì hỏi), chỉ lượt tay mới có nút dừng; đang chờ lượt nền thì khóa và báo đang chờ', [nutNen.id, nutNen.label, nutNen.disabled, nutTay.id, nutCho.label, nutCho.disabled], ['fbm-sync-start', 'Bắt đầu đồng bộ', false, 'fbm-sync-cancel', 'Đang chờ đồng bộ nền xong...', true]);
   // Bấm chạy tay khi lượt nền đang chạy: GAS trả SYNC_BACKGROUND_RUNNING, Sidebar hỏi người dùng; chỉ khi chọn dừng mới gọi lệnh dừng nền.
   const savedStartServer = hop.fbmSyncStartServer, savedWaitIdle = hop.fbmSyncWaitForBackgroundIdle, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
   const nenStatus = { phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };

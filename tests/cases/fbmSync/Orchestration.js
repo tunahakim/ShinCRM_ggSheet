@@ -417,6 +417,7 @@ async function chay(so) {
   const backgroundState = heartbeat.FbmSync.stateRead();
   backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.activeRequestId = 'background-request'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
   heartbeat.FbmSync.stateWrite(backgroundState);
+  check(so, 'trạng thái gửi Sidebar nêu lượt đang chạy là của ai', heartbeat.FbmSync.statusView().origin, 'background');
   const manualRequest = heartbeat.FbmSync.start({ mode: 'read', manual: true });
   check(so, 'chạy tay giữa lượt nền không tự dừng nền mà trả mã để Sidebar hỏi người dùng', [manualRequest.ok, manualRequest.code, !!manualRequest.status, heartbeat.FbmSync.stateRead().metadata.manualPending, heartbeat.FbmSync.stateRead().runId], [false, 'SYNC_BACKGROUND_RUNNING', true, null, 'background-run']);
   const stopRequest = heartbeat.FbmSync.stopBackground();
