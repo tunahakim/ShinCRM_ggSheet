@@ -682,6 +682,12 @@ async function chay(so) {
   let quaHan = '';
   await hop.fbmSyncWaitForBackgroundIdle('run', () => Promise.resolve({ ok: true }), Date.now() - 1).catch((error) => { quaHan = error.message; });
   hop.setTimeout = savedTimeout; hop.fbmSyncStatusOnce = savedStatusOnce;
+  const savedCallStatus = hop.callServer, savedPaintStatus = hop.fbmSyncPaint;
+  hop.callServer = () => Promise.resolve({ phase: 'idle', runId: '', updatedAt: Date.now() + 1000 });
+  hop.fbmSyncPaint = () => undefined;
+  const docThat = await hop.fbmSyncStatusOnce();
+  hop.callServer = savedCallStatus; hop.fbmSyncPaint = savedPaintStatus;
+  check(so, 'Đọc trạng thái luôn trả status GAS kể cả khi đã vẽ, để hàm chờ lượt nền thấy được phase idle', [docThat && docThat.phase, docThat && docThat.runId], ['idle', '']);
   check(so, 'Chờ lượt nền: chỉ gọi lệnh gốc khi GAS nhả lượt, gặp lượt nền kế thì chờ tiếp; quá hạn báo lỗi rõ, không chạy lệnh gốc', [goiLenh, choXong.code, quaHan.indexOf('chưa chạy đồng bộ') >= 0], [2, 'STARTED', true]);
 
   // Thẻ xung đột: còn số đếm mà RAM chưa có bản ghi thì nói lý do, không báo "không có xung đột".
