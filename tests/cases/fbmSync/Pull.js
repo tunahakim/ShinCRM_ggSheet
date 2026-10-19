@@ -253,6 +253,17 @@ async function chay(so) {
   check(so, 'chỉ xét khách vắng và sang cửa ghi khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE, chưa ghi gì',
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
     [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']]]);
+  const savedScope = builders.FbmSync.scope;
+  builders.FbmSync.scope = () => ({ codes: ['ALT0010', 'alt00099', 'ALT00010'], fbm: ['ALT0010', 'alt00099', 'ALT00010'], shin: ['CUS-1'], fbmNew: ['ALT0010', 'alt00099'], notFound: [] });
+  const scopeScan = { mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} };
+  marked.length = 0;
+  builders.FbmSync.customerScanRecord(scopeScan, { total: 2, rows: [{ ma_kh: 'ALT00010' }] }, true);
+  builders.FbmSync.customerScanRecord(scopeScan, { total: 0, rows: [{ ma_kh: 'ALT00099' }] }, false);
+  builders.FbmSync.customerScanEnd(scopeScan);
+  builders.FbmSync.scope = savedScope;
+  check(so, 'Mã khách chỉ định chưa có trên Sheet mà danh sách khách FBM không trả về (gộp mọi trang, không phân biệt hoa thường) thành cảnh báo không chặn ở kết quả phiên, phiên vẫn sang cửa ghi',
+    [(scopeScan.metadata.preflightIssues || []).map((item) => [item.code, item.blocking, /ALT0010\b/.test(item.message), /00099/.test(item.message)]), marked.slice()],
+    [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['mốc', 'vắng', 'cửa ghi']]);
   builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline; builders.FbmSync.activityStagesContinue = savedScanEnd.stages;
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };

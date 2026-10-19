@@ -38,6 +38,11 @@ function chay(so) {
     [byFbm.ok, byFbm.settings.scopeCodes, [scopeByFbm.fbm, scopeByFbm.shin], [scopeByShin.fbm, scopeByShin.shin]],
     [true, ['ALT00010', 'ALT00099'], [['ALT00010', 'ALT00099'], ['CUS-020061']], [['ALT00010'], ['CUS-020061']]]);
   check(so, 'Lưu danh sách trả kết quả đổi mã từng dòng: mã → khách, mã FBM chưa có trên Sheet', byFbm.scopeLines.map((line) => [line.code, line.status, line.customerId]), [['ALT00010', 'matched', 'CUS-020061'], ['ALT00099', 'fbm_new', '']]);
+  const oddLogBefore = settingsLog.length, oddLength = hop.FbmSync.syncSettingsSave({ scopeCodes: 'ALT0010, ALT00099' });
+  check(so, 'Mã FBM đúng tiền tố mà khác độ dài đã cài vẫn được lưu nhưng dòng đó mang cảnh báo độ dài và Log có một dòng cảnh báo; mã đúng độ dài không bị đánh dấu',
+    [oddLength.ok, oddLength.settings.scopeCodes, oddLength.scopeLines.map((line) => [line.code, line.lengthExpected || 0]), settingsLog.slice(oddLogBefore).map((event) => [event.action, /ALT0010\b/.test(event.reason), /ALT00099/.test(event.reason)])],
+    [true, ['ALT0010', 'ALT00099'], [['ALT0010', 8], ['ALT00099', 0]], [['sync_settings_save', true, false]]]);
+  check(so, 'Cài đặt tài khoản thiếu tiền tố hoặc độ dài thì không cảnh báo độ dài', hop.FbmSync.scopeLengthMark([{ code: 'ALT1', status: 'fbm_new' }], { customerPrefix: '', customerCodeLength: '' })[0].lengthExpected, undefined);
   const newShin = hop.FbmSync.syncSettingsSave({ scopeCodes: 'CUS-020062' }).settings && hop.FbmSync.scope();
   check(so, 'Khách mới tạo ở ShinCRM chưa có mã FBM: chỉ vào chiều ghi, grid Customer lọc ra rỗng chứ không quét toàn bộ', [newShin.fbm, newShin.shin], [[], ['CUS-020062']]);
   const logBefore = settingsLog.length;
