@@ -107,7 +107,7 @@ FbmSync.syncSettingsSave = function (input) {
   var previous = FbmSync.syncSettingsRead(), check = fbmSyncSettingsValidate(Object.assign({}, previous, input || {})), scopeLines = null;
   // Đổi mã ra khách chỉ khi người dùng gửi danh sách: mã ShinCRM không có trên Sheet thì từ chối, danh sách đang lưu giữ nguyên.
   if (check.ok && input && input.scopeCodes !== undefined) {
-    scopeLines = FbmSync.scopeResolve(check.settings.scopeCodes).lines;
+    scopeLines = FbmSync.scopeLengthMark(FbmSync.scopeResolve(check.settings.scopeCodes).lines, FbmSync.accountSettingsRead());
     var notFound = scopeLines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; });
     if (notFound.length) { check = { ok: false, code: 'FBM_SCOPE_CODE_NOT_FOUND', field: 'scopeCodes', message: 'Không tìm thấy mã khách ShinCRM trên Sheet Customer: ' + notFound.join(', ') + '. Danh sách đang lưu giữ nguyên.', scopeLines: scopeLines }; }
   }
@@ -122,7 +122,22 @@ FbmSync.syncSettingsSave = function (input) {
   if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings'); }
   else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
   if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
+  var oddLength = (scopeLines || []).filter(function (line) { return line.lengthExpected; }).map(function (line) { return line.code; });
+  if (oddLength.length && typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'sync_settings_save', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Mã khách chỉ định đúng tiền tố mã FBM nhưng khác độ dài đã cài: ' + oddLength.join(', ') + '. Vẫn lưu; kiểm tra lại nếu gõ thiếu hoặc thừa ký tự.', detail: { codes: oddLength } }); }
   return { ok: true, settings: check.settings, previous: previous, scopeLines: scopeLines };
+};
+
+/**
+ * Đánh dấu mã FBM chưa có trên Sheet mà đúng tiền tố nhưng khác độ dài mã FBM trong cài đặt tài khoản: chỉ để cảnh báo, không chặn lưu, vì FBM có thể đổi độ dài mã mà cài đặt chưa kịp sửa.
+ * Thiếu tiền tố hoặc độ dài trong cài đặt thì không đánh dấu gì.
+ */
+FbmSync.scopeLengthMark = function (lines, account) {
+  var prefix = String(account && account.customerPrefix || '').trim().toUpperCase(), length = Number(account && account.customerCodeLength || 0);
+  if (!prefix || !length) { return lines; }
+  return (lines || []).map(function (line) {
+    var code = String(line.code || '').trim();
+    return line.status === 'fbm_new' && code.toUpperCase().indexOf(prefix) === 0 && code.length !== length ? Object.assign({}, line, { lengthExpected: length }) : line;
+  });
 };
 
 /** Khoảng nghỉ gửi kèm envelope theo mili-giây; Extension chọn ngẫu nhiên trong khoảng này trước mỗi request FBM. */
@@ -162,12 +177,12 @@ FbmSync.scopeResolve = function (codes) {
   return { fbm: fbm, shin: shin, lines: lines };
 };
 
-/** Phạm vi của lượt chạy: `null` khi không giới hạn (đọc và ghi toàn bộ), ngược lại `{ codes, fbm, shin, notFound }`; danh sách rỗng lọc ra rỗng chứ không rơi thành toàn bộ. */
+/** Phạm vi của lượt chạy: `null` khi không giới hạn (đọc và ghi toàn bộ), ngược lại `{ codes, fbm, shin, fbmNew, notFound }` (`fbmNew`: mã FBM chưa có trên Sheet); danh sách rỗng lọc ra rỗng chứ không rơi thành toàn bộ. */
 FbmSync.scope = function () {
   var settings = FbmSync.syncSettingsRead();
   if (settings.scopeLimited === false) { return null; }
   var resolved = FbmSync.scopeResolve(settings.scopeCodes);
-  return { codes: settings.scopeCodes.slice(), fbm: resolved.fbm, shin: resolved.shin, notFound: resolved.lines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; }) };
+  return { codes: settings.scopeCodes.slice(), fbm: resolved.fbm, shin: resolved.shin, fbmNew: resolved.lines.filter(function (line) { return line.status === 'fbm_new'; }).map(function (line) { return line.code; }), notFound: resolved.lines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; }) };
 };
 
 /** Công tắc phạm vi đang bật hay tắt; chỉ đọc cờ, không đổi mã ra khách. */
