@@ -274,16 +274,19 @@ function writeGateComparable(value, spec, timezone) {
 }
 
 /**
- * Kiểm xung đột bằng giá trị cũ (tài liệu 06 Phần 4), chỉ nguồn `user` sửa bản ghi đã có. `rows` là các dòng hiện tại trên Sheet của `plans` sửa, đọc trong khóa, cùng thứ tự.
- * Trường là xung đột khi Sheet đã khác giá trị lúc mở form và giá trị gửi lên cũng khác giá trị đang có; đổi một phía thì không. Thiếu `old` thì ném lỗi: không có đường lưu nào bỏ qua phép này.
+ * Kiểm xung đột bằng giá trị cũ (tài liệu 06 Phần 4): mọi lần ghi theo ảnh chụp người dùng đã xem. `rows` là các dòng hiện tại trên Sheet của `plans` sửa, đọc trong khóa, cùng thứ tự.
+ * Trường là xung đột khi Sheet đã khác giá trị lúc mở và giá trị gửi lên cũng khác giá trị đang có; đổi một phía thì không.
+ * Nguồn `user` (form) bắt buộc `old` cho mọi trường gửi lên, thiếu thì ném lỗi: không có đường lưu form nào bỏ qua phép này. Nguồn máy chỉ kiểm khi có `old` và chỉ các trường trong `old` (trường người dùng quyết); trường máy tự quyết như `fbmHash` do người điều phối kiểm trong cùng khóa.
  */
-function writeGateConflicts(plans, rows, fields, context) {
+function writeGateConflicts(plans, rows, fields, context, source) {
   var conflicts = [];
   plans.forEach(function (plan, i) {
+    if (source !== 'user' && !plan.old) { return; }
     if (!plan.old) { throw new Error('Lưu bản ghi "' + plan.id + '" thiếu giá trị lúc mở form nên không kiểm được xung đột; không ghi gì. Tải lại Sidebar rồi thử lại.'); }
     Object.keys(plan.values).forEach(function (name) {
       var at = context.names.indexOf(name);
       if (at < 0) { return; }
+      if (source !== 'user' && !Object.prototype.hasOwnProperty.call(plan.old, name)) { return; }
       if (!Object.prototype.hasOwnProperty.call(plan.old, name)) { throw new Error('Lưu bản ghi "' + plan.id + '" thiếu giá trị lúc mở form của trường "' + name + '"; không ghi gì. Tải lại Sidebar rồi thử lại.'); }
       var spec = fields[name];
       var old = writeGateComparable(plan.old[name], spec, context.timezone);
@@ -373,7 +376,7 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
   if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields); }
 
   plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid, selectAllowed); });
-  var conflicts = source === 'user' && edits.length ? writeGateConflicts(edits, current.rows, fields, context) : [];
+  var conflicts = edits.length ? writeGateConflicts(edits, current.rows, fields, context, source) : [];
   writeGateUniqueCheck(plans, names, fields, source, context, invalid);
 
   if (invalid.length) {

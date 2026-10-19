@@ -104,13 +104,13 @@ function fbmDevClearConflict() {
   var xoaKh = ids.length ? deleteRecords('customer', ids) : { ok: true };
   return { seen: seen, activitiesLeft: giaoDich.map(function (record) { return record.id; }), activityDelete: xoaGd.ok, customerDelete: xoaKh.ok };
 }
-/** Dò ca "FBM đổi giữa chừng" (G10.7f): sau khi Sidebar đã mở xem xung đột, làm lệch hash FBM chốt lúc mở; bước Lưu kế tiếp phải thấy khác và trả về xem lại thay vì chốt. Không chạm FBM. */
-function fbmTamperConflictOpenedHash() {
-  var state = FbmSync.stateRead(), refresh = state.metadata && state.metadata.conflictRefresh;
-  if (!refresh || refresh.stage !== 'review') { return { ok: false, reason: 'Chưa mở xem xung đột nào trên Sidebar.' }; }
-  refresh.openedHash = 'fbm-doi-giua-chung';
-  FbmSync.stateWrite(state);
-  return { ok: true, id: refresh.id };
+/** Dò ca "ShinCRM đổi trong lúc đang xem xung đột": đổi Website của ALT00010 trên Sheet, giữ nguyên trạng thái đồng bộ, nên bước Lưu kế tiếp của màn xung đột phải hỏi bằng popup xung đột của form. Không chạm FBM. */
+function fbmDevEditAltWebsite() {
+  var source = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === 'ALT00010' && String(record.recordStatus || 'active') !== 'deleted'; })[0];
+  if (!source) { return { ok: false, reason: 'Chưa có khách ALT00010 trên Sheet DEV.' }; }
+  var website = 'Website ShinCRM sửa giữa chừng ' + Utilities.formatDate(new Date(), 'Asia/Ho_Chi_Minh', 'HH:mm');
+  fbmFixtureSave('customer', [{ id: source.id, website: website }], 'pull');
+  return { ok: true, id: source.id, before: source.website, website: website, syncStatus: source.syncStatus };
 }
 /** Dò đẩy Activity (G10.4): sửa nội dung Activity đang có của ALT00010 và nhân bản nó thành một Activity mới chưa có ID FBM, nên lượt đẩy kế tiếp có một lệnh sửa và một lệnh tạo. */
 function fbmSeedActivityPush() {
@@ -178,7 +178,8 @@ function fbmProbeStuckState() {
 
 /** Dò hash chờ xác nhận và khóa ghi (không chứa cookie hay mật khẩu) để điều tra lệch dữ liệu sau lệnh ghi FBM. */
 function fbmProbePendingPushes() {
-  return { pending: FbmSync.pendingPushesRead(), cursor: FbmSync.stateRead().cursor, conflictRefresh: FbmSync.stateRead().metadata.conflictRefresh };
+  var state = FbmSync.stateRead();
+  return { pending: FbmSync.pendingPushesRead(), cursor: state.cursor, conflictRefresh: state.metadata.conflictRefresh };
 }
 
 /** Tạm thu phạm vi live (đọc và đẩy) về khách CUS-020061 đã tạo thật, để lượt hai chiều đọc được Activity của khách này (G12.5). Trả về ALT00010 bằng `fbmScopeDefaultCustomer`. */

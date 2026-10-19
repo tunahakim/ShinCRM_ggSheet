@@ -20,6 +20,9 @@ FbmSync.recordChange = function (decide) {
     return plan;
   } });
   if (result.ok) { return result; }
+  // Ghi theo ảnh chụp người dùng đã xem mà Sheet vừa đổi: không phải lỗi, người điều phối trả `conflicts` để người dùng quyết như form.
+  var last = result.saves[result.saves.length - 1];
+  if (last && Array.isArray(last.conflicts) && last.conflicts.length) { return result; }
   var item = (plan.save || [])[result.saves.length - 1] || {};
   throw FbmSync.sheetWriteError(item.entity, item.records, item.source, result.saves[result.saves.length - 1]);
 };
