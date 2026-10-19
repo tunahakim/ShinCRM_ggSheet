@@ -70,7 +70,7 @@ function gon(rows, hiddenRows, hiddenCols) {
 }
 
 const CUSTOMER = [['@CUS_MA_KH', '@CUS_TEN_CT'], ['KH000006', 'Công ty 6'], ['', 'Công ty trống'], ['KH000008', 'Công ty 8']];
-const VIEW = [['@CUS_MA_KH'], ['KH999999'], ['KH999998'], ['KH999997'], ['KH999996'], ['KH999995']];
+const VIEW = [['@CUS_MA_KH', '@CUS_TEN_CT'], ['KH999999', ''], ['KH999998', ''], ['KH999997', ''], ['KH999996', ''], ['KH999995', '']];
 
 /** Sheet đang mở nằm ở một ô cố định; sheet khác (View, dài hơn, cũng có cột mã) nằm trong danh sách. */
 function trang(copyRows) {
