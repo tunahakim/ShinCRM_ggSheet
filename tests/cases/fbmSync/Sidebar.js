@@ -540,6 +540,8 @@ async function chay(so) {
   check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
     [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
     [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
+  check(so, 'Dòng mã FBM mang cảnh báo độ dài hiện thêm độ dài đã cài sau câu mã chưa có trên Sheet',
+    /ALT0010: mã FBM chưa có trên Sheet.*\(8 ký tự\)/.test(hop.fbmSyncSettingsScopeLinesText([{ code: 'ALT0010', kind: 'fbm', status: 'fbm_new', lengthExpected: 8 }])), true);
   check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';

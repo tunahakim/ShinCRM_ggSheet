@@ -235,8 +235,16 @@ FbmSync.customerNext = function (state, page, total) {
 /** Đếm khách đã nhận trong lượt quét; tổng lấy ở trang đầu vì FBM chỉ đếm `TotalRowCount` ở trang đầu, trang sau trả 0 (Nghiên cứu FBM ch03 mục 3.3). */
 FbmSync.customerScanRecord = function (state, grid, firstPage) {
   state.metadata = state.metadata || {};
+  var scope = firstPage && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
   var scan = firstPage ? { total: Number(grid && grid.total || 0), seen: 0 } : (state.metadata.customerScan || { total: 0, seen: 0 });
+  if (scope && (scope.fbmNew || []).length) { scan.scopeUnseen = scope.fbmNew.slice(); }
   scan.seen = Number(scan.seen || 0) + (grid && grid.rows ? grid.rows.length : 0);
+  // Mã chỉ định chưa có trên Sheet: FBM lọc `ma_kh in (...)` nên mã gõ sai trả về không dòng nào mà không báo lỗi; gạch dần các mã FBM có trả để cuối danh sách biết mã nào không có.
+  if ((scan.scopeUnseen || []).length && grid && grid.rows) {
+    var returned = {};
+    grid.rows.forEach(function (row) { returned[String(row.ma_kh || '').trim().toUpperCase()] = true; });
+    scan.scopeUnseen = scan.scopeUnseen.filter(function (code) { return !returned[String(code).trim().toUpperCase()]; });
+  }
   state.metadata.customerScan = scan;
   // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử.
   if (firstPage) { state.progress = { done: 0, total: scan.total }; }
@@ -273,8 +281,17 @@ FbmSync.customerScanEnd = function (state) {
   }
   // Số khách mốc của bước đếm chỉ ghi ở đây: lượt đã đọc đủ danh sách toàn bộ khách.
   FbmSync.customerBaselineWrite(total);
+  FbmSync.scopeUnseenNote(state, scan.scopeUnseen);
   FbmSync.customerAbsentMark(state);
   return FbmSync.activityStagesContinue(state, {});
+};
+
+/** Mã khách chỉ định mà danh sách khách FBM không trả về: cảnh báo ở kết quả phiên và ghi Log, phiên vẫn chạy cho các khách còn lại. */
+FbmSync.scopeUnseenNote = function (state, codes) {
+  if (!(codes || []).length) { return; }
+  var message = 'FBM không trả về khách nào có mã: ' + codes.join(', ') + '. Kiểm tra lại mã trong danh sách khách chỉ định (đủ ký tự, đúng tiền tố) hoặc quyền xem của tài khoản FBM.';
+  state.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat([{ code: 'FBM_SCOPE_CODE_NOT_ON_FBM', severity: 'warn', scope: 'fbm_sync', message: message, blocking: false }]);
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scope_code_not_on_fbm', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: message, detail: { codes: codes.slice() } }); }
 };
 
 /** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */

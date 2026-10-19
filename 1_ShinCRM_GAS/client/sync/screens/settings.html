@@ -126,7 +126,7 @@ function fbmSyncSettingsScopeLinesText(lines) {
   var schema = FBM_SYNC_SETTINGS_SCHEMA.module.scopeLine;
   return (lines || []).map(function (line) {
     if (line.status === 'matched') { return line.code + schema.matched + (line.kind === 'shin' ? (line.fbmCode || line.customerId) : line.customerId); }
-    return line.code + (line.status === 'fbm_new' ? schema.fbmNew : schema.notFound);
+    return line.code + (line.status === 'fbm_new' ? schema.fbmNew + (line.lengthExpected ? schema.lengthWarning.replace('{length}', line.lengthExpected) : '') : schema.notFound);
   }).join('\n');
 }
 function fbmSyncRenderSettings(panel, status) {

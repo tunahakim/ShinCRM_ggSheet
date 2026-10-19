@@ -1250,7 +1250,7 @@ function fbmSyncSaveSyncSettings(button) {
     FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload);
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); }
     var scopeText = fbmSyncSettingsScopeLinesText(result.scopeLines);
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'success', 'Đã lưu cài đặt chung.' + (scopeText ? '\n' + scopeText : '')); }
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', (result.scopeLines || []).some(function (line) { return line.lengthExpected; }) ? 'warning' : 'success', 'Đã lưu cài đặt chung.' + (scopeText ? '\n' + scopeText : '')); }
     return fbmSyncStatusOnce();
   }).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }

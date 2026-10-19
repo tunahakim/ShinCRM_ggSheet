@@ -25,8 +25,28 @@ function sheetGridEnsureRoom(sheet, endRow, slack) {
   if (endRow <= maxRows) { return 0; }
 
   var them = endRow - maxRows + (slack === undefined ? SHEET_GRID_SLACK : slack);
+  sheetPolicyAssertWritable(sheet);
   sheet.insertRowsAfter(maxRows, them);
   return them;
+}
+
+/** Bảo đảm lưới rộng tới cột `endColumn`, nới thêm cột ở cuối nếu chưa. Cột nới thêm nằm sau mọi cột đã có nên không cột nào dịch chỗ và tờ nháp không phải quên. Trả về số cột đã nới. */
+function sheetGridEnsureColumns(sheet, endColumn) {
+  var maxColumns = sheet.getMaxColumns();
+  if (endColumn <= maxColumns) { return 0; }
+  sheetPolicyAssertWritable(sheet);
+  sheet.insertColumnsAfter(maxColumns, endColumn - maxColumns);
+  return endColumn - maxColumns;
+}
+
+/** Kích thước lưới (cả hàng, cột trống), thứ quyết định trần ô của tệp và vùng đặt khuôn cả cột. Google trả gần 0 ms nên không nhớ. */
+function sheetGridSize(sheet) {
+  return { rows: sheet.getMaxRows(), columns: sheet.getMaxColumns() };
+}
+
+/** Tọa độ một vùng có sẵn (vùng trigger báo vừa sửa, vùng đang chọn): đọc từ chính đối tượng vùng, không tốn lệnh Sheet. */
+function sheetRangeBounds(range) {
+  return { row: range.getRow(), column: range.getColumn(), lastRow: range.getLastRow(), lastColumn: range.getLastColumn() };
 }
 
 /**

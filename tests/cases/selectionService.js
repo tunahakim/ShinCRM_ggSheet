@@ -110,7 +110,7 @@ function chay(so) {
 
   check(so, 'một luật cho mọi hàng: GAS đọc ô mã ở cả hàng tiêu đề, chỗ không có cột mã trả rỗng, chỉ không đọc khi không có vị trí',
     [firstProbe.selection.customerCell,
-      hop.selectionCustomerCell({ sheet: { getLastColumn: () => 1, getRange: (r) => ({ getValues: () => [['@CUS_MA_KH']], getValue: () => (r === 1 ? '@CUS_MA_KH' : '') }) } }, { sheetName: 'Customer', row: 1 }),
+      hop.selectionCustomerCell({ sheet: { getName: () => 'Customer', getLastColumn: () => 1, getMaxRows: () => 10, getMaxColumns: () => 1, getRange: (r) => ({ getValues: () => [['@CUS_MA_KH']], getValue: () => (r === 1 ? '@CUS_MA_KH' : '') }) } }, { sheetName: 'Customer', row: 1 }),
       hop.selectionCustomerCell({ sheet: { getLastColumn: () => 0 } }, { sheetName: 'Category', row: 5 }),
       hop.selectionCustomerCell({ sheet: {} }, { sheetName: '', row: 0 })],
     ['value', { read: true, value: '@CUS_MA_KH' }, { read: true, value: '' }, { read: false, value: '' }]);

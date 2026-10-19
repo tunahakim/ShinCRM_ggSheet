@@ -40,21 +40,21 @@ function viewTabColorSync(sheets, options) {
     list.forEach(function (sheet) {
       var name = sheet.getName();
       var id = String(sheet.getSheetId());
-      var current = sheet.getTabColor();
+      var current = sheetTabColorRead(sheet);
       var orange = viewTabTintIsStaleColor(current);
       if (viewIsStale(name)) {
         if (orange) { return; }
         if (viewing === null) { viewing = options && options.fromSidebar ? viewTabTintViewingSheet(shinOpenBook()) : ''; }
         if (name === viewing) { return; }
         original[id] = current || '';
-        sheet.setTabColor(SETTINGS.VIEW_STALE_TAB_COLOR);
+        sheetTabColorWrite(sheet, SETTINGS.VIEW_STALE_TAB_COLOR);
         changed += 1;
         dirty = true;
         return;
       }
       var had = Object.prototype.hasOwnProperty.call(original, id);
       if (orange) {
-        sheet.setTabColor(had ? original[id] || null : null);
+        sheetTabColorWrite(sheet, had ? original[id] || null : null);
         changed += 1;
       }
       if (had) { delete original[id]; dirty = true; }

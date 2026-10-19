@@ -10,11 +10,10 @@
  * Trả về `{ appended, renamed, extra }` để bên gọi báo cho người dùng. Mã trùng trên sheet thì ném lỗi trước khi ghi gì, cùng luật với `readColumnMap`.
  */
 function sheetEnsureHeader(sheet, columns, headerRows) {
-  var width = sheet.getLastColumn();
+  var header = sheetReadHeader(sheet);
+  var width = header.length;
   var labelRows = Math.min(headerRows, 2);
-  var current = width ? sheet.getRange(1, 1, labelRows, width).getValues().map(function (row) {
-    return row.map(function (cell) { return cell === null || cell === undefined ? '' : String(cell).trim(); });
-  }) : [];
+  var current = !width ? [] : labelRows < 2 ? [header] : [header, sheetReadRows(sheet, [2])[0].map(sheetReadCellText)];
   while (current.length < labelRows) { current.push([]); }
 
   var at = {};
@@ -55,15 +54,14 @@ function sheetEnsureHeader(sheet, columns, headerRows) {
   });
 
   var total = width + appended.length;
-  if (sheet.getMaxColumns() < total) { sheet.insertColumnsAfter(sheet.getMaxColumns(), total - sheet.getMaxColumns()); }
+  sheetGridEnsureColumns(sheet, total);
   var rows = current.map(function (row) {
     var full = [];
     for (var i = 0; i < total; i += 1) { full.push(row[i] === undefined ? '' : row[i]); }
     return full;
   });
   // Một lệnh ghi cho cả khối tiêu đề, theo luật gộp lệnh ghi của tài liệu 06. Ô của cột lạ được ghi lại đúng giá trị vừa đọc.
-  sheet.getRange(1, 1, labelRows, total).setValues(rows);
-  sheetReadCopyDrop(sheet.getName());
+  sheetCellsWrite(sheet, 1, 1, rows);
 
   return {
     appended: appended,

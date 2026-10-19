@@ -13,7 +13,11 @@ function sheetPolicy(sheetName) {
 
 /** Chặn trước mọi lệnh ghi của tầng 1: sheet tự do không được ghi; sheet kho và sheet quản trị chỉ ghi khi đang cầm khóa tài liệu, nên quên cầm khóa không có đường ghi được. */
 function sheetPolicyAssertWritable(sheet) {
-  var name = sheet.getName();
+  sheetPolicyAssertNameWritable(sheet.getName());
+}
+
+/** Như `sheetPolicyAssertWritable` nhưng theo tên, cho lệnh tạo sheet chưa có. */
+function sheetPolicyAssertNameWritable(name) {
   var policy = sheetPolicy(name);
   if (!policy.writable) { throw new Error('Sheet "' + name + '" là sheet tự do của người dùng, ShinCRM không ghi vào đó.'); }
   if (policy.needsLock && !(DOCUMENT_STORE.docLockDepth > 0)) {

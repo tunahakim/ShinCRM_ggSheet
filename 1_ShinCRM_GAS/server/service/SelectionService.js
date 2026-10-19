@@ -13,10 +13,11 @@ function selectionProbeContext() {
 function selectionSnapshotFromContext(context) {
   var sheet = context.sheet;
   var range = context.range;
-  var row = range ? range.getRow() : 0;
-  var col = range ? range.getColumn() : 0;
-  var rowEnd = range ? range.getLastRow() : 0;
-  var colEnd = range ? range.getLastColumn() : 0;
+  var bounds = range ? sheetRangeBounds(range) : null;
+  var row = bounds ? bounds.row : 0;
+  var col = bounds ? bounds.column : 0;
+  var rowEnd = bounds ? bounds.lastRow : 0;
+  var colEnd = bounds ? bounds.lastColumn : 0;
 
   return {
     spreadsheetId: context.book.getId(),
@@ -158,11 +159,7 @@ function selectionIsFreeSheet(sheetName) {
 
 /** Cột mã khách của sheet xem tự do, từ đúng một lần đọc hàng 1: `@CUS_MA_KH` trước, thiếu thì `@ACT_MA_KH`. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán. Chỉ dùng khi không có Extension đọc. */
 function selectionFreeSheetColumn(sheet) {
-  var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) { return 0; }
-  var header = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (value) {
-    return String(value === null || value === undefined ? '' : value).trim();
-  });
+  var header = sheetReadHeader(sheet);
   var codes = [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code];
   for (var i = 0; i < codes.length; i++) {
     var first = header.indexOf(codes[i]);
@@ -298,8 +295,8 @@ function selectionCustomerCell(context, snapshot) {
     column = selectionFreeSheetColumn(context.sheet);
   }
   if (!column) { return { read: true, value: '' }; }
-  var value = context.sheet.getRange(snapshot.row, column).getValue();
-  return { read: true, value: String(value === null || value === undefined ? '' : value).trim() };
+  var cell = sheetGridReadBlock(context.sheet, snapshot.row, 1, 1, column);
+  return { read: true, value: cell.length ? sheetReadCellText(cell[0][0]) : '' };
 }
 
 /** Nghiệm thu trên Google: chọn hàng dữ liệu và hàng tiêu đề để đối chiếu mã khách cùng thời gian thật. */

@@ -8,25 +8,30 @@
 
 /**
  * Dựng toàn bộ khung sheet. Chạy lại được nhiều lần: sheet đã có thì chỉ đối chiếu hàng tiêu đề theo mã (thêm mã thiếu vào cuối, không đổi chỗ cột nào), không đụng dữ liệu bên dưới.
+ * Cả lượt dựng chạy trong một lần cầm khóa tài liệu: nó ghi sheet kho, và tầng 1 từ chối ghi sheet kho ngoài khóa.
  */
 function setupSheets() {
+  return documentLockRun(setupSheetsLocked);
+}
+
+function setupSheetsLocked() {
   var file = shinOpenBook();
   var report = ['ShinCRM — dựng khung sheet', 'Tệp: ' + file.getName(), ''];
 
   Object.keys(SHEET_LAYOUT).filter(function (sheetName) { return sheetName !== 'Config'; }).forEach(function (sheetName) {
     var layout = SHEET_LAYOUT[sheetName];
     var columns = sheetCoreColumns(sheetName);
-    var sheet = file.getSheetByName(sheetName) || file.insertSheet(sheetName);
+    var sheet = file.getSheetByName(sheetName) || sheetBookCreate(sheetName);
     var headerRows = layout.headerRows;
 
     // Đối chiếu theo mã, không ghi lại theo vị trí: sheet đã có dữ liệu có thể xếp cột khác bảng khai (FBM-056).
     var header = sheetEnsureHeader(sheet, columns, headerRows);
 
-    sheet.getRange(1, 1, 1, header.width).setFontWeight('bold').setBackground(layout.headerColor);
+    sheetCellsStyle(sheet, 1, 1, 1, header.width, { bold: true, background: layout.headerColor });
     if (headerRows >= 2) {
-      sheet.getRange(2, 1, 1, header.width).setFontWeight('bold');
+      sheetCellsStyle(sheet, 2, 1, 1, header.width, { bold: true });
     }
-    sheet.setFrozenRows(headerRows);
+    sheetFrozenRowsSet(sheet, headerRows);
 
     if (header.renamed.length) { report.push('🔁 ' + sheetName + ': đổi mã cột, giữ dữ liệu: ' + header.renamed.join(', ')); }
     if (header.appended.length) { report.push('➕ ' + sheetName + ': thêm cột còn thiếu vào cuối: ' + header.appended.join(', ')); }
@@ -46,11 +51,11 @@ function setupSheets() {
 
   // Sheet trắng của Google tên "Trang tính1" hoặc "Sheet1"; xóa nếu nó còn trống, vì để lại thì nó lọt vào danh sách sheet cần nạp.
   var leftovers = file.getSheets().filter(function (sheet) {
-    return !SHEET_LAYOUT.hasOwnProperty(sheet.getName()) && sheet.getLastRow() === 0;
+    return !SHEET_LAYOUT.hasOwnProperty(sheet.getName()) && sheetReadLastRow(sheet) === 0;
   });
   leftovers.forEach(function (sheet) {
     report.push('🗑 Đã xóa sheet trống thừa: ' + sheet.getName());
-    file.deleteSheet(sheet);
+    sheetBookDeleteBlank(sheet);
   });
 
   report.push('');
@@ -76,7 +81,7 @@ function setupColumnFormats() {
   columnFormatSheets().forEach(function (sheetName) {
     var sheet = shinOpenSheet(sheetName);
     var firstDataRow = SHEET_LAYOUT[sheetName].firstDataRow;
-    var maxRows = sheet.getMaxRows();
+    var maxRows = sheetGridSize(sheet).rows;
 
     if (maxRows < firstDataRow) {
       lines.push('⚠️ ' + sheetName + ': lưới chưa có hàng dữ liệu nào, chưa đặt khuôn hiển thị');
@@ -100,7 +105,7 @@ function setupColumnFormats() {
     });
 
     groups.forEach(function (group) {
-      sheet.getRange(firstDataRow, group.at, maxRows - firstDataRow + 1, group.count).setNumberFormat(group.format);
+      sheetCellsFormat(sheet, firstDataRow, group.at, maxRows - firstDataRow + 1, group.count, group.format);
     });
 
     lines.push('✅ ' + sheetName + ': đặt khuôn hiển thị cho ' + cols.length + ' cột lõi bằng ' + groups.length + ' lệnh, hàng ' + firstDataRow + '–' + maxRows);
@@ -137,8 +142,9 @@ function verifySheets() {
     var failed = false;
     var sheet = shinOpenSheet(sheetName);
 
-    if (sheet.getFrozenRows() !== layout.headerRows) {
-      var frozenNote = 'đóng băng ' + sheet.getFrozenRows() + ' hàng, phải là ' + layout.headerRows;
+    var frozen = sheetFrozenRowsRead(sheet);
+    if (frozen !== layout.headerRows) {
+      var frozenNote = 'đóng băng ' + frozen + ' hàng, phải là ' + layout.headerRows;
       problems.push(sheetName + ': ' + frozenNote);
       notes.push(frozenNote);
       failed = true;
@@ -188,13 +194,13 @@ function verifySheets() {
       var sheet = shinOpenSheet(sheetName);
       var firstDataRow = SHEET_LAYOUT[sheetName].firstDataRow;
 
-      if (sheet.getMaxRows() < firstDataRow) {
+      if (sheetGridSize(sheet).rows < firstDataRow) {
         lines.push('⚠️ ' + sheetName + ', khuôn hiển thị — lưới chưa có hàng dữ liệu nào để đọc khuôn');
         return;
       }
 
       var columnMap = readColumnMap(sheetName);
-      var formats = sheet.getRange(firstDataRow, 1, 1, columnMap.lastColumn).getNumberFormats()[0];
+      var formats = sheetReadNumberFormats(sheet, firstDataRow, 1, 1, columnMap.lastColumn)[0];
       var wrong = Object.keys(formatByCode).filter(function (code) {
         return formats[columnIndex(columnMap, code) - 1] !== formatByCode[code];
       });

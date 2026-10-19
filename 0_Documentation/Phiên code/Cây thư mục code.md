@@ -59,11 +59,12 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SheetHeader.js        Cửa duy nhất đặt hàng tiêu đề: đối chiếu theo mã, mã thiếu nối vào cuối, không đổi chỗ cột đã có (FBM-056).
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
 │   │   ├── SheetReadCopy.js      Tầng 1 đọc ô thô và tờ nháp của một lần gọi GAS (hàng mã, số dòng, đối tượng sheet, múi giờ, dòng đã đọc); bỏ khi vừa cầm khóa, tự `flush` trước lần đọc kế khi còn lệnh ghi chờ.
-│   │   ├── SheetCellWrite.js     Tầng 1 ghi ô thô: ghi giá trị, đặt khuôn, xóa nội dung, xóa dòng; chặn ghi theo chính sách loại sheet và tự quên vùng vừa ghi trong tờ nháp.
+│   │   ├── SheetCellWrite.js     Tầng 1 ghi ô thô: ghi giá trị, đặt khuôn, chữ đậm và màu nền, danh sách chọn, xóa nội dung, xóa dòng; chặn ghi theo chính sách loại sheet và tự quên vùng vừa ghi trong tờ nháp.
+│   │   ├── SheetStructure.js     Tầng 1 cấu trúc: tạo sheet, xóa sheet trắng, chuyển tới sheet, cố định hàng, màu tab; áp chính sách loại sheet như công cụ ghi ô.
 │   │   ├── SheetPolicy.js        Chính sách loại sheet (kho, `!`, Log, tự do): có được nhớ, được ghi, ghi có cần khóa tài liệu.
 │   │   ├── SheetRegions.js       Tầng 2 lập kế hoạch vùng: gom số hàng/cột thành dải liền nhau, gom dòng đọc theo ngưỡng cách dòng.
 │   │   ├── SheetLocate.js        Tầng 2 định vị: đổi cột mã đã đọc ra bảng mã → số dòng, ném lỗi khi trùng mã.
-│   │   ├── SheetGrid.js          Sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới lưới trước khi ghi. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
+│   │   ├── SheetGrid.js          Tầng 1 sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới hàng và cột, kích thước lưới, tọa độ vùng có sẵn. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
 │   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Tầng 3 đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client; định vị bản ghi theo mã (`placement`) và đọc lại theo vị trí. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── EntityWrite.js        Tầng 3 ghi bản ghi theo tên trường: định vị cột, dấu nháy và khuôn chữ cho cột chữ, gom vùng, gọi công cụ ghi ô. Không kiểm, không cầm khóa.
