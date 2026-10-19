@@ -77,15 +77,15 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
     | Mã `SYNC_BACKGROUND_RUNNING` kèm `status` | `startRun` và `openConflict` khi lượt nền đang chạy | Không ai | Cho Sidebar biết phải hỏi; `status` cấp bước và giờ bắt đầu cho tóm tắt popup |
     | Lựa chọn popup `stop` / `wait` / `cancel` | Người dùng | Không ai | `stop` gọi lệnh dừng rồi chờ; `wait` chỉ chờ; `cancel` (nút X, Esc, nền) không làm gì |
 
-  - [ ] B7.1. GAS: lệnh `stop_background` (`ControlPort`, nhóm lệnh giữ khóa, `FbmSyncService.fbmStopBackground`) gọi một hàm duy nhất đặt cờ dừng nền khi lượt đang chạy là lượt nền; lượt tay hoặc không có lượt thì không đặt gì. `startRun` gặp lượt nền thì trả `SYNC_BACKGROUND_RUNNING`, không đặt cờ.
-  - [ ] B7.2. GAS: `openConflict` gặp lượt nền đang chạy trả `SYNC_BACKGROUND_RUNNING`; lượt tay đang chạy giữ `SYNC_RUNNING`.
-  - [ ] B7.3. Popup chung `uiDecisionChoose`: thêm nút X ở tiêu đề (ra `cancel`), vùng `detail` gập lại sau nút hành động với nút "Xem chi tiết"; bỏ luật bắt buộc có lựa chọn `cancel` vì X luôn có. Popup cũ giữ nút quay lại của mình.
-  - [ ] B7.4. Sidebar: một hàm hỏi `fbmSyncAskBackgroundRunning(status, việc)` trên `uiDecisionChoose`: tiêu đề "Đồng bộ nền đang chạy", tóm tắt nêu bước và giờ bắt đầu từ `status`, hai nút "Dừng đồng bộ nền và … ngay" / "Tự … khi đồng bộ nền xong". Hàm chờ dùng chung (đổi tên `fbmSyncWaitForIdentityBackground` thành `fbmSyncWaitForBackgroundIdle`, nhịp hỏi và hạn chờ đặt trong hằng số cấu hình đầu tệp) rồi gọi lại đúng lệnh gốc. Bỏ `backgroundStopping` tự bật khi bấm chạy; chỉ bật khi người dùng chọn dừng.
-  - [ ] B7.5. Ba nơi gọi: chạy tay (`fbmSyncRunStart`), kiểm liên kết (hai chỗ `fbmStartIdentityCheck`/`fbmStartIdentityProbe`), mở xung đột (`fbmSyncOpenConflict`).
-  - [ ] B7.6. Thẻ xung đột: còn xung đột mà chưa có bản ghi trong RAM thì hiện lý do (đang chờ đồng bộ nền, lỗi mở), không hiện "Không có xung đột cần xử lý".
-  - [ ] B7.7. Test GAS (Orchestration, BackgroundChain, Conflict): bấm chạy tay giữa lượt nền không đặt cờ; `stop_background` đặt cờ và lượt nền dừng; mở xung đột giữa lượt nền trả mã mới, không phát request. Test Sidebar: popup ba lựa chọn, X không gọi GAS, `stop` gọi dừng rồi chạy lệnh gốc, `wait` không gọi dừng; popup chung có nút X và chi tiết gập.
-  - [ ] B7.8. `node tests/run.js` đạt hết.
-  - [ ] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
+  - [x] B7.1. GAS: lệnh `stop_background` (`ControlPort`, nhóm lệnh giữ khóa, `FbmSyncService.fbmStopBackground`) gọi một hàm duy nhất đặt cờ dừng nền khi lượt đang chạy là lượt nền; lượt tay hoặc không có lượt thì không đặt gì. `startRun` gặp lượt nền thì trả `SYNC_BACKGROUND_RUNNING`, không đặt cờ.
+  - [x] B7.2. GAS: `openConflict` gặp lượt nền đang chạy trả `SYNC_BACKGROUND_RUNNING`; lượt tay đang chạy giữ `SYNC_RUNNING`.
+  - [x] B7.3. Popup chung `uiDecisionChoose`: thêm nút X ở tiêu đề (ra `cancel`), vùng `detail` gập lại sau nút hành động với nút "Xem chi tiết"; bỏ luật bắt buộc có lựa chọn `cancel` vì X luôn có. Popup cũ giữ nút quay lại của mình.
+  - [x] B7.4. Sidebar: một hàm hỏi `fbmSyncAskBackgroundRunning(status, việc)` trên `uiDecisionChoose`: tiêu đề "Đồng bộ nền đang chạy", tóm tắt nêu bước và giờ bắt đầu từ `status`, hai nút "Dừng đồng bộ nền và … ngay" / "Tự … khi đồng bộ nền xong". Hàm chờ dùng chung (đổi tên `fbmSyncWaitForIdentityBackground` thành `fbmSyncWaitForBackgroundIdle`, nhịp hỏi và hạn chờ đặt trong hằng số cấu hình đầu tệp) rồi gọi lại đúng lệnh gốc. Bỏ `backgroundStopping` tự bật khi bấm chạy; chỉ bật khi người dùng chọn dừng.
+  - [x] B7.5. Ba nơi gọi: chạy tay (`fbmSyncRunStart`), kiểm liên kết (hai chỗ `fbmStartIdentityCheck`/`fbmStartIdentityProbe`), mở xung đột (`fbmSyncOpenConflict`).
+  - [x] B7.6. Thẻ xung đột: còn xung đột mà chưa có bản ghi trong RAM thì hiện lý do (đang chờ đồng bộ nền, lỗi mở), không hiện "Không có xung đột cần xử lý".
+  - [x] B7.7. Test GAS (Orchestration, BackgroundChain, Conflict): bấm chạy tay giữa lượt nền không đặt cờ; `stop_background` đặt cờ và lượt nền dừng; mở xung đột giữa lượt nền trả mã mới, không phát request. Test Sidebar: popup ba lựa chọn, X không gọi GAS, `stop` gọi dừng rồi chạy lệnh gốc, `wait` không gọi dừng; popup chung có nút X và chi tiết gập.
+  - [x] B7.8. `node tests/run.js` đạt hết.
+  - [x] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
   - [ ] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
