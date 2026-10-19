@@ -39,7 +39,7 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 - [x] B2. Test: giá trị gửi lại khác bản đã mở thì không ghi; ShinCRM đổi từ lúc mở thì trả màn xem lại; ba lựa chọn ghi đúng baseline.
 - [x] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
 - [x] B5. Màn xung đột dùng chung luật với form sửa (chủ dự án duyệt 2026-10-19): ảnh chụp lúc mở nằm ở Sidebar; cửa ghi so trường được quyết với giá trị lúc mở (`writeGateConflicts` nhận `old` của nguồn máy); popup xung đột và popup bận dùng chung `client/ui/recordDecision.html`; sửa 06 Phần 4, 09/04 bước 4, 09/08.
-- [ ] B6. Sửa lỗi B5: chọn "Lưu giá trị bạn đang chọn" sau khi Sheet đổi lại ghi giá trị Sheet (nghiệm thu ca 4, Website 14:05 thành 14:06). Gốc: `snapshot.old` mang hai vai, vừa là mốc so vừa là giá trị ghi khi chọn ShinCRM (`Conflict.js:184,185`). Chủ dự án duyệt 2026-10-19, kèm hai quyết định: mốc dời sang giá trị Sheet ngay lúc popup hiện và giữ nguyên dù người dùng chọn "Quay lại" (lần Lưu sau không hỏi lại thứ đã thấy, chỉ hỏi khi Sheet đổi thêm); ô xung đột được nhắc trên màn thay vì hỏi lại bằng popup.
+- [x] B6. Sửa lỗi B5: chọn "Lưu giá trị bạn đang chọn" sau khi Sheet đổi lại ghi giá trị Sheet (nghiệm thu ca 4, Website 14:05 thành 14:06). Gốc: `snapshot.old` mang hai vai, vừa là mốc so vừa là giá trị ghi khi chọn ShinCRM (`Conflict.js:184,185`). Chủ dự án duyệt 2026-10-19, kèm hai quyết định: mốc dời sang giá trị Sheet ngay lúc popup hiện và giữ nguyên dù người dùng chọn "Quay lại" (lần Lưu sau không hỏi lại thứ đã thấy, chỉ hỏi khi Sheet đổi thêm); ô xung đột được nhắc trên màn thay vì hỏi lại bằng popup.
   - Vai trò dữ liệu sau khi sửa (mỗi dữ liệu một vai):
 
     | Dữ liệu | Ai tạo | Ai được đổi | Vai duy nhất |
@@ -59,15 +59,16 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B6.7. Màn xung đột chọn "Quay lại": tô đỏ trường bị sửa trên Sheet như form (`saveFlowPaintInvalid`), giữ trong một bảng riêng của RAM, không lẫn với bảng "chưa chọn" (dòng đếm trường chưa chọn không được tính các trường này); chọn hoặc sửa trường đó thì hết đỏ.
   - [x] B6.8. `node tests/run.js` đạt hết.
   - [x] B6.9. Sửa 09/04 bước 4 và 06 Phần 4: lệnh chốt gửi giá trị hai phía đang hiện, ảnh chụp chỉ là mốc; mốc dời lúc popup hiện, giữ khi Quay lại.
-  - [ ] B6.10. Commit (lõi GAS, Sidebar, test, tài liệu), đẩy DEV, tải lại tab Sheet, làm lại ca 4 từ đầu.
+  - [x] B6.10. Commit (lõi GAS, Sidebar, test, tài liệu), đẩy DEV, tải lại tab Sheet, làm lại ca 4 từ đầu.
 - [ ] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
   - [x] Ca 1 Lấy FBM: CUS-020075 nhận Website FBM, về "đã đồng bộ", baseline mới.
   - [ ] Ca 2 Lấy ShinCRM (ACT-011377) rồi Chỉ đẩy: FBM nhận nội dung ShinCRM.
   - [ ] Ca 3 Tùy chỉnh (ACT-011402) rồi Chỉ đẩy: FBM nhận giá trị gõ tay.
-  - [ ] Ca 4 ShinCRM đổi lúc đang xem (`fbmDevEditAltWebsite`): Lưu hiện popup xung đột của form; chọn giá trị Sheet thì màn cập nhật phía ShinCRM, chọn giữ lựa chọn thì ghi.
+  - [x] Ca 4 ShinCRM đổi lúc đang xem (`fbmDevEditAltWebsite`): Lưu hiện popup xung đột của form; chọn giá trị Sheet thì màn cập nhật phía ShinCRM, chọn giữ lựa chọn thì ghi.
   - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
   - Ca 2 và ca 3 lúc 13:4x chạy trên code V33 (V33 đã đẩy đè DEV): FBM đã nhận đúng giá trị (ACT-011377 nội dung ShinCRM, ACT-011402 "Nội dung tùy chỉnh B4 ca 3", đã đồng bộ 13:56), nhưng chưa chứng minh code phiên này; làm lại hai ca sau B6. Từ 13:58 DEV là code phiên này (@942), phiên V33 tạm dừng tới khi gộp.
-  - Ca 4 trên code phiên này: popup chung hiện đúng, nhánh "Dùng giá trị trên Sheet" đúng, nhánh "Lưu giá trị bạn đang chọn" sai, thành mục B6.
+  - Ca 4 sau B6 (15:04): chọn ShinCRM "…14:54", Sheet đổi thành "…15:04", Lưu hiện popup ghi "lần trước bạn thấy: …14:54"; chọn Quay lại thì trường Website tô đỏ, ô giữ "…14:54", không tính là chưa chọn; Lưu lại không hỏi nữa, Sheet nhận "…14:54", chờ đối soát, hết hàng đợi. Nhánh "Lưu giá trị bạn đang chọn" gửi cùng `shinValues` nên chỉ kiểm bằng test Sidebar.
+- [ ] B7. Mở màn xung đột bị chặn cả khi lượt nền đang chạy (Log 15:03:20 `SYNC_RUNNING`), dù bản ghi không tham gia lượt đó; màn lại hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Gốc: bước mở dùng chung con trỏ và cơ chế request của phiên đồng bộ (`state.cursor = conflict_refresh`, `Conflict.js:51,64`). Chờ phương án đủ ba phần trình chủ dự án.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
