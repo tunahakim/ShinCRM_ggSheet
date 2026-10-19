@@ -93,6 +93,12 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B8.2. `fbmSyncRunActionBlock`: chỉ lượt tay đang chạy mới hiện "Dừng đồng bộ"; lượt nền đang chạy hiện "Bắt đầu đồng bộ" (bấm đi qua `fbmSyncRun` → popup B7); đang chờ lượt nền (`backgroundWait`) thì nút khóa với nhãn "Đang chờ đồng bộ nền xong...", nhãn đặt trong schema.
   - [x] B8.3. Test: nút với lượt nền, lượt tay, lúc đang chờ; `statusView` có `origin`.
   - [ ] B8.4. Sửa 09/08 đoạn "Thao tác gặp lượt nền"; `node tests/run.js`; commit, đẩy DEV, nghiệm thu: lượt nền chạy thì nút là "Bắt đầu đồng bộ", bấm hiện popup.
+- [ ] B9. Nút X của popup lượt nền đưa màn về như vừa mở, coi như chưa bấm nút gây ra popup (chủ dự án chốt 2026-10-19), áp chung cho mọi thao tác. Gốc: mỗi thao tác đổi màn trước khi gọi GAS (vẽ "Đang chuẩn bị...", dòng báo "Đang kiểm tra liên kết...", chuyển sang tab Xung đột), còn nhánh X lại tự viết thêm dòng báo riêng ở từng nơi và vẽ lại bằng status giả vừa vẽ.
+  Vai trò dữ liệu: `started.status` (GAS, trạng thái thật lúc trả `SYNC_BACKGROUND_RUNNING`; là thứ màn hiện nếu vừa mở, dùng để vẽ lại khi X); các giá trị lúc mở màn (`running=false`, `mode='read'`, `identityAction=''`, `identityLastAction=''`, `resultsTab='summary'`, `conflictNote=''`, dòng báo tài khoản rỗng) là đích của X.
+  - [x] B9.1. Một công cụ `fbmSyncScreenFresh(status)` đưa các giá trị hiển thị về lúc mở rồi vẽ bằng status thật; `fbmSyncAfterBackground` gọi nó khi X và trả `SYNC_BACKGROUND_SKIPPED`. Bỏ ba nhánh X tự viết dòng báo ở kiểm liên kết, tự điền và thẻ xung đột; nút mở xung đột mở lại khi X.
+  - [x] B9.2. Test: X ở kiểm liên kết, tự điền, tab Xung đột đều về đúng giá trị lúc mở, vẽ status thật, chỉ một lần gọi lệnh gốc.
+  - [x] B9.3. Sửa 09/08 câu nút X; `node tests/run.js` 2642 đạt.
+  - [ ] B9.4. Nghiệm thu trên Sheet DEV cùng B8.4.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
