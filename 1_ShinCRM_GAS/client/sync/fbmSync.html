@@ -787,6 +787,7 @@ function fbmSyncShowConflict(conflict) {
   FBM_SYNC_CLIENT.conflictChoices = {};
   FBM_SYNC_CLIENT.conflictDraft = {};
   FBM_SYNC_CLIENT.conflictInvalid = {};
+  FBM_SYNC_CLIENT.conflictSheetChanged = {};
   FBM_SYNC_CLIENT.subscreen = 'results'; FBM_SYNC_CLIENT.resultsTab = conflict ? 'conflict' : 'summary';
 }
 /** Một phía của một trường xung đột, tính từ DTO GAS cùng lựa chọn và bản sửa đang giữ trong RAM; màn vẽ và bước cập nhật DOM dùng chung. */
@@ -811,12 +812,16 @@ function fbmSyncConflictDecision(item) {
   var kindList = Object.keys(kinds), whole = kindList.length === 1 && kindList[0] !== 'manual' ? kindList[0] : '';
   return { missing: missing, choice: whole || 'manual', merged: whole ? null : merged, pushes: kindList.some(function (kind) { return kind !== 'fbm'; }) };
 }
+/** Trường bị tô đỏ: chưa chọn khi bấm Lưu (`conflictInvalid`, được đếm ở dòng nhắc) hoặc bị sửa trên Sheet mà người dùng chọn "Quay lại" ở popup (`conflictSheetChanged`, như ô đỏ của form). Màn vẽ và bước cập nhật DOM dùng chung. */
+function fbmSyncConflictMarked(field) {
+  return !!((FBM_SYNC_CLIENT.conflictInvalid || {})[field.field] || (FBM_SYNC_CLIENT.conflictSheetChanged || {})[field.field]);
+}
 /** Cập nhật trạng thái các ô sau mỗi thao tác mà không vẽ lại màn, để không mất con trỏ đang gõ. */
 function fbmSyncConflictRefresh() {
   var item = FBM_SYNC_CLIENT.conflict, schema = FBM_SYNC_CONFLICT_SCHEMA, classes = FBM_SYNC_CONFLICT_UI.classes, invalid = FBM_SYNC_CLIENT.conflictInvalid || {};
   if (!item) { return; }
   (item.fields || []).forEach(function (field, index) {
-    fbmSyncSetTargetState(schema.ids.fieldPrefix + index, invalid[field.field] ? { addClass: [classes.invalid] } : { removeClass: [classes.invalid] });
+    fbmSyncSetTargetState(schema.ids.fieldPrefix + index, fbmSyncConflictMarked(field) ? { addClass: [classes.invalid] } : { removeClass: [classes.invalid] });
     schema.sides.forEach(function (side) {
       var view = fbmSyncConflictSide(field, side), key = index + '-' + side;
       fbmSyncSetTargetState(schema.ids.radioPrefix + key, { checked: view.selected });
@@ -837,13 +842,13 @@ function fbmSyncConflictPick(target) {
     var bulk = fbmSyncControlValue(target.id), side = bulk === schema.bulk.fbm ? 'fbm' : bulk === schema.bulk.shin ? 'shin' : '';
     if (bulk === schema.bulk.none) { return; }
     (item.fields || []).forEach(function (field) {
-      if (side) { FBM_SYNC_CLIENT.conflictChoices[field.field] = side; delete FBM_SYNC_CLIENT.conflictInvalid[field.field]; } else { delete FBM_SYNC_CLIENT.conflictChoices[field.field]; }
+      if (side) { FBM_SYNC_CLIENT.conflictChoices[field.field] = side; fbmSyncConflictUnmark(field.field); } else { delete FBM_SYNC_CLIENT.conflictChoices[field.field]; }
     });
     // Menu là lệnh một lần, không phải trạng thái: trả về nhãn "Lựa chọn" để bấm lại cùng mục vẫn có tác dụng.
     fbmSyncSetTargetState(target.id, { value: schema.bulk.none });
   } else {
     FBM_SYNC_CLIENT.conflictChoices[target.getAttribute('data-fbm-conflict-pick')] = target.getAttribute('data-fbm-conflict-side');
-    delete FBM_SYNC_CLIENT.conflictInvalid[target.getAttribute('data-fbm-conflict-pick')];
+    fbmSyncConflictUnmark(target.getAttribute('data-fbm-conflict-pick'));
   }
   fbmSyncConflictRefresh();
 }
@@ -853,7 +858,13 @@ function fbmSyncConflictEdit(target) {
   FBM_SYNC_CLIENT.conflictDraft = FBM_SYNC_CLIENT.conflictDraft || {};
   FBM_SYNC_CLIENT.conflictDraft[field] = FBM_SYNC_CLIENT.conflictDraft[field] || {};
   FBM_SYNC_CLIENT.conflictDraft[field][side] = String(target.value || '');
+  fbmSyncConflictUnmark(field);
   fbmSyncConflictRefresh();
+}
+/** Người dùng chọn hoặc sửa một trường thì trường đó hết đỏ, dù đỏ vì chưa chọn hay vì Sheet đổi. */
+function fbmSyncConflictUnmark(field) {
+  delete (FBM_SYNC_CLIENT.conflictInvalid || {})[field];
+  delete (FBM_SYNC_CLIENT.conflictSheetChanged || {})[field];
 }
 /** Lưu một bản ghi xung đột: còn trường chưa chọn thì tô đỏ các trường đó như thiếu trường bắt buộc, không gọi GAS. */
 function fbmSyncSaveConflict(button) {
@@ -861,6 +872,7 @@ function fbmSyncSaveConflict(button) {
   if (!item) { return; }
   var decision = fbmSyncConflictDecision(item);
   FBM_SYNC_CLIENT.conflictInvalid = {};
+  FBM_SYNC_CLIENT.conflictSheetChanged = {};
   decision.missing.forEach(function (field) { FBM_SYNC_CLIENT.conflictInvalid[field] = true; });
   fbmSyncConflictRefresh();
   if (decision.missing.length) { return; }
@@ -871,16 +883,16 @@ function fbmSyncSaveConflict(button) {
   });
 }
 /** Chữ của popup dùng chung (`recordDecision`) khi đứng ở màn xung đột. */
-var FBM_SYNC_CONFLICT_WORDS = { doing: 'xử lý xung đột', value: 'chọn', opened: 'lúc mở', back: 'Quay lại màn xung đột, chưa lưu gì', kept: 'Lựa chọn của bạn vẫn còn trên màn xung đột.' };
+var FBM_SYNC_CONFLICT_WORDS = { doing: 'xử lý xung đột', value: 'chọn', back: 'Quay lại màn xung đột, chưa lưu gì', kept: 'Lựa chọn của bạn vẫn còn trên màn xung đột.' };
 /**
- * Chốt xung đột đang mở bằng một lần gọi GAS, không đọc lại FBM: gửi kèm giá trị FBM của các trường lệch và ảnh chụp lúc mở (`snapshot`) đúng như màn đã hiện.
+ * Chốt xung đột đang mở bằng một lần gọi GAS, không đọc lại FBM: gửi kèm giá trị FBM và giá trị ShinCRM của các trường lệch đúng như màn đang hiện, cùng ảnh chụp (`snapshot`) chỉ làm mốc so.
  * Kết quả xử lý như lưu form: ShinCRM đổi giữa chừng thì hỏi bằng popup xung đột chung, bận thì popup bận chung, lựa chọn trên màn còn nguyên. `CONFLICT_REOPEN` (giá trị FBM gửi lại lệch bản lúc mở) thì mở lại xung đột, lúc đó FBM được đọc mới.
  */
 function fbmSyncResolveConflict(entity, id, choice, merged) {
-  var item = FBM_SYNC_CLIENT.conflict, fbmValues = {};
+  var item = FBM_SYNC_CLIENT.conflict, fbmValues = {}, shinValues = {};
   if (!item || item.id !== id) { return Promise.reject(new Error('Màn xung đột không còn hiện bản ghi ' + id + '; mở lại chế độ xử lý xung đột.')); }
-  (item.fields || []).forEach(function (field) { fbmValues[field.field] = field.right; });
-  return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues, item.snapshot]).then(function (result) {
+  (item.fields || []).forEach(function (field) { fbmValues[field.field] = field.right; shinValues[field.field] = field.left; });
+  return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues, shinValues, item.snapshot]).then(function (result) {
     var code = result && result.code;
     if (code === 'CONFLICT_SHEET_CHANGED') { return fbmSyncConflictSheetChanged(item, result.conflicts, choice, merged); }
     if (code === 'CONFLICT_RECORD_BUSY') {
@@ -904,14 +916,19 @@ function fbmSyncResolveConflict(entity, id, choice, merged) {
   });
 }
 /**
- * ShinCRM đã đổi các ô người dùng đang quyết: nhận giá trị trên Sheet làm mốc mới như form (lưu lại sau đó là chủ ý ghi đè) rồi hỏi bằng popup chung.
- * `sheet` đưa giá trị trên Sheet vào phía ShinCRM của các ô đó và chọn nó, các ô khác giữ lựa chọn; màn vẫn mở để người dùng xem rồi bấm Lưu.
+ * ShinCRM đã đổi các ô người dùng đang quyết: nhận giá trị trên Sheet làm mốc mới như form (lưu lại sau đó là chủ ý ghi đè) rồi hỏi bằng popup chung. Mốc chỉ dời ở đây và giữ nguyên dù người dùng chọn gì; giá trị đang hiện (`field.left`) không đổi trừ khi chọn `sheet`.
+ * `sheet` đưa giá trị trên Sheet vào phía ShinCRM của các ô đó và chọn nó, các ô khác giữ lựa chọn; màn vẫn mở để người dùng xem rồi bấm Lưu. "Quay lại" tô đỏ các ô đó như form để người dùng thấy trường nào Sheet vừa đổi.
  */
 function fbmSyncConflictSheetChanged(item, conflicts, choice, merged) {
   conflicts.forEach(function (c) { item.snapshot.old[c.field] = c.current; });
   return recordConflictChoose(conflicts, FBM_SYNC_CONFLICT_WORDS).then(function (pick) {
     if (pick === 'mine') { return fbmSyncResolveConflict(item.entity, item.id, choice, merged); }
-    if (pick !== 'sheet') { return null; }
+    if (pick !== 'sheet') {
+      FBM_SYNC_CLIENT.conflictSheetChanged = FBM_SYNC_CLIENT.conflictSheetChanged || {};
+      (item.fields || []).forEach(function (field) { if (conflicts.some(function (c) { return c.field === field.localField; })) { FBM_SYNC_CLIENT.conflictSheetChanged[field.field] = true; } });
+      fbmSyncConflictRefresh();
+      return null;
+    }
     FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
     conflicts.forEach(function (c) {
       (item.fields || []).forEach(function (field) {

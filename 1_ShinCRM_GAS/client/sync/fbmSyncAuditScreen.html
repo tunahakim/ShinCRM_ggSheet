@@ -34,7 +34,7 @@ function fbmSyncConflictContentBlocks(status) {
         ] })
       ] });
     });
-    return RowGroup({ id: schema.ids.fieldPrefix + index, className: uiClassJoin(classes.field, invalid[field.field] ? classes.invalid : ''), elements: [Row({ className: classes.fieldHead, elements: [Text({ className: classes.fieldName, text: label }), Text({ className: classes.pickLabel, text: schema.labels.pick })] })].concat(sides) });
+    return RowGroup({ id: schema.ids.fieldPrefix + index, className: uiClassJoin(classes.field, fbmSyncConflictMarked(field) ? classes.invalid : ''), elements: [Row({ className: classes.fieldHead, elements: [Text({ className: classes.fieldName, text: label }), Text({ className: classes.pickLabel, text: schema.labels.pick })] })].concat(sides) });
   });
   var footer = [
     Text({ id: schema.ids.missing, className: classes.missing, text: schema.labels.missing.replace('{count}', missingCount), hidden: !missingCount }),
