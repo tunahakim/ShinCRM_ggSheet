@@ -37,7 +37,7 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 
 - [x] B1. Sidebar gửi kèm giá trị FBM các trường lệch khi chốt; GAS ghép vào dòng, so hash với hash lúc mở, rồi ghi qua `conflictSettle`; bỏ request đọc lại.
 - [x] B2. Test: giá trị gửi lại khác bản đã mở thì không ghi; ShinCRM đổi từ lúc mở thì trả màn xem lại; ba lựa chọn ghi đúng baseline.
-- [ ] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
+- [x] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
 - [ ] B4. Chủ dự án nghiệm thu trên Sheet DEV ba lựa chọn.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
