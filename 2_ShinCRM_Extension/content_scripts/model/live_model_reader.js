@@ -28,7 +28,10 @@
   var SEARCH_RETRY_MS = 30000;
   // Gid của sheet nằm ngay dưới object chứa bảng quy đổi (đo trên DEV: tầng 1); sâu hơn dễ gặp gid sheet khác.
   var AXIS_GID_DEPTH = 3;
-  var AXIS_GID_MAX_NODES = 5000;
+  // Trần số thuộc tính đọc khi tìm gid quanh một bảng; trang Google có rất nhiều object nhỏ mang mảng số, không có trần là đứng trang.
+  var AXIS_GID_MAX_READS = 2000;
+  // Object chứa bảng quy đổi chỉ có vài chục thuộc tính; object lớn hơn là bảng dữ liệu, không xét.
+  var AXIS_MAX_KEYS = 64;
   // Mảng dài hơn mức này là dữ liệu (bảng quy đổi, lưới), không chứa gid cần tìm.
   var AXIS_GID_MAX_LIST = 50;
 
@@ -120,8 +123,9 @@
     return '';
   }
 
+  // Bảng một phần tử (`[0]`) quá phổ biến trong trang để làm dấu nhận dạng; sheet có cột mã luôn có ít nhất hai hàng.
   function isAscendingIndex(list) {
-    if (!list.length) { return false; }
+    if (list.length < 2) { return false; }
     for (var i = 0; i < list.length; i++) {
       var value = list[i];
       if (typeof value !== 'number' || value < 0 || value !== Math.floor(value) || (i && value <= list[i - 1])) { return false; }
@@ -144,18 +148,19 @@
     return true;
   }
 
-  /** Bảng quy đổi vị trí đang hiện → vị trí thật của một chiều nằm trong `node`; null khi không có hoặc có hai bảng khác nội dung. */
+  /** Bảng quy đổi vị trí đang hiện → vị trí thật của một chiều nằm trong `node`; null khi không có hoặc có hai bảng. */
   function axisOf(node) {
     if (!isNode(node) || Array.isArray(node)) { return null; }
-    var lists = ownKeys(node).map(function (key) { return ownValue(node, key); }).filter(Array.isArray);
+    var keys = ownKeys(node);
+    if (keys.length > AXIS_MAX_KEYS) { return null; }
+    var lists = keys.map(function (key) { return ownValue(node, key); }).filter(Array.isArray);
     if (lists.length < 2) { return null; }
     var found = null;
     for (var i = 0; i < lists.length; i++) {
       if (!isAscendingIndex(lists[i])) { continue; }
       for (var j = 0; j < lists.length; j++) {
         if (!marksMatch(lists[i], lists[j])) { continue; }
-        // Sheet một cột không ẩn gì có bảng `[0]` và mảng đánh dấu `[0]` nhận nhau qua lại; cùng nội dung thì cùng phép quy đổi.
-        if (found && found.join(',') !== lists[i].join(',')) { return null; }
+        if (found && found !== lists[i]) { return null; }
         found = lists[i];
       }
     }
@@ -169,17 +174,18 @@
   function nearestGidIs(node, gid) {
     var seen = new WeakSet();
     var level = [node];
-    var visited = 0;
+    var reads = 0;
     for (var depth = 0; depth <= AXIS_GID_DEPTH && level.length; depth++) {
       var digits = [];
       var next = [];
-      for (var i = 0; i < level.length && visited < AXIS_GID_MAX_NODES; i++) {
+      for (var i = 0; i < level.length; i++) {
         var current = level[i];
         if (seen.has(current) || (Array.isArray(current) && current.length > AXIS_GID_MAX_LIST)) { continue; }
         seen.add(current);
-        visited += 1;
         var keys = ownKeys(current);
-        if (keys.length > SEARCH_MAX_KEYS) { continue; }
+        reads += keys.length;
+        // Hết trần mà chưa gặp gid thì coi là không chắc chắn, không đọc tiếp.
+        if (reads > AXIS_GID_MAX_READS) { return false; }
         for (var j = 0; j < keys.length; j++) {
           var value = ownValue(current, keys[j]);
           if (typeof value === 'string' && /^[0-9]+$/.test(value)) { digits.push(value); }
