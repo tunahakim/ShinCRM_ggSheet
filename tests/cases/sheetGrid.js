@@ -22,6 +22,8 @@ function chay(so) {
   const hop = nen.hop;
   const sheet = nen.Customer.sheet;
   const hangDau = hop.SHEET_FIRST_DATA_ROW;
+  // Customer là sheet kho: nới lưới chỉ chạy trong khóa tài liệu.
+  const noiLuoi = (...doiSo) => hop.documentLockRun(() => hop.sheetGridEnsureRoom(...doiSo));
 
   // `dungHop` vừa ghi hàng 1, nên sheet đang ở đúng trạng thái "có tiêu đề, chưa có bản ghi".
   // Đây là trạng thái mà `getLastRow()` trả về 1 chứ không trả về 0, và là lý do hàm này tồn tại.
@@ -47,22 +49,34 @@ function chay(so) {
   const hangCuoi = sheet.getMaxRows() - 1;
   check(so, 'đọc quá tay thì cắt gọn theo lưới, không ném lỗi', hop.sheetGridReadBlock(sheet, hangCuoi, 500, 5).length, 2);
   check(so, 'cắt gọn cả theo số cột của lưới', hop.sheetGridReadBlock(sheet, hangDau, 1, 500)[0].length, sheet.getMaxColumns());
+  checkThrows(so, 'nới lưới sheet kho ngoài khóa tài liệu bị chặn', () => hop.sheetGridEnsureRoom(sheet, sheet.getMaxRows() + 1), 'ngoài khóa');
   checkThrows(so, 'tệp giả vẫn ném lỗi khi hỏi thẳng getRange quá lưới — đúng như Google',
     () => sheet.getRange(sheet.getMaxRows() + 1, 1, 1, 1), 'chỉ có');
 
   // Nới lưới. Trả về con số chứ không trả về `undefined` để phép nghiệm thu đo được — một luật không đo được là một lời hứa.
-  check(so, 'lưới đã đủ chỗ thì nới thêm 0 hàng', hop.sheetGridEnsureRoom(sheet, 10), 0);
+  check(so, 'lưới đã đủ chỗ thì nới thêm 0 hàng', noiLuoi(sheet, 10), 0);
 
   const truocKhiNoi = sheet.getMaxRows();
-  const daNoi = hop.sheetGridEnsureRoom(sheet, truocKhiNoi + 1);
+  const daNoi = noiLuoi(sheet, truocKhiNoi + 1);
   check(so, 'thiếu 1 hàng thì nới 1 cộng SHEET_GRID_SLACK, chứ không nới vừa đủ', daNoi, 1 + hop.SHEET_GRID_SLACK);
   check(so, 'lưới sau khi nới đúng bằng lưới cũ cộng số đã nới', sheet.getMaxRows(), truocKhiNoi + daNoi);
-  check(so, 'nới thừa nên lượt ghi ngay sau đó không phải nới lại', hop.sheetGridEnsureRoom(sheet, truocKhiNoi + 2), 0);
+  check(so, 'nới thừa nên lượt ghi ngay sau đó không phải nới lại', noiLuoi(sheet, truocKhiNoi + 2), 0);
   check(so, 'nới lưới tốn đúng 1 lệnh insertRows cho cả hai lượt gọi', nen.dem.insertRows, 1);
 
   // Nới thừa 0 hàng là quyền của bên gọi, và có một bên gọi cần nó: phép đo lưới không muốn phình sheet thêm 500 hàng.
   const truocKhiNoiSat = sheet.getMaxRows();
-  check(so, 'nới sát không thừa hàng nào khi bên gọi truyền slack bằng 0', hop.sheetGridEnsureRoom(sheet, truocKhiNoiSat + 3, 0), 3);
+  check(so, 'nới sát không thừa hàng nào khi bên gọi truyền slack bằng 0', noiLuoi(sheet, truocKhiNoiSat + 3, 0), 3);
+
+  section('Cấu trúc sheet — tạo và xóa sheet theo chính sách loại sheet');
+  checkThrows(so, 'không tạo sheet tên rơi vào loại sheet tự do', () => hop.sheetBookCreate('Nháp của tôi'), 'sheet tự do');
+  checkThrows(so, 'không tạo sheet quản trị ngoài khóa tài liệu', () => hop.sheetBookCreate('!Mới'), 'ngoài khóa');
+  checkThrows(so, 'không xóa sheet còn dữ liệu, kể cả sheet tự do', () => {
+    const nhap = nen.book.insertSheet('NhapCoDuLieu');
+    nhap.getRange(1, 1).setValue('x');
+    hop.sheetBookDeleteBlank(nhap);
+  }, 'còn dữ liệu');
+  hop.sheetBookDeleteBlank(sheetTrang);
+  check(so, 'sheet tự do trắng hoàn toàn thì xóa được', nen.book.getSheetByName('SheetTrangHoanToan'), null);
 
   return so;
 }

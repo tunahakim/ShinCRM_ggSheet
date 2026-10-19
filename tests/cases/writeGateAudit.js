@@ -1,10 +1,6 @@
 /**
- * Kiểm kê tĩnh mọi thao tác thay đổi Sheet trong code GAS runtime.
- *
- * Đây là hàng rào chống sinh thêm "cửa ghi" ngoài tài liệu 06. Không cố đoán
- * luật nghiệp vụ bằng tên file: nó quét API mutator thực tế, rồi đối chiếu
- * từng file với inventory đã chốt. `server/dev/` được tách riêng vì chỉ là
- * công cụ nghiệm thu; một writer mới ngoài hai danh sách phải làm bộ kiểm đỏ.
+ * Test quét mã của tầng 1 đọc/ghi Sheet (tài liệu 06 Phần 2): mọi lệnh Google đọc hoặc ghi ô, cấu trúc, kích thước lưới chỉ được nằm trong bốn tệp tầng 1. Nơi khác phải gọi công cụ tầng 1, để chính sách theo loại sheet (khóa tài liệu, sheet tự do) và tờ nháp của lần gọi không ai phải nhớ.
+ * Ngoại lệ có tên: `server/dev/` (chỉ DEV) và tệp dựng sheet `Config` (hết hạn ở phiên chuyển Config vào Sidebar).
  */
 
 const fs = require('fs');
@@ -13,32 +9,18 @@ const { section, check } = require('../lib/assert');
 
 const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 
-const RUNTIME_WRITERS = {
-  'server/config/ConfigSheetSetup.js': 'config/setup',
-  'server/log/LogGate.js': 'infrastructure/log',
-  'server/sheet/SheetCellWrite.js': 'sheet/cell-write',
-  'server/sheet/SheetGrid.js': 'helper/grid',
-  'server/sheet/SheetHeader.js': 'infrastructure/header',
-  'server/sheet/SetupSheets.js': 'infrastructure/setup',
-  'server/sheet/SyncColumnSetup.js': 'sync/schema',
-  'server/view/ViewSheetSetup.js': 'view/setup',
-  'server/view/ViewTabTint.js': 'view/tab-tint'
-};
+const LAYER1_FILES = ['server/sheet/SheetCellWrite.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetReadCopy.js', 'server/sheet/SheetStructure.js'];
+const NAMED_EXCEPTIONS = ['server/config/ConfigSheetSetup.js'];
+const isExempt = (file) => file.startsWith('server/dev/') || LAYER1_FILES.indexOf(file) >= 0 || NAMED_EXCEPTIONS.indexOf(file) >= 0;
 
-/**
- * Quan hệ của mỗi writer với bản đọc Sheet chung (tài liệu 06 Phần 2): `forget` = công cụ ghi ô tầng 1, tự quên đúng vùng vừa ghi trong tờ nháp; `drop` = chạm giá trị, hàng mã hoặc số dòng của sheet kho nên phải bỏ bản đọc; `format` = chỉ đặt khuôn, chữ đậm, cố định hàng trên sheet kho, hàng mã đi qua `SheetHeader.js`; `none` = không chạm sheet kho.
- */
-const READ_COPY_RELATION = {
-  'server/config/ConfigSheetSetup.js': 'drop',
-  'server/log/LogGate.js': 'none',
-  'server/sheet/SheetCellWrite.js': 'forget',
-  'server/sheet/SheetGrid.js': 'format',
-  'server/sheet/SheetHeader.js': 'drop',
-  'server/sheet/SetupSheets.js': 'format',
-  'server/sheet/SyncColumnSetup.js': 'format',
-  'server/view/ViewSheetSetup.js': 'none',
-  'server/view/ViewTabTint.js': 'none'
-};
+/** Lệnh đọc ô, cấu trúc và kích thước lưới. `getSheets`, `getSheetByName`, `getName` không ở đây: chúng chỉ hỏi tệp có những sheet nào. */
+const READER_NAMES = [
+  'getValue', 'getValues', 'getDisplayValue', 'getDisplayValues', 'getNote', 'getNotes',
+  'getFormula', 'getFormulas', 'getFormulaR1C1', 'getFormulasR1C1', 'getNumberFormat', 'getNumberFormats',
+  'getRichTextValue', 'getRichTextValues', 'getBackground', 'getBackgrounds', 'getFontWeight', 'getFontWeights',
+  'getLastRow', 'getLastColumn', 'getMaxRows', 'getMaxColumns', 'getFrozenRows', 'getFrozenColumns',
+  'getDataRange', 'getTabColor', 'getDataValidation', 'getDataValidations'
+];
 
 const MUTATOR_NAMES = [
   'setValue', 'setValues', 'clear', 'clearContent', 'clearDataValidations',
@@ -64,7 +46,7 @@ const MUTATOR_NAMES = [
   'appendRow', 'hideSheet', 'showSheet'
 ];
 
-const MUTATOR_RE = new RegExp('\\.(' + MUTATOR_NAMES.join('|') + ')\\s*\\(', 'g');
+const MUTATOR_RE = new RegExp('\\.(' + MUTATOR_NAMES.concat(READER_NAMES).join('|') + ')\\s*\\(', 'g');
 
 function listJsFiles(root, prefix) {
   const entries = fs.readdirSync(root, { withFileTypes: true });
@@ -119,46 +101,24 @@ function mutatorsIn(source) {
 }
 
 function chay(so) {
-  section('Audit cửa ghi — inventory thao tác thay đổi Sheet trong GAS');
+  section('Tầng 1 đọc/ghi Sheet — lệnh Google chạm ô hoặc cấu trúc chỉ nằm ở tầng 1');
 
   const files = listJsFiles(GAS_DIR, '');
   const runtime = files.filter((file) => !file.startsWith('server/dev/'));
+  const read = (file) => fs.readFileSync(path.join(GAS_DIR, file), 'utf8');
+
   const violations = [];
-  const writers = [];
-
-  runtime.forEach((file) => {
-    const source = fs.readFileSync(path.join(GAS_DIR, file), 'utf8');
-    const mutators = mutatorsIn(source);
-    if (!mutators.length) { return; }
-    writers.push(file);
-    if (!Object.prototype.hasOwnProperty.call(RUNTIME_WRITERS, file)) {
-      violations.push(file + ': chưa có trong inventory');
-    }
+  files.filter((file) => !isExempt(file)).forEach((file) => {
+    const calls = mutatorsIn(read(file));
+    if (calls.length) { violations.push(file + ': ' + calls.map((item) => item.name + '@' + item.line).join(', ')); }
   });
+  check(so, 'ngoài tầng 1 và ngoại lệ có tên, không tệp nào gọi thẳng lệnh Google chạm ô hoặc cấu trúc', violations, []);
+  check(so, 'tệp tầng 1 và ngoại lệ có tên đều tồn tại', LAYER1_FILES.concat(NAMED_EXCEPTIONS).filter((file) => !fs.existsSync(path.join(GAS_DIR, file))), []);
+  const fixture = mutatorsIn("function fixture(sheet) { var n = sheet.getLastRow(); sheet.getRange('A1').setValue(n); }");
+  check(so, 'phép quét tự bắt được cả lệnh đọc lẫn lệnh ghi trong mã vi phạm mẫu', fixture.map((item) => item.name), ['getLastRow', 'setValue']);
+  check(so, 'chỉ tầng 1 và ngoại lệ có tên quên hay bỏ tờ nháp', runtime.filter((file) => LAYER1_FILES.indexOf(file) < 0 && NAMED_EXCEPTIONS.indexOf(file) < 0
+    && /\bsheetReadCopy(?:Forget|Drop)\s*\(/.test(stripNonCode(read(file)))), []);
 
-  Object.keys(RUNTIME_WRITERS).forEach((file) => {
-    const full = path.join(GAS_DIR, file);
-    if (!fs.existsSync(full)) { violations.push(file + ': inventory trỏ tới file không tồn tại'); }
-  });
-
-  check(so, 'mọi file runtime có mutator đều nằm trong inventory cửa ghi', violations, []);
-  check(so, 'inventory không bỏ sót file có mutator', writers.slice().sort(), Object.keys(RUNTIME_WRITERS).slice().sort());
-
-  check(so, 'mỗi writer có khai quan hệ với bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).sort(), Object.keys(RUNTIME_WRITERS).sort());
-  check(so, 'writer chạm giá trị, hàng mã hoặc số dòng sheet kho đều bỏ bản đọc Sheet chung', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'drop'
-    && !/\bsheetReadCopyDrop\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
-  check(so, 'công cụ ghi ô tầng 1 tự quên vùng vừa ghi', Object.keys(READ_COPY_RELATION).filter((file) => READ_COPY_RELATION[file] === 'forget').map((file) => {
-    return [file, /\bsheetReadCopyForget\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))];
-  }), [['server/sheet/SheetCellWrite.js', true]]);
-  check(so, 'ngoài công cụ ghi ô không tệp runtime nào gọi sheetReadCopyForget', runtime.filter((file) => file !== 'server/sheet/SheetCellWrite.js' && file !== 'server/sheet/SheetReadCopy.js'
-    && /\bsheetReadCopyForget\w*\s*\(/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8')))), []);
-
-  const syncViolations = [];
-  files.filter((file) => file.startsWith('fbm_sync/')).forEach((file) => {
-    const mutators = mutatorsIn(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
-    if (mutators.length) { syncViolations.push(file + ':' + mutators.map((item) => item.name + '@' + item.line).join(',')); }
-  });
-  check(so, 'fbm_sync không ghi thẳng Sheet ngoài cửa ghi chung', syncViolations, []);
   // Cửa bản ghi là đường duy nhất đổi dòng Customer/Activity (tài liệu 06 Phần 1): gọi thẳng cửa ghi hay cửa xóa là đi vòng sổ bận và đọc ngoài khóa. Quét cả `server/dev/` vì hàm dò cũng ghi lên Sheet DEV.
   const callersOf = (ten) => files.filter((file) => new RegExp('(?<![\\w.])(?<!function )' + ten + '\\s*\\(').test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))));
   check(so, 'chỉ Cửa bản ghi gọi cửa ghi và cửa xóa', [callersOf('writeGateSave'), callersOf('deleteGateRemove')], [['server/gate/RecordGate.js'], ['server/gate/RecordGate.js']]);
@@ -166,8 +126,6 @@ function chay(so) {
     [['recordHoldsRead', 'recordHoldsWrite', 'recordHoldsApply', 'recordHoldsBusy', 'recordHoldsWithoutOwner', 'recordHoldsPeekOwner'].reduce((out, ten) => out.concat(callersOf(ten).filter((file) => file !== 'server/state/RecordHolds.js' && file !== 'server/gate/RecordGate.js')), []),
       files.filter((file) => file !== 'server/state/RecordHolds.js' && /SHIN_RECORD_HOLDS_V1|\bRECORD_HOLDS_KEY\b/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))))],
     [[], []]);
-  const fixtureViolation = mutatorsIn("function fixtureViolation(sheet) { sheet.getRange('A1').setValue('x'); }");
-  check(so, 'phép quét cửa ghi tự bắt được fixture vi phạm trong fbm_sync', [fixtureViolation.length, fixtureViolation[0] && fixtureViolation[0].name], [1, 'setValue']);
 
   const requiredCommit = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
   requiredCommit.forEach((file) => {
