@@ -199,6 +199,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── actions.html          Mười lăm hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười lăm thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
 │   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
 │   │   ├── fieldInvalid.html     Hiện kết quả kiểm ô của GAS: tô đỏ ô sai, bỏ dấu khi gõ lại, gộp câu báo. Dùng chung cho form bản ghi và các card cấu hình FBM; tự nó không kiểm gì.
+│   │   ├── recordDecision.html   Popup xung đột và popup bận khi lưu theo ảnh chụp người dùng đã xem bị cửa ghi từ chối. Form sửa và màn xung đột FBM cùng một luật nên cùng tệp này, chỉ khác bộ chữ.
 │   │   ├── notices.html          Nơi duy nhất giữ các việc người dùng cần biết, dòng báo ở đáy và lúc thân Sidebar chuyển sang màn thông báo.
 │   │   ├── unsavedChanges.html   Cổng dirty dùng chung: giữ action chờ, modal ba lựa chọn, highlight trường thay đổi và cảnh báo mặc định khi đóng tab.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.

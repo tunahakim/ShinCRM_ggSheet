@@ -38,11 +38,12 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
 - [x] B1. Sidebar gửi kèm giá trị FBM các trường lệch khi chốt; GAS ghép vào dòng, so hash với hash lúc mở, rồi ghi qua `conflictSettle`; bỏ request đọc lại.
 - [x] B2. Test: giá trị gửi lại khác bản đã mở thì không ghi; ShinCRM đổi từ lúc mở thì trả màn xem lại; ba lựa chọn ghi đúng baseline.
 - [x] B3. Sửa 09/04 bảng sáu bước, ràng buộc "hFBM phải lấy mới lúc bấm" và câu "state GAS không giữ giá trị hai bên".
+- [x] B5. Màn xung đột dùng chung luật với form sửa (chủ dự án duyệt 2026-10-19): ảnh chụp lúc mở nằm ở Sidebar; cửa ghi so trường được quyết với giá trị lúc mở (`writeGateConflicts` nhận `old` của nguồn máy); popup xung đột và popup bận dùng chung `client/ui/recordDecision.html`; sửa 06 Phần 4, 09/04 bước 4, 09/08.
 - [ ] B4. Nghiệm thu (Claude tự chạy Chrome, chủ dự án cho phép 2026-10-19) trên Sheet DEV ba lựa chọn.
   - [x] Ca 1 Lấy FBM: CUS-020075 nhận Website FBM, về "đã đồng bộ", baseline mới.
   - [ ] Ca 2 Lấy ShinCRM (ACT-011377) rồi Chỉ đẩy: FBM nhận nội dung ShinCRM.
   - [ ] Ca 3 Tùy chỉnh (ACT-011402) rồi Chỉ đẩy: FBM nhận giá trị gõ tay.
-  - [ ] Ca 4 ShinCRM đổi lúc đang xem (sửa bằng lệnh): Lưu bị từ chối, tự mở lại với giá trị mới, Log `conflict_reopen`.
+  - [ ] Ca 4 ShinCRM đổi lúc đang xem (`fbmDevEditAltWebsite`): Lưu hiện popup xung đột của form; chọn giá trị Sheet thì màn cập nhật phía ShinCRM, chọn giữ lựa chọn thì ghi.
   - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
   - Dừng 2026-10-19 12:20: fbo.com.vn không phản hồi (máy này hết giờ kết nối, Google vẫn vào được); chạy tiếp khi FBM vào lại được.
 
