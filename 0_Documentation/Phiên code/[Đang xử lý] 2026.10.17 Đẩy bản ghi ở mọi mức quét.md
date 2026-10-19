@@ -68,7 +68,7 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [ ] Ca 5 FBM đổi lúc đang xem (sửa Website ALT00010 trên FBM), chọn ShinCRM, Chỉ đẩy: FBM không bị ghi đè, xung đột lại; dọn bằng Lấy FBM.
   - Ca 2 và ca 3 lúc 13:4x chạy trên code V33 (V33 đã đẩy đè DEV): FBM đã nhận đúng giá trị (ACT-011377 nội dung ShinCRM, ACT-011402 "Nội dung tùy chỉnh B4 ca 3", đã đồng bộ 13:56), nhưng chưa chứng minh code phiên này; làm lại hai ca sau B6. Từ 13:58 DEV là code phiên này (@942), phiên V33 tạm dừng tới khi gộp.
   - Ca 4 sau B6 (15:04): chọn ShinCRM "…14:54", Sheet đổi thành "…15:04", Lưu hiện popup ghi "lần trước bạn thấy: …14:54"; chọn Quay lại thì trường Website tô đỏ, ô giữ "…14:54", không tính là chưa chọn; Lưu lại không hỏi nữa, Sheet nhận "…14:54", chờ đối soát, hết hàng đợi. Nhánh "Lưu giá trị bạn đang chọn" gửi cùng `shinValues` nên chỉ kiểm bằng test Sidebar.
-- [ ] B7. Thao tác của người dùng gặp lượt nền đang chạy thì hỏi bằng popup, không tự dừng lượt nền (chủ dự án duyệt 2026-10-19). Gốc: kênh đọc FBM chỉ có một (một request bay, một cổng kiểm phiên trong state), phần này đúng kiến trúc và giữ nguyên; lỗi là "Đồng bộ ngay" và "Kiểm tra liên kết" tự đặt cờ dừng lượt nền khi người dùng chưa chọn (`PullFlow.js:16-22`), "Mở xung đột" thì chỉ báo lỗi vào Log (`Conflict.js:51`), và thẻ xung đột hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Log 15:03:20 `SYNC_RUNNING`.
+- [x] B7. Thao tác của người dùng gặp lượt nền đang chạy thì hỏi bằng popup, không tự dừng lượt nền (chủ dự án duyệt 2026-10-19). Gốc: kênh đọc FBM chỉ có một (một request bay, một cổng kiểm phiên trong state), phần này đúng kiến trúc và giữ nguyên; lỗi là "Đồng bộ ngay" và "Kiểm tra liên kết" tự đặt cờ dừng lượt nền khi người dùng chưa chọn (`PullFlow.js:16-22`), "Mở xung đột" thì chỉ báo lỗi vào Log (`Conflict.js:51`), và thẻ xung đột hiện "Không có xung đột cần xử lý" cạnh "1 xung đột còn lại". Log 15:03:20 `SYNC_RUNNING`.
   - Vai trò dữ liệu:
 
     | Dữ liệu | Ai tạo | Ai được đổi | Vai duy nhất |
@@ -86,7 +86,7 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B7.7. Test GAS (Orchestration, BackgroundChain, Conflict): bấm chạy tay giữa lượt nền không đặt cờ; `stop_background` đặt cờ và lượt nền dừng; mở xung đột giữa lượt nền trả mã mới, không phát request. Test Sidebar: popup ba lựa chọn, X không gọi GAS, `stop` gọi dừng rồi chạy lệnh gốc, `wait` không gọi dừng; popup chung có nút X và chi tiết gập.
   - [x] B7.8. `node tests/run.js` đạt hết.
   - [x] B7.9. Sửa 09/02 mục 6 "Thao tác của người dùng luôn được ưu tiên", 09/08 hai đoạn "Đồng bộ ngay" (dòng 78, 200), 04 Phần 9 popup chung (nút X, chi tiết gập, luật tóm tắt/chi tiết).
-  - [ ] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
+  - [x] B7.10. Commit, đẩy DEV, tải lại tab; nghiệm thu: mở tab Xung đột và bấm Bắt đầu đúng lúc lượt nền chạy.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
