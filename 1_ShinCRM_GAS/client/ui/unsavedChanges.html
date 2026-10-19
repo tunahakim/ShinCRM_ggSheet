@@ -102,21 +102,31 @@ function unsavedChangesDialog() { return document.getElementById('shin-unsaved-d
 var UI_DECISION_VARIANT_CLASS = { primary: 'shin-unsaved-save', danger: 'shin-unsaved-discard', neutral: 'shin-unsaved-continue' };
 
 /**
- * Popup của Sidebar, công cụ duy nhất hỏi người dùng chọn một trong nhiều lựa chọn. Khối nghiệp vụ chỉ truyền nội dung (`title`, `message`, `lines`) và `choices` (`{ id, label, variant }`); host, renderer và nút vẫn thuộc core. Trả `Promise` mang `id` của lựa chọn.
- * Nút đóng nền và Esc luôn ra `cancel`, nên `choices` phải có lựa chọn `cancel` mang nghĩa quay lại, không làm gì: đóng nhầm không được chạy việc nào.
+ * Popup của Sidebar, công cụ duy nhất hỏi người dùng chọn một trong nhiều lựa chọn. Khối nghiệp vụ chỉ truyền nội dung và `choices` (`{ id, label, variant }`); host, renderer và nút vẫn thuộc core. Trả `Promise` mang `id` của lựa chọn.
+ * Khung cố định: tiêu đề kèm nút X, tóm tắt (`message`, `lines`: thứ cần để quyết), các nút lựa chọn, rồi chi tiết (`detail`: chỉ để tham khảo) gập sẵn sau nút "Xem chi tiết".
+ * Nút X, nền và Esc luôn ra `cancel`, nghĩa là đóng popup và không chạy việc người dùng vừa bấm; bên gọi phải coi `cancel` là không làm gì.
  */
 function uiDecisionChoose(options) {
   var opts = options || {}, dialog = unsavedChangesDialog();
   var choices = Array.isArray(opts.choices) ? opts.choices : [];
-  if (!choices.some(function (choice) { return choice.id === 'cancel'; })) { throw new Error('Popup Sidebar phải có lựa chọn `cancel` cho nút đóng nền và Esc.'); }
+  var detail = Array.isArray(opts.detail) ? opts.detail : [];
   if (!dialog || typeof renderReplaceChildren !== 'function') { return Promise.reject(new Error('Sidebar thiếu host dialog quyết định.')); }
   if (UI_DECISION_DIALOG.open) { return Promise.resolve('cancel'); }
-  var body = [Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') })];
+  var body = [Row({ className: 'shin-decision-head', elements: [
+    Text({ id: 'shin-decision-title', className: 'shin-unsaved-title', text: String(opts.title || '') }),
+    Icon({ icon: 'close', tooltip: 'Đóng', className: 'shin-decision-close', data: { 'ui-decision-choice': 'cancel' } })
+  ] })];
   if (opts.message) { body.push(Text({ id: 'shin-decision-message', className: 'shin-unsaved-message', text: String(opts.message) })); }
   (opts.lines || []).forEach(function (line) { body.push(Text({ className: 'shin-unsaved-message', text: String(line) })); });
-  body.push(RowGroup({ className: 'shin-unsaved-actions', elements: choices.map(function (choice) {
-    return Button({ className: UI_DECISION_VARIANT_CLASS[choice.variant] || UI_DECISION_VARIANT_CLASS.neutral, data: { 'ui-decision-choice': String(choice.id) }, label: String(choice.label || '') });
-  }) }));
+  if (choices.length) {
+    body.push(RowGroup({ className: 'shin-unsaved-actions', elements: choices.map(function (choice) {
+      return Button({ className: UI_DECISION_VARIANT_CLASS[choice.variant] || UI_DECISION_VARIANT_CLASS.neutral, data: { 'ui-decision-choice': String(choice.id) }, label: String(choice.label || '') });
+    }) }));
+  }
+  if (detail.length) {
+    body.push(Button({ className: 'shin-decision-more', data: { 'ui-decision-detail': 'open' }, label: 'Xem chi tiết' }));
+    body.push(RowGroup({ className: 'shin-decision-detail', hidden: true, elements: detail.map(function (line) { return Text({ className: 'shin-unsaved-message', text: String(line) }); }) }));
+  }
   renderReplaceChildren(dialog, [
     Box({ className: 'shin-unsaved-backdrop', data: { 'ui-decision-choice': 'cancel' } }),
     RowGroup({ className: 'shin-unsaved-panel', elements: body })
@@ -126,6 +136,15 @@ function uiDecisionChoose(options) {
   UI_DECISION_DIALOG.open = true;
   UI_DECISION_DIALOG.busy = false;
   return new Promise(function (resolve) { UI_DECISION_DIALOG.resolve = resolve; });
+}
+
+/** Mở vùng chi tiết của popup đang hiện; nút "Xem chi tiết" ẩn đi vì chi tiết không có trạng thái gập lại cần giữ. */
+function uiDecisionShowDetail() {
+  var dialog = unsavedChangesDialog();
+  if (!dialog || !UI_DECISION_DIALOG.open) { return; }
+  var box = dialog.querySelector('.shin-decision-detail'), more = dialog.querySelector('[data-ui-decision-detail]');
+  if (box) { box.removeAttribute('hidden'); }
+  if (more) { more.setAttribute('hidden', ''); }
 }
 
 /* Dạng hai nút (quay lại / xác nhận) cho các thao tác nguy hiểm; trả `true` khi xác nhận. */
@@ -249,6 +268,12 @@ function unsavedChangesInstall() {
   UNSAVED_CHANGES.installed = true;
   unsavedChangesRenderDialog();
   document.addEventListener('click', function (event) {
+    var more = event.target && event.target.closest ? event.target.closest('[data-ui-decision-detail]') : null;
+    if (more && UI_DECISION_DIALOG.open) {
+      event.preventDefault();
+      uiDecisionShowDetail();
+      return;
+    }
     var decision = event.target && event.target.closest ? event.target.closest('[data-ui-decision-choice]') : null;
     if (decision && UI_DECISION_DIALOG.open) {
       event.preventDefault();

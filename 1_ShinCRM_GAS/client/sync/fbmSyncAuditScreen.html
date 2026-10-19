@@ -18,7 +18,9 @@ function fbmSyncConflictContentBlocks(status) {
   // Bản ghi đang mở là DTO GAS trả khi mở chế độ xung đột, giữ trong RAM Sidebar; status chỉ mang số đếm.
   var metadata = status.metadata || {}, item = FBM_SYNC_CLIENT.conflict;
   var head = Row({ className: classes.head, elements: [Text({ className: classes.count, text: schema.remaining.replace('{count}', Number(item ? item.remaining : metadata.conflictCount) || 0) })] });
-  if (!item) { return [ui.card([head, Empty(schema.empty)])]; }
+  // Số đếm còn mà RAM chưa có bản ghi nghĩa là chưa mở được (đang chờ nền, người dùng đóng popup, lỗi mở): nói đúng lý do, không báo "không có xung đột".
+  var pending = Number(metadata.conflictCount || 0) > 0;
+  if (!item) { return [ui.card([head, Empty(!pending ? schema.empty : FBM_SYNC_CLIENT.backgroundWait === 'conflict' ? schema.waitingBackground : FBM_SYNC_CLIENT.conflictNote || schema.opening)])]; }
   var invalid = FBM_SYNC_CLIENT.conflictInvalid || {}, missingCount = Object.keys(invalid).length;
   var bulk = StandaloneControl({ id: schema.ids.bulk, kind: 'menu', value: schema.bulk.none, ariaLabel: schema.labels.pick, options: [{ value: schema.bulk.none, label: schema.labels.pick }].concat([schema.bulk.fbm, schema.bulk.shin, schema.bulk.clear].map(function (value) { return { value: value, label: schema.bulkLabels[value] }; })) });
   var fields = (item.fields || []).map(function (field, index) {
