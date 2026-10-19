@@ -116,3 +116,15 @@ function fbmProbeScheduleMarkers() {
   Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) { var done = Number(props.getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0), due = FbmSync.scheduleDueAt(kind); markers[kind] = { doneAt: done ? new Date(done).toISOString() : '', dueInMin: Math.round((due - now) / 60000) }; });
   return { now: new Date(now).toISOString(), master: FbmSync.masterEnabled(), background: FbmSync.backgroundEnabled(), markers: markers, phase: state.phase, origin: state.origin, scheduledScan: state.scheduledScan, chain: state.chain, activeRequestId: state.activeRequestId, deadlineAt: state.deadlineAt ? new Date(Number(state.deadlineAt)).toISOString() : '', failureCode: state.failureCode, message: state.message, sessionExpired: state.session && state.session.expired, due: FbmSync.scheduleDueKinds(now, []), trace: (function () { try { return JSON.parse(props.getProperty('FBM_SYNC_TRACE_V1') || '[]').slice(-25).map(function (t) { return new Date(Number(t.at)).toISOString().slice(11, 19) + ' ' + t.stage + ' ' + (t.operation || '') + ' ' + (t.code || t.failureCode || ''); }); } catch (e) { return String(e); } })() };
 }
+
+/** Các dòng đang xung đột chờ quyết kèm giá trị ShinCRM, baseline và giờ đồng bộ, chỉ đọc, để soạn và đối chiếu nghiệm thu màn xung đột. */
+function fbmProbeConflicts() {
+  var scan = FbmSync.localScan();
+  return FbmSync.conflictQueue(scan).map(function (item) {
+    var record = scan.records(item.entity).filter(function (row) { return String(row.id) === item.id; })[0] || {};
+    var keep = item.entity === 'customer' ? ['companyName', 'fbmCustomerCode', 'website', 'email', 'phone', 'contactName'] : ['customerId', 'workDate', 'content', 'title'];
+    var out = { entity: item.entity, id: item.id, fbmId: item.fbmId, fbmHash: record.fbmHash, syncedAt: record.syncedAt };
+    keep.forEach(function (field) { out[field] = record[field]; });
+    return out;
+  });
+}
