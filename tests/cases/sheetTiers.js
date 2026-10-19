@@ -158,6 +158,16 @@ function chay(so) {
     [/thiếu giá trị lúc mở form/.test(loiCua(() => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', note: 'x' }], source: 'user' })))), o('@CUS_GHI_CHU')],
     [true, 'ghi chú']);
 
+  const mayLuu = (record, old) => trongLanGoi(h, () => h.writeGateSave({ entity: 'customer', records: [record], source: 'pull', old: old === undefined ? undefined : [old] }));
+  const mayXungDot = mayLuu({ id: 'KH000001', phone: '0903000003', note: 'máy ghi' }, { phone: '' });
+  check(so, 'nguồn máy có ảnh chụp người dùng: trường trong ảnh chụp bị đổi trên Sheet thì không ghi gì và trả xung đột',
+    [mayXungDot.ok, (mayXungDot.conflicts || []).map((c) => c.field).join(','), o('@CUS_SDT'), o('@CUS_GHI_CHU')],
+    [false, 'phone', '0901000001', 'ghi chú']);
+  const mayNgoaiAnh = mayLuu({ id: 'KH000001', note: 'máy ghi' }, { phone: '0901000001' });
+  check(so, 'nguồn máy có ảnh chụp: trường không nằm trong ảnh chụp không bị kiểm, vẫn ghi', [mayNgoaiAnh.ok, o('@CUS_GHI_CHU')], [true, 'máy ghi']);
+  const mayKhongAnh = mayLuu({ id: 'KH000001', note: 'máy ghi lại' });
+  check(so, 'nguồn máy không có ảnh chụp thì ghi như cũ, không đòi giá trị lúc mở', [mayKhongAnh.ok, o('@CUS_GHI_CHU')], [true, 'máy ghi lại']);
+
   const ghiGoc = h.sheetCellsWrite;
   let daDoiChu = false;
   h.sheetCellsWrite = function () {

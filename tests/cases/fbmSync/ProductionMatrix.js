@@ -47,6 +47,19 @@ function makeSync() {
   hop.writeGateSave = (request) => {
     writes.push(request);
     const entity = request.entity;
+    const conflicts = [];
+    (request.records || []).forEach((patch, i) => {
+      const old = request.old && request.old[i];
+      const row = local[entity].find((item) => String(item.id || '') === String(patch.id || ''));
+      if (!old || !row) { return; }
+      Object.keys(old).forEach((field) => {
+        if (!Object.prototype.hasOwnProperty.call(patch, field)) { return; }
+        const current = String(row[field] === undefined || row[field] === null ? '' : row[field]);
+        const mine = String(patch[field] === undefined || patch[field] === null ? '' : patch[field]);
+        if (current !== String(old[field]) && mine !== current) { conflicts.push({ index: i, id: patch.id, field, label: field, old: old[field], current, mine }); }
+      });
+    });
+    if (conflicts.length) { return { ok: false, conflicts }; }
     (request.records || []).forEach((patch) => {
       const id = String(patch.id || '');
       let index = local[entity].findIndex((item) => String(item.id || '') === id);
@@ -322,50 +335,57 @@ async function chay(so) {
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const cfOpen = CF.openConflict();
   check(so, 'FBM-024: phiên mới không làm mất hàng đợi xung đột; mở chế độ xung đột chỉ phát request đọc bản ghi FBM đầu hàng đợi',
-    [cfOpen.ok, cfOpen.remaining, cfOpen.request && cfOpen.request.meta.kind, cfOpen.request && cfOpen.request.meta.conflictId, CF.stateRead().metadata.conflictRefresh.stage],
-    [true, 3, 'conflict_refresh_grid', 'CUS-000001', 'open']);
+    [cfOpen.ok, cfOpen.remaining, cfOpen.request && cfOpen.request.meta.kind, cfOpen.request && cfOpen.request.meta.conflictId, JSON.stringify(CF.stateRead().metadata.conflictRefresh)],
+    [true, 3, 'conflict_refresh_grid', 'CUS-000001', JSON.stringify({ entity: 'customer', id: 'CUS-000001' })]);
   const cfOpened = CF.conflictOpened(gridResponse(cfOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM khác 1')]));
-  check(so, 'FBM-024: response đọc FBM về thì GAS tính diff tại chỗ, trả DTO một bản ghi gồm giá trị ShinCRM và FBM mới nhất',
-    [cfOpened.ok, cfOpened.conflict && cfOpened.conflict.id, cfOpened.conflict && cfOpened.conflict.remaining, nameDiff(cfOpened.conflict).left, nameDiff(cfOpened.conflict).right, CF.stateRead().metadata.conflictRefresh.stage],
-    [true, 'CUS-000001', 3, 'Tên Shin 1', 'Tên FBM khác 1', 'review']);
-  // Lệnh chốt không đọc lại FBM: Sidebar gửi lại giá trị FBM các trường lệch như màn đã hiện.
+  check(so, 'FBM-024: response đọc FBM về thì GAS tính diff tại chỗ, trả DTO kèm ảnh chụp lúc mở; state không giữ bản đang xem',
+    [cfOpened.ok, cfOpened.conflict && cfOpened.conflict.id, cfOpened.conflict && cfOpened.conflict.remaining, nameDiff(cfOpened.conflict).left, nameDiff(cfOpened.conflict).right, cfOpened.conflict.snapshot.old.companyName, !!cfOpened.conflict.snapshot.openedHash, CF.stateRead().metadata.conflictRefresh],
+    [true, 'CUS-000001', 3, 'Tên Shin 1', 'Tên FBM khác 1', 'Tên Shin 1', true, null]);
+  // Lệnh chốt không đọc lại FBM: Sidebar gửi lại giá trị FBM các trường lệch và ảnh chụp như màn đã hiện.
   const fbmValuesOf = (dto) => Object.fromEntries(((dto && dto.fields) || []).map((item) => [item.field, item.right]));
   const cfReopen = (rows) => { const opened = CF.openConflict(); return CF.conflictOpened(gridResponse(opened.request.id, rows)); };
-  check(so, 'FBM-024: chưa mở bản ghi thì không được chốt', CF.confirmConflict('customer', 'CUS-000002', 'fbm', null, {}).code, 'CONFLICT_NOT_OPEN');
   check(so, 'Chốt xung đột không phát request đọc lại FBM: lệnh chốt không còn hàm chuẩn bị đọc lại', typeof CF.prepareConflictResolution, 'undefined');
 
   cf.logs.length = 0;
-  const cfMismatch = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, { ten_kh: 'Tên FBM bị sửa ở trình duyệt' });
-  check(so, 'Giá trị FBM gửi kèm lệnh chốt khác bản FBM lúc mở thì không ghi, trả mở lại, bỏ bản đang mở và ghi Log',
-    [cfMismatch.code, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, CF.stateRead().metadata.conflictRefresh, cf.logs.some((event) => event.action === 'conflict_reopen' && event.recordId === 'CUS-000001')],
-    ['CONFLICT_REOPEN', 'Tên Shin 1', 'xung đột chờ quyết', null, true]);
-  const cfOpenedAgain = cfReopen([fbmRow('F-1', 'ALT00001', 'Tên FBM khác 1')]);
-  const cfStray = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, Object.assign(fbmValuesOf(cfOpenedAgain.conflict), { note: 'ghi lén' }));
+  const cfMismatch = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, { ten_kh: 'Tên FBM bị sửa ở trình duyệt' }, cfOpened.conflict.snapshot);
+  check(so, 'Giá trị FBM gửi kèm lệnh chốt khác bản FBM lúc mở thì không ghi, trả mở lại và ghi Log',
+    [cfMismatch.code, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, cf.logs.some((event) => event.action === 'conflict_reopen' && event.recordId === 'CUS-000001')],
+    ['CONFLICT_REOPEN', 'Tên Shin 1', 'xung đột chờ quyết', true]);
+  const cfStray = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, Object.assign(fbmValuesOf(cfOpened.conflict), { note: 'ghi lén' }), cfOpened.conflict.snapshot);
   check(so, 'Giá trị FBM gửi kèm có trường ngoài fingerprint thì không ghi, trả mở lại', [cfStray.code, cf.local.customer[0].companyName, /note/.test(cfStray.message)], ['CONFLICT_REOPEN', 'Tên Shin 1', true]);
-  const cfNoValues = (cfReopen([fbmRow('F-1', 'ALT00001', 'Tên FBM khác 1')]), CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, null));
+  const cfNoValues = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, null, cfOpened.conflict.snapshot);
   check(so, 'Lệnh chốt thiếu giá trị FBM thì không ghi, trả mở lại', [cfNoValues.code, cf.local.customer[0].companyName], ['CONFLICT_REOPEN', 'Tên Shin 1']);
+  const cfNoShot = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpened.conflict), null);
+  check(so, 'Lệnh chốt thiếu ảnh chụp lúc mở thì không ghi, trả mở lại', [cfNoShot.code, /ảnh chụp/.test(cfNoShot.message), cf.local.customer[0].companyName], ['CONFLICT_REOPEN', true, 'Tên Shin 1']);
 
   const cfOpenedNewer = cfReopen([fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]);
   cf.local.customer[0].companyName = 'Tên Shin sửa 1';
-  const cfLocalChanged = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict));
-  check(so, 'FBM-024: ShinCRM đổi giữa lúc mở và lúc chốt thì không ghi, trả mở lại để đọc FBM mới và xem bản ShinCRM vừa sửa',
-    [cfLocalChanged.code, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, CF.stateRead().metadata.conflictRefresh],
-    ['CONFLICT_REOPEN', 'Tên Shin sửa 1', 'xung đột chờ quyết', null]);
-  const cfOpenedBusy = cfReopen([fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]);
-  check(so, 'FBM-024: mở lại sau khi ShinCRM đổi thì màn xung đột hiện giá trị ShinCRM vừa sửa', nameDiff(cfOpenedBusy.conflict).left, 'Tên Shin sửa 1');
+  const cfLocalChanged = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), cfOpenedNewer.conflict.snapshot);
+  const cfChangedField = (cfLocalChanged.conflicts || [])[0] || {};
+  check(so, 'ShinCRM đổi trường đang quyết giữa lúc mở và lúc chốt thì không ghi gì, trả xung đột đủ ba giá trị như lưu form',
+    [cfLocalChanged.code, cfChangedField.field, cfChangedField.old, cfChangedField.current, cfChangedField.mine, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus],
+    ['CONFLICT_SHEET_CHANGED', 'companyName', 'Tên Shin 1', 'Tên Shin sửa 1', 'Tên FBM mới hơn 1', 'Tên Shin sửa 1', 'xung đột chờ quyết']);
+  // Sidebar chọn "Lưu giá trị bạn đang chọn": ảnh chụp nhận giá trị Sheet hiện tại làm mốc mới rồi gửi lại.
+  const cfShotNew = JSON.parse(JSON.stringify(cfOpenedNewer.conflict.snapshot));
+  cfShotNew.old.companyName = cfChangedField.current;
+  const cfNewSession = CF.stateStart('', 'checking_session', 0); cfNewSession.phase = 'done'; CF.stateWrite(cfNewSession);
+  CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   giuBanGhi(cf.hop, 'khac', 'customer', 'CUS-000001', 'Tiến trình khác đang giữ.');
-  const cfBusy = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedBusy.conflict));
-  check(so, 'FBM-024: bản ghi đang bị tiến trình khác giữ lúc chốt thì báo bận, không ghi gì, vẫn ở bước xem để chốt lại',
-    [cfBusy.code, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, CF.stateRead().metadata.conflictRefresh.stage], ['CONFLICT_RECORD_BUSY', 'Tên Shin sửa 1', 'xung đột chờ quyết', 'review']);
+  const cfBusy = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), cfShotNew);
+  check(so, 'Bản ghi đang bị tiến trình khác giữ lúc chốt thì báo bận kèm lý do, không ghi gì',
+    [cfBusy.code, cfBusy.busy && cfBusy.busy.reason, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus], ['CONFLICT_RECORD_BUSY', 'Tiến trình khác đang giữ.', 'Tên Shin sửa 1', 'xung đột chờ quyết']);
   cf.hop.recordGateRun({ by: 'khac', decide: () => ({ release: [{ entity: 'customer', ids: ['CUS-000001'] }] }) });
-  const cfFbm = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedBusy.conflict));
-  check(so, 'FBM-024 PA1: lấy FBM ghi giá trị FBM vào ShinCRM, baseline là hash FBM lúc mở, trạng thái đã đồng bộ, còn 2 xung đột',
-    [cfFbm.ok, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus, cf.local.customer[0].fbmHash === CF.hash(CF.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1'), {}), 'customer', {}), cfFbm.remaining, CF.stateRead().metadata.conflictCount],
-    [true, 'Tên FBM mới hơn 1', 'đã đồng bộ', true, 2, 2]);
+  cf.local.customer[0].note = 'Ghi chú sửa giữa chừng';
+  const cfFbm = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), cfShotNew);
+  check(so, 'FBM-024 PA1: phiên mới bắt đầu giữa chừng vẫn chốt được theo ảnh chụp; lấy FBM ghi giá trị FBM, baseline là hash FBM lúc mở, trường khác vừa sửa được giữ, còn 2 xung đột',
+    [cfFbm.ok, cf.local.customer[0].companyName, cf.local.customer[0].note, cf.local.customer[0].syncStatus, cf.local.customer[0].fbmHash === CF.hash(CF.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1'), {}), 'customer', {}), cfFbm.remaining, CF.stateRead().metadata.conflictCount],
+    [true, 'Tên FBM mới hơn 1', 'Ghi chú sửa giữa chừng', 'đã đồng bộ', true, 2, 2]);
+  const cfGone = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), cfShotNew);
+  check(so, 'Chốt lại dòng đã rời trạng thái xung đột chờ quyết thì báo không còn, không ghi gì', [cfGone.code, cf.local.customer[0].companyName], ['CONFLICT_NOT_FOUND', 'Tên FBM mới hơn 1']);
 
   const cfOpen2 = CF.openConflict();
   const cfOpened2 = CF.conflictOpened(gridResponse(cfOpen2.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')]));
-  const cfShin = CF.confirmConflict('customer', 'CUS-000002', 'shin', null, fbmValuesOf(cfOpened2.conflict));
+  const cfShin = CF.confirmConflict('customer', 'CUS-000002', 'shin', null, fbmValuesOf(cfOpened2.conflict), cfOpened2.conflict.snapshot);
   const cfShinRow = cf.local.customer[1];
   check(so, 'FBM-024 PA2: lấy ShinCRM giữ giá trị ShinCRM, baseline là hash FBM mới, trạng thái chờ đối soát và vào danh sách đẩy',
     [cfShin.ok, cfOpen2.request.meta.conflictId, cfShinRow.companyName, cfShinRow.syncStatus, cfShinRow.fbmHash === CF.hash(CF.customerRecord(fbmRow('F-2', 'ALT00002', 'Tên FBM 2'), {}), 'customer', {}), CF.pushCandidates('customer').map((item) => item.id)],
@@ -374,9 +394,9 @@ async function chay(so) {
   const cfOpen3 = CF.openConflict();
   const cfOpened3 = CF.conflictOpened(gridResponse(cfOpen3.request.id, [fbmRow('F-3', 'ALT00003', 'Tên FBM 3')]));
   const cfMergeField = nameDiff(cfOpened3.conflict).field;
-  const cfManual = CF.confirmConflict('customer', 'CUS-000003', 'manual', { [cfMergeField]: { choice: 'manual', value: 'Tên tự nhập 3' } }, fbmValuesOf(cfOpened3.conflict));
+  const cfManual = CF.confirmConflict('customer', 'CUS-000003', 'manual', { [cfMergeField]: { choice: 'manual', value: 'Tên tự nhập 3' } }, fbmValuesOf(cfOpened3.conflict), cfOpened3.conflict.snapshot);
   const cfManualState = CF.stateRead();
-  check(so, 'FBM-024 PA3: tùy chỉnh ghi giá trị tự nhập vào ShinCRM, trạng thái chờ đối soát; hết hàng đợi thì số đếm về 0 và không còn bản ghi đang mở',
+  check(so, 'FBM-024 PA3: tùy chỉnh ghi giá trị tự nhập vào ShinCRM, trạng thái chờ đối soát; hết hàng đợi thì số đếm về 0 và không còn request đang chờ',
     [cfManual.ok, cf.local.customer[2].companyName, cf.local.customer[2].syncStatus, cfManual.remaining, cfManualState.metadata.conflictCount, cfManualState.metadata.conflictRefresh],
     [true, 'Tên tự nhập 3', 'chờ đối soát', 0, 0, null]);
   const cfEmpty = CF.openConflict();
@@ -417,7 +437,7 @@ async function chay(so) {
   const unNext = UN.openConflict();
   check(so, 'FBM-033: mở lại chế độ xung đột thì tới lượt bản ghi kế tiếp, không kẹt ở bản ghi không đọc được', [unNext.ok, unNext.request && unNext.request.meta.conflictId, unNext.remaining], [true, 'CUS-000002', 3]);
   const unOpened2 = UN.conflictOpened(gridResponse(unNext.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')]));
-  const unSettled = UN.confirmConflict('customer', 'CUS-000002', 'fbm', null, Object.fromEntries(unOpened2.conflict.fields.map((item) => [item.field, item.right])));
+  const unSettled = UN.confirmConflict('customer', 'CUS-000002', 'fbm', null, Object.fromEntries(unOpened2.conflict.fields.map((item) => [item.field, item.right])), unOpened2.conflict.snapshot);
   check(so, 'FBM-033: chốt bản ghi kế tiếp theo bản đã mở thì rời hàng đợi', [unSettled.ok, un.local.customer[1].companyName, unSettled.remaining], [true, 'Tên FBM 2', 2]);
   un.local.customer[2].fbmId = '';
   const unNoId = UN.openConflict();
@@ -506,7 +526,7 @@ async function chay(so) {
   const cvView = AC.conflictView({ entity: 'customer', id: 'CUS-X', local: { fbmCustomerCode: 'ALT00009', companyName: 'Cty X', taxNumber: '0101', phone: '090' }, latest: { fbmCustomerCode: 'ALT00009', companyName: 'Cty X', taxNumber: '0202', phone: '091' }, gate: acGate }, 1);
   check(so, 'G9.1: mã số thuế (có validate và unique) chỉ được chọn một bên, điện thoại được gõ tay', (cvView.fields || []).map((item) => [item.label, item.editable]), [['Điện thoại', true], ['Mã số thuế', false]]);
   ac.hop.DATA_SCHEMA = {};
-  const acManual = AC.confirmConflict('activity', ac.local.activity[0].id, 'manual', { details: { choice: 'manual', value: 'Nội dung tự nhập' }, end_date: { choice: 'fbm' } }, Object.fromEntries(acOpened.conflict.fields.map((item) => [item.field, item.right])));
+  const acManual = AC.confirmConflict('activity', ac.local.activity[0].id, 'manual', { details: { choice: 'manual', value: 'Nội dung tự nhập' }, end_date: { choice: 'fbm' } }, Object.fromEntries(acOpened.conflict.fields.map((item) => [item.field, item.right])), acOpened.conflict.snapshot);
   const acRow = ac.local.activity[0];
   check(so, 'G9.3: Activity xung đột hai trường thì DTO mở ra đúng hai trường FBM details và end_date', [acPull.conflicts, acFields], [1, ['details', 'end_date']]);
   check(so, 'G9.3: PA3 Activity ghi giá trị tự nhập vào content, lấy end_date FBM vào workDate, giữ liên kết Customer, chờ đối soát và hết hàng đợi',
