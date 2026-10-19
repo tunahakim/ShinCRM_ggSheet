@@ -466,7 +466,7 @@
 ## Slice R13 — Giao thức context thô và tối ưu request
 
 - [x] Ghi rõ payload `CRM_CONTEXT`: Name Box nguyên bản, sheet/gid/Spreadsheet ID, hàng 1 thô, `complete`, kết quả read plan, tín hiệu bàn phím/click, sequence và timestamp.
-- [ ] Hàng 1 gửi mọi ô có giá trị khác rỗng, dùng địa chỉ vật lý `A1`/`B1` và số cột vật lý; cột ẩn không bị đánh số lại; không gửi toàn bộ hàng dữ liệu. Mở lại 2026-10-19: lưới live dồn cột ẩn nên địa chỉ bị đánh số lại; sửa ở `[Đang xử lý] 2026.10.17 Đẩy bản ghi ở mọi mức quét.md` mục B10.
+- [x] Hàng 1 gửi mọi ô có giá trị khác rỗng, dùng địa chỉ vật lý `A1`/`B1` và số cột vật lý; cột ẩn không bị đánh số lại; không gửi toàn bộ hàng dữ liệu.
 - [x] Sidebar giữ schema và ý nghĩa mã `@`, tự phân tích `E5`, `E5:G7`, `A:A`, `5:7`; Extension không gửi `selectionKind`, `row`, `col` như kết luận nghiệp vụ.
 - [x] Read plan được gửi lúc bắt tay hoặc khi schema đổi, không tạo chuỗi ba message cho mỗi lần chọn ô; Extension chỉ đối chiếu tọa độ/giá trị kỳ vọng và trả `ok`, `mismatch` hoặc `unavailable`.
 - [x] Loại trường nghiệp vụ `customerId`/`customerIdSource` khỏi payload Extension; giữ kết quả đọc thô và để Sidebar tự đối chiếu Store. Khi có input phải thử đọc giá trị mới, không dùng cache cũ làm giá trị hiện tại nếu live model chưa cập nhật (`sheet_scout.js`, `live_model_reader.js`, `tests/cases/liveModelReader.js`, `tests/cases/selectionPoll.js`).

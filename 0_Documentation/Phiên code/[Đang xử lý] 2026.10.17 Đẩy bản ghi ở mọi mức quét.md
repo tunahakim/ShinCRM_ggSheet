@@ -100,13 +100,13 @@ Branch `feature/push-compare` tách từ `feature/expensive-ops`, làm trong wor
   - [x] B9.3. Sửa 09/08 câu nút X; `node tests/run.js` 2642 đạt.
   - [ ] B9.4. Nghiệm thu trên Sheet DEV cùng B8.4.
 
-- [ ] B10. Extension đọc đúng ô khi sheet có hàng, cột ẩn hoặc bộ lọc (chủ dự án yêu cầu 2026-10-19: không gõ cứng, Extension tự dò khi Google đổi). Gốc: bộ đọc coi chỉ số lưới live là tọa độ thật, trong khi lưới chỉ chứa hàng và cột đang hiện; ở `!lead` ẩn A–B gây `LIVE_GRID_CONFLICT`, ẩn hàng thì trả `ok` sai hàng. Căn cứ: `Nghiên cứu Google Sheet/2026.09.09 ...` mục 14, tài liệu 05 Phần 10.
+- [x] B10. Extension đọc đúng ô khi sheet có hàng, cột ẩn hoặc bộ lọc (chủ dự án yêu cầu 2026-10-19: không gõ cứng, Extension tự dò khi Google đổi). Gốc: bộ đọc coi chỉ số lưới live là tọa độ thật, trong khi lưới chỉ chứa hàng và cột đang hiện; ở `!lead` ẩn A–B gây `LIVE_GRID_CONFLICT`, ẩn hàng thì trả `ok` sai hàng. Căn cứ: `Nghiên cứu Google Sheet/2026.09.09 ...` mục 14, tài liệu 05 Phần 10.
   Vai trò dữ liệu: bảng quy đổi hàng/cột (Google, nguồn sự thật về vị trí đang hiện; Extension chỉ đọc, kiểm lại mỗi lần đọc); mảng đánh dấu (Google, dùng đối chiếu bảng quy đổi); lưới đầy đủ (Google, giá trị ô theo vị trí gọn); đường dẫn đã nhớ tới object chứa bảng theo gid (Extension, chỉ là lối tắt, sai thì dò lại); `rawHeaderRow` (Extension trả, địa chỉ thật; Sidebar dựng `readPlan['!']` theo mã cột như cũ).
   - [x] B10.1. Dò trên DEV: ẩn cột, ẩn hàng, bộ lọc; ghi tài liệu nghiên cứu mục 14, tài liệu 05, mở lại mục cột ẩn trong `Checklist reload RAM và sheet quản trị.md`.
   - [x] B10.2. `live_model_reader.js`: nhận object chứa bảng quy đổi theo hình dạng trong lượt dò sẵn có, giữ object có gid gần nhất đúng gid; ghép bảng hàng/cột với lưới theo kích thước, loại lưới không khớp; đọc ô qua bảng quy đổi; `rawHeaderRow` địa chỉ thật; mỗi lần đọc kiểm lại ràng buộc, sai thì dò lại và trả `LIVE_AXIS_NOT_FOUND`.
   - [x] B10.3. Sidebar `sheetLink.html`: `LIVE_AXIS_NOT_FOUND` vào danh sách lỗi bộ đọc (hỏi GAS, băng cảnh báo, Log một lần mỗi phiên); không coi là sheet không có cột mã.
   - [x] B10.4. Test `tests/cases/liveModelReader.js`: ẩn hàng giữa, hai cột ẩn không liền nhau, cột mã nằm giữa, bộ lọc; bản sao vùng đang hiện bị loại; ô thật đang ẩn trả không đọc được; thiếu bảng, bảng sai độ dài, không tăng dần, lệch mảng đánh dấu, số hàng bằng số cột, gid gần nhất là sheet khác đều không trả `ok`. Test Sidebar cho `LIVE_AXIS_NOT_FOUND`. `node tests/run.js` 2662 đạt.
-  - [ ] B10.5. Commit Extension và Sidebar; chủ dự án tải lại Extension; nghiệm thu trên DEV: `!lead` ẩn A–B đọc được ngay không băng cảnh báo, ẩn thêm hàng 3 và một cột giữa đọc đúng khách, Customer có bộ lọc đọc đúng; hiện lại và gỡ bộ lọc.
+  - [x] B10.5. Commit Extension và Sidebar; chủ dự án tải lại Extension; nghiệm thu trên DEV: `!lead` ẩn A–B đọc được ngay không băng cảnh báo, ẩn thêm hàng 3 và một cột giữa đọc đúng khách, Customer có bộ lọc đọc đúng; hiện lại và gỡ bộ lọc.
 
 ### Nhóm C — Đẩy ở mọi mức quét (sau V33 chặng 6)
 
