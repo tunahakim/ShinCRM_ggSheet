@@ -67,29 +67,10 @@ function saveFlowOld(top, record) {
 }
 
 /**
- * Popup xung đột khi lưu: mỗi ô bị đổi trên Sheet trong lúc sửa một dòng, ba lựa chọn áp chung cho mọi ô xung đột. Trả `Promise` mang `mine`, `sheet` hoặc `cancel`.
- * Tên lựa chọn phải tự nói nó làm gì với giá trị nào; đóng nhầm (nền, Esc) là `cancel`, không lưu gì.
- */
-function saveFlowConflictChoice(conflicts) {
-  var hien = function (v) { return v === '' || v === null || v === undefined ? '(trống)' : '"' + v + '"'; };
-  var mot = conflicts.length === 1;
-  return uiDecisionChoose({
-    title: mot ? 'Ô ' + conflicts[0].label + ' vừa được sửa trên Sheet' : conflicts.length + ' ô vừa được sửa trên Sheet',
-    message: 'Trong lúc bạn sửa form, ' + (mot ? 'ô này' : 'các ô này') + ' đã bị đổi trên Sheet nên chưa lưu gì. Chọn giá trị muốn giữ:',
-    lines: conflicts.map(function (c) { return c.label + ': trên Sheet là ' + hien(c.current) + ', bạn đang nhập ' + hien(c.mine) + ' (lúc mở form: ' + hien(c.old) + ')'; }),
-    choices: [
-      { id: 'mine', label: 'Lưu giá trị bạn đang nhập, thay giá trị trên Sheet', variant: 'primary' },
-      { id: 'sheet', label: 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang nhập', variant: 'neutral' },
-      { id: 'cancel', label: 'Quay lại form, chưa lưu gì', variant: 'neutral' }
-    ]
-  });
-}
-
-/**
  * Làm theo lựa chọn của popup xung đột. Lúc này mốc kiểm đã là giá trị trên Sheet, nên `mine` chỉ cần lưu lại; `sheet` đưa giá trị trên Sheet vào các ô xung đột, ô khác giữ chữ đang nhập, form vẫn mở.
  */
 function saveFlowResolveConflict(entity, conflicts) {
-  return saveFlowConflictChoice(conflicts).then(function (choice) {
+  return recordConflictChoose(conflicts, RECORD_DECISION_FORM_WORDS).then(function (choice) {
     if (choice === 'mine') { return saveFlowSubmit(); }
     if (choice === 'sheet') {
       var names = conflicts.map(function (c) { return c.field; });
@@ -130,14 +111,7 @@ function saveFlowResolveGone(entity) {
 
 /** Bản ghi đang bị tiến trình khác giữ (thường là đồng bộ đang đẩy nó lên FBM) nên chưa lưu gì; nội dung đang nhập còn nguyên trên form. Thử lại là gửi lại đúng lệnh lưu. */
 function saveFlowResolveBusy(entity, busy) {
-  return uiDecisionChoose({
-    title: (entity === 'customer' ? 'Khách' : 'Giao dịch') + ' này đang bận nên chưa lưu',
-    message: String(busy && busy.reason || 'Một tiến trình khác đang xử lý bản ghi này.') + ' Nội dung bạn đang nhập vẫn còn trên form.',
-    choices: [
-      { id: 'retry', label: 'Thử lại', variant: 'primary' },
-      { id: 'cancel', label: 'Quay lại form, chưa lưu gì', variant: 'neutral' }
-    ]
-  }).then(function (choice) { return choice === 'retry' ? saveFlowSubmit() : null; });
+  return recordBusyChoose(entity, busy, RECORD_DECISION_FORM_WORDS).then(function (choice) { return choice === 'retry' ? saveFlowSubmit() : null; });
 }
 
 /** Popup trường nhập sai khi lưu: ô sai đã tô đỏ, popup liệt kê lỗi, đóng thì con trỏ về ô sai đầu tiên. */

@@ -865,20 +865,28 @@ function fbmSyncSaveConflict(button) {
   fbmSyncConflictRefresh();
   if (decision.missing.length) { return; }
   button.disabled = true;
-  fbmSyncResolveConflict(item.entity, item.id, decision.choice, decision.merged).catch(function (error) {
+  fbmSyncResolveConflict(item.entity, item.id, decision.choice, decision.merged).then(function () { button.disabled = false; }, function (error) {
     button.disabled = false;
     fbmSyncPaintError(error, 'Không xử lý được xung đột.');
   });
 }
+/** Chữ của popup dùng chung (`recordDecision`) khi đứng ở màn xung đột. */
+var FBM_SYNC_CONFLICT_WORDS = { doing: 'xử lý xung đột', value: 'chọn', opened: 'lúc mở', back: 'Quay lại màn xung đột, chưa lưu gì', kept: 'Lựa chọn của bạn vẫn còn trên màn xung đột.' };
 /**
- * Chốt xung đột đang mở bằng một lần gọi GAS, không đọc lại FBM: gửi kèm giá trị FBM của các trường lệch đúng như màn đã hiện để GAS so hash với bản FBM lúc mở.
- * GAS trả `CONFLICT_REOPEN` khi không ghi được theo bản đã mở (ShinCRM vừa đổi): mở lại xung đột, lúc đó FBM được đọc mới.
+ * Chốt xung đột đang mở bằng một lần gọi GAS, không đọc lại FBM: gửi kèm giá trị FBM của các trường lệch và ảnh chụp lúc mở (`snapshot`) đúng như màn đã hiện.
+ * Kết quả xử lý như lưu form: ShinCRM đổi giữa chừng thì hỏi bằng popup xung đột chung, bận thì popup bận chung, lựa chọn trên màn còn nguyên. `CONFLICT_REOPEN` (giá trị FBM gửi lại lệch bản lúc mở) thì mở lại xung đột, lúc đó FBM được đọc mới.
  */
-function fbmSyncResolveConflict(entity, id, choice) {
-  var merged = arguments.length > 3 ? arguments[3] : undefined, fbmValues = {};
-  ((FBM_SYNC_CLIENT.conflict && FBM_SYNC_CLIENT.conflict.id === id && FBM_SYNC_CLIENT.conflict.fields) || []).forEach(function (field) { fbmValues[field.field] = field.right; });
-  return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues]).then(function (result) {
-    if (result && result.code === 'CONFLICT_REOPEN') {
+function fbmSyncResolveConflict(entity, id, choice, merged) {
+  var item = FBM_SYNC_CLIENT.conflict, fbmValues = {};
+  if (!item || item.id !== id) { return Promise.reject(new Error('Màn xung đột không còn hiện bản ghi ' + id + '; mở lại chế độ xử lý xung đột.')); }
+  (item.fields || []).forEach(function (field) { fbmValues[field.field] = field.right; });
+  return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues, item.snapshot]).then(function (result) {
+    var code = result && result.code;
+    if (code === 'CONFLICT_SHEET_CHANGED') { return fbmSyncConflictSheetChanged(item, result.conflicts, choice, merged); }
+    if (code === 'CONFLICT_RECORD_BUSY') {
+      return recordBusyChoose(entity, result.busy, FBM_SYNC_CONFLICT_WORDS).then(function (pick) { return pick === 'retry' ? fbmSyncResolveConflict(entity, id, choice, merged) : null; });
+    }
+    if (code === 'CONFLICT_REOPEN' || code === 'CONFLICT_NOT_FOUND') {
       fbmSyncShowConflict(null);
       fbmSyncPaint(Object.assign({}, result.status || FBM_SYNC_CLIENT.lastStatus, { message: result.message }));
       return fbmSyncOpenConflict();
@@ -893,6 +901,27 @@ function fbmSyncResolveConflict(entity, id, choice) {
       fbmSyncPaint(snapshot);
       throw error;
     });
+  });
+}
+/**
+ * ShinCRM đã đổi các ô người dùng đang quyết: nhận giá trị trên Sheet làm mốc mới như form (lưu lại sau đó là chủ ý ghi đè) rồi hỏi bằng popup chung.
+ * `sheet` đưa giá trị trên Sheet vào phía ShinCRM của các ô đó và chọn nó, các ô khác giữ lựa chọn; màn vẫn mở để người dùng xem rồi bấm Lưu.
+ */
+function fbmSyncConflictSheetChanged(item, conflicts, choice, merged) {
+  conflicts.forEach(function (c) { item.snapshot.old[c.field] = c.current; });
+  return recordConflictChoose(conflicts, FBM_SYNC_CONFLICT_WORDS).then(function (pick) {
+    if (pick === 'mine') { return fbmSyncResolveConflict(item.entity, item.id, choice, merged); }
+    if (pick !== 'sheet') { return null; }
+    FBM_SYNC_CLIENT.conflictChoices = FBM_SYNC_CLIENT.conflictChoices || {};
+    conflicts.forEach(function (c) {
+      (item.fields || []).forEach(function (field) {
+        if (field.localField !== c.field) { return; }
+        field.left = c.current;
+        FBM_SYNC_CLIENT.conflictChoices[field.field] = 'shin';
+        if (FBM_SYNC_CLIENT.conflictDraft && FBM_SYNC_CLIENT.conflictDraft[field.field]) { delete FBM_SYNC_CLIENT.conflictDraft[field.field].shin; }
+      });
+    });
+    return fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus);
   });
 }
 function fbmSyncRetryPushFailures() {

@@ -1,0 +1,40 @@
+<script>
+/**
+ * Popup dùng chung khi lưu theo ảnh chụp người dùng đã xem mà cửa ghi từ chối: form sửa và màn xung đột FBM cùng một luật (tài liệu 06 Phần 4), nên cùng một popup.
+ * `words` nói người dùng đang ở đâu: `{ doing, value, opened, back }`, ví dụ form là `{ doing: 'sửa form', value: 'nhập', opened: 'lúc mở form', back: 'Quay lại form, chưa lưu gì' }`.
+ */
+var RECORD_DECISION_FORM_WORDS = { doing: 'sửa form', value: 'nhập', opened: 'lúc mở form', back: 'Quay lại form, chưa lưu gì', kept: 'Nội dung bạn đang nhập vẫn còn trên form.' };
+
+/**
+ * Popup xung đột: mỗi ô bị đổi trên Sheet trong lúc người dùng đang quyết, ba lựa chọn áp chung cho mọi ô. Trả `Promise` mang `mine`, `sheet` hoặc `cancel`.
+ * Tên lựa chọn phải tự nói nó làm gì với giá trị nào; đóng nhầm (nền, Esc) là `cancel`, không lưu gì.
+ */
+function recordConflictChoose(conflicts, words) {
+  var w = words || RECORD_DECISION_FORM_WORDS;
+  var hien = function (v) { return v === '' || v === null || v === undefined ? '(trống)' : '"' + v + '"'; };
+  var mot = conflicts.length === 1;
+  return uiDecisionChoose({
+    title: mot ? 'Ô ' + conflicts[0].label + ' vừa được sửa trên Sheet' : conflicts.length + ' ô vừa được sửa trên Sheet',
+    message: 'Trong lúc bạn ' + w.doing + ', ' + (mot ? 'ô này' : 'các ô này') + ' đã bị đổi trên Sheet nên chưa lưu gì. Chọn giá trị muốn giữ:',
+    lines: conflicts.map(function (c) { return c.label + ': trên Sheet là ' + hien(c.current) + ', bạn đang ' + w.value + ' ' + hien(c.mine) + ' (' + w.opened + ': ' + hien(c.old) + ')'; }),
+    choices: [
+      { id: 'mine', label: 'Lưu giá trị bạn đang ' + w.value + ', thay giá trị trên Sheet', variant: 'primary' },
+      { id: 'sheet', label: 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang ' + w.value, variant: 'neutral' },
+      { id: 'cancel', label: w.back, variant: 'neutral' }
+    ]
+  });
+}
+
+/** Popup bản ghi đang bị tiến trình khác giữ trong sổ bận: chưa ghi gì, người dùng thử lại hoặc quay lại. Trả `Promise` mang `retry` hoặc `cancel`. */
+function recordBusyChoose(entity, busy, words) {
+  var w = words || RECORD_DECISION_FORM_WORDS;
+  return uiDecisionChoose({
+    title: (entity === 'customer' ? 'Khách' : 'Giao dịch') + ' này đang bận nên chưa lưu',
+    message: String(busy && busy.reason || 'Một tiến trình khác đang xử lý bản ghi này.') + ' ' + w.kept,
+    choices: [
+      { id: 'retry', label: 'Thử lại', variant: 'primary' },
+      { id: 'cancel', label: w.back, variant: 'neutral' }
+    ]
+  });
+}
+</script>
