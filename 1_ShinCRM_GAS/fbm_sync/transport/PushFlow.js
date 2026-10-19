@@ -118,10 +118,64 @@ FbmSync.finishCustomerCreateRecovery = function (state, response) {
 
 /** Kiểm tra response mở form có đủ trường fingerprint trước khi xác nhận. */
 FbmSync.verifyFormValues = function (response, entity) {
-  var values = FbmSync.extractFormValues(response, entity), required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
+  return FbmSync.requireFormFields(FbmSync.extractFormValues(response, entity), entity);
+};
+/** Giá trị form thiếu trường fingerprint thì hash bản FBM sai, nên không được dùng để so hay dựng lệnh lưu. */
+FbmSync.requireFormFields = function (values, entity) {
+  var required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
   var missing = required.filter(function (name) { return !Object.prototype.hasOwnProperty.call(values, name); });
-  if (missing.length) { throw new Error('FBM_VERIFY_INCOMPLETE: thiếu trường ' + missing.join(', ') + ' trong response đọc xác nhận.'); }
+  if (missing.length) { throw new Error('FBM_VERIFY_INCOMPLETE: thiếu trường ' + missing.join(', ') + ' trong response mở form FBM.'); }
   return values;
+};
+/** Câu nêu tên các trường lệch giữa hai bản cho Log; không kèm giá trị vì nội dung có thể dài, giá trị hai bên xem ở màn xung đột. */
+FbmSync.diffFieldText = function (entity, left, right, gate) {
+  var fields = FbmSync.diff(entity, left, right, gate).map(function (item) { return item.field; });
+  return fields.length ? ' ở trường ' + fields.join(', ') : '';
+};
+
+/**
+ * So ba bản trước khi lưu lên FBM (`09/04` "So trước khi đẩy"): `record` là đúng bản ghi dùng dựng lệnh lưu, `formValues` là bản FBM vừa mở, mốc là `record.fbmHash`.
+ * Trả `action`: `save` (FBM còn bằng mốc, hoặc còn dấu #SC cần bỏ), `settled` (hai bên đã bằng nhau), `conflict` (cả hai cùng đổi, hoặc chưa có mốc mà khác nhau), `fbmOnly` (chỉ FBM đổi, để chiều lấy về kéo).
+ */
+FbmSync.pushOpenDecision = function (entity, record, formValues, gate) {
+  var decision = FbmSync.threeWay({ hBASE: String(record && record.fbmHash || '').trim() }, { hSHIN: FbmSync.hash(record, entity, gate) }, { hFBM: FbmSync.hash(formValues, entity, gate) });
+  var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(formValues && formValues.details);
+  var action = decision.hFBM === decision.hSHIN ? (markerLeft ? 'save' : 'settled') : !decision.fbmChanged ? 'save' : decision.shinChanged ? 'conflict' : 'fbmOnly';
+  return { action: action, hFBM: decision.hFBM, hSHIN: decision.hSHIN, hBASE: decision.hBASE };
+};
+
+/**
+ * Bước mở form quyết không lưu: ghi kết quả lên dòng trong Cửa bản ghi, nhả bản ghi rồi sang ứng viên kế, không dừng phiên.
+ * Dòng đọc lại trong cửa khác bản đã so thì không ghi kết quả so, chỉ đưa về `chờ đối soát` để lượt sau so lại.
+ */
+FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValues, decision, gate) {
+  var entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sync = FbmSync.SYNC_STATUS;
+  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, build: function (local) {
+    if (FbmSync.hash(local, entity, gate) !== decision.hSHIN) { return { patch: { id: local.id, syncStatus: sync.pending }, value: 'changed' }; }
+    if (decision.action === 'settled') { return { patch: { id: local.id, fbmHash: decision.hFBM, syncStatus: sync.synced, syncedAt: new Date() }, value: 'settled' }; }
+    if (decision.action === 'conflict') { return { patch: { id: local.id, syncStatus: sync.conflict }, value: 'conflict' }; }
+    return { patch: { id: local.id, syncStatus: sync.synced }, value: 'fbmOnly' };
+  } });
+  if (done.status === 'busy') { throw new Error('Bản ghi ' + entity + ' ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa ghi kết quả so với FBM.'); }
+  var outcome = done.status === 'gone' ? 'gone' : done.value, message;
+  if (outcome !== 'gone' && outcome !== 'changed') { FbmSync.pushFailuresRemove([entity + ':' + id]); }
+  if (typeof FbmSync.businessStepAdd === 'function' && outcome !== 'gone') { FbmSync.businessStepAdd(state, 'push_' + entity, { written: 1, sheetWriteBatches: 1 }); }
+  if (outcome === 'conflict') {
+    state.counts.conflict += 1;
+    state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
+    FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_CONFLICT !== 'undefined' ? LOG_CONFLICT : 'conflict', 'FBM đã đổi sau lần đồng bộ trước và khác ShinCRM' + FbmSync.diffFieldText(entity, done.local, formValues, gate) + '; không ghi đè FBM, chờ quyết định xung đột.', { syncStatus: sync.conflict });
+    message = 'Không đẩy ' + entity + ' ' + id + ': FBM đã đổi, chuyển xung đột chờ quyết.';
+  } else if (outcome === 'settled') {
+    message = 'FBM đã có đúng dữ liệu ' + entity + ' ' + id + '; cập nhật mốc, không gửi lệnh lưu.';
+  } else if (outcome === 'fbmOnly') {
+    message = 'Không đẩy ' + entity + ' ' + id + ': chỉ FBM đổi, chờ chiều lấy về.';
+  } else if (outcome === 'changed') {
+    message = 'Hoãn ' + entity + ' ' + id + ': dòng vừa được sửa, lượt sau so lại.';
+  } else {
+    message = 'Bỏ ' + entity + ' ' + id + ': dòng không còn trên Sheet.';
+  }
+  state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = message; FbmSync.stateWrite(state);
+  return FbmSync.nextPushRequest(state);
 };
 
 /**
@@ -163,10 +217,7 @@ FbmSync.finishPushVerification = function (state, response) {
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đã xác nhận ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
   }
-  // Ghi tên trường lệch kèm giá trị đã chuẩn hóa (cắt ngắn) để người dùng biết FBM nhận gì; đầy đủ hai bên xem ở màn xung đột.
-  var shortValue = function (text) { text = String(text === undefined || text === null ? '' : text); return '"' + (text.length > 40 ? text.slice(0, 40) + '…' : text) + '"'; };
-  var differingFields = FbmSync.diff(entity, local, values, gate).map(function (item) { return item.field + ' (ShinCRM ' + shortValue(item.left) + ', FBM ' + shortValue(item.right) + ')'; });
-  var differing = differingFields.length ? ' ở trường ' + differingFields.join(', ') : '';
+  var differing = FbmSync.diffFieldText(entity, local, values, gate);
   if (markerLeft && !incomingHash) { differing = ' (FBM vẫn giữ dấu nhận diện #SC sau lệnh sửa không mang dấu)'; FbmSync.markerCleanCount(state); }
   if (outcome.outcome === 'notApplied') {
     state.counts.skipped += 1;
@@ -174,10 +225,12 @@ FbmSync.finishPushVerification = function (state, response) {
     state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'FBM chưa áp dụng ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
   }
-  FbmSync.logPullRecord(entity, values, local, sync.conflict, 'Đọc xác nhận khác dữ liệu vừa ghi' + differing + '; chờ quyết định xung đột.');
+  // Xung đột không dừng phiên (`09/02` bước 3): dòng đã thành `xung đột chờ quyết` và được nhả, các bản ghi sau vẫn đẩy.
+  FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_CONFLICT !== 'undefined' ? LOG_CONFLICT : 'conflict', 'Đọc xác nhận khác dữ liệu vừa ghi' + differing + '; chờ quyết định xung đột.', { syncStatus: sync.conflict });
   state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
-  state.counts.conflict += 1; state.cursor = {}; state.current = ''; state.phase = 'conflict'; state.message = 'Đọc xác nhận khác dữ liệu vừa ghi; đã dừng để kiểm tra xung đột.'; FbmSync.stateWrite(state);
-  return null;
+  state.counts.conflict += 1;
+  state.cursor = { kind: 'push_scan', entity: entity, index: Number(cursor.index || 0) + 1 }; state.current = ''; state.message = 'Đọc xác nhận ' + entity + ' ' + id + ' khác dữ liệu vừa ghi; chuyển xung đột chờ quyết.'; FbmSync.stateWrite(state);
+  return FbmSync.nextPushRequest(state);
 };
 
 /** Dọn dấu chỉ là việc làm gọn: hỏng thì cảnh báo ở Log và câu chốt phiên trên Sidebar, giao dịch vẫn đã đồng bộ và lượt kéo sau xếp dọn lại. */
@@ -439,7 +492,9 @@ FbmSync.continuePush = function (state, response) {
     return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
   }
   if (cursor.operation === 'customer_edit_open') {
-    var customerOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'customer'), 'customer', candidate);
+    var customerOldValues = FbmSync.requireFormFields(FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'customer'), 'customer', candidate), 'customer');
+    var customerDecision = FbmSync.pushOpenDecision('customer', candidate.record, customerOldValues, gate);
+    if (customerDecision.action !== 'save') { return FbmSync.finishPushOpenWithoutSave(state, cursor, candidate, customerOldValues, customerDecision, gate); }
     var customerSaveRequest = FbmSync.customerEditRequest(candidate.record, customerOldValues, gate);
     cursor.operation = 'customer_edit_save';
     delete cursor.oldValues;
@@ -450,6 +505,9 @@ FbmSync.continuePush = function (state, response) {
     var activityOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'activity'), 'activity', candidate);
     var configuredOwner = String(FbmSync.scriptSettings().accountName || ''), currentOwner = String(activityOldValues.owner || '');
     if (!configuredOwner || (currentOwner && currentOwner !== configuredOwner)) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
+    FbmSync.requireFormFields(activityOldValues, 'activity');
+    var activityDecision = FbmSync.pushOpenDecision('activity', candidate.record, activityOldValues, gate);
+    if (activityDecision.action !== 'save') { return FbmSync.finishPushOpenWithoutSave(state, cursor, candidate, activityOldValues, activityDecision, gate); }
     var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate);
     cursor.operation = 'activity_edit_save';
     delete cursor.oldValues;
