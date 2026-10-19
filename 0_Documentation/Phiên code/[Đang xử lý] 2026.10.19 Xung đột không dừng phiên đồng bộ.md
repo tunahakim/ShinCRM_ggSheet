@@ -48,4 +48,14 @@ Branch `claude/fix-conflict-no-stop-f8d187`, tách từ `feature/expensive-ops`.
 - [x] 10. `readAgainStatus` gồm "xung đột chờ quyết" để dòng luôn được đọc lại kể cả khi FBM đã quay về gốc.
 - [x] 11. Test: bốn tình huống (khớp nhau, FBM về gốc, ShinCRM về gốc, vẫn khác) ở `ProductionMatrix.js`; xung đột định danh không bị gỡ ở `Pull.js`.
 - [x] 12. Sửa `09/04` và bảng nguồn ghi ở tài liệu 06.
-- [ ] 13. Chủ dự án nghiệm thu trên Sheet DEV: sửa một dòng đang xung đột cho hai phía khớp nhau, chạy Hai chiều, dòng về "đã đồng bộ" và Log có "Hai phía đã khớp nhau; gỡ xung đột".
+- [x] 13. Chủ dự án nghiệm thu trên Sheet DEV: sửa một dòng đang xung đột cho hai phía khớp nhau, chạy Hai chiều, dòng về "đã đồng bộ" và Log có "Hai phía đã khớp nhau; gỡ xung đột".
+
+## Cờ vắng, bộ đếm và cảnh báo mã khách chỉ định (chủ dự án chốt 2026-10-19)
+
+Chủ dự án thấy ACT-011387 vẫn "xung đột chờ quyết" dù FBM đã xóa giao dịch, ô Bỏ qua đếm dòng được chuyển "chờ đối soát", và mã khách chỉ định gõ sai (ALT0010 thay cho ALT00010) làm phiên không thấy khách mà không báo gì.
+
+- [x] 14. Cửa gắn cờ (`gateFlagDecide`) không còn bỏ dòng chờ quyết: FBM đã xóa hoặc đổi chủ thì dòng nhận cờ, rời hàng đợi xung đột, số chờ quyết giảm theo.
+- [x] 15. Bộ đếm: dòng chỉ ShinCRM đổi chuyển "chờ đối soát" không tính Bỏ qua; dòng cũ so lại vẫn xung đột tính vào ô Xung đột của phiên (một lần mỗi dòng), không cộng vào số chờ quyết; dòng tự gỡ trừ khỏi số chờ quyết. Sửa định nghĩa hai ô ở `09/08`.
+- [x] 16. Test cho 14 và 15.
+- [ ] 17. Cảnh báo mã khách chỉ định, không chặn lưu: lúc lưu cấu hình, mã đúng tiền tố mà sai độ dài thì cảnh báo; lúc chạy, mã chỉ định mà FBM không trả về thì cảnh báo trên Sidebar và ghi Log.
+- [ ] 18. Chủ dự án nghiệm thu trên Sheet DEV: chạy lại với ACT-011387 (FBM đã xóa) thấy dòng chuyển "không thấy bên FBM"; ô Bỏ qua không đếm dòng chờ đối soát; gõ thử một mã chỉ định sai độ dài thấy cảnh báo.
