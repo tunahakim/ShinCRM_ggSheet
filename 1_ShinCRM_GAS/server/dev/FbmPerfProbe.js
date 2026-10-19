@@ -347,6 +347,24 @@ function fbmProbePushStepCost() {
   ].join(String.fromCharCode(10));
 }
 
+/** Tách chi phí trong `pushCandidates`: đọc Sheet, chuyển ô thành bản ghi (gọi lại khi Sheet đã đọc), băm, và các phép đọc state đi kèm. Chỉ đọc. */
+function fbmProbePushHashSplit() {
+  sheetReadCopyClear();
+  return FbmSync.withLocalSnapshot(function () {
+    var out = [], gate = FbmSync.stateCategoryGate(FbmSync.stateRead());
+    ['customer', 'activity'].forEach(function (entity) {
+      var a = Date.now(), first = FbmSync.readLocal(entity), b = Date.now(), again = FbmSync.readLocal(entity), c = Date.now();
+      again.forEach(function (record) { FbmSync.hash(record, entity, gate); }); var d = Date.now();
+      out.push(entity + ': đọc lần đầu ' + (b - a) + ' ms | dựng lại bản ghi khi Sheet đã đọc ' + (c - b) + ' ms | băm ' + again.length + ' dòng ' + (d - c) + ' ms');
+    });
+    sheetReadCopyClear();
+    var fields = entityReadCombinedFields('activity', [DATA_SCHEMA, SYNC_SCHEMA]), ctx = entityReadContext('activity', fields), total = ctx.rowCount;
+    [total, Math.floor(total / 2), 100, 10].forEach(function (n) { var f = Date.now(), got = entityReadRange(ctx, SHEET_FIRST_DATA_ROW + total - n, n); out.push('activity đọc ' + n + ' dòng cuối (đã có bối cảnh): ' + (Date.now() - f) + ' ms, ' + got.rows.length + ' bản ghi'); });
+    var e = Date.now(); FbmSync.stateRead(); FbmSync.pushFailuresRead(); if (typeof FbmSync.scope === 'function') { FbmSync.scope(); } out.push('state + sổ lỗi + phạm vi: ' + (Date.now() - e) + ' ms');
+    return out.join(String.fromCharCode(10));
+  });
+}
+
 /** Chi phí kiểm tra trước phiên tách theo phần rẻ (chạy trước request FBM đầu) và phần đắt (chạy sau khi phiên FBM xác thực, chỉ chiều có đẩy); mỗi phép xóa tờ nháp trước để đo như lần gọi mới. Chỉ đọc. */
 function fbmProbePreflightCost() {
   function timed(label, fn) { sheetReadCopyClear(); var a = Date.now(), result = FbmSync.withLocalSnapshot(fn); return label + ": " + (Date.now() - a) + " ms" + (result && result.candidateCount !== undefined ? " (ứng viên " + result.candidateCount + ", chặn " + result.blocking.length + ")" : ""); }
