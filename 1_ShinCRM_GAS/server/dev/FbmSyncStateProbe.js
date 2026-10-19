@@ -103,9 +103,9 @@ function fbmProbeStateMetadataSizes() {
 function fbmProbeCustomerActivities(customerId) {
   var id = String(customerId || 'CUS-020075'), customer = FbmSync.readLocal('customer').filter(function (record) { return record.id === id; })[0] || null;
   return {
-    customer: customer && { id: customer.id, fbmId: customer.fbmId, fbmCustomerCode: customer.fbmCustomerCode, syncStatus: customer.syncStatus },
+    customer: customer && { id: customer.id, fbmId: customer.fbmId, fbmCustomerCode: customer.fbmCustomerCode, syncStatus: customer.syncStatus, website: customer.website, fbmHash: customer.fbmHash },
     activities: FbmSync.readLocal('activity').filter(function (record) { return record.customerId === id; }).map(function (record) {
-      return { id: record.id, fbmId: record.fbmId, workDate: record.workDate, syncStatus: record.syncStatus, syncedAt: record.syncedAt, recordStatus: record.recordStatus, title: String(record.title || record.details || '').slice(0, 40) };
+      return { id: record.id, fbmId: record.fbmId, workDate: record.workDate, fbmHash: record.fbmHash, content: String(record.content || '').slice(0, 60), syncStatus: record.syncStatus, syncedAt: record.syncedAt, recordStatus: record.recordStatus, title: String(record.title || record.details || '').slice(0, 40) };
     })
   };
 }
