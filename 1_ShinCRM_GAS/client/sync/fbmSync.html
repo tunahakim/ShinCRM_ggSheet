@@ -750,6 +750,7 @@ function fbmSyncClearAccountNotice(scope) {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, []); }
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
+/** Đọc trạng thái GAS và vẽ khi còn mới. Luôn trả đúng status GAS đọc được, kể cả khi không vẽ: bên chờ lượt nền và bên báo lỗi dựa vào giá trị này. */
 function fbmSyncStatusOnce(freshOpen) {
   var epoch = FBM_SYNC_CLIENT.viewEpoch, requestSeq = ++FBM_SYNC_CLIENT.statusRequestSeq, runningWhenRequested = FBM_SYNC_CLIENT.running;
   return callServer('fbmGetSyncStatus').then(function (status) {
@@ -760,7 +761,8 @@ function fbmSyncStatusOnce(freshOpen) {
     if (updatedAt && updatedAt < FBM_SYNC_CLIENT.lastServerUpdatedAt) { return status; }
     if (updatedAt) { FBM_SYNC_CLIENT.lastServerUpdatedAt = updatedAt; }
     FBM_SYNC_CLIENT.statusReady = true;
-    return fbmSyncPaint(status, freshOpen);
+    fbmSyncPaint(status, freshOpen);
+    return status;
   }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'status_load');
     throw error;
