@@ -366,6 +366,65 @@ async function chay(so) {
       [wrote, wide, narrow, capWrote, SF.shardListRead('T_')], [3, ['T_0', 'T_1', 'T_2', 'T_SHARDS'], ['dddddd', '', '', '1', ['dddddd']], 1, ['aaaaaa']]);
   }
 
+  // Cổng của chặng đẩy (C1): dấu lần đẩy sạch chỉ ghi khi lần quét không còn ứng viên, xóa ở đầu chặng mở; lượt nền khớp dấu thì không đọc Sheet, không đẩy.
+  const cleanKey = (q) => q.run.documentProperties.data.FBM_SYNC_PUSH_CLEAN_V1;
+  const syncedCustomer = (q, x) => { const row = editCustomer(x); row.fbmHash = q.F.hash(row, 'customer', q.F.stateCategoryGate(q.F.stateRead())); return row; };
+  {
+    const F = pushQueue([]).F, now = { rev: 7, failures: '', scope: '', account: 'Le Tuan Anh' };
+    const bg = { origin: 'background', scan: 'detail' };
+    check(so, 'C1: phép quyết cổng: lượt tay và Quét nhanh luôn mở; chưa có dấu mở; lệch phần nào thì mở kèm tên phần; bốn phần khớp mới đóng',
+      [F.pushGateDecide({ origin: 'manual', scan: 'detail' }, now, now), F.pushGateDecide({ origin: 'background', scan: 'full' }, now, now), F.pushGateDecide(bg, null, now),
+        F.pushGateDecide(bg, Object.assign({}, now, { rev: 6 }), now).reason, F.pushGateDecide(bg, Object.assign({}, now, { failures: 'customer:CUS-A=h' }), now).reason,
+        F.pushGateDecide(bg, Object.assign({}, now, { scope: 'limited:ALT00010', account: '' }), now).reason, F.pushGateDecide(bg, Object.assign({}, now), now)],
+      [{ open: true, reason: 'manual' }, { open: true, reason: 'bypass_scan' }, { open: true, reason: 'no_mark' }, 'changed:rev', 'changed:failures', 'changed:scope,account', { open: false, reason: 'clean' }]);
+  }
+  {
+    const q = pushQueue([]);
+    q.run.local.customer.push(syncedCustomer(q, 'A'));
+    q.run.hop.reloadJournalRead = () => ({ rev: 41 });
+    const end = q.F.pushStageBegin(q.F.stateRead()), mark = JSON.parse(cleanKey(q) || 'null');
+    const capped = pushQueue(['A', 'B'].map(editCustomer));
+    capped.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify({ rev: 1 }));
+    capped.F.SHARD_LIST_BYTES = 8; capped.F.BUDGET.pushPassesMax = 1;
+    const cappedFirst = capped.F.pushStageBegin(capped.F.stateRead()), clearedAtBegin = cleanKey(capped);
+    pushOk(capped);
+    check(so, 'C1: chặng đẩy quét không còn ứng viên thì ghi dấu đúng bản đọc trước lần quét; chặng mở xóa dấu cũ ngay từ đầu; dừng không sạch thì không ghi dấu',
+      [end, mark, !!cappedFirst, clearedAtBegin, capped.F.stateRead().phase, cleanKey(capped)],
+      [null, { rev: 41, failures: '', scope: '', account: '' }, true, undefined, 'done', undefined]);
+  }
+  {
+    const q = pushQueue(['A'].map(editCustomer));
+    const reads = { count: 0 }, readBefore = q.F.readLocal;
+    q.F.readLocal = (entity) => { reads.count += 1; return readBefore(entity); };
+    q.F.preflightNeedsLocal = () => true;
+    const preflightCalls = [];
+    q.F.preflightLocal = (options) => { preflightCalls.push(options.scan); return { ok: true, issues: [], blocking: [], warnings: [], candidateCount: 1 }; };
+    q.F.preflightApply = () => null;
+    q.run.hop.logTrace = (entry) => q.run.logs.push(entry);
+    const mark = q.F.pushCleanNow();
+    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(mark));
+    const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
+    const stepped = q.F.preflightLocalStep(q.F.stateRead()), gated = q.F.stateRead(), stage = q.F.pushStageBegin(gated);
+    const closedTrace = q.run.logs.filter((event) => event.action === 'push_gate_closed');
+    const full = q.F.stateRead(); full.scan = 'full'; full.pushGate = undefined; q.F.stateWrite(full);
+    const fullState = q.F.stateRead(); q.F.preflightLocalStep(fullState);
+    check(so, 'C1: lượt nền khớp dấu thì cổng đóng: không chạy kiểm dữ liệu ShinCRM, không đọc Sheet, không phát request đẩy, giữ dấu, ghi một dòng vết; Quét nhanh nền vẫn kiểm',
+      [stepped, gated.pushGate, stage, reads.count, q.F.stateRead().phase, JSON.parse(cleanKey(q)), closedTrace.length, preflightCalls, fullState.pushGate],
+      [null, { open: false, reason: 'clean' }, null, 0, 'done', mark, 1, ['full'], { open: true, reason: 'bypass_scan' }]);
+  }
+  {
+    const q = pushQueue(['A'].map(editCustomer));
+    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', 'hỏng');
+    const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
+    const gate = q.F.pushGateCheck(q.F.stateRead(), { origin: 'background', scan: 'detail', mode: 'write' });
+    const warn = q.run.logs.filter((event) => event.action === 'push_clean_read');
+    q.run.hop.reloadJournalRead = () => ({ rev: 3 });
+    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(Object.assign(q.F.pushCleanNow(), { rev: 2 })));
+    check(so, 'C1: dấu hỏng thì Log cảnh báo rồi mở cổng, không coi là chưa có dấu một cách im lặng; sửa Sheet sau lần đẩy sạch (sổ nạp lại tăng) thì mở',
+      [gate, warn.length, warn[0] && warn[0].outcome, q.F.pushGateCheck(q.F.stateRead(), { origin: 'background', scan: 'detail', mode: 'write' })],
+      [{ open: true, reason: 'mark_corrupt' }, 1, 'warn', { open: true, reason: 'changed:rev' }]);
+  }
+
   // Chế độ xung đột (FBM-024): hàng đợi là các dòng Sheet "xung đột chờ quyết", state chỉ giữ số đếm và một bản ghi đang mở.
   const conflictGridFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
   const fbmRow = (id, code, name) => ({ stt_rec_kh: id, ma_kh: code, ten_kh: name, ma_so_thue: '010000' + code.slice(-2), ong_ba: 'Người liên hệ', dc_lh: 'Hà Nội', dien_thoai: '0900000000', email: code.toLowerCase() + '@example.test', ten_dclh_tinh: 'Hà Nội' });

@@ -166,6 +166,16 @@ function soBan(hopCat) {
 /** Công cụ đọc/ghi Sheet tầng 1–3 (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
 const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetStructure.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
+/**
+ * Dấu lần đẩy sạch đọc sổ nạp lại, cài đặt phạm vi và tài khoản đã liên kết; trên GAS ba thứ đó luôn có. Hộp chỉ nạp chặng đẩy thì cấp bản trung tính (không giới hạn phạm vi, chưa liên kết, sổ ở 0); hộp nạp tệp thật hoặc tự gán thì dùng bản của nó.
+ */
+function capDauDaySach(hopCat) {
+  const F = hopCat.FbmSync;
+  if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ scopeLimited: false, scopeCodes: [] }); }
+  if (typeof F.bindingAccountName !== 'function') { F.bindingAccountName = () => ''; }
+  if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
+}
+
 function napServer(hopCat, ...duongDans) {
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
@@ -180,6 +190,7 @@ function napServer(hopCat, ...duongDans) {
     if (duongDan === 'fbm_sync/read/GridRead.js') { capMaNguoiDungThu(hopCat); }
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
+  if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
   return hopCat;
 }
 
