@@ -375,3 +375,28 @@ function fbmProbePreflightCost() {
     timed("Cả hai liền nhau (lệnh chẩn đoán), chiều hai chiều", function () { return FbmSync.runPreflight({ mode: "write", origin: "background", scan: "full" }); })
   ].join(' | ');
 }
+
+/** Chi phí một bước đẩy theo danh sách mã: dựng bối cảnh đọc, đọc cột mã để tra dòng, đọc đúng một dòng, và đọc/ghi một khóa DocumentProperties cỡ 9 KB (khóa thử, xóa ngay sau đo). */
+function fbmProbePushListStepCost() {
+  var out = [], nl = String.fromCharCode(10), key = 'DEV_PROBE_PUSH_LIST';
+  ['customer', 'activity'].forEach(function (entity) {
+    sheetReadCopyClear();
+    var fields = entityReadCombinedFields(entity, [DATA_SCHEMA, SYNC_SCHEMA]);
+    var a = Date.now(), ctx = entityReadContext(entity, fields), b = Date.now(), ids = entityReadIdColumn(ctx), c = Date.now();
+    var id = String(ids[Math.floor(ids.length / 2)] || '').trim(), got = entityReadByIds(ctx, [id]), d = Date.now();
+    out.push(entity + ': bối cảnh ' + (b - a) + ' ms | cột mã ' + ids.length + ' dòng ' + (c - b) + ' ms | đọc 1 dòng theo mã ' + (d - c) + ' ms (' + got.rows.length + ' bản ghi)');
+  });
+  var list = [], n = 0;
+  while (JSON.stringify(list).length < 8800) { list.push('ACT-' + String(100000 + n)); n += 1; }
+  var text = JSON.stringify(list), real = documentStoreReal();
+  function loadAll(label) { var times = []; for (var i = 0; i < 5; i += 1) { var t = Date.now(); real.getProperties(); times.push(Date.now() - t); } return label + ' ' + times.join('/') + ' ms'; }
+  var all = real.getProperties(), bytes = 0; Object.keys(all).forEach(function (k) { bytes += k.length + String(all[k]).length; });
+  out.push('DocumentProperties đang dùng: ' + Object.keys(all).length + ' khóa, ' + bytes + ' byte');
+  var before = loadAll('nạp cả kho, chưa có khóa thử:');
+  var e = Date.now(); real.setProperty(key, text); var f = Date.now(); var back = real.getProperty(key); var g = Date.now();
+  var withKey = loadAll('nạp cả kho, có khóa thử:');
+  var h0 = Date.now(); real.deleteProperty(key); var h = Date.now();
+  out.push('Khóa thử ' + list.length + ' mã, ' + text.length + ' byte: ghi ' + (f - e) + ' ms | đọc ' + (g - f) + ' ms | xóa ' + (h - h0) + ' ms | khớp ' + (back === text));
+  out.push(before); out.push(withKey);
+  return out.join(nl);
+}
