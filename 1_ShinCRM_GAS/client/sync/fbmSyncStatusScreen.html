@@ -6,7 +6,9 @@ function fbmSyncStatusInfoLines(status) {
   var schema = FBM_SYNC_STATUS_SCHEMA, lines = [], active = fbmSyncProgressData(status, {}).active;
   lines.push(fbmSyncStatusLine(schema.info.direction, String(status.direction || schema.directionFallback)));
   var pack = (FBM_SYNC_RUN_SCHEMA.pack.options || []).filter(function (option) { return option.value === status.scanPack; })[0];
-  if (pack) { lines.push(fbmSyncStatusLine(schema.info.pack, pack.label)); }
+  // Lượt không theo gói (Giữ phiên có đẩy) mang nhãn do GAS đặt.
+  var packLabel = pack ? pack.label : String(status.scanLabel || '');
+  if (packLabel) { lines.push(fbmSyncStatusLine(schema.info.pack, packLabel)); }
   if (status.session) { lines.push(fbmSyncStatusLine(schema.info.session, schema.session.customer + (status.session.customer ? schema.session.confirmed : schema.session.absent) + schema.session.separator + schema.session.activity + (status.session.activity ? schema.session.confirmed : schema.session.absent))); }
   if (active && (status.entityLabel || status.current)) { lines.push(fbmSyncStatusLine(schema.info.current, [status.entityLabel, status.current].filter(function (part) { return !!part; }).join(' '))); }
   return lines;
