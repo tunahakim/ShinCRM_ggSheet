@@ -329,21 +329,21 @@ function fbmDevAlignSheetTimezone() {
   return 'Đã đổi múi giờ tệp từ ' + before + ' sang ' + book.getSpreadsheetTimeZone();
 }
 
-/** Chi phí một bước chọn ứng viên đẩy (V17): mỗi phép xóa tờ nháp trước để đo như lần gọi GAS mới; "nóng" là gọi lại trong cùng lần đọc nên chỉ còn phần dựng và băm. Chỉ đọc. */
+/** Chi phí chặng đẩy theo danh sách mã (V17): lần quét cả hai sheet ở đầu mỗi vòng, và một bước đọc lại đúng dòng theo mã rồi xét bằng phép xét một dòng. Mỗi phép xóa tờ nháp trước để đo như lần gọi GAS mới. Chỉ đọc. */
 function fbmProbePushStepCost() {
   function cold(label, fn) { sheetReadCopyClear(); var a = Date.now(), out = FbmSync.withLocalSnapshot(fn); return label + ': ' + (Date.now() - a) + ' ms' + (out !== undefined ? ' (' + out + ')' : ''); }
-  function warm(label, before, fn) { sheetReadCopyClear(); return FbmSync.withLocalSnapshot(function () { before(); var a = Date.now(), out = fn(); return label + ': ' + (Date.now() - a) + ' ms' + (out !== undefined ? ' (' + out + ')' : ''); }); }
   var customerId = 'CUS-020075', activityId = 'ACT-011377';
+  function step(entity, id) {
+    var context = FbmSync.pushReviewContext(FbmSync.stateRead()), record = FbmSync.readLocalById(entity, id);
+    if (!record) { return 'không thấy ' + id; }
+    var parent = entity === 'activity' ? FbmSync.readLocalById('customer', record.customerId) : null, candidate = FbmSync.pushReview(entity, record, parent, context);
+    return candidate ? 'có việc: ' + candidate.kind + (candidate.hold ? ', chờ sửa ' + candidate.hold.code : '') : 'không có việc';
+  }
   return [
-    cold('Đọc Customer (readLocal)', function () { return FbmSync.readLocal('customer').length + ' dòng'; }),
-    cold('Đọc Activity (readLocal)', function () { return FbmSync.readLocal('activity').length + ' dòng'; }),
-    cold('pushCandidates Customer, lạnh', function () { return FbmSync.pushCandidates('customer').length + ' ứng viên'; }),
-    cold('pushCandidates Activity, lạnh', function () { return FbmSync.pushCandidates('activity').length + ' ứng viên'; }),
-    warm('pushCandidates Customer, nóng', function () { FbmSync.readLocal('customer'); }, function () { return FbmSync.pushCandidates('customer').length + ' ứng viên'; }),
-    warm('pushCandidates Activity, nóng', function () { FbmSync.readLocal('customer'); FbmSync.readLocal('activity'); }, function () { return FbmSync.pushCandidates('activity').length + ' ứng viên'; }),
-    cold('Đọc một Customer theo mã', function () { return entityReadRecordById('customer', [DATA_SCHEMA, SYNC_SCHEMA], customerId).rows.length + ' dòng'; }),
-    cold('Đọc một Activity theo mã', function () { return entityReadRecordById('activity', [DATA_SCHEMA, SYNC_SCHEMA], activityId).rows.length + ' dòng'; }),
-    cold('hydratePushCandidate Activity (hiện nay)', function () { return FbmSync.hydratePushCandidate({ entity: 'activity', id: activityId }).record ? 'có' : 'không'; })
+    cold('Quét đầu vòng (localScan + pushCandidatesAll), lạnh', function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan)).length + ' ứng viên'; }),
+    cold('Một bước Customer: đọc theo mã + xét, lạnh', function () { return step('customer', customerId); }),
+    cold('Một bước Activity: đọc theo mã kèm khách cha + xét, lạnh', function () { return step('activity', activityId); }),
+    cold('hydratePushCandidate Activity', function () { return FbmSync.hydratePushCandidate({ entity: 'activity', id: activityId }).record ? 'có' : 'không'; })
   ].join(String.fromCharCode(10));
 }
 
