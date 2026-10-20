@@ -20,29 +20,6 @@ FbmSync.READ_NEW_DONE_PREFIX = 'FBM_SYNC_READ_NEW_DONE_';
 FbmSync.READ_WAIT_KEY = 'FBM_SYNC_READ_WAIT';
 FbmSync.LAST_ACTIVITY_FIELDS = ['end_date', 'ma_cv'];
 FbmSync.TOP_ORDER_PREFIX = 'FBM_SYNC_TOP_ORDER_';
-// Chừa khoảng cho tên khóa dưới trần 9.000 byte một khóa.
-FbmSync.SHARD_LIST_BYTES = 8000;
-
-/** Danh sách chuỗi chia nhiều khóa theo số byte; phần tử không được chứa dấu phẩy (số CUS, `stt_rec_kh`, id giao dịch). */
-FbmSync.shardListRead = function (prefix) {
-  var props = FbmSync.props(), count = Number(props.getProperty(prefix + 'SHARDS') || 0), items = [];
-  for (var i = 0; i < count; i += 1) {
-    String(props.getProperty(prefix + i) || '').split(',').forEach(function (text) { if (text !== '') { items.push(text); } });
-  }
-  return items;
-};
-FbmSync.shardListWrite = function (prefix, items) {
-  var props = FbmSync.props(), previous = Number(props.getProperty(prefix + 'SHARDS') || 0), shards = [], current = '';
-  (items || []).forEach(function (item) {
-    var text = String(item);
-    if (current && current.length + text.length + 1 > FbmSync.SHARD_LIST_BYTES) { shards.push(current); current = ''; }
-    current = current ? current + ',' + text : text;
-  });
-  if (current) { shards.push(current); }
-  shards.forEach(function (text, index) { props.setProperty(prefix + index, text); });
-  for (var j = shards.length; j < previous; j += 1) { props.setProperty(prefix + j, ''); }
-  if (shards.length || previous) { props.setProperty(prefix + 'SHARDS', String(shards.length)); }
-};
 
 /** Mở các kho của lớp 3; kho chính xác từng bit vì khách chưa đánh dấu nghĩa là chưa đọc, không được coi là đã đọc. */
 FbmSync.activityLayersBegin = function () {

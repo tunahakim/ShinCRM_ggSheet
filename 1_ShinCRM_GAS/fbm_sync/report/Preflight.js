@@ -73,7 +73,7 @@ FbmSync.preflightHashSummary = function (scan) {
 
 /**
  * `scan` là bản đọc `localScan` của lần kiểm tra; ứng viên đẩy và hàng xung đột đều xét trên đó, không đọc lại Sheet.
- * Chỉ lỗi chung (đọc dữ liệu hỏng, không dựng được ánh xạ danh mục, thiếu cấu hình chung) mới chặn phiên. Lỗi của riêng một bản ghi chỉ là cảnh báo: dòng xung đột và bản ghi từng đẩy lỗi đã bị `pushCandidates` loại, bản ghi thiếu ánh xạ danh mục hoặc lệch người phụ trách bị `markPushSkipped` loại lúc đẩy; preflight báo trước và không tính chúng vào số ứng viên.
+ * Chỉ lỗi chung (đọc dữ liệu hỏng, không dựng được ánh xạ danh mục, thiếu cấu hình chung) mới chặn phiên. Lỗi của riêng một bản ghi chỉ là cảnh báo: dòng xung đột và bản ghi từng đẩy lỗi bị phép xét một dòng (`pushReview`) loại, bản ghi lệch người phụ trách, thiếu ánh xạ danh mục hoặc thiếu trường bị chặng đẩy đánh dấu chờ sửa; preflight báo trước và không tính chúng vào số ứng viên.
  * `conflictPending` là số dòng xung đột chờ quyết để người điều phối ghi Log; hàm này không tự ghi.
  */
 FbmSync.preflightCandidates = function (issues, mode, scan) {
@@ -100,32 +100,14 @@ FbmSync.preflightCandidates = function (issues, mode, scan) {
     FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), blockWrite);
   }
   try {
-    if (typeof FbmSync.pushCandidates !== 'function') { return { candidates: candidates, gate: gate, settings: settings, conflictPending: conflictPending }; }
-    ['customer', 'activity'].forEach(function (entity) {
-      (FbmSync.pushCandidates(entity, scan) || []).forEach(function (candidate) {
-        candidate.entity = entity;
-        var record = candidate.record || {}, skipped = false;
-        var ownerError = settingsOk && typeof FbmSync.pushOwnerError === 'function' ? FbmSync.pushOwnerError(candidate, settings) : '';
-        if (ownerError) {
-          skipped = true;
-          FbmSync.preflightIssue(issues, 'FBM_ACTIVITY_OWNER_MISMATCH', 'warn', entity, ownerError + ' Lượt này bỏ qua bản ghi đó.', false);
-        }
-        var fields = entity === 'customer'
-          ? [['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')], ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')]]
-          : [['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')]];
-        fields.forEach(function (field) {
-          var value = String(field[1] === null || field[1] === undefined ? '' : field[1]).trim();
-          var valid = gate.valid && gate.valid[field[0]];
-          if (value && (!valid || !valid[value])) {
-            skipped = true;
-            FbmSync.preflightIssue(issues, 'FBM_CATEGORY_MAPPING_MISSING', 'warn', entity, 'Bản ghi ' + String(candidate.id || '') + ' dùng danh mục "' + value + '" nhưng Category chưa có ánh xạ FBM cho ' + field[0] + '; lượt này bỏ qua bản ghi đó.', false);
-          }
-        });
-        if (!skipped) { candidates.push(candidate); }
-        if (settingsOk && candidate.kind === 'create' && entity === 'customer' && (!String(settings.customerPrefix || '').trim() || !String(settings.customerCodeLength || '').trim())) {
-          FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_MISSING', 'error', 'Config', 'Ứng viên tạo Customer ' + String(candidate.id || '') + ' cần tiền tố và độ dài mã khách FBM.', blockWrite);
-        }
-      });
+    // Cùng phép xét với chặng đẩy: dòng chờ người sửa chưa đánh dấu chỉ là cảnh báo; dòng đã đánh dấu thì phép xét coi là không có việc nên không báo lại mỗi lượt.
+    var holdCodes = { owner: 'FBM_ACTIVITY_OWNER_MISMATCH', category: 'FBM_CATEGORY_MAPPING_MISSING', eligibility: 'FBM_PUSH_INELIGIBLE' };
+    FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan, settingsOk ? settings : {})).forEach(function (candidate) {
+      var entity = candidate.entity;
+      if (candidate.hold) { FbmSync.preflightIssue(issues, holdCodes[candidate.hold.code], 'warn', entity, candidate.hold.reason, false); } else { candidates.push(candidate); }
+      if (settingsOk && candidate.kind === 'create' && entity === 'customer' && (!String(settings.customerPrefix || '').trim() || !String(settings.customerCodeLength || '').trim())) {
+        FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_MISSING', 'error', 'Config', 'Ứng viên tạo Customer ' + String(candidate.id || '') + ' cần tiền tố và độ dài mã khách FBM.', blockWrite);
+      }
     });
   } catch (candidateError) {
     FbmSync.preflightIssue(issues, 'FBM_LOCAL_CANDIDATE_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được ứng viên local trước phiên: ' + String(candidateError && candidateError.message || candidateError), blockWrite);

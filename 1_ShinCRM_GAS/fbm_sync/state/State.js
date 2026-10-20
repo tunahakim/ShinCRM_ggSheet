@@ -268,6 +268,28 @@ FbmSync.pushFailuresRemove = function (keys) {
   (keys || []).forEach(function (key) { if (store.hashes[key] !== undefined || store.details[key] !== undefined) { delete store.hashes[key]; delete store.details[key]; removed = true; } });
   if (removed) { FbmSync.pushFailuresWrite(store); }
 };
+
+/**
+ * Danh sách đẩy của chặng đẩy: các mã lần quét gần nhất thấy có việc, Khách trước Giao dịch. Chỉ là gợi ý chỗ cần nhìn, không quyết gì: mỗi mã được đọc lại và xét lại trước khi đẩy, và chặng đẩy chỉ sạch sau một lần quét không còn ứng viên, nên danh sách thiếu hay cũ không làm sót bản ghi.
+ * Chỉ một khóa để kho không phình theo số bản ghi; phần không vừa để lần quét sau. Ghi một lần sau mỗi lần quét, không sửa từng bước.
+ */
+FbmSync.PUSH_LIST_PREFIX = 'FBM_SYNC_PUSH_LIST_';
+FbmSync.PUSH_LIST_TAGS = { customer: 'c', activity: 'a' };
+/** Trả số mã đã ghi (đầu danh sách, vừa một khóa). */
+FbmSync.pushListWrite = function (candidates) {
+  return FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, (candidates || []).map(function (item) { return FbmSync.PUSH_LIST_TAGS[item.entity] + ':' + String(item.id || ''); }), 1);
+};
+/** Phần tử không đúng dạng là khóa hỏng: ném lỗi để bên gọi ghi Log rồi quét lại, không coi là rỗng. */
+FbmSync.pushListRead = function () {
+  var entities = {};
+  Object.keys(FbmSync.PUSH_LIST_TAGS).forEach(function (entity) { entities[FbmSync.PUSH_LIST_TAGS[entity]] = entity; });
+  return FbmSync.shardListRead(FbmSync.PUSH_LIST_PREFIX).map(function (text) {
+    var at = text.indexOf(':'), entity = at > 0 ? entities[text.slice(0, at)] : '', id = at > 0 ? text.slice(at + 1) : '';
+    if (!entity || !id) { throw new Error('Danh sách đẩy hỏng ở phần tử "' + text.slice(0, 40) + '".'); }
+    return { entity: entity, id: id };
+  });
+};
+FbmSync.pushListClear = function () { FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, []); };
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();

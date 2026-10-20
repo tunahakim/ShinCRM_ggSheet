@@ -305,10 +305,7 @@ FbmSync.activityStagesContinue = function (state, extra) {
 FbmSync.beginCustomerPull = function (state) {
   if (state.mode === 'push') {
     FbmSync.prepareCategoryGate(state);
-    state.phase = 'push'; state.entity = 'customer'; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
-    state.message = 'Đang chuẩn bị các bản ghi ShinCRM cần đẩy lên FBM...';
-    FbmSync.stateWrite(state);
-    return FbmSync.nextPushRequest(state);
+    return FbmSync.pushStageBegin(state);
   }
   FbmSync.prepareCategoryGate(state);
   if (typeof FbmSync.businessStepStart === 'function' && state.scan === 'full') {
@@ -334,8 +331,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
     if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
-    state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; state.phase = 'push'; state.entity = 'customer'; FbmSync.stateWrite(state);
-    result.request = FbmSync.nextEnvelope(FbmSync.nextPushRequest(state)); result.status = FbmSync.statusView();
+    result.request = FbmSync.nextEnvelope(FbmSync.pushStageBegin(state)); result.status = FbmSync.statusView();
     return result;
   }
   FbmSync.finishPullRun(state);

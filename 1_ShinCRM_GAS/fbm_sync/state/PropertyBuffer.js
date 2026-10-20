@@ -25,6 +25,37 @@ FbmSync.withLocalSnapshot = function (fn) {
 /** Kho mà code đồng bộ dùng: trong khóa điều phối ghi chờ tới lúc nhả khóa; ngoài khóa như `documentProps()`. */
 FbmSync.props = function () { return documentPropsDeferred(); };
 
+// Chừa khoảng cho tên khóa dưới trần 9.000 byte một khóa.
+FbmSync.SHARD_LIST_BYTES = 8000;
+
+/** Danh sách chuỗi chia nhiều khóa theo số byte; phần tử không được chứa dấu phẩy (số CUS, `stt_rec_kh`, id giao dịch). */
+FbmSync.shardListRead = function (prefix) {
+  var props = FbmSync.props(), count = Number(props.getProperty(prefix + 'SHARDS') || 0), items = [];
+  for (var i = 0; i < count; i += 1) {
+    String(props.getProperty(prefix + i) || '').split(',').forEach(function (text) { if (text !== '') { items.push(text); } });
+  }
+  return items;
+};
+/** `maxShards` giới hạn số khóa được ghi; phần không vừa bị bỏ. Trả số phần tử đã ghi. */
+FbmSync.shardListWrite = function (prefix, items, maxShards) {
+  var props = FbmSync.props(), previous = Number(props.getProperty(prefix + 'SHARDS') || 0), shards = [], current = '', written = 0, limit = maxShards || Infinity;
+  (items || []).some(function (item) {
+    var text = String(item);
+    if (current && current.length + text.length + 1 > FbmSync.SHARD_LIST_BYTES) {
+      if (shards.length + 1 >= limit) { return true; }
+      shards.push(current); current = '';
+    }
+    current = current ? current + ',' + text : text; written += 1;
+    return false;
+  });
+  if (current) { shards.push(current); }
+  shards.forEach(function (text, index) { props.setProperty(prefix + index, text); });
+  // Khóa thừa ghi rỗng thay vì xóa: lệnh ghi gộp được thành một lần gọi kho, còn mỗi lệnh xóa là một lần gọi riêng; số khóa vẫn chặn trên bởi lần dài nhất.
+  for (var j = shards.length; j < previous; j += 1) { props.setProperty(prefix + j, ''); }
+  if (shards.length || previous) { props.setProperty(prefix + 'SHARDS', String(shards.length)); }
+  return written;
+};
+
 /** Ghi gộp hỏng: thêm một dòng Log mang runId/phase/cursor (đọc thêm kho một lần chỉ ở nhánh hỏng) rồi trả lỗi có mã để bên gọi ném. */
 FbmSync.propertyFlushFailed = function (err) {
   var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
