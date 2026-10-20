@@ -771,6 +771,23 @@ async function chay(so) {
   check(so, 'message từ origin lạ mang lệnh Extension đúng nonce không làm đổi FBM_SYNC_CLIENT', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [[], true]);
   messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: ack });
   check(so, 'cùng message từ origin Google Sheets thì được nhận', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [['resolve'], false]);
+  // Extension đang giữ Sheet khác: Sidebar phải hỏi người dùng; chỉ khi bấm chuyển mới gửi lại kèm switchFrom.
+  originHop.setTimeout = setTimeout;
+  const switchPosts = [], switchDialogs = [], switchLogs = [];
+  originHop.window.top = { postMessage: (message) => {
+    switchPosts.push(message.config);
+    const ok = message.config.switchFrom === 'sheet-cu';
+    messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: { action: 'CRM_FBM_CONFIG_ACK', nonce: originHop.SHEET_LINK_NONCE, sessionId: 'relay-1', id: message.id, ok: ok, code: ok ? 'RELAY_SPREADSHEET_SWITCHED' : 'RELAY_SPREADSHEET_SWITCH_REQUIRED', error: ok ? '' : 'Extension đang đồng bộ cho Sheet khác', currentSpreadsheetId: ok ? '' : 'sheet-cu' } });
+  } };
+  originHop.callServer = (name, args) => { switchLogs.push([name].concat(args || [])); return Promise.resolve({ ok: true }); };
+  const relayConfigThu = { url: 'https://script.google.com/macros/s/relay-moi/exec', key: 'k', spreadsheetId: 'sheet-moi', extension: {} };
+  let switchChoice = false;
+  originHop.window.uiDecisionOpen = (options) => { switchDialogs.push(options); return Promise.resolve(switchChoice); };
+  const giuSheetCu = await originHop.fbmSyncPostRelayConfigConfirmed(relayConfigThu).then(() => 'luu', (err) => err.code);
+  check(so, 'Extension đang giữ Sheet khác, người dùng bấm giữ: hộp hỏi nêu Sheet đang giữ, không gửi lại cấu hình, ghi Log lựa chọn', [giuSheetCu, switchPosts.length, switchDialogs.length, /sheet-cu/.test(switchDialogs[0] && switchDialogs[0].message), switchLogs], ['RELAY_SPREADSHEET_KEPT', 1, 1, true, [['fbmLogRelaySwitchDecision', 'keep', 'sheet-cu']]]);
+  switchPosts.length = 0; switchLogs.length = 0; switchChoice = true;
+  const chuyenSheet = await originHop.fbmSyncPostRelayConfigConfirmed(relayConfigThu);
+  check(so, 'Người dùng bấm chuyển: Sidebar ghi Log rồi gửi lại cấu hình kèm switchFrom đúng Sheet Extension đang giữ', [chuyenSheet, switchPosts.map((config) => config.switchFrom), switchLogs], [true, ['', 'sheet-cu'], [['fbmLogRelaySwitchDecision', 'switch', 'sheet-cu']]]);
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
   const inputField = dom.document.createElement('div'); inputField.id = 'fbm-identity-user-field'; inputField.className = 'shin-form-field is-invalid';

@@ -121,6 +121,12 @@ function fbmSyncRelayConfig() {
     backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled()
   };
 }
+/** Ghi Log lựa chọn của người dùng khi Extension đang đồng bộ nền cho Sheet khác: chuyển sang Sheet này hay giữ Sheet cũ. */
+FbmSync.relaySwitchDecisionLog = function (decision, fromSpreadsheetId) {
+  var switching = decision === 'switch', from = String(fromSpreadsheetId || '').slice(0, 120);
+  logEvent({ source: 'fbm_sync', action: switching ? 'relay_spreadsheet_switched' : 'relay_spreadsheet_kept', outcome: LOG_WARN, reason: switching ? 'Người dùng xác nhận chuyển đồng bộ nền của Extension từ Sheet ' + from + ' sang Sheet này.' : 'Người dùng giữ Extension đồng bộ nền cho Sheet ' + from + '; Sheet này chưa nhận đồng bộ nền.', detail: { fromSpreadsheetId: from } });
+  return { ok: true };
+};
 /** Đổi khóa relay nguyên tử; Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
 function fbmSyncRotateRelayKey() {
   var lock = LockService.getScriptLock();

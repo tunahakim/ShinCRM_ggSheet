@@ -154,7 +154,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 }
 var FBM_EXECUTOR_VERSION = '21.22';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = 'e5476b1e7f9c';
+var FBM_CONTRACT_VERSION = '8d2b578969a1';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -562,16 +562,23 @@ function fbmTransportProbe(message) {
   }).catch(function (error) { return { ok: false, code: 'RELAY_FETCH_FAILED', error: String(error && error.message || error), ms: Date.now() - startedAt }; });
 }
 
-/** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. */
+/**
+ * Thế hệ cấu hình relay: tăng mỗi lần Extension chuyển sang Sheet khác. Chuỗi nền mang thế hệ lúc nó đọc cấu hình; lệch thế hệ nghĩa là Sheet đã đổi giữa chừng, chuỗi phải dừng chứ không được chạy tiếp cho Sheet cũ.
+ * Chỉ sống trong RAM của worker là đủ: worker bị tắt thì chuỗi đang chạy cũng chết theo.
+ */
+var relayConfigGeneration = 0;
+
+/** Đọc một relay config duy nhất; thiếu config thì không được chạm tab FBM. Thế hệ lấy trước khi đọc kho: cấu hình vừa đổi giữa lúc đọc thì chuỗi dừng thừa một lần, không bao giờ chạy theo cấu hình cũ. */
 function getRelayConfig() {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.get) { return Promise.resolve(null); }
+  var generation = relayConfigGeneration;
   return new Promise(function (resolve) {
     chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmPollMinutes', 'fbmRunOnStartup'], function (config) {
       var url = normalizeRelayUrl(config && config.fbmWebAppUrl);
       var key = config && String(config.fbmSyncKey || '').trim();
       var spreadsheetId = config && String(config.fbmSpreadsheetId || '').trim();
       var extension = { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(config && config.fbmPollMinutes || 5)))), runOnStartup: config && config.fbmRunOnStartup !== false };
-      resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId, extension: extension } : null);
+      resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId, extension: extension, generation: generation } : null);
     });
   });
 }
@@ -586,30 +593,38 @@ function normalizeRelayUrl(value) {
   return parsed.toString().replace(/\/$/, '');
 }
 
-/** So cấu hình kỹ thuật đã lưu; không gọi Web App khi Sidebar mở. */
-function relayConfigAlreadyConfirmed(config) {
+/** Đọc nguyên trạng cấu hình relay đã lưu. */
+function relayConfigSaved() {
   return new Promise(function (resolve) {
-    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmPollMinutes', 'fbmRunOnStartup'], function (saved) {
-      resolve(
-        normalizeRelayUrl(saved && saved.fbmWebAppUrl) === normalizeRelayUrl(config && config.url) &&
-        String(saved && saved.fbmSyncKey || '') === String(config && config.key || '') &&
-        String(saved && saved.fbmSpreadsheetId || '') === String(config && config.spreadsheetId || '') &&
-        Number(saved && saved.fbmPollMinutes || 5) === Number(config && config.extension && config.extension.pollMinutes || 5) &&
-        (saved && saved.fbmRunOnStartup !== false) === (config && config.extension && config.extension.runOnStartup !== false)
-      );
-    });
+    chrome.storage.local.get(['fbmWebAppUrl', 'fbmSyncKey', 'fbmSpreadsheetId', 'fbmPollMinutes', 'fbmRunOnStartup'], function (saved) { resolve(saved || {}); });
   });
 }
 
-/** Sidebar chỉ truyền địa chỉ relay một lần; Extension chỉ kiểm tra cấu trúc rồi lưu local. */
+/** So cấu hình kỹ thuật đã lưu; không gọi Web App khi Sidebar mở. */
+function relayConfigMatches(saved, config) {
+  return normalizeRelayUrl(saved.fbmWebAppUrl) === normalizeRelayUrl(config.url) &&
+    String(saved.fbmSyncKey || '') === String(config.key || '') &&
+    String(saved.fbmSpreadsheetId || '') === String(config.spreadsheetId || '') &&
+    Number(saved.fbmPollMinutes || 5) === Number(config.extension.pollMinutes || 5) &&
+    (saved.fbmRunOnStartup !== false) === (config.extension.runOnStartup !== false);
+}
+
+/**
+ * Sidebar chỉ truyền địa chỉ relay; Extension kiểm tra cấu trúc rồi lưu local.
+ * Extension giữ đúng một Sheet. Sidebar của Sheet khác chỉ thay được Sheet đang giữ khi mang `switchFrom` đúng Spreadsheet đang lưu, tức người dùng đã bấm xác nhận ở Sidebar; thiếu hoặc sai thì không lưu và trả Spreadsheet đang giữ để Sidebar hỏi. Mở nhầm Sheet vì vậy không tự kéo đồng bộ nền sang Sheet đó.
+ */
 function configureRelay(config) {
   var value = config || {}, url = normalizeRelayUrl(value.url), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
   if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL Web App hợp lệ, khóa hoặc Spreadsheet ID.' }); }
   if (relayConfigureFlight) { return relayConfigureFlight; }
   var extension = value.extension && typeof value.extension === 'object' ? value.extension : {};
   var normalized = { url: url, key: key, spreadsheetId: spreadsheetId, extension: { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(extension.pollMinutes || 5)))), runOnStartup: extension.runOnStartup !== false } };
-  relayConfigureFlight = relayConfigAlreadyConfirmed(normalized).then(function (confirmed) {
-    if (confirmed) {
+  relayConfigureFlight = relayConfigSaved().then(function (saved) {
+    var currentSpreadsheetId = String(saved.fbmSpreadsheetId || '').trim(), switching = !!currentSpreadsheetId && currentSpreadsheetId !== spreadsheetId;
+    if (switching && String(value.switchFrom || '').trim() !== currentSpreadsheetId) {
+      return { ok: false, code: 'RELAY_SPREADSHEET_SWITCH_REQUIRED', currentSpreadsheetId: currentSpreadsheetId, error: 'Extension đang đồng bộ nền cho một Sheet khác; chỉ chuyển sang Sheet này khi người dùng xác nhận.' };
+    }
+    if (relayConfigMatches(saved, normalized)) {
       scheduleGasPoll(normalized.extension);
       return { ok: true, code: 'RELAY_CONFIG_UNCHANGED' };
     }
@@ -617,8 +632,13 @@ function configureRelay(config) {
       chrome.storage.local.set({ fbmWebAppUrl: url, fbmSyncKey: key, fbmSpreadsheetId: spreadsheetId, fbmPollMinutes: normalized.extension.pollMinutes, fbmRunOnStartup: normalized.extension.runOnStartup }, function () {
         var error = chrome.runtime.lastError;
         if (error) { resolve({ ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message }); return; }
+        if (switching) {
+          // Hộp đen của chuỗi cũ thuộc Sheet cũ, không được mang lên GAS của Sheet mới.
+          relayConfigGeneration += 1;
+          chrome.storage.local.remove([FBM_CHAIN_TRAIL_KEY]);
+        }
         scheduleGasPoll(normalized.extension);
-        resolve({ ok: true, code: 'RELAY_CONFIG_SAVED' });
+        resolve({ ok: true, code: switching ? 'RELAY_SPREADSHEET_SWITCHED' : 'RELAY_CONFIG_SAVED' });
       });
     });
   }).catch(function (error) { return { ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: String(error && error.message || error) }; }).finally(function () { relayConfigureFlight = null; });
@@ -652,6 +672,18 @@ function relayRun(config, gasReply, used, channel) {
     return Promise.resolve(gasReply);
   }
   noteChainStep('gas_request_received', next, hop);
+  if (config.generation !== relayConfigGeneration) {
+    // Người dùng đã chuyển Extension sang Sheet khác: báo một lần cho GAS cũ để nó đóng request này rồi dừng, không chạm tab FBM, không chạy request nó cấp tiếp.
+    noteChainStep('config_switched', next, hop, 'RELAY_CONFIG_SWITCHED');
+    var switchedMessage = 'Extension đã chuyển đồng bộ nền sang Sheet khác theo xác nhận của người dùng; dừng chuỗi của Sheet này.';
+    return postRelay(config.url, config.key, Object.assign(lane.failure(next, 'RELAY_CONFIG_SWITCHED', switchedMessage, hop + 1), { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)).then(function () {
+      return { ok: false, code: 'RELAY_CONFIG_SWITCHED', error: switchedMessage, request: null };
+    }, function (relayError) {
+      var relayMessage = String(relayError && relayError.message || relayError || 'Không báo được việc chuyển Sheet lên GAS cũ.').slice(0, 240);
+      noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
+      return { ok: false, code: 'RELAY_CONFIG_SWITCHED', error: switchedMessage + ' ' + relayMessage, request: null };
+    });
+  }
   function post(body) { return postRelay(config.url, config.key, Object.assign(body, { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)); }
   function reportFailure(code, message) {
     var failureCode = String(code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
