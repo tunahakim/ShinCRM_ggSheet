@@ -332,6 +332,16 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   var match = expectedHasValue
     ? { status: FbmSync.identityMismatches(expected, FbmSync.identityFilledFields(expected, runtime)).length ? 'REBIND_REQUIRED' : 'BOUND' }
     : FbmSync.identityStatus(runtime);
+  // Liên kết (hoặc bản nháp đăng nhập thử) phải khớp cả grid User lẫn trang FBM vừa mở sau đăng nhập.
+  var pageCheck = match.status === 'BOUND' ? FbmSync.pageIdentityCheck(expectedHasValue ? expected : match.binding, FbmSync.pageIdentity(response), cursor.pageReloaded === true) : { status: 'ok' };
+  if (pageCheck.status === 'reload') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
+  if (pageCheck.status === 'missing') {
+    FbmSync.sessionIdentityClear(state);
+    state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'FBM_PAGE_IDENTITY_MISSING'; state.lastError = 'Đăng nhập xong nhưng đã tải lại trang FBM vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản.'; state.message = state.lastError; FbmSync.stateWrite(state);
+    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_page_missing'); }
+    return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
+  }
+  if (pageCheck.status === 'mismatch') { match = { status: 'REBIND_REQUIRED' }; }
   if (match.status !== 'BOUND') {
     FbmSync.sessionIdentityClear(state);
     if (!cursor.testOnly && FbmSync.loginConfigSetEnabled) { FbmSync.loginConfigSetEnabled(false); }

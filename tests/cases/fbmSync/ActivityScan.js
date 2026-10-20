@@ -36,7 +36,7 @@ function executorWith(fetchImpl) {
   let listener = null;
   const context = {
     console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined, Uint8Array,
-    document: { documentElement: { innerHTML: '<script>var payload={"cookie":"safeFHN_CRM_App"};</script>', textContent: '' } },
+    document: { documentElement: { innerHTML: '<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script><script>var menu={"username":"Le Tuan Anh"};</script>', textContent: '' } },
     fetch: fetchImpl,
     chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
   };

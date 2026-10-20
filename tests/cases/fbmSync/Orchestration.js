@@ -1,6 +1,6 @@
 /** Kiểm tra state, cursor và status điều phối. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer, giuBanGhiDongBo } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhiDongBo, TRANG_FBM_THU } = require("../../lib/load-gas");
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
@@ -312,7 +312,7 @@ async function chay(so) {
    heartbeat.FbmSync.statePatch({ session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const scheduledHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
   check(so, 'Quet nhanh den han: lan hoi nen mo thang luot Customer bang request dau cua luot (probe User), khong gui request dem khach truoc', [scheduledHeartbeat.ok, scheduledHeartbeat.request.meta.kind, scheduledHeartbeat.status.phase], [true, 'session_probe', 'checking_session']);
-   const continuedProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
+   const continuedProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'probe User cua phien nen moi cap authorize Customer', [continuedProbe && continuedProbe.ok, continuedProbe && continuedProbe.request && continuedProbe.request.meta.kind, continuedProbe && continuedProbe.request && continuedProbe.request.meta.entity], [true, 'authorize', 'customer']);
    const continuedBackground = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'response authorize cua phien nen di qua continuation chung', [continuedBackground && continuedBackground.ok, continuedBackground && continuedBackground.request && continuedBackground.request.meta.kind, continuedBackground && continuedBackground.request && continuedBackground.request.meta.entity, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'authorize', 'activity', 'authorize_activity']);

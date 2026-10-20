@@ -1,6 +1,6 @@
 /** Kiểm tra pull Customer/Activity, identity, hash và missing. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, TRANG_FBM_THU } = require("../../lib/load-gas");
 const { TEP_NEN } = require("../../lib/dung-hop");
 const fs = require("fs");
 const path = require("path");
@@ -292,7 +292,7 @@ async function chay(so) {
   const identityProbeStarted = builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' });
   const identityUserRequest = identityProbeStarted.request;
   check(so, 'Identity probe chi doc User grid, khong lay Authorized thua', [identityProbeStarted.ok, identityUserRequest.meta.kind, identityFlowState.phase, identityFlowState.cursor.kind, identityUserRequest.body.controller], [true, 'identity_user_grid', 'checking_session', 'identity_user_grid', 'User']);
-  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: identityUserRequest.id }] } });
+  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: identityUserRequest.id }] } });
   check(so, 'Identity probe nhan dien du ma so va ten day du, cho xac nhan luu', [identityProbeFinished.ok, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName], [true, 'done', {}, '2037', 'Le Tuan Anh']);
   check(so, 'Identity probe thieu dong User thi fail ro rang', builders.FbmSync.identityUser({ d: { Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }] } } }).code, 'IDENTITY_PROBE_INCOMPLETE');
 

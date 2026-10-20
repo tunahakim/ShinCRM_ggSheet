@@ -93,6 +93,8 @@ function capOXacThucMacDinh(hopCat, ten) {
 
 /** Mã người dùng FBM thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
 const MA_NGUOI_DUNG_THU = '2037';
+/** Giá trị Extension bắt từ trang FBM thử (`transport.captures`), khớp liên kết thử 2037 / Le Tuan Anh mà các test hay lưu; response probe hay grid User giả phải mang theo, vì GAS so liên kết với cả grid lẫn trang. */
+const TRANG_FBM_THU = { payloadCookie: '461020379855cFHN_CRM_App', pageUserId: '2037', pageAccountName: 'Le Tuan Anh' };
 
 /**
  * Tệp thật chỉ dựng request đọc khách sau khi phiên đã xác minh (cổng phát request chèn probe User trước), nên mã người dùng của điều kiện quyền luôn có. Nhiều test dựng request trực tiếp, không qua probe, nên nguồn danh tính phiên (`sessionVerifiedIdentity`) được cấp mã thử khi trống.
@@ -227,4 +229,4 @@ function dongSoCuoi(hopCat) {
   return hopCat.reloadJournalRead().entries.slice(-1)[0] || {};
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi };
+module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, TRANG_FBM_THU };

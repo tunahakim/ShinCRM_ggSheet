@@ -491,11 +491,20 @@ FbmSync.continueStep = function (rawResponse) {
     }
     var probedRuntime = { spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''), userId: probedIdentity.userId, username: probedIdentity.username, accountName: probedIdentity.accountName };
     var probedStatus = typeof FbmSync.identityStatus === 'function' ? FbmSync.identityStatus(probedRuntime) : { status: 'BOUND' };
-    if ((state.scan !== 'identity_probe' && state.scan !== 'identity_check' && probedStatus.status !== 'BOUND') || probedStatus.status === 'REBIND_REQUIRED') {
+    var gridMismatch = (state.scan !== 'identity_probe' && state.scan !== 'identity_check' && probedStatus.status !== 'BOUND') || probedStatus.status === 'REBIND_REQUIRED';
+    // Liên kết phải khớp cả grid User lẫn trang FBM; chưa có liên kết (đọc danh tính để tự điền) thì không có gì để so phía trang.
+    var probedBinding = !gridMismatch && probedStatus.status === 'BOUND' ? probedStatus.binding : null;
+    var pageCheck = probedBinding ? FbmSync.pageIdentityCheck(probedBinding, FbmSync.pageIdentity(rawResponse), cursor.pageReloaded === true) : { status: 'ok' };
+    if (pageCheck.status === 'reload') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
+    if (gridMismatch || pageCheck.status !== 'ok') {
+      var pageMissing = pageCheck.status === 'missing';
       FbmSync.sessionIdentityClear(state);
-      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = 'SESSION_IDENTITY_MISMATCH';
-      state.lastError = 'Tài khoản FBM hiện tại không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_probe_mismatch'); }
+      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = pageMissing ? 'FBM_PAGE_IDENTITY_MISSING' : 'SESSION_IDENTITY_MISMATCH';
+      state.lastError = pageMissing ? 'Đã tải lại trang FBM nhưng vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản nên request nghiệp vụ đã bị chặn.'
+        : gridMismatch ? 'Tài khoản FBM hiện tại không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.'
+          : 'Mã hoặc tên người đăng nhập trên trang FBM không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.';
+      state.message = state.lastError; FbmSync.stateWrite(state);
+      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, pageMissing ? 'session_probe_page_missing' : gridMismatch ? 'session_probe_mismatch' : 'session_probe_page_mismatch'); }
       return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
     }
     FbmSync.sessionIdentityVerify(state, probedIdentity);

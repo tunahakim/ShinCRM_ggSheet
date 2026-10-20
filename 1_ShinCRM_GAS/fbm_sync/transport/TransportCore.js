@@ -35,9 +35,37 @@ FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\
  * thiếu mã, vì chặn như vậy chỉ làm phiên đồng bộ hỏng tùy tab đang hiện trang nào (FBM-037). */
 FbmSync.payloadCookieTransport = function () {
   return {
-    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
+    captures: [
+      { name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 },
+      { name: 'pageUserId', source: 'page_html', pattern: FbmSync.PAGE_USER_ID_CAPTURE_PATTERN, flags: 'i', group: 1 },
+      { name: 'pageAccountName', source: 'page_html', pattern: FbmSync.PAGE_ACCOUNT_NAME_CAPTURE_PATTERN, flags: '', group: 1 }
+    ],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }]
   };
+};
+// Nơi thứ hai có danh tính người đăng nhập, ngoài grid User (Nghiên cứu FBM ch02 "Thuật toán trích xuất userId", "Tên đầy đủ của người đăng nhập"):
+// HTML trang chính sau đăng nhập. Mã người dùng nằm giữa 4 ký tự đầu và 5 ký tự cuối của payload cookie; tên đầy đủ nằm ở `"username":"…"` của khối cấu hình menu (tên trường là username nhưng giá trị là tên đầy đủ).
+FbmSync.PAGE_USER_ID_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"][^'"\\]{4}([^'"\\]+)[^'"\\]{5}FHN_CRM_App\\?['"]`;
+FbmSync.PAGE_ACCOUNT_NAME_CAPTURE_PATTERN = String.raw`\\?['"]username\\?['"]\s*:\s*\\?['"]([^'"\\]+)\\?['"]`;
+/** Danh tính Extension trích từ HTML tab FBM ngay lúc gửi request này (`payloadCookieTransport`). Chỉ đọc từ response hiện tại, không lưu: HTML tab là ảnh chụp lúc tải trang, giá trị chỉ đúng cho lần đọc này. */
+FbmSync.pageIdentity = function (rawResponse) {
+  var parsed = FbmSync.protocol.parse(rawResponse) || {}, transport = parsed._transport || {}, captures = transport.captures || {};
+  return { userId: String(captures.pageUserId || ''), accountName: String(captures.pageAccountName || '') };
+};
+/** URL GAS ra lệnh tab FBM tải lại trước khi gửi request (`meta.reloadFbmPage`): trang khách hàng là trang mặc định sau đăng nhập và có đủ hai giá trị của `pageIdentity`. */
+FbmSync.FBM_IDENTITY_PAGE_PATH = '/Main/zccrAccount.aspx';
+/**
+ * Phát lại đúng request vừa gửi của cursor hiện tại (probe User hoặc grid User sau đăng nhập), kèm lệnh tải tab về trang khách hàng.
+ * Cờ `pageReloaded` trong cursor đánh dấu đã tải lại, để lần đọc sau vẫn thiếu thì `pageIdentityCheck` báo lỗi chứ không tải lại mãi.
+ */
+FbmSync.pageIdentityReloadRequest = function (state, cursor) {
+  state.cursor = Object.assign({}, cursor || {}, { pageReloaded: true });
+  state.message = 'Trang FBM trên tab chưa có mã và tên người đăng nhập; đang tải lại trang khách hàng để đối chiếu.';
+  FbmSync.stateWrite(state);
+  var request = FbmSync.requestForCursor(state);
+  if (!request) { return { ok: false, code: 'SESSION_RESUME_FAILED', request: null, status: FbmSync.statusView(), error: 'Không dựng lại được request để đối chiếu trang FBM.' }; }
+  request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH });
+  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
 };
 /** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
 if (typeof FbmSync.transportValue !== 'function') {

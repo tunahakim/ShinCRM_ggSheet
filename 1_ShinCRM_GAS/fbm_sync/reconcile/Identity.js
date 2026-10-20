@@ -129,6 +129,20 @@ FbmSync.identityFilledFields = function (expected, runtime) {
   ['spreadsheetId', 'userId', 'username', 'accountName'].forEach(function (name) { if (want[name]) { picked[name] = got[name]; } });
   return picked;
 };
+/**
+ * So danh tính trích từ trang FBM (`pageIdentity`) với danh tính kỳ vọng (liên kết hoặc bản nháp đăng nhập thử). Liên kết phải khớp cả grid User lẫn trang; hàm này là phép so phía trang, phép so phía grid là `identityStatus`/`identityMismatches`.
+ * Chỉ so trường kỳ vọng có giá trị (trang không có tên đăng nhập). Trang thiếu giá trị thì trả `reload` khi chưa tải lại, `missing` khi đã tải lại; không đoán, không bỏ qua.
+ */
+FbmSync.pageIdentityCheck = function (expected, page, reloaded) {
+  var want = FbmSync.identityNormalize(expected), got = page || {}, fields = ['userId', 'accountName'].filter(function (name) { return !!want[name]; });
+  if (!fields.length) { return { status: 'ok', reasons: [] }; }
+  var missing = fields.filter(function (name) { return !String(got[name] || ''); });
+  if (missing.length) { return { status: reloaded === true ? 'missing' : 'reload', reasons: missing }; }
+  var picked = {};
+  fields.forEach(function (name) { picked[name] = String(got[name]); });
+  var reasons = FbmSync.identityMismatches(want, picked);
+  return { status: reasons.length ? 'mismatch' : 'ok', reasons: reasons };
+};
 /** Trạng thái liên kết của file đang chạy, kèm đối chiếu danh tính đang chạy (nếu đưa vào) với liên kết qua `identityMismatches`. */
 FbmSync.identityStatus = function (runtime) {
   var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {};

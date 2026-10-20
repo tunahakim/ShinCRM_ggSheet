@@ -1,6 +1,6 @@
 /** Kiểm tra chiều push, khóa, owner và log. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer, giuBanGhiDongBo, soBan } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhiDongBo, soBan, TRANG_FBM_THU } = require("../../lib/load-gas");
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
@@ -74,7 +74,7 @@ async function chay(so) {
   orchestration.FbmSync.statePatch({ runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
   const businessProbe = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
   check(so, 'request nghiep vu chi duoc cap sau probe User dat', businessProbe.meta.kind, 'session_probe');
-  const businessRequest = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: businessProbe.id }] } });
+  const businessRequest = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: businessProbe.id }] } });
   check(so, 'probe dat thi moi phat request nghiep vu de kiem fail-closed', [businessRequest.ok, businessRequest.request && businessRequest.request.meta.kind], [true, 'grid']);
   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: businessRequest.request.id }] } });
   check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, null, 'error', 'TRANSPORT_ERROR']);

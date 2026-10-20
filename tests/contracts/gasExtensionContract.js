@@ -12,7 +12,7 @@ const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
   request: {
     fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
-    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
+    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'reloadFbmPage', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
     transport: ['captures', 'replacements'],
     // Khoảng nghỉ ngẫu nhiên Extension chờ trước mỗi request gọi FBM (kể cả từng phần tử của lô), tính từ lúc request FBM trước kết thúc.
     requestGap: ['minMs', 'maxMs'],
