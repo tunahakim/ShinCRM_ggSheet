@@ -250,9 +250,9 @@ async function chay(so) {
     ['grid', JSON.stringify(['ma_so_thue:**0101234567']), 'customer_create_recover']);
   const afterFound = recoverFound.F.continuePush(recoverFound.F.stateRead(), taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }, { stt_rec_kh: 'FBM-LOST', ma_kh: 'ALT00077', ma_so_thue: '0101234567', ten_kh: 'Tên đã sửa bên FBM' }]));
   const foundRow = recoverFound.run.local.customer[0];
-  check(so, 'FBM-027: tra thấy đúng một Customer khớp chính xác MST thì vá stt_rec_kh và ma_kh, chuyển "chờ đối soát", baseline rỗng, không tạo lại',
-    [foundRow.fbmId, foundRow.fbmCustomerCode, foundRow.syncStatus, foundRow.fbmHash, afterFound, recoverFound.F.stateRead().counts.error],
-    ['FBM-LOST', 'ALT00077', 'chờ đối soát', '', null, 0]);
+  check(so, 'FBM-027: tra thấy đúng một Customer khớp chính xác MST thì vá stt_rec_kh và ma_kh, baseline rỗng, không tạo lại; lần quét lại của chặng mở form để so hai bên chứ không lưu',
+    [foundRow.fbmId, foundRow.fbmCustomerCode, foundRow.fbmHash, afterFound && afterFound.meta && afterFound.meta.kind, recoverFound.F.stateRead().counts.error],
+    ['FBM-LOST', 'ALT00077', '', 'customer_edit_open', 0]);
 
   const recoverMissing = pushQueue([Object.assign({}, lostCustomer)]);
   recoverMissing.F.nextPushRequest(recoverMissing.F.stateRead());

@@ -1,6 +1,6 @@
 /** So ba bản trước khi lưu FBM (`09/04` "So trước khi đẩy"): hash form bằng hash lưới, và bước mở form không ghi đè bản FBM đã đổi sau mốc. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer, giuBanGhiDongBo, soBan } = require("../../lib/load-gas");
+const { taoHopCat, napServer, giuBanGhiDongBo, soBan, datUngVienDay } = require('../../lib/load-gas');
 
 const TEP = ['fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js'];
 
@@ -73,7 +73,7 @@ async function chay(so) {
   const ghi = [];
   F.readLocal = (entity) => entity === 'customer' ? sheet.map((r) => Object.assign({}, r)) : [];
   hop.writeGateSave = (request) => { ghi.push(...request.records); request.records.forEach((patch) => { sheet = sheet.map((r) => r.id === patch.id ? Object.assign({}, r, patch) : r); }); return { ok: true }; };
-  F.pushCandidates = () => sheet.filter((r) => r.id === 'CUS-B' && r.syncStatus === F.SYNC_STATUS.pending).map((record) => ({ kind: 'edit', id: record.id, record, raw: record, position: 1 }));
+  datUngVienDay({ FbmSync: F }, () => sheet.filter((r) => r.id === 'CUS-B' && r.syncStatus === F.SYNC_STATUS.pending).map((record) => ({ kind: 'edit', id: record.id, record, raw: record, position: 1 })));
   F.customerEditOpenRequest = (fbmId) => ({ url: 'https://fbm.test/edit', body: { values: [fbmId] }, meta: { kind: 'customer_edit_open', id: fbmId } });
   giuBanGhiDongBo(hop, 'customer', 'CUS-A');
   const xungDot = F.stateStart('', 'push', 0);
@@ -118,7 +118,7 @@ async function chay(so) {
   let gdSheetRows = [{ id: 'ACT-008600', customerId: 'CUS-A', fbmId: '174813', taskType: 'GD', content: 'ShinCRM sửa nội dung', workDate: '2026-09-09', owner: 'Owner', fbmHash: gdMocCu, syncStatus: F.SYNC_STATUS.pushing }];
   F.readLocal = (entity) => entity === 'activity' ? gdSheetRows.map((r) => Object.assign({}, r)) : [Object.assign({}, khachSheet, { id: 'CUS-A' })];
   hop.writeGateSave = (request) => { request.records.forEach((patch) => { gdSheetRows = gdSheetRows.map((r) => r.id === patch.id ? Object.assign({}, r, patch) : r); }); return { ok: true }; };
-  F.pushCandidates = () => [];
+  datUngVienDay({ FbmSync: F }, () => []);
   giuBanGhiDongBo(hop, 'activity', 'ACT-008600');
   const gdState = F.stateStart('', 'push', 0);
   gdState.cursor = { kind: 'push_wait', operation: 'activity_edit_open', entity: 'activity', index: 0, candidate: { entity: 'activity', kind: 'edit', id: 'ACT-008600' } };

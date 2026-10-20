@@ -145,7 +145,7 @@ function chay(so) {
     client.dong.slice(truocLan2).map((e) => e.outcome + '|' + e.reason), ['error|Sidebar báo lỗi phiên đồng bộ: Lỗi khác sau khi phiên đã dừng']);
   // FBM-009/FBM-020: lỗi theo bản ghi gom trong RAM, xả ra Sheet Log ở ranh giới lát, kể cả khi lát bị exception.
   const gom = dungState();
-  napServer(gom.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/write/SheetSave.js');
+  napServer(gom.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/SheetSave.js');
   const runIdGom = gom.st.runId;
   gom.nen.FbmSync.continue = () => {
     for (let i = 1; i <= 25; i += 1) { gom.nen.FbmSync.recordIssueAdd('pull', 'customer', 'xung đột', 'CUS-' + i, 'FBM và ShinCRM cùng đổi', 'conflict'); }
