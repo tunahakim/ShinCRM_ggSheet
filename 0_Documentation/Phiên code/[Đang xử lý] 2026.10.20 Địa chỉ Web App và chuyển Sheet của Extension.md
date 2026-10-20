@@ -1,0 +1,34 @@
+# Địa chỉ Web App và chuyển Sheet của Extension
+
+Cùng branch `feature/expensive-ops`. Chủ dự án duyệt 2026-10-20: Web App tự ghi địa chỉ của chính nó; Extension chỉ đổi sang Sheet khác khi người dùng bấm xác nhận ở Sidebar.
+
+## Gốc lỗi
+
+- Địa chỉ Web App relay là hằng số trong code (`FBM_SYNC_RELAY_WEB_APP_URL`). Địa chỉ thuộc về bản triển khai của từng script, còn code đi theo mọi bản sao, nên bản sao Sheet chỉ Extension về Web App của Sheet gốc; GAS gốc từ chối vì lệch Spreadsheet ID và ghi lỗi vào Log của Sheet gốc, người dùng bản sao không thấy gì.
+- Extension giữ một cấu hình relay và Sidebar mở sau cùng ghi đè không hỏi: mở nhầm Sheet là đồng bộ nền chuyển sang Sheet đó.
+
+## Số đo
+
+- `fbmProbeServiceUrl` (DEV, 2026-10-20): trong ngữ cảnh Web App, `ScriptApp.getService().getUrl()` trả đúng địa chỉ `/exec` của bản triển khai đang chạy.
+
+## Việc
+
+- [ ] Mục 1: GAS tự biết địa chỉ Web App.
+  - [ ] Kho: ScriptProperties `FBM_SYNC_RELAY_URL_V1` = `{ url, scriptId }`. Đọc thấy `scriptId` khác `ScriptApp.getScriptId()` thì coi như chưa có (bản sao mang theo thuộc tính của script gốc).
+  - [ ] Công cụ ghi `FbmSync.relayUrlRecord()`: lấy `getService().getUrl()`, chỉ ghi khi khác bản đang lưu, ghi Log `relay_url_recorded` khi đổi.
+  - [ ] Điều phối: `doPost` gọi ghi sau khi qua khóa (một lần đọc ScriptProperties cho cả khóa và địa chỉ); `doGet` mới ở EntryPoints: có tham số `fn` và còn thư mục dev thì chuyển cho cửa chạy hàm, ngược lại ghi địa chỉ và trả trang "Đã ghi địa chỉ Web App". Cửa chạy hàm đổi `doGet` thành `devRunnerGet`.
+  - [ ] `fbmSyncRelayConfig` và `fbmSyncRotateRelayKey` đọc địa chỉ đã ghi; chưa có thì ném lỗi rõ (Sidebar hiện, Log ghi), không cấp cấu hình. Bỏ `catch` im lặng khi đọc Spreadsheet ID. Bỏ hằng số.
+  - [ ] `tests/gas.js` lấy mã bản triển khai relay từ `.dev-runner.json` (`relayDeploymentId`), không đọc hằng số trong code.
+- [ ] Mục 2: Extension chỉ đổi Sheet khi người dùng xác nhận.
+  - [ ] `configureRelay`: đã có cấu hình của Spreadsheet khác mà cấu hình mới không mang `switchFrom` đúng Spreadsheet đang lưu thì không lưu, trả `RELAY_SPREADSHEET_SWITCH_REQUIRED` kèm `currentSpreadsheetId`. Cùng Spreadsheet (đổi khóa, đổi nhịp, đổi địa chỉ) thì lưu như cũ.
+  - [ ] Chuyển Sheet thì tăng thế hệ cấu hình; chuỗi nền đang chạy theo cấu hình cũ dừng ở bước kế: báo `RELAY_CONFIG_SWITCHED` một lần về GAS cũ rồi thôi, không gọi FBM.
+  - [ ] Cầu nối iframe chuyển `currentSpreadsheetId` trong ACK. Hợp đồng thêm trường cấu hình, trường ACK và mã mới; chép mã hợp đồng mới.
+  - [ ] Sidebar: ACK `RELAY_SPREADSHEET_SWITCH_REQUIRED` thì mở hộp quyết định dùng chung (`uiDecisionOpen`) nói rõ Extension đang đồng bộ cho Sheet nào; bấm chuyển thì gửi lại kèm `switchFrom`; bấm giữ thì báo ở màn cài đặt rằng Sheet này chưa nhận đồng bộ nền. Cả hai lựa chọn ghi Log.
+- [ ] Mục 3: test offline.
+  - [ ] GAS: chưa ghi địa chỉ thì không cấp cấu hình; địa chỉ của script khác bị bỏ qua; `doPost` qua khóa ghi địa chỉ, ghi một lần khi không đổi.
+  - [ ] Extension: Spreadsheet khác không có `switchFrom` thì không lưu và báo mã; có `switchFrom` đúng thì lưu; `switchFrom` sai thì không lưu; chuỗi cũ dừng sau khi chuyển.
+  - [ ] Sidebar: mã chuyển Sheet mở hộp quyết định, chọn chuyển thì gửi kèm `switchFrom`.
+- [ ] Mục 4: tài liệu 06 (ScriptProperties giữ địa chỉ Web App, bước mở link Web App khi cài, luật chuyển Sheet); `Cây thư mục code.md` nếu có tệp mới.
+- [ ] Mục 5: DEV.
+  - [ ] Đẩy DEV, mở link Web App relay một lần, kiểm `FBM_SYNC_RELAY_URL_V1` đúng địa chỉ relay; nhịp nền vẫn chạy.
+  - [ ] Chủ dự án tải lại Extension và nhân bản Sheet; kiểm bản sao báo chưa có địa chỉ, sau khi triển khai và mở link thì Sidebar bản sao hỏi chuyển Sheet.
