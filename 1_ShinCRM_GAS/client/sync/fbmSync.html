@@ -273,7 +273,7 @@ function fbmSyncConfigureRelay() {
   if (!openId || FBM_SYNC_RELAY_CONFIGURE_OPEN_ID === openId) { return Promise.resolve(null); }
   FBM_SYNC_RELAY_CONFIGURE_OPEN_ID = openId;
   return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = callServer('fbmGetRelayConfig').then(function (config) {
-    return fbmSyncPostRelayConfig(config, true).then(function (saved) {
+    return fbmSyncPostRelayConfigConfirmed(config).then(function (saved) {
       if (!saved) { throw new Error('Extension không xác nhận đã lưu cấu hình kết nối.'); }
       FBM_SYNC_CLIENT.relayConfigured = true;
       FBM_SYNC_CLIENT.relayConfig = config;
@@ -285,6 +285,11 @@ function fbmSyncConfigureRelay() {
   });
 }
 function fbmSyncRelayFailed(error) {
+  // Người dùng chọn giữ Sheet cũ không phải lỗi; lựa chọn đã ghi Log ở GAS, chỉ cần nói rõ ở màn cài đặt.
+  if (error && error.code === 'RELAY_SPREADSHEET_KEPT') {
+    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'info', error.message); }
+    return null;
+  }
   if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'error', 'Không gửi được cấu hình kết nối tới Extension: ' + String(error && error.message || error)); }
   fbmSyncPaintError(error, 'Không gửi được cấu hình kết nối tới Extension.');
   return null;
@@ -293,13 +298,34 @@ function fbmSyncRelayFailed(error) {
 function fbmSyncResendRelayConfig() {
   var config = FBM_SYNC_CLIENT.relayConfig;
   if (!config || FBM_SYNC_RELAY_CONFIGURE_FLIGHT) { return Promise.resolve(null); }
-  return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = fbmSyncPostRelayConfig(config, true).then(function (saved) {
+  return FBM_SYNC_RELAY_CONFIGURE_FLIGHT = fbmSyncPostRelayConfigConfirmed(config).then(function (saved) {
     if (!saved) { throw new Error('Extension không xác nhận đã lưu cấu hình kết nối.'); }
     FBM_SYNC_CLIENT.relayConfigured = true;
     if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return config;
   }).catch(fbmSyncRelayFailed).finally(function () {
     FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;
+  });
+}
+/**
+ * Gửi relay config, chờ ACK; Extension đang đồng bộ nền cho Sheet khác thì hỏi người dùng trước khi chuyển.
+ * Extension chỉ lưu khi nhận `switchFrom` đúng Sheet nó đang giữ, nên không có lựa chọn ở đây thì Sheet đang chạy không bị thay. Mở nhầm Sheet chỉ thấy hộp hỏi, không kéo đồng bộ nền sang.
+ */
+function fbmSyncPostRelayConfigConfirmed(config) {
+  return fbmSyncPostRelayConfig(config, true).catch(function (error) {
+    if (!error || error.code !== 'RELAY_SPREADSHEET_SWITCH_REQUIRED' || !error.currentSpreadsheetId) { throw error; }
+    var from = String(error.currentSpreadsheetId);
+    return window.uiDecisionOpen({
+      title: 'Extension đang đồng bộ nền cho Sheet khác',
+      message: 'Extension đang tự đồng bộ FBM cho Sheet có mã ' + from + '. Chuyển sang Sheet này thì Sheet kia ngừng đồng bộ nền, và Sheet này sẽ tự đẩy dữ liệu của nó lên FBM theo lịch. Chỉ chuyển khi đây đúng là Sheet bạn muốn dùng thật; mở nhầm Sheet thì bấm Giữ Sheet cũ.',
+      cancelLabel: 'Giữ Sheet cũ',
+      confirmLabel: 'Chuyển sang Sheet này'
+    }).then(function (confirmed) {
+      return callServer('fbmLogRelaySwitchDecision', [confirmed ? 'switch' : 'keep', from]).then(function () {
+        if (!confirmed) { var kept = new Error('Bạn đã giữ Extension đồng bộ nền cho Sheet ' + from + '; Sheet này chưa nhận đồng bộ nền. Mở lại Sidebar nếu muốn chuyển.'); kept.code = 'RELAY_SPREADSHEET_KEPT'; throw kept; }
+        return fbmSyncPostRelayConfig(Object.assign({}, config, { switchFrom: from }), true);
+      });
+    });
   });
 }
 /** Gửi relay config và tùy chọn chờ Extension xác nhận đã lưu. */
@@ -313,7 +339,7 @@ function fbmSyncPostRelayConfig(config, requireAck) {
   return new Promise(function (resolve, reject) {
     var timer = setTimeout(function () { delete FBM_SYNC_CLIENT.relayWaiters[id]; reject(new Error('Extension không xác nhận đã lưu khóa relay mới.')); }, 5000);
     FBM_SYNC_CLIENT.relayWaiters[id] = { resolve: resolve, reject: reject, timer: timer };
-    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '', extension: config.extension || {} } }, 'https://docs.google.com');
+    window.top.postMessage({ action: 'CRM_FBM_CONFIG', id: id, nonce: SHEET_LINK_NONCE, sessionId: FBM_SYNC_RELAY_SESSION, config: { url: config.url, key: config.key, spreadsheetId: config.spreadsheetId || '', extension: config.extension || {}, switchFrom: config.switchFrom || '' } }, 'https://docs.google.com');
   });
 }
 /**
@@ -486,7 +512,11 @@ function fbmSyncInstall() {
       if (!relayWaiter) { return; }
       delete FBM_SYNC_CLIENT.relayWaiters[String(data.id || '')];
       clearTimeout(relayWaiter.timer);
-      if (data.ok) { relayWaiter.resolve(true); } else { relayWaiter.reject(new Error(String(data.error || 'Extension không lưu được cấu hình relay.'))); }
+      if (data.ok) { relayWaiter.resolve(true); return; }
+      var relayError = new Error(String(data.error || 'Extension không lưu được cấu hình relay.'));
+      relayError.code = String(data.code || '');
+      relayError.currentSpreadsheetId = String(data.currentSpreadsheetId || '');
+      relayWaiter.reject(relayError);
       return;
     }
     if (data.action === 'CRM_FBM_CREDENTIALS_RESULT' && data.nonce === SHEET_LINK_NONCE) {
@@ -1455,7 +1485,7 @@ function fbmSyncLoginTestLoop(result) {
 function fbmSyncRotateRelay() {
   if (typeof window.confirm === 'function' && !window.confirm('Đổi khóa relay? Extension sẽ phải nhận và lưu khóa mới.')) { return Promise.resolve(null); }
   return callServer('fbmRotateRelayKey').then(function (config) {
-    return fbmSyncPostRelayConfig(config, true).then(function () {
+    return fbmSyncPostRelayConfigConfirmed(config).then(function () {
       FBM_SYNC_CLIENT.relayConfigured = true;
       FBM_SYNC_CLIENT.relayConfig = config;
       if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('relay', 'success', 'Đã đổi cấu hình kết nối và Extension đã xác nhận lưu khóa mới.'); }

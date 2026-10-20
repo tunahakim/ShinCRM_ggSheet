@@ -91,16 +91,29 @@ function capOXacThucMacDinh(hopCat, ten) {
   if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
 }
 
-/** Mã người dùng FBM của phiên thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
+/** Mã người dùng FBM thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
 const MA_NGUOI_DUNG_THU = '2037';
+/** Giá trị Extension bắt từ trang FBM thử (`transport.captures`), khớp liên kết thử 2037 / Le Tuan Anh mà các test hay lưu; response probe hay grid User giả phải mang theo, vì GAS so liên kết với cả grid lẫn trang. */
+const TRANG_FBM_THU = { payloadCookie: '461020379855cFHN_CRM_App', pageUserId: '2037', pageAccountName: 'Le Tuan Anh' };
 
 /**
- * Tệp thật luôn có mã người dùng sau bước kiểm phiên, và request đọc khách thiếu mã thì không dựng được. Hộp cát dựng phiên giả không qua bước đó nên được cấp sẵn mã thử khi phiên giả để trống.
+ * Tệp thật chỉ dựng request đọc khách sau khi phiên đã xác minh (cổng phát request chèn probe User trước), nên mã người dùng của điều kiện quyền luôn có. Nhiều test dựng request trực tiếp, không qua probe, nên nguồn danh tính phiên (`sessionVerifiedIdentity`) được cấp mã thử khi trống.
+ * Chỉ bọc nguồn, không bọc `scriptSettings`: test nào đi qua probe thật thì mã của grid User đi thẳng vào request. Cổng vẫn đọc `sessionIdentityIsVerified` thật, nên test nào kiểm "phiên chưa xác minh phải probe trước" vẫn thấy đúng hành vi.
  */
-function capMaNguoiDungThu(hopCat) {
-  const goc = hopCat.FbmSync && hopCat.FbmSync.scriptSettings;
-  if (typeof goc !== 'function') { return; }
-  hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
+function capPhienThu(hopCat) {
+  const F = hopCat.FbmSync;
+  if (!F) { return; }
+  // Hộp cát chỉ nạp tệp dựng request, không nạp cổng phiên (TransportCore): cấp danh tính thử tối thiểu; nạp TransportCore sau thì hàm thật thay vào và được bọc lại.
+  if (typeof F.sessionVerifiedIdentity !== 'function') { const gia = () => ({ userId: MA_NGUOI_DUNG_THU, username: '', accountName: '' }); gia.laBanThu = true; F.sessionVerifiedIdentity = gia; return; }
+  if (F.sessionVerifiedIdentity.laBanThu) { return; }
+  const goc = F.sessionVerifiedIdentity;
+  const thu = function () {
+    const value = goc.apply(this, arguments);
+    if (!value.userId) { value.userId = MA_NGUOI_DUNG_THU; }
+    return value;
+  };
+  thu.laBanThu = true;
+  F.sessionVerifiedIdentity = thu;
 }
 
 /**
@@ -186,8 +199,12 @@ function napServer(hopCat, ...duongDans) {
   }
   duongDans.forEach((duongDan) => {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
+    // Liên kết tài khoản đọc qua cửa đọc JSON của kho (`documentPropertyJson` trong State.js); bản thật luôn có nó.
+    if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.documentPropertyJson === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
+      vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
+    }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
-    if (duongDan === 'fbm_sync/read/GridRead.js') { capMaNguoiDungThu(hopCat); }
+    if (duongDan === 'fbm_sync/transport/TransportCore.js' || duongDan === 'fbm_sync/read/GridRead.js') { capPhienThu(hopCat); }
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
   if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
@@ -250,4 +267,4 @@ function boUngVienDay(hopCat) {
   if (F.__pushReviewGoc) { F.pushReview = F.__pushReviewGoc; }
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, datUngVienDay, boUngVienDay };
+module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, TRANG_FBM_THU, datUngVienDay, boUngVienDay };

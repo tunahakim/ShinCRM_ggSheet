@@ -130,3 +130,9 @@ function fbmProbeConflicts() {
     return out;
   });
 }
+
+/** Đo `ScriptApp.getService().getUrl()` khi chạy trong ngữ cảnh Web App (cửa chạy hàm là một bản triển khai Web App), để biết GAS có tự biết địa chỉ bản triển khai đang chạy không. */
+function fbmProbeServiceUrl() {
+  var url = String(ScriptApp.getService().getUrl() || '');
+  return { serviceUrl: url, stored: FbmSync.relayUrlStored(PropertiesService.getScriptProperties()), scriptId: ScriptApp.getScriptId() };
+}

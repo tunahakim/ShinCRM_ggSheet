@@ -333,9 +333,9 @@ async function chay(so) {
   noUser.F.scriptSettings = () => Object.assign(settingsWithUser(), { userId: '' });
   const noUserEnd = await noUser.run({ afterError: () => null });
   const noUserStatus = noUser.F.statusView();
-  check(so, 'Thiếu mã người dùng FBM: không gửi request đọc khách nào, phiên dừng ở lỗi FBM_USER_ID_MISSING, Sidebar và Log báo "thiếu mã người dùng FBM"', [
+  check(so, 'Thiếu mã người dùng FBM: không gửi request đọc khách nào, phiên dừng ở lỗi FBM_USER_ID_MISSING, Sidebar và Log báo "chưa có mã người dùng"', [
     noUser.trace.kinds.filter((kind) => /^(scan_job|customer_count|batch)/.test(kind)).length, noUser.F.stateRead().phase, noUser.F.stateRead().lastFailureCode,
-    /thiếu mã người dùng FBM/.test(String(noUserStatus.lastError || noUserStatus.message || '')), noUser.logs.some((event) => /thiếu mã người dùng FBM/.test(JSON.stringify(event))), noUserEnd && noUserEnd.request || null
+    /chưa có mã người dùng/.test(String(noUserStatus.lastError || noUserStatus.message || '')), noUser.logs.some((event) => /chưa có mã người dùng/.test(JSON.stringify(event))), noUserEnd && noUserEnd.request || null
   ], [0, 'error', 'FBM_USER_ID_MISSING', true, true, null]);
 }
 

@@ -125,14 +125,14 @@ FbmSync.pushHold = function (candidate, context) {
   return null;
 };
 
-/** Owner của Activity phải khớp binding đã xác nhận trước khi cấp bất kỳ request push nào. */
+/** Owner của Activity phải khớp tên đầy đủ của tài khoản phiên đã xác minh (cùng là tài khoản liên kết) trước khi cấp request ghi. Trước bước kiểm tra phiên chưa có tên nên không kết luận gì. */
 FbmSync.pushOwnerError = function (candidate, settings) {
   if (!candidate || candidate.entity !== 'activity') { return ''; }
   var cfg = settings || FbmSync.scriptSettings(), configured = String(cfg.accountName || '');
   var owner = String(candidate.record && candidate.record.owner || '');
   if (!configured) { return ''; }
   if (owner && owner !== configured) {
-    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đã liên kết "' + configured + '".';
+    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đang đăng nhập "' + configured + '".';
   }
   return '';
 };

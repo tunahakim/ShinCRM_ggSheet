@@ -35,9 +35,37 @@ FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\
  * thiếu mã, vì chặn như vậy chỉ làm phiên đồng bộ hỏng tùy tab đang hiện trang nào (FBM-037). */
 FbmSync.payloadCookieTransport = function () {
   return {
-    captures: [{ name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 }],
+    captures: [
+      { name: 'payloadCookie', source: 'page_html', pattern: FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN, flags: 'i', group: 1 },
+      { name: 'pageUserId', source: 'page_html', pattern: FbmSync.PAGE_USER_ID_CAPTURE_PATTERN, flags: 'i', group: 1 },
+      { name: 'pageAccountName', source: 'page_html', pattern: FbmSync.PAGE_ACCOUNT_NAME_CAPTURE_PATTERN, flags: '', group: 1 }
+    ],
     replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }]
   };
+};
+// Nơi thứ hai có danh tính người đăng nhập, ngoài grid User (Nghiên cứu FBM ch02 "Thuật toán trích xuất userId", "Tên đầy đủ của người đăng nhập"):
+// HTML trang chính sau đăng nhập. Mã người dùng nằm giữa 4 ký tự đầu và 5 ký tự cuối của payload cookie; tên đầy đủ nằm ở `"username":"…"` của khối cấu hình menu (tên trường là username nhưng giá trị là tên đầy đủ).
+FbmSync.PAGE_USER_ID_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"][^'"\\]{4}([^'"\\]+)[^'"\\]{5}FHN_CRM_App\\?['"]`;
+FbmSync.PAGE_ACCOUNT_NAME_CAPTURE_PATTERN = String.raw`\\?['"]username\\?['"]\s*:\s*\\?['"]([^'"\\]+)\\?['"]`;
+/** Danh tính Extension trích từ HTML tab FBM ngay lúc gửi request này (`payloadCookieTransport`). Chỉ đọc từ response hiện tại, không lưu: HTML tab là ảnh chụp lúc tải trang, giá trị chỉ đúng cho lần đọc này. */
+FbmSync.pageIdentity = function (rawResponse) {
+  var parsed = FbmSync.protocol.parse(rawResponse) || {}, transport = parsed._transport || {}, captures = transport.captures || {};
+  return { userId: String(captures.pageUserId || ''), accountName: String(captures.pageAccountName || '') };
+};
+/** URL GAS ra lệnh tab FBM tải lại trước khi gửi request (`meta.reloadFbmPage`): trang khách hàng là trang mặc định sau đăng nhập và có đủ hai giá trị của `pageIdentity`. */
+FbmSync.FBM_IDENTITY_PAGE_PATH = '/Main/zccrAccount.aspx';
+/**
+ * Phát lại đúng request vừa gửi của cursor hiện tại (probe User hoặc grid User sau đăng nhập), kèm lệnh tải tab về trang khách hàng.
+ * Cờ `pageReloaded` trong cursor đánh dấu đã tải lại, để lần đọc sau vẫn thiếu thì `pageIdentityCheck` báo lỗi chứ không tải lại mãi.
+ */
+FbmSync.pageIdentityReloadRequest = function (state, cursor) {
+  state.cursor = Object.assign({}, cursor || {}, { pageReloaded: true });
+  state.message = 'Trang FBM trên tab chưa có mã và tên người đăng nhập; đang tải lại trang khách hàng để đối chiếu.';
+  FbmSync.stateWrite(state);
+  var request = FbmSync.requestForCursor(state);
+  if (!request) { return { ok: false, code: 'SESSION_RESUME_FAILED', request: null, status: FbmSync.statusView(), error: 'Không dựng lại được request để đối chiếu trang FBM.' }; }
+  request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH });
+  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
 };
 /** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
 if (typeof FbmSync.transportValue !== 'function') {
@@ -69,6 +97,8 @@ FbmSync.sessionGateMeta = function (state) {
 };
 /** Nhóm request hệ thống chỉ cổng phiên được quyền dựng và phát. */
 FbmSync.SESSION_SYSTEM_KINDS = ['login', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
+/** Request hệ thống được đi khi phiên chưa xác minh: chính các bước xác minh. Giữ phiên đọc dữ liệu khách (request đếm mang điều kiện quyền) nên không thuộc nhóm này. */
+FbmSync.SESSION_PROBE_EXEMPT_KINDS = ['login', 'identity_user_grid', 'session_probe'];
 FbmSync.isSessionSystemRequest = function (request) {
   var kind = String(request && request.meta && request.meta.kind || '');
   return FbmSync.SESSION_SYSTEM_KINDS.indexOf(kind) >= 0;
@@ -76,6 +106,34 @@ FbmSync.isSessionSystemRequest = function (request) {
 FbmSync.sessionIdentityIsVerified = function (state) {
   var session = state && state.session || {};
   return session.expired !== true && session.identityVerified === true && !!String(session.sessionId || '') && String(session.identitySessionId || '') === String(session.sessionId || '');
+};
+/** Ghi danh tính tab FBM vừa đọc từ grid User vào phiên, chưa đánh dấu đã xác minh (dùng khi chỉ đọc để tự điền liên kết). */
+FbmSync.sessionIdentityRecord = function (state, identity) {
+  var value = identity || {};
+  state.session = state.session || {};
+  state.session.userId = String(value.userId || '');
+  state.session.accountUsername = String(value.username || '');
+  state.session.accountName = String(value.accountName || '');
+  return state;
+};
+/** Đánh dấu phiên đã xác minh đúng tài khoản liên kết; bên gọi đã đối chiếu `identity` với liên kết trước khi gọi. Cổng phát request chỉ cho request nghiệp vụ đi khi có dấu này (`sessionIdentityIsVerified`). */
+FbmSync.sessionIdentityVerify = function (state, identity) {
+  FbmSync.sessionIdentityRecord(state, identity);
+  var session = state.session;
+  session.expired = false;
+  if (!String(session.sessionId || '')) { session.sessionId = FbmSync.sessionGateToken(); }
+  session.identityVerified = true;
+  session.identitySessionId = String(session.sessionId);
+  session.identityVerifiedAt = Date.now();
+  return state;
+};
+/**
+ * Danh tính tài khoản FBM dùng trong request nghiệp vụ (điều kiện quyền đọc khách, `owner` khi ghi): giá trị đọc từ FBM của phiên đã xác minh, không phải liên kết. Liên kết là giá trị khai báo, chỉ để đối chiếu.
+ * Phiên chưa xác minh thì trả rỗng, nên request đọc khách không dựng được trước bước kiểm tra phiên.
+ */
+FbmSync.sessionVerifiedIdentity = function (state) {
+  var session = state && state.session || {}, verified = FbmSync.sessionIdentityIsVerified(state);
+  return { userId: verified ? String(session.userId || '') : '', username: verified ? String(session.accountUsername || '') : '', accountName: verified ? String(session.accountName || '') : '' };
 };
 FbmSync.sessionIdentityClear = function (state) {
   var session = (state || {}).session || {};
@@ -247,6 +305,15 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
 /**
+ * Mở request đầu của cursor đã lưu (Giữ phiên). Request đọc khách mang mã người dùng của phiên đã xác minh nên không dựng được trước khi xác minh:
+ * phiên chưa xác minh thì mở bằng probe, nhánh probe dựng lại request từ cursor sau khi xác minh.
+ */
+FbmSync.cursorStartEnvelope = function (state) {
+  var current = state || FbmSync.stateRead();
+  if (FbmSync.sessionIdentityIsVerified(current)) { return FbmSync.nextEnvelope(FbmSync.requestForCursor(current)); }
+  return FbmSync.sessionGateResumeProbeRequest(current, current.cursor, 'Đang kiểm tra tab và tài khoản FBM...');
+};
+/**
  * Dấu "phiên hết hạn" và cờ cổng phiên còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
  * Không tốn request hỏi riêng: bỏ dấu và cờ cổng của lượt cũ, request việc thật của lượt mới tự nhận diện phiên; phiên chết thì cổng đăng nhập theo chu kỳ chờ như mọi response khác.
  * Cờ "đã thử đăng nhập" chỉ chặn lặp đăng nhập trong một lượt; để sót sang lần hỏi sau thì phiên chết lần nữa bị dừng nhầm thay vì đăng nhập lại. Giãn cách giữa các lần đăng nhập do chu kỳ thử lại giữ, không do cờ này.
@@ -270,7 +337,7 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
     current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';
     current.lastFailureCode = 'SESSION_PROBE_RETRY';
     FbmSync.stateWrite(current);
-    return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe')), status: FbmSync.statusView() };
   }
   if (gate.probeOnly === true || gate.loginAttempted === true) {
     var code = gate.probeOnly === true ? 'SESSION_PROBE_UNCERTAIN' : 'SESSION_PROBE_FAILED_AFTER_LOGIN';
@@ -376,7 +443,7 @@ FbmSync.nextEnvelope = function (request) {
     var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
-    var requestNeedsGate = !FbmSync.isSessionSystemRequest(request) || cursorNeedsGate || requestKind === 'authorize';
+    var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
     var loginFlowOwnsSystemRequest = typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(pendingState);
     if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
       var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});

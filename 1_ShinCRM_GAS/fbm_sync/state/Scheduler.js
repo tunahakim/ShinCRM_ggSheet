@@ -241,7 +241,7 @@ FbmSync.keepaliveStart = function (direction) {
   }
   state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('heartbeat')), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorStartEnvelope(state), status: FbmSync.statusView() };
 };
 /**
  * Tiến trình hiện tại của chuỗi vừa chạy xong: ghi giờ chạy xong của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
@@ -321,10 +321,10 @@ function fbmSyncHeartbeatRequest(options) {
       var opened = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan)), openedRequest = opened && opened.request || null, openedState = FbmSync.stateRead();
       if (!openedRequest) { return { ok: !!(opened && opened.ok), code: opened && opened.code || 'CHAIN_START_EMPTY', request: null, status: FbmSync.statusView(), error: opened && opened.error }; }
       var openedEnvelope = openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest);
-      var openedCode = String((openedState.cursor || {}).kind || '') === 'heartbeat' && typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(openedEnvelope, openedState) : 'CHAIN_REQUEST_READY';
+      var openedCode = openedState.scheduledScan === 'heartbeat' && typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(openedEnvelope, openedState) : 'CHAIN_REQUEST_READY';
       return { ok: true, code: openedCode, request: openedEnvelope, status: FbmSync.statusView() };
     }
-    var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
+    var heartbeatEnvelope = FbmSync.cursorStartEnvelope(state), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
 }

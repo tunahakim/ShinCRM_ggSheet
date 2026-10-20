@@ -347,7 +347,7 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
 /** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. */
 FbmSync.pushConfigErrors = function (candidate, settings) {
   var cfg = settings || FbmSync.scriptSettings();
-  if (!String(cfg.accountName || '').trim()) { return 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.'; }
+  if (!String(cfg.accountName || '').trim()) { return 'Phiên FBM chưa có tên đầy đủ của tài khoản đã xác minh; chiều đẩy đã bị dừng.'; }
   if (candidate.kind === 'create' && candidate.entity === 'customer' && (!String(cfg.customerPrefix || '').trim() || !String(cfg.customerCodeLength || '').trim())) { return 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.'; }
   return '';
 };

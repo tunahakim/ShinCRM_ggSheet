@@ -57,6 +57,7 @@ FbmSync.budgetTimeoutMs = function (request, requestGap) {
     total += (String(meta.kind || '') === 'scan_chunk' ? 0 : gapMs) + FbmSync.budgetFetchMs(meta) * fetches;
   });
   if (request && request.meta && request.meta.afterLoginUrl) { total += budget.tabReadyMs; }
+  if (request && request.meta && request.meta.reloadFbmPage) { total += budget.tabReadyMs; }
   return total;
 };
 

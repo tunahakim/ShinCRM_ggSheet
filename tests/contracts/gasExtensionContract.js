@@ -12,7 +12,7 @@ const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
   request: {
     fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
-    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
+    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'reloadFbmPage', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job'],
     transport: ['captures', 'replacements'],
     // Khoảng nghỉ ngẫu nhiên Extension chờ trước mỗi request gọi FBM (kể cả từng phần tử của lô), tính từ lúc request FBM trước kết thúc.
     requestGap: ['minMs', 'maxMs'],
@@ -38,12 +38,18 @@ const CONTRACT = {
   // Extension → Web App GAS (nhịp nền).
   relay: {
     kinds: ['heartbeat_request', 'heartbeat', 'heartbeat_transport_failure', 'background_sync', 'transport_probe'],
-    commands: ['continue', 'transport_failure']
+    commands: ['continue', 'transport_failure'],
+    // Extension đã chuyển sang Sheet khác giữa chuỗi: báo một lần cho GAS cũ rồi dừng.
+    failureCodes: ['RELAY_CONFIG_SWITCHED']
   },
   // Sidebar ↔ Extension qua postMessage.
   bridge: {
     toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_REQUEST', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL', 'CRM_FBM_TRANSPORT_PROBE'],
-    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_TRANSPORT_PROBE_RESULT']
+    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_TRANSPORT_PROBE_RESULT'],
+    // Cấu hình relay: `switchFrom` là Spreadsheet Extension đang giữ, chỉ gửi sau khi người dùng xác nhận chuyển Sheet ở Sidebar.
+    config: ['url', 'key', 'spreadsheetId', 'extension', 'switchFrom'],
+    configAck: ['ok', 'code', 'error', 'currentSpreadsheetId'],
+    configCodes: ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 'RELAY_SPREADSHEET_SWITCHED', 'RELAY_SPREADSHEET_SWITCH_REQUIRED', 'RELAY_CONFIG_INVALID', 'RELAY_CONFIG_SAVE_FAILED']
   }
 };
 

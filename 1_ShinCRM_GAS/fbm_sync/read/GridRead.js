@@ -4,25 +4,18 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 // Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
 FbmSync.CUSTOMER_PAGE_ROWS = 50;
 
-/** Đọc cấu hình runtime; token ưu tiên state của phiên hiện tại. */
+/** Đọc cấu hình runtime. Cookie, token và danh tính (mã người dùng, tên đầy đủ) lấy từ phiên; danh tính chỉ có khi phiên đã xác minh (`sessionVerifiedIdentity`). */
 FbmSync.scriptSettings = function () {
-  var currentState = {}, session = {};
-  try { currentState = FbmSync.stateRead() || {}; session = currentState.session || {}; } catch (ignore) { currentState = {}; session = {}; }
-  var cookie = String(session.cookie || '');
-  var userId = String(session.userId || '');
-  if (!userId && cookie.indexOf('FHN_CRM_App') >= 0) {
-    var compact = cookie.slice(0, cookie.indexOf('FHN_CRM_App'));
-    userId = compact.length > 9 ? compact.slice(4, -5) : '';
-  }
-  var accountName = typeof FbmSync.bindingAccountName === 'function' ? FbmSync.bindingAccountName() : '';
+  var currentState = FbmSync.stateRead() || {}, session = currentState.session || {};
+  var identity = FbmSync.sessionVerifiedIdentity(currentState);
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   return {
     baseUrl: 'https://fbo.com.vn:8888',
-    cookie: cookie,
+    cookie: String(session.cookie || ''),
     customerAuthorized: String(session.customerAuthorized || ''),
     activityAuthorized: String(session.activityAuthorized || ''),
-    userId: userId,
-    accountName: accountName,
+    userId: identity.userId,
+    accountName: identity.accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || '')
   };
@@ -59,7 +52,7 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
     var cfg = FbmSync.scriptSettings(), opt = options || {}, payload = gridPayload(entity, opt, cfg);
     if (entity === 'customer') {
       // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
-      if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('thiếu mã người dùng FBM nên không dựng request đọc khách; kiểm tra lại tab FBM rồi chạy lại.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
+      if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('phiên FBM chưa được xác minh tài khoản nên chưa có mã người dùng; không dựng request đọc khách.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
       payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
     }
     var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
@@ -306,15 +299,4 @@ FbmSync.extractAuthorized = function (response) {
   var data = parsed.d || parsed;
   if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
   return String(data.Authorized || data.authorized || '');
-};
-/** Lấy các trường nhận diện không nhạy cảm nếu response authorize có trả; không suy đoán từ payload. */
-FbmSync.extractSessionIdentity = function (response) {
-  var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
-  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || {}; }
-  var source = data && typeof data === 'object' ? data : {}, pick = function (names) {
-    for (var i = 0; i < names.length; i += 1) { if (source[names[i]] !== undefined && source[names[i]] !== null) { return String(source[names[i]]); } }
-    return '';
-  };
-  // `FBM_ACCOUNT_NAME` below is a possible field alias returned by FBM, never a Config parameter.
-  return { userId: pick(['FBM_USER_ID', 'UserId', 'userId', 'user_id', 'userid']), accountName: pick(['FBM_ACCOUNT_NAME', 'AccountName', 'accountName', 'UserName', 'userName', 'username', 'FullName', 'fullName']) };
 };

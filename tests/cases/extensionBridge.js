@@ -345,7 +345,7 @@ async function chay(so) {
   const bootstrapSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'ram', 'bootstrap.html'), 'utf8');
   check(so, 'mo Sidebar gui relay mot lan sau bat tay local, khong doi mo man Dong bo', bootstrapSource.indexOf('sheetLinkInstall();') >= 0 && bootstrapSource.indexOf('fbmSyncPrepareRelayForSidebarOpen();') >= 0 && syncSource.indexOf('function fbmSyncPrepareRelayForSidebarOpen()') >= 0 && syncSource.indexOf('FBM_SYNC_RELAY_OPEN_PREPARED') >= 0 && syncSource.indexOf('CRM_FBM_HEARTBEAT_NOW') < 0, true);
   check(so, 'GAS tu cap khoa relay mot lan bang lock', entryPointsSource.indexOf('documentStoreWaitLock(lock, 10000)') >= 0 && entryPointsSource.indexOf('if (!key) { key = Utilities.getUuid()') >= 0 && entryPointsSource.indexOf('FBM_SYNC_KEY') >= 0, true);
-  check(so, 'GAS cap relay tu deployment co dinh, khong lay URL @HEAD theo context', entryPointsSource.indexOf('FBM_SYNC_RELAY_WEB_APP_URL') >= 0 && entryPointsSource.indexOf('ScriptApp.getService().getUrl()') < 0, true);
+  check(so, 'GAS khong chua dia chi Web App co dinh (ban sao Sheet phai tu ghi dia chi cua minh)', /script\.google\.com\/macros\/s\/AKfy/.test(entryPointsSource), false);
   check(so, 'doi khoa relay co ACK tu Extension', entryPointsSource.indexOf('function fbmSyncRotateRelayKey') >= 0 && syncSource.indexOf('fbmSyncPostRelayConfig(config, true)') >= 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CONFIG_ACK') >= 0, true);
   check(so, 'relay tu choi probe ngoai nhip nen; Extension khong con ham probe rieng', entryPointsSource.indexOf("body.kind === 'probe'") < 0 && entryPointsSource.indexOf('RELAY_KIND_UNSUPPORTED') >= 0 && workerSource.indexOf('function fbmRelayProbe()') < 0 && workerSource.indexOf("type === 'FBM_RELAY_PROBE'") < 0, true);
   check(so, 'Web App relay kiem tra khoa va Spreadsheet ID truoc khi xu ly', entryPointsSource.indexOf("getProperty('FBM_SYNC_KEY')") >= 0 && entryPointsSource.indexOf("body.key !== expected") >= 0 && entryPointsSource.indexOf("String(body.spreadsheetId) !== actualSpreadsheetId") >= 0, true);
@@ -361,7 +361,7 @@ async function chay(so) {
   check(so, 'Extension chi kiem tra cau truc roi luu relay local, khong probe Web App', workerSource.indexOf('function configureRelay(config)') >= 0 && workerSource.indexOf('normalizeRelayUrl(value.url)') >= 0 && workerSource.indexOf("kind: 'probe'") < 0 && workerSource.indexOf('configureRelay(config).then(sendResponse)') >= 0, true);
   check(so, 'relay loi khong yeu cau Sidebar tu lam moi hoac tao retry ngoai lich', workerSource.indexOf('function requestRelayRefresh') < 0 && fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_REFRESH_RELAY') < 0 && syncSource.indexOf('CRM_FBM_RELAY_REFRESH') < 0, true);
   check(so, 'alarm la nhip ky thuat; GAS moi quyet dinh co viec nen', workerSource.indexOf('function restoreHeartbeatSchedule') >= 0 && workerSource.indexOf('getRelayConfig().then(function (config)') >= 0 && workerSource.indexOf('fbmRelayBackgroundEnabled') < 0 && workerSource.indexOf('function applyRelaySchedule') < 0, true);
-  check(so, 'relay config trung khop da xac nhan khong probe lai GAS', workerSource.indexOf('function relayConfigAlreadyConfirmed') >= 0 && workerSource.indexOf("code: 'RELAY_CONFIG_UNCHANGED'") >= 0 && workerSource.indexOf('if (relayConfigureFlight)') >= 0, true);
+  check(so, 'relay config trung khop da xac nhan khong probe lai GAS', workerSource.indexOf('function relayConfigMatches') >= 0 && workerSource.indexOf("code: 'RELAY_CONFIG_UNCHANGED'") >= 0 && workerSource.indexOf('if (relayConfigureFlight)') >= 0, true);
   check(so, 'service worker chi giu mot pipeline nen qua heartbeat', workerSource.indexOf('function fbmRunBackgroundSync()') < 0 && workerSource.indexOf("type === 'FBM_BACKGROUND_SYNC'") < 0 && workerSource.indexOf('relayBackgroundSyncRequests') < 0, true);
   check(so, 'heartbeat coi GAS noop hop le la thanh cong va khong tim tab FBM', workerSource.indexOf("noteHeartbeatStatus('gas_noop'") >= 0 && workerSource.indexOf('if (!gasRequest.request)') >= 0, true);
   check(so, 'background relay dung DTO gon, khong gui traceTail/metadata Sidebar', workerSource.indexOf("kind: 'background_sync'") >= 0 && entryPointsSource.indexOf('fbmSyncRelayCompactResult') >= 0 && entryPointsSource.indexOf("body.kind === 'background_sync'") >= 0, true);
@@ -397,7 +397,8 @@ async function chay(so) {
       },
       storage: { local: {
         get(keys, done) { const value = {}; (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = relayStorage[key]; }); done(value); },
-        set(value, done) { Object.assign(relayStorage, value); done(); }
+        set(value, done) { Object.assign(relayStorage, value); if (done) { done(); } },
+        remove(keys) { (Array.isArray(keys) ? keys : [keys]).forEach((key) => { delete relayStorage[key]; }); }
       } }
     },
     fetch() { relayFetches += 1; return Promise.reject(new Error('configureRelay không được fetch')); }
@@ -483,17 +484,40 @@ async function chay(so) {
   const changedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: { pollMinutes: 6, runOnStartup: true } });
   check(so, 'cau hinh relay chi luu local va khong phat sinh /exec probe', [localRelay.code, unchangedRelay.code, changedRelay.code, relayFetches, relayStorage.fbmWebAppUrl, relayAlarms, relayAlarm.periodInMinutes, typeof workerMessageListener], ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 'RELAY_CONFIG_SAVED', 0, 'https://script.google.com/macros/s/relay-test/exec', 2, 6, 'function']);
 
+  // Extension giữ đúng một Sheet: Sidebar của Sheet khác chỉ thay được khi người dùng đã xác nhận (mang `switchFrom` đúng Sheet đang giữ).
+  const configCu = await workerContext.getRelayConfig();
+  relayStorage.fbmChainTrail = { stage: 'fbm_tab_sent' };
+  const sheetMoi = { url: 'https://script.google.com/macros/s/relay-moi/exec', key: 'relay-key-moi', spreadsheetId: 'sheet-moi' };
+  const chuaHoi = await workerContext.configureRelay(sheetMoi);
+  check(so, 'Sidebar của Sheet khác gửi cấu hình khi chưa hỏi người dùng: Extension không lưu, trả mã yêu cầu xác nhận kèm Sheet đang giữ', [chuaHoi.ok, chuaHoi.code, chuaHoi.currentSpreadsheetId, relayStorage.fbmSpreadsheetId, relayStorage.fbmWebAppUrl], [false, 'RELAY_SPREADSHEET_SWITCH_REQUIRED', 'sheet-test', 'sheet-test', 'https://script.google.com/macros/s/relay-test/exec']);
+  const hoiSai = await workerContext.configureRelay(Object.assign({ switchFrom: 'sheet-nao-do' }, sheetMoi));
+  check(so, 'switchFrom không đúng Sheet đang giữ (xác nhận cho tình huống cũ): Extension không lưu', [hoiSai.code, relayStorage.fbmSpreadsheetId], ['RELAY_SPREADSHEET_SWITCH_REQUIRED', 'sheet-test']);
+  const daXacNhan = await workerContext.configureRelay(Object.assign({ switchFrom: 'sheet-test' }, sheetMoi));
+  check(so, 'Người dùng xác nhận chuyển: Extension thay hẳn cấu hình cũ, xóa hộp đen của chuỗi Sheet cũ', [daXacNhan.code, relayStorage.fbmSpreadsheetId, relayStorage.fbmWebAppUrl, relayStorage.fbmSyncKey, relayStorage.fbmChainTrail], ['RELAY_SPREADSHEET_SWITCHED', 'sheet-moi', 'https://script.google.com/macros/s/relay-moi/exec', 'relay-key-moi', undefined]);
+  const cungSheet = await workerContext.configureRelay(Object.assign({}, sheetMoi, { key: 'relay-key-xoay' }));
+  check(so, 'Cùng Sheet đổi khóa không cần xác nhận', [cungSheet.code, relayStorage.fbmSyncKey], ['RELAY_CONFIG_SAVED', 'relay-key-xoay']);
+  const chuoiCuBodies = [];
+  const fetchTruoc = workerContext.fetch;
+  workerContext.fetch = (url, options) => { chuoiCuBodies.push([url, JSON.parse(options.body)]); return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve(JSON.stringify({ ok: true, request: { id: 'gas-cu-cap-tiep', meta: {} } })); } }); };
+  const chuoiCu = await workerContext.relayRun(configCu, { request: { id: 'request-cua-sheet-cu', meta: {} } }, 3, 'background');
+  workerContext.fetch = fetchTruoc;
+  check(so, 'Chuỗi nền đọc cấu hình trước khi chuyển Sheet: báo RELAY_CONFIG_SWITCHED đúng một lần về GAS cũ, không chạm tab FBM, không chạy request GAS cũ cấp tiếp', [chuoiCu.code, chuoiCuBodies.length, chuoiCuBodies[0][0], chuoiCuBodies[0][1].command, chuoiCuBodies[0][1].payload.code, chuoiCuBodies[0][1].payload.requestId, chuoiCuBodies[0][1].spreadsheetId], ['RELAY_CONFIG_SWITCHED', 1, 'https://script.google.com/macros/s/relay-test/exec', 'transport_failure', 'RELAY_CONFIG_SWITCHED', 'request-cua-sheet-cu', 'sheet-test']);
+  const configMoi = await workerContext.getRelayConfig();
+  check(so, 'Cấu hình đọc sau khi chuyển mang thế hệ mới', configMoi.generation === workerContext.relayConfigGeneration && configMoi.generation !== configCu.generation, true);
+  // Trả Extension về Sheet thử ban đầu cho các phép kiểm sau.
+  await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', switchFrom: 'sheet-moi', extension: { pollMinutes: 6, runOnStartup: true } });
+
   const backgroundRelayBodies = [];
   workerContext.fetch = (url, options) => {
     backgroundRelayBodies.push(JSON.parse(options.body));
     return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve(JSON.stringify({ ok: false, code: 'FBM_TRANSPORT_UNAVAILABLE', request: null })); } });
   };
-  const backgroundFailure = await workerContext.relayRun({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' }, { request: { id: 'background-request', meta: {} } }, 0, 'background');
+  const backgroundFailure = await workerContext.relayRun({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', generation: workerContext.relayConfigGeneration }, { request: { id: 'background-request', meta: {} } }, 0, 'background');
   check(so, 'relay nen bao loi transport ve GAS mot lan khi Sidebar dong, giu dung ma loi tab', [backgroundFailure.code, backgroundRelayBodies.length, backgroundRelayBodies[0].kind, backgroundRelayBodies[0].command, backgroundRelayBodies[0].payload.requestId], ['FBM_TAB_NOT_FOUND', 1, 'background_sync', 'transport_failure', 'background-request']);
   backgroundRelayBodies.length = 0;
   let relayNetworkFetches = 0;
   workerContext.fetch = () => { relayNetworkFetches += 1; return Promise.reject(new Error('NETWORK_DOWN')); };
-  const relayNetworkFailure = await workerContext.relayRun({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' }, { request: { id: 'network-request', meta: {} } }, 0, 'background');
+  const relayNetworkFailure = await workerContext.relayRun({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', generation: workerContext.relayConfigGeneration }, { request: { id: 'network-request', meta: {} } }, 0, 'background');
   check(so, 'relay mat mang ket thuc huu han khong lap vo han', [relayNetworkFailure.code, relayNetworkFetches, relayNetworkFailure.request], ['GAS_RELAY_FAILED', 1, null]);
 
   let updatedListener = null;
@@ -553,14 +577,14 @@ async function chay(so) {
       chrome: {
         tabs: {
           query: () => Promise.resolve([tab]),
-          update(tabId, options, done) { state.updates.push(options); setImmediate(() => done(Object.assign({}, tab, options))); },
+          update(tabId, options, done) { state.updates.push(options); setImmediate(() => { done(Object.assign({}, tab, options)); if (options.url) { setTimeout(() => state.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); } }); },
           reload(tabId, options, done) {
             state.reloads += 1;
             setImmediate(() => { done(); if (behaviour.reloadCompletes) { setTimeout(() => state.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); } });
           },
           onUpdated: { addListener(fn) { state.listeners.push(fn); }, removeListener(fn) { state.listeners = state.listeners.filter((item) => item !== fn); } },
           sendMessage(tabId, message, done) {
-            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answersAfterReload && state.reloads > 0) { done({ ready: true, version: '21.22' }); } return; }
+            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answers || (behaviour.answersAfterReload && state.reloads > 0)) { done({ ready: true, version: '21.22' }); } return; }
             if (message.type === 'FBM_EXECUTE_V2') { state.executes += 1; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
           }
         },
@@ -575,7 +599,7 @@ async function chay(so) {
     vm.runInContext(workerSource, context, { filename: WORKER_FILE });
     return { context, state };
   };
-  const relayConfig = { url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' };
+  const relayConfig = { url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', generation: 0 };
   const tabRequest = (id) => ({ request: { id, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', meta: { kind: 'session_probe', timeoutMs: 400, gasReplyMs: 5000 } } });
 
   const dO = tabWorker({ id: 5, status: 'unloaded', discarded: true, autoDiscardable: true }, { reloadCompletes: true, answersAfterReload: true });
@@ -598,6 +622,16 @@ async function chay(so) {
   check(so, 'Tab FBM tải mãi không xong, tải lại cũng không xong: hết hạn envelope thì báo FBM_TAB_NOT_READY qua kênh background_sync, không chờ vô hạn và không còn hẹn giờ giữ worker', [
     ketQuaTai.code, tai.state.reloads, tai.state.executes, tai.state.bodies.map((item) => [item.kind, item.command, item.payload.code, item.hop]), tai.context.workerKeepAliveTimer, tai.state.listeners.length
   ], ['FBM_TAB_NOT_READY', 1, 0, [['background_sync', 'transport_failure', 'FBM_TAB_NOT_READY', 3]], null, 0]);
+
+  const reloadRequest = (id, url) => { const item = tabRequest(id); item.request.meta.reloadFbmPage = url; return item; };
+  const doiTrang = tabWorker({ id: 8, status: 'complete', autoDiscardable: false }, { answers: true });
+  const ketQuaDoiTrang = await doiTrang.context.relayRun(relayConfig, reloadRequest('tab-doi-trang', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx'), 0, 'heartbeat');
+  check(so, 'GAS cấp reloadFbmPage: Extension đổi tab tới đúng URL đó, chờ tải xong rồi mới gửi request; không tải lại tab', [
+    ketQuaDoiTrang.ok, doiTrang.state.updates.map((item) => item.url), doiTrang.state.reloads, doiTrang.state.executes, doiTrang.state.trails.filter((item) => /^fbm_(tab|page)_/.test(item))
+  ], [true, ['https://fbo.com.vn:8888/Main/zccrAccount.aspx'], 0, 1, ['fbm_tab_preparing:complete', 'fbm_page_reloading', 'fbm_tab_sent', 'fbm_tab_replied']]);
+  const ngoaiMien = tabWorker({ id: 9, status: 'complete', autoDiscardable: false }, { answers: true });
+  const ketQuaNgoaiMien = await ngoaiMien.context.relayRun(relayConfig, reloadRequest('tab-ngoai-mien', 'https://example.com/'), 0, 'heartbeat');
+  check(so, 'URL reloadFbmPage ngoài miền FBM: không đổi trang, không gửi request, báo FBM_TAB_NOT_READY', [ketQuaNgoaiMien.code, ngoaiMien.state.updates.length, ngoaiMien.state.executes], ['FBM_TAB_NOT_READY', 0, 0]);
 
   // Mọi lời chờ của worker phải có hạn: hẹn giờ chỉ nằm ở các công cụ chờ, hàm gọi tab/executor/mạng phải chờ qua công cụ có hạn.
   const unboundedWaits = (source) => source.split(/\n(?=function \w+\()/).map((chunk) => ({ name: (chunk.match(/^function (\w+)\(/) || [])[1] || '', body: chunk })).filter((item) => item.name).filter((item) => {

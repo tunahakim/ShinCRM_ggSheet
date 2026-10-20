@@ -134,7 +134,7 @@ function bridgeOnMessage(event) {
     sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
       if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
       try {
-        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
+        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || ''), currentSpreadsheetId: String(!error && reply && reply.currentSpreadsheetId || '') }, event.origin);
       } catch (ignoreAck) {}
     });
     return;

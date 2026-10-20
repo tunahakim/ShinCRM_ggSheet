@@ -63,7 +63,8 @@ FbmSync.startRun = function (options) {
   }
   // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
   state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
-  state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
+  // Kiểm tra liên kết đối chiếu bản nháp người dùng đang xem trên Sidebar; không gửi bản nháp thì đối chiếu liên kết đã lưu.
+  state.identityTarget = state.scan === 'identity_check' ? (opt.identity && typeof opt.identity === 'object' ? FbmSync.identityNormalize(opt.identity) : FbmSync.boundIdentity()) : null;
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
@@ -186,17 +187,9 @@ FbmSync.pushGateCheck = function (state, options) {
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
 FbmSync.authContinue = function (entity, response) {
   // Token gắn với phiên và phải lưu trước mọi request ghi.
-  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead(), identity = typeof FbmSync.extractSessionIdentity === 'function' ? FbmSync.extractSessionIdentity(response) : {};
+  // Không đối chiếu danh tính ở đây: cổng phát request buộc mọi `authorize` đi sau bước kiểm tra phiên (grid User so với liên kết), và response xác thực không mang danh tính (Nghiên cứu FBM ch02 2.7).
+  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead();
   if (!auth) { throw new Error('FBM không trả mã authorized cho ' + entity + '.'); }
-  if (identity.userId) { state.session.userId = identity.userId; }
-  if (identity.accountName) { state.session.accountName = identity.accountName; }
-  if (FbmSync.canWriteFbm(state.mode) && typeof FbmSync.identityPreflight === 'function') {
-    var identityCheck = FbmSync.identityStatus({ userId: state.session.userId, accountName: state.session.accountName });
-    if (identityCheck.status === 'REBIND_REQUIRED') {
-      state.phase = 'error'; state.lastFailureCode = 'REBIND_REQUIRED'; state.lastError = 'Liên kết tài khoản FBM không khớp; chiều ghi đã bị dừng.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      return null;
-    }
-  }
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
     if (state.scan === 'identity_probe') {
@@ -457,9 +450,7 @@ FbmSync.continueStep = function (rawResponse) {
     if (gateResponse) { return gateResponse; }
   }
   if (cursor.kind === 'session_probe' && !FbmSync.protocol.isLiveSessionResponse(rawResponse)) {
-    var probeFailure = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-    if (probeFailure && probeFailure.request) { return probeFailure; }
-    return probeFailure;
+    return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
@@ -521,9 +512,7 @@ FbmSync.continueStep = function (rawResponse) {
     var probedIdentity = FbmSync.identityUser(response);
     if (!probedIdentity.ok) {
       if (typeof FbmSync.protocol.isUnauthenticatedResponse === 'function' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse)) {
-        var probeRecovery = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-        if (probeRecovery && probeRecovery.request) { return probeRecovery; }
-        if (probeRecovery) { return probeRecovery; }
+        return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
       }
       FbmSync.sessionIdentityClear(state);
       state.phase = 'error'; state.cursor = {}; state.lastFailureCode = probedIdentity.code || 'IDENTITY_PROBE_INCOMPLETE';
@@ -533,21 +522,23 @@ FbmSync.continueStep = function (rawResponse) {
     }
     var probedRuntime = { spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''), userId: probedIdentity.userId, username: probedIdentity.username, accountName: probedIdentity.accountName };
     var probedStatus = typeof FbmSync.identityStatus === 'function' ? FbmSync.identityStatus(probedRuntime) : { status: 'BOUND' };
-    if ((state.scan !== 'identity_probe' && state.scan !== 'identity_check' && probedStatus.status !== 'BOUND') || probedStatus.status === 'REBIND_REQUIRED') {
+    var gridMismatch = (state.scan !== 'identity_probe' && state.scan !== 'identity_check' && probedStatus.status !== 'BOUND') || probedStatus.status === 'REBIND_REQUIRED';
+    // Liên kết phải khớp cả grid User lẫn trang FBM; chưa có liên kết (đọc danh tính để tự điền) thì không có gì để so phía trang.
+    var probedBinding = !gridMismatch && probedStatus.status === 'BOUND' ? probedStatus.binding : null;
+    var pageCheck = probedBinding ? FbmSync.pageIdentityCheck(probedBinding, FbmSync.pageIdentity(rawResponse), cursor.pageReloaded === true) : { status: 'ok' };
+    if (pageCheck.status === 'reload') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
+    if (gridMismatch || pageCheck.status !== 'ok') {
+      var pageMissing = pageCheck.status === 'missing';
       FbmSync.sessionIdentityClear(state);
-      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = 'SESSION_IDENTITY_MISMATCH';
-      state.lastError = 'Tài khoản FBM hiện tại không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_probe_mismatch'); }
+      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = pageMissing ? 'FBM_PAGE_IDENTITY_MISSING' : 'SESSION_IDENTITY_MISMATCH';
+      state.lastError = pageMissing ? 'Đã tải lại trang FBM nhưng vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản nên request nghiệp vụ đã bị chặn.'
+        : gridMismatch ? 'Tài khoản FBM hiện tại không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.'
+          : 'Mã hoặc tên người đăng nhập trên trang FBM không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.';
+      state.message = state.lastError; FbmSync.stateWrite(state);
+      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, pageMissing ? 'session_probe_page_missing' : gridMismatch ? 'session_probe_mismatch' : 'session_probe_page_mismatch'); }
       return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
     }
-    state.session.userId = probedIdentity.userId;
-    state.session.accountUsername = probedIdentity.username;
-    state.session.accountName = probedIdentity.accountName;
-    state.session.expired = false;
-    if (!String(state.session.sessionId || '')) { state.session.sessionId = FbmSync.sessionGateToken(); }
-    state.session.identityVerified = true;
-    state.session.identitySessionId = String(state.session.sessionId);
-    state.session.identityVerifiedAt = Date.now();
+    FbmSync.sessionIdentityVerify(state, probedIdentity);
     if (state.scan === 'identity_probe') {
       state.metadata = state.metadata || {};
       state.metadata.identityProbe = probedRuntime;
@@ -608,9 +599,7 @@ FbmSync.continueStep = function (rawResponse) {
       state.lastError = identityUser.message; state.message = identityUser.message; FbmSync.stateWrite(state);
       return { ok: false, code: identityUser.code, status: FbmSync.statusView(), error: identityUser.message };
     }
-    state.session.userId = identityUser.userId;
-    state.session.accountName = identityUser.accountName;
-    state.session.accountUsername = identityUser.username;
+    FbmSync.sessionIdentityRecord(state, identityUser);
     state.metadata = state.metadata || {};
     state.metadata.identityProbe = {
       spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),

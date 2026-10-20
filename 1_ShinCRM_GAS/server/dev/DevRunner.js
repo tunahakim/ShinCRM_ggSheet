@@ -19,7 +19,7 @@
  */
 var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets', 'measureDeleteRows', 'measureChunkRows', 'measureFirstPaint',
-  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbePreflightCost', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmSeedActivityConflict', 'fbmDevMarkConflict', 'fbmDevClearConflict', 'fbmDevEditAltWebsite', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbeCustomerActivities', 'fbmProbeConflicts', 'fbmProbeScheduleMarkers', 'fbmProbeSheetReadCost', 'fbmProbePushStepCost', 'fbmProbePushHashSplit', 'fbmProbePushListStepCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply',
+  'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbePreflightCost', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmSeedActivityConflict', 'fbmDevMarkConflict', 'fbmDevClearConflict', 'fbmDevEditAltWebsite', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbeCustomerActivities', 'fbmProbeConflicts', 'fbmProbeScheduleMarkers', 'fbmProbeSheetReadCost', 'fbmProbePushStepCost', 'fbmProbePushHashSplit', 'fbmProbePushListStepCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply', 'fbmProbeServiceUrl',
   'dumpColumnMap', 'dumpSettings', 'dumpSheetGrid', 'dumpNamedRanges', 'wipeNamedRanges', 'dumpCoreSheetHead', 'dumpRecentLog',
   'devLogTraceOn', 'devLogTraceOff', 'formulaProbeCreate', 'formulaProbeRemove', 'measureReloadCosts', 'measureTabColorBatch',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
@@ -53,9 +53,9 @@ function devFormatResult(result) {
 }
 
 /**
- * Nhận lời gọi từ bên ngoài. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.
+ * Nhận lời gọi từ bên ngoài qua `doGet` (fbm_sync/transport/EntryPoints) khi lời gọi mang `token`. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.
  */
-function doGet(e) {
+function devRunnerGet(e) {
   var params = (e && e.parameter) ? e.parameter : {};
   var reply = function (text) {
     return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);

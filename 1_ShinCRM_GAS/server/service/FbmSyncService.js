@@ -74,6 +74,7 @@ function fbmSaveConnection(config) { return runEntryPoint('fbmSaveConnection', '
 function fbmRepairLoginUsername(input) { return runEntryPoint('fbmRepairLoginUsername', 'sidebar', 'throw', function () { return FbmSync.loginConfigRepairUsername(input || {}); }); }
 function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('retry_push_failures', {}); }); }
 function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', 'throw', function () { return fbmSyncRelayConfig(); }); }
+function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return runEntryPoint('fbmLogRelaySwitchDecision', 'sidebar', 'throw', function () { return FbmSync.relaySwitchDecisionLog(decision === 'switch' ? 'switch' : 'keep', fromSpreadsheetId); }); }
 function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', 'throw', function () { return fbmSyncRotateRelayKey(); }); }
 function fbmOpenConflict() { return runEntryPoint('fbmOpenConflict', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('open_conflict', {}); }); }
 function fbmConflictOpened(response) { return runEntryPoint('fbmConflictOpened', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('conflict_opened', { response: response }); }); }
