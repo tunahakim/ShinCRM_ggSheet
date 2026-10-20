@@ -131,6 +131,8 @@ Referer: https://fbo.com.vn:8888/Default.aspx
 
 **Thuật toán trích xuất userId:** Bước 1: tìm vị trí tên database trong chuỗi, cắt bỏ phần database ở cuối (ví dụ `"500020372f578FHN_CRM_App"` → `"500020372f578"`). Bước 2: bỏ 4 ký tự đầu (prefix) và 5 ký tự cuối (hash), phần còn lại là userId (ví dụ `"500020372f578"` → bỏ `"5000"` và `"2f578"` → còn `"2037"`).
 
+**Tên đầy đủ của người đăng nhập (đo 2026-10-20 trên FBM thật):** cùng HTML thô của `/Main/zccrAccount.aspx` (66 KB, tải mất khoảng 0,4 giây; `/Default.aspx` chuyển tiếp về đúng trang này) có khối cấu hình menu `..._MenuExtender` chứa `"username":"<tên đầy đủ>"`, ví dụ `"username":"Lê Tuấn Anh"`. Trường tên là `username` nhưng giá trị là tên đầy đủ (trùng cột `ten` của grid User), không phải tên đăng nhập. Trang vẽ giá trị này vào `#mpHeader span.MenuExtenderHeaderText`. Chuỗi xuất hiện đúng một lần trong HTML thô, có trong cả `innerHTML` của tab đang mở. Tên đăng nhập không có trong HTML này. Lưu ý: HTML của tab là ảnh chụp lúc tải trang; muốn biết phiên phía máy chủ đang là tài khoản nào thì phải đọc response mới (tải lại trang hoặc grid User), không dựa vào tab đã mở lâu.
+
 ### 2.7 Lấy mã authorized
 
 Mã `authorized` là giá trị phân quyền do FBM server cấp cho mỗi phiên đăng nhập. Mã này bắt buộc khi thực hiện các thao tác tạo mới, sửa, xóa dữ liệu. Mã thay đổi mỗi lần đăng nhập (hoặc mỗi lần reload trang), nên cần lấy lại sau mỗi lần login.
