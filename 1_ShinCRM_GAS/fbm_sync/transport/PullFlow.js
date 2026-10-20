@@ -154,12 +154,28 @@ FbmSync.preflightApply = function (state, preflight) {
 FbmSync.preflightLocalStep = function (state) {
   var options = { mode: state.mode, origin: state.origin, scan: state.scan };
   if (typeof FbmSync.preflightLocal !== 'function' || !FbmSync.preflightNeedsLocal(options)) { return null; }
+  if (FbmSync.canWriteFbm(state.mode)) {
+    state.pushGate = FbmSync.pushGateCheck(state, options);
+    if (!state.pushGate.open) { FbmSync.scheduleTrace('push_gate_closed', FbmSync.PUSH_GATE_CLOSED_TRACE, { scan: state.scan, mode: state.mode }); FbmSync.stateWrite(state); return null; }
+  }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'preflight_hash', options); }
   var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
   if (typeof FbmSync.businessStepFinish === 'function') {
     FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking.length || 0), skipped: Number(preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
   }
   return FbmSync.preflightApply(state, preflight);
+};
+
+/** Quyết cổng của chặng đẩy cho lượt: đọc dấu đã lưu và dấu hiện tại rồi so. Dấu hỏng thì ghi Log cảnh báo và mở, không coi là không có dấu một cách im lặng. */
+FbmSync.pushGateCheck = function (state, options) {
+  var mark = null;
+  if (options.origin === 'background') {
+    try { mark = FbmSync.pushCleanRead(); } catch (markError) {
+      if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_clean_read', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: String(markError && markError.message || markError) + ' Quét lại cả hai sheet.' }); }
+      return { open: true, reason: 'mark_corrupt' };
+    }
+  }
+  return FbmSync.pushGateDecide(options, mark, mark ? FbmSync.pushCleanNow() : null);
 };
 
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */

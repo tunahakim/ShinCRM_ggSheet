@@ -397,6 +397,9 @@ FbmSync.pushCursorNext = function (cursor, done) {
 
 /** Một chỗ mở chặng đẩy cho mọi chiều: dấu trang chưa có danh sách nên bước đầu tiên quét cả hai sheet (`pushPassNext`). */
 FbmSync.pushStageBegin = function (state) {
+  // Cổng do `preflightLocalStep` quyết một lần cho lượt; thiếu nghĩa là mở. Đóng thì giữ nguyên dấu, vì nó vẫn đúng.
+  if (state.pushGate && state.pushGate.open === false) { return FbmSync.pushStageEnd(state, 0, null); }
+  FbmSync.pushCleanClear();
   state.phase = 'push'; state.entity = 'customer'; state.current = ''; state.cursor = FbmSync.pushCursor({});
   state.message = 'Đang chuẩn bị các bản ghi ShinCRM cần đẩy lên FBM...';
   FbmSync.stateWrite(state);
@@ -410,6 +413,8 @@ FbmSync.pushStageBegin = function (state) {
  */
 FbmSync.pushPassNext = function (state) {
   var cursor = FbmSync.pushCursor(state.cursor), stalled = cursor.pass > 0 && cursor.at >= cursor.size && !cursor.progress;
+  // Đọc trước khi đọc Sheet: lần quét này sạch thì dấu là đúng bản này, mọi sửa sau lúc đọc đều làm dấu lệch.
+  var mark = FbmSync.pushCleanNow();
   var found = FbmSync.withLocalSnapshot(function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(state, scan)); });
   ['customer', 'activity'].forEach(function (entity) {
     var step = 'push_' + entity;
@@ -417,7 +422,7 @@ FbmSync.pushPassNext = function (state) {
     FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: entity });
     FbmSync.businessStepAdd(state, step, { candidateCount: found.filter(function (item) { return item.entity === entity; }).length });
   });
-  if (!found.length) { return FbmSync.pushStageEnd(state, 0); }
+  if (!found.length) { return FbmSync.pushStageEnd(state, 0, mark); }
   if (stalled || cursor.pass >= FbmSync.BUDGET.pushPassesMax) {
     var reason = 'Chặng đẩy dừng khi còn ' + found.length + ' bản ghi chưa xong ' + (stalled ? '(vòng vừa rồi mọi bản ghi đều hoãn vì đang bận hoặc vừa sửa)' : '(đã quét đủ ' + FbmSync.BUDGET.pushPassesMax + ' lần)') + '; lượt sau làm tiếp.';
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_unfinished', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: reason, detail: { remaining: found.length, passes: cursor.pass, stalled: stalled } }); }
@@ -429,9 +434,10 @@ FbmSync.pushPassNext = function (state) {
   return found.slice(0, size).map(function (item) { return { entity: item.entity, id: item.id }; });
 };
 
-/** Kết thúc chặng đẩy (sạch hoặc dừng không sạch): xóa danh sách, chốt lượt. */
-FbmSync.pushStageEnd = function (state, remaining) {
+/** Kết thúc chặng đẩy (sạch hoặc dừng không sạch): xóa danh sách, chốt lượt. `mark` chỉ có khi lần quét vừa rồi không còn ứng viên: ghi làm dấu lần đẩy sạch. */
+FbmSync.pushStageEnd = function (state, remaining, mark) {
   FbmSync.pushListClear();
+  if (mark) { FbmSync.pushCleanWrite(mark); }
   state.phase = 'done'; state.entity = ''; state.current = ''; state.cursor = {};
   state.message = FbmSync.runDoneMessage(state) + (remaining ? ' Còn ' + remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '');
   FbmSync.stateWrite(state);

@@ -290,6 +290,28 @@ FbmSync.pushListRead = function () {
   });
 };
 FbmSync.pushListClear = function () { FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, []); };
+
+/**
+ * Dấu lần đẩy sạch: mọi thứ ngoài dòng Sheet mà phép xét đẩy dựa vào. Dòng Sheet đại diện bằng `rev` của sổ nạp lại (mọi cửa ghi và trigger sửa tay đều tăng nó, kể cả Category và Config); sổ lỗi đẩy, phạm vi trong cài đặt và tài khoản FBM đã liên kết đọc thẳng. Chỉ là quyền bỏ qua một lần quét, không phải nguồn sự thật: thiếu hay hỏng thì quét.
+ * Đọc từ bản chụp DocumentProperties của lần gọi nên không thêm lần gọi kho.
+ */
+FbmSync.PUSH_CLEAN_KEY = 'FBM_SYNC_PUSH_CLEAN_V1';
+FbmSync.pushCleanNow = function () {
+  var hashes = FbmSync.pushFailuresRead().hashes, settings = FbmSync.syncSettingsRead();
+  return {
+    rev: Number(reloadJournalRead().rev),
+    failures: Object.keys(hashes).sort().map(function (key) { return key + '=' + hashes[key]; }).join('|'),
+    scope: settings.scopeLimited === false ? '' : 'limited:' + (settings.scopeCodes || []).join(','),
+    account: FbmSync.bindingAccountName()
+  };
+};
+/** Dấu đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
+FbmSync.pushCleanRead = function () { return FbmSync.documentPropertyJson(FbmSync.PUSH_CLEAN_KEY, 'dấu lần đẩy sạch'); };
+FbmSync.pushCleanWrite = function (mark) {
+  var write = FbmSync.documentPropertySet(FbmSync.PUSH_CLEAN_KEY, JSON.stringify(mark), 'push_clean');
+  if (!write.ok) { throw write.error; }
+};
+FbmSync.pushCleanClear = function () { FbmSync.props().deleteProperty(FbmSync.PUSH_CLEAN_KEY); };
 /** Đọc state và tự bù field thiếu từ mặc định. */
 FbmSync.stateRead = function () {
   var fallback = FbmSync.stateDefault();

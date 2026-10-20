@@ -148,6 +148,16 @@ FbmSync.pushCandidates = function (entity, scan, context) {
   }).filter(Boolean);
 };
 
+/** Cổng của chặng đẩy, thuần: `options` là chiều và loại quét của lượt, `mark` là dấu đã lưu, `now` là dấu hiện tại. Trả `{ open, reason }`; đóng chỉ khi lượt nền không thuộc loại bỏ qua và bốn phần đều khớp. */
+FbmSync.pushGateDecide = function (options, mark, now) {
+  var opt = options || {};
+  if (opt.origin !== 'background') { return { open: true, reason: 'manual' }; }
+  if (FbmSync.PUSH_GATE_BYPASS_SCANS.indexOf(String(opt.scan || '')) >= 0) { return { open: true, reason: 'bypass_scan' }; }
+  if (!mark) { return { open: true, reason: 'no_mark' }; }
+  var changed = ['rev', 'failures', 'scope', 'account'].filter(function (part) { return String(mark[part]) !== String(now[part]); });
+  return changed.length ? { open: true, reason: 'changed:' + changed.join(',') } : { open: false, reason: 'clean' };
+};
+
 /** Quét cả hai thực thể, Khách trước Giao dịch: Giao dịch của khách mới chỉ đẩy được sau khi khách có mã FBM. */
 FbmSync.pushCandidatesAll = function (scan, context) {
   return FbmSync.pushCandidates('customer', scan, context).concat(FbmSync.pushCandidates('activity', scan, context));
