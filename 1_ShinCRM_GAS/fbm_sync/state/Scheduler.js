@@ -78,8 +78,10 @@ FbmSync.SCHEDULE_LABELS = { heartbeat: 'Giữ phiên FBM', customerFull: 'Quét 
 /** Loại quét nền luôn quét đẩy dù dấu lần đẩy sạch còn khớp: lưới an toàn cho sửa Sheet mà trigger không chạy nên sổ nạp lại không tăng (chủ dự án chốt Quét nhanh 2026-10-19). Lượt tay luôn quét. */
 FbmSync.PUSH_GATE_BYPASS_SCANS = ['full'];
 FbmSync.PUSH_GATE_CLOSED_TRACE = 'Bỏ qua kiểm dữ liệu ShinCRM và chặng đẩy: từ lần đẩy sạch trước không có gì đổi.';
+/** Dòng `Mức quét` của lượt Giữ phiên có đẩy; `Chiều chạy` lấy theo chiều lịch nền (chủ dự án chốt 2026-10-20). */
+FbmSync.KEEPALIVE_SCAN_LABEL = 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)';
 /** Kiểu quét của lượt mà mỗi tiến trình nền mở; Giữ phiên không mở lượt nào. */
-FbmSync.SCHEDULE_SCANS = { customerFull: 'full', activityFull: 'activity_bulk', detail: 'detail' };
+FbmSync.SCHEDULE_SCANS = { customerFull: 'full', activityFull: 'activity_bulk', detail: 'detail', heartbeat: 'keepalive' };
 /** Số nguyên không âm từ ô người dùng gõ. Ô trống là thiếu, không ngầm thay bằng số nào: `Number('')` bằng 0 nên phải xét chuỗi trước. Trả `{ value }` hoặc `{ reason }`. */
 FbmSync.scheduleWholeNumber = function (raw, min, max, label, unit) {
   var text = raw === null || raw === undefined ? '' : String(raw).trim();
@@ -211,20 +213,35 @@ FbmSync.schedulerPickDue = function (now, options) {
   FbmSync.stateWrite(state);
   return { ok: true, kind: due[0] };
 };
-/** Mở một tiến trình của chuỗi. Giữ phiên chỉ là request đếm mang cursor `heartbeat`; các tiến trình khác là một lượt nền thường, tự kết thúc bằng bước đếm. */
+/** Mở một tiến trình của chuỗi. Giữ phiên do `keepaliveStart` quyết; các tiến trình khác là một lượt nền thường, tự kết thúc bằng bước đếm. */
 FbmSync.chainStart = function (kind) {
   var state = FbmSync.stateRead(), schedule = FbmSync.backgroundScheduleRead(), direction = state.chain && state.chain.direction || schedule.direction;
   state.chain = Object.assign({ ran: [], direction: direction }, state.chain || {}, { current: kind });
-  if (kind === 'heartbeat') {
-    state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('heartbeat')), status: FbmSync.statusView() };
-  }
   state.scheduledScan = '';
+  if (kind === 'heartbeat') {
+    FbmSync.stateWrite(state);
+    return FbmSync.keepaliveStart(direction);
+  }
   FbmSync.stateWrite(state);
   var options = { mode: direction, scan: FbmSync.SCHEDULE_SCANS[kind] || 'full', origin: 'background' };
   if (kind === 'detail') { options.detail = schedule.detail; }
   return FbmSync.start(options);
+};
+/**
+ * Nơi duy nhất quyết thân của Giữ phiên, cho cả hai đường cấp (`chainStart` và `fbmSyncHeartbeatRequest`). Chiều lịch nền có ghi FBM và cổng chặng đẩy mở thì mở lượt Chỉ đẩy nền `keepalive`: request đầu của lượt là bước kiểm phiên nên vẫn giữ phiên, cuối lượt đếm khách theo chiều lịch nền. Còn lại (cổng đóng, chiều Lấy) phát request đếm như cũ.
+ * Cổng quyết ở đây được chuyển vào lượt nên bước kiểm dữ liệu ShinCRM không quyết lại.
+ */
+FbmSync.keepaliveStart = function (direction) {
+  var state = FbmSync.stateRead();
+  if (FbmSync.canWriteFbm(direction)) {
+    var options = { mode: 'push', scan: 'keepalive', origin: 'background', scheduleMode: direction };
+    var gate = FbmSync.pushGateCheck(state, options);
+    if (gate.open) { return FbmSync.start(Object.assign(options, { pushGate: gate })); }
+    state = FbmSync.stateRead();
+  }
+  state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
+  FbmSync.stateWrite(state);
+  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('heartbeat')), status: FbmSync.statusView() };
 };
 /**
  * Tiến trình hiện tại của chuỗi vừa chạy xong: ghi giờ chạy xong của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
@@ -299,11 +316,13 @@ function fbmSyncHeartbeatRequest(options) {
     // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: bỏ dấu, response của request đếm khách quyết định phiên sống hay chết (09/06).
     if (!FbmSync.runInProgress(state)) { FbmSync.sessionGateForgetStale(state); }
     FbmSync.stateWrite(state);
-    // Chuỗi mở bằng chính request đầu của tiến trình đến hạn; chỉ Giữ phiên (và Quét nhanh do bước đếm gọi) mới mở bằng request đếm khách.
-    if (state.chain && state.scheduledScan && state.scheduledScan === state.chain.current && state.scheduledScan !== 'heartbeat') {
-      var opened = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan)), openedRequest = opened && opened.request || null;
+    // Chuỗi mở bằng chính request đầu của tiến trình đến hạn, kể cả Giữ phiên (`keepaliveStart` quyết đếm hay đẩy); chỉ Quét nhanh do bước đếm gọi còn mở bằng request đếm khách ở dưới.
+    if (state.chain && state.scheduledScan && state.scheduledScan === state.chain.current) {
+      var opened = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan)), openedRequest = opened && opened.request || null, openedState = FbmSync.stateRead();
       if (!openedRequest) { return { ok: !!(opened && opened.ok), code: opened && opened.code || 'CHAIN_START_EMPTY', request: null, status: FbmSync.statusView(), error: opened && opened.error }; }
-      return { ok: true, code: 'CHAIN_REQUEST_READY', request: openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest), status: FbmSync.statusView() };
+      var openedEnvelope = openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest);
+      var openedCode = String((openedState.cursor || {}).kind || '') === 'heartbeat' && typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(openedEnvelope, openedState) : 'CHAIN_REQUEST_READY';
+      return { ok: true, code: openedCode, request: openedEnvelope, status: FbmSync.statusView() };
     }
     var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };

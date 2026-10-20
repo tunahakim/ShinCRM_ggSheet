@@ -56,7 +56,7 @@ FbmSync.startRun = function (options) {
   var state = FbmSync.stateStart('', 'checking_session', 0, {
     origin: opt.origin === 'background' ? 'background' : 'manual',
     mode: FbmSync.modeOf(opt.mode),
-    scan: opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : 'full'
+    scan: opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : opt.scan === 'keepalive' ? 'keepalive' : 'full'
   });
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
@@ -67,6 +67,9 @@ FbmSync.startRun = function (options) {
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
+  // Lượt Giữ phiên chạy mode `push` nhưng đếm khách và Quét nhanh bù theo chiều lịch nền; cổng đã quyết ở `keepaliveStart`.
+  state.scheduleMode = state.scan === 'keepalive' ? FbmSync.modeOf(opt.scheduleMode) : '';
+  state.pushGate = opt.pushGate || null;
   FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(Number(opt.detail && opt.detail.customersPerRun || FbmSync.backgroundScheduleDefault().detail.customersPerRun))) : 0; }
   // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).
@@ -155,8 +158,8 @@ FbmSync.preflightLocalStep = function (state) {
   var options = { mode: state.mode, origin: state.origin, scan: state.scan };
   if (typeof FbmSync.preflightLocal !== 'function' || !FbmSync.preflightNeedsLocal(options)) { return null; }
   if (FbmSync.canWriteFbm(state.mode)) {
-    state.pushGate = FbmSync.pushGateCheck(state, options);
-    if (!state.pushGate.open) { FbmSync.scheduleTrace('push_gate_closed', FbmSync.PUSH_GATE_CLOSED_TRACE, { scan: state.scan, mode: state.mode }); FbmSync.stateWrite(state); return null; }
+    if (!state.pushGate) { state.pushGate = FbmSync.pushGateCheck(state, options); }
+    if (!state.pushGate.open) { FbmSync.stateWrite(state); return null; }
   }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'preflight_hash', options); }
   var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
@@ -175,7 +178,9 @@ FbmSync.pushGateCheck = function (state, options) {
       return { open: true, reason: 'mark_corrupt' };
     }
   }
-  return FbmSync.pushGateDecide(options, mark, mark ? FbmSync.pushCleanNow() : null);
+  var gate = FbmSync.pushGateDecide(options, mark, mark ? FbmSync.pushCleanNow() : null);
+  if (!gate.open) { FbmSync.scheduleTrace('push_gate_closed', FbmSync.PUSH_GATE_CLOSED_TRACE, { scan: String(options.scan || ''), mode: String(options.mode || '') }); }
+  return gate;
 };
 
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */

@@ -42,9 +42,13 @@ FbmSync.customerCountChanged = function (total) {
 /** Bước đếm chỉ ở chiều có ghi Sheet (09/02 mục 8): chiều Kiểm tra và Chỉ đẩy không ghi được mốc, gọi Quét nhanh cùng chiều sẽ lặp mãi. */
 FbmSync.customerCountApplies = function (mode) { return FbmSync.canWriteSheet(mode); };
 
-/** Đánh dấu đầu lượt: chỉ lượt nghiệp vụ có ghi Sheet mới đếm cuối lượt; lượt đăng nhập thử, kiểm tra liên kết dùng chung state nhưng không mang dấu này. */
+/**
+ * Đánh dấu đầu lượt: chỉ lượt nghiệp vụ có ghi Sheet mới đếm cuối lượt; lượt đăng nhập thử, kiểm tra liên kết dùng chung state nhưng không mang dấu này.
+ * Chiều đếm ghi vào dấu: lượt Giữ phiên chạy mode `push` nhưng đếm và Quét nhanh bù theo chiều lịch nền (`scheduleMode`), không thì Hai chiều mất bước phát hiện khách mới.
+ */
 FbmSync.countTailMark = function (state) {
-  if (['full', 'activity_bulk', 'detail'].indexOf(String(state.scan || '')) >= 0 && FbmSync.customerCountApplies(state.mode)) { state.metadata = state.metadata || {}; state.metadata.countTail = { pending: true }; }
+  var scan = String(state.scan || ''), mode = scan === 'keepalive' ? state.scheduleMode : state.mode;
+  if (['full', 'activity_bulk', 'detail', 'keepalive'].indexOf(scan) >= 0 && FbmSync.customerCountApplies(mode)) { state.metadata = state.metadata || {}; state.metadata.countTail = { pending: true, mode: mode }; }
 };
 
 /**
@@ -56,7 +60,7 @@ FbmSync.runTail = function (result) {
   var state = FbmSync.stateRead();
   var tail = state.metadata && state.metadata.countTail;
   if (state.phase !== 'done' || !tail || tail.pending !== true) { return result; }
-  state.metadata.countTail = { pending: false, message: String(state.message || '') };
+  state.metadata.countTail = { pending: false, mode: tail.mode, message: String(state.message || '') };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_count' };
   state.message = 'Đang đếm lại số khách FBM...';
   FbmSync.stateWrite(state);
@@ -79,10 +83,10 @@ FbmSync.customerCountContinue = function (state, rawResponse) {
   FbmSync.stateWrite(state);
   if (!changed) { return { ok: true, request: null, status: FbmSync.statusView() }; }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'customer_count_changed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }); }
-  return FbmSync.recountStart(state.mode, state.origin);
+  return FbmSync.recountStart(tail.mode || state.mode, state.origin);
 };
 
-/** Quét nhanh do bước đếm gọi: cùng chiều, cùng nguồn với lượt vừa xong; không đi qua công tắc tiến trình và không dời mốc lịch nào. */
+/** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn; không đi qua công tắc tiến trình và không dời mốc lịch nào. */
 FbmSync.recountStart = function (mode, origin) {
   var started = FbmSync.start({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false });
   if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); started.status = FbmSync.statusView(); }
