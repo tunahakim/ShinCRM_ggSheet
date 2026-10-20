@@ -757,7 +757,45 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
-  check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
+  check(so, 'Chrome startup co the hoi GAS ngay mot luot Giu phien theo cau hinh; chua co dau lan day sach nen Giu phien mo luot chi day, request dau la buoc kiem phien', [startup.ok, startup.code, startup.request && startup.request.meta.kind, scheduleFlow.hop.FbmSync.stateRead().scan, scheduleFlow.hop.FbmSync.stateRead().chain.current], [true, 'CHAIN_REQUEST_READY', 'session_probe', 'keepalive', 'heartbeat']);
+  // Giữ phiên có đẩy (C2): một chỗ quyết cho hai đường cấp; cổng mở thì mở lượt Chỉ đẩy nền `keepalive`, đếm và Quét nhanh bù theo chiều lịch nền.
+  const keepaliveFlow = (direction, options) => {
+    const opt = options || {}, flow = workflowGas({ extraFiles: ['fbm_sync/diagnostic/Trace.js'] }), F = flow.hop.FbmSync, traces = [];
+    F.scheduleTrace = (action) => traces.push(action);
+    F.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
+    F.backgroundScheduleSave({ direction, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30, customersPerRun: 30 } });
+    flow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
+    flow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
+    if (opt.cleanMark) { flow.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(F.pushCleanNow())); }
+    const result = opt.viaChain ? (() => { F.schedulerPickDue(now); return F.chainStart('heartbeat'); })() : F.heartbeatRequest({ source: 'alarm' });
+    return { flow, F, traces, result, state: F.stateRead() };
+  };
+  {
+    const two = keepaliveFlow('write'), view = two.F.statusView();
+    check(so, 'C2: Giữ phiên Hai chiều chưa có dấu lần đẩy sạch: mở lượt Chỉ đẩy nền keepalive (request đầu là kiểm phiên), mang cổng đã quyết, đánh dấu đếm cuối lượt theo chiều Hai chiều; màn trạng thái hiện chiều lịch nền và nhãn Giữ phiên',
+      [two.result.ok, two.result.request && two.result.request.meta.kind, two.state.origin, two.state.mode, two.state.scan, two.state.scheduleMode, two.state.pushGate, two.state.metadata.countTail, two.state.chain.current, view.direction, view.scanLabel],
+      [true, 'session_probe', 'background', 'push', 'keepalive', 'write', { open: true, reason: 'no_mark' }, { pending: true, mode: 'write' }, 'heartbeat', 'Hai chiều', 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)']);
+    const viaChain = keepaliveFlow('write', { viaChain: true });
+    check(so, 'C2: đường chainStart và đường hỏi nền đi qua cùng một chỗ quyết, ra cùng lượt keepalive', [viaChain.state.scan, viaChain.state.mode, viaChain.result.request && viaChain.result.request.meta.kind], ['keepalive', 'push', two.result.request && two.result.request.meta.kind]);
+    const recountModes = [];
+    two.F.recountStart = (mode, origin) => { recountModes.push([mode, origin]); return { ok: true, request: null }; };
+    const counted = two.F.stateRead(); counted.metadata.countTail = { pending: false, mode: 'write', message: 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.' }; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);
+    two.F.customerCountContinue(two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } }));
+    check(so, 'C2: số khách lệch sau lượt Giữ phiên có đẩy thì Quét nhanh bù chạy theo chiều lịch nền (Hai chiều), không theo mode push của lượt', recountModes, [['write', 'background']]);
+  }
+  {
+    const pushOnly = keepaliveFlow('push');
+    check(so, 'C2: Giữ phiên Chỉ đẩy cổng mở thì mở lượt keepalive nhưng không đếm cuối lượt (chiều không ghi Sheet); màn trạng thái hiện ShinCRM → FBM',
+      [pushOnly.state.scan, pushOnly.state.mode, pushOnly.state.scheduleMode, !!(pushOnly.state.metadata && pushOnly.state.metadata.countTail), pushOnly.F.statusView().direction], ['keepalive', 'push', 'push', false, 'ShinCRM → FBM']);
+  }
+  {
+    const closed = keepaliveFlow('write', { cleanMark: true });
+    const read = keepaliveFlow('read');
+    check(so, 'C2: cổng đóng (dấu khớp) thì Giữ phiên phát request đếm như cũ và ghi vết cổng đóng; chiều Lấy không đọc cổng, phát request đếm',
+      [closed.result.request && closed.result.request.meta.kind, closed.result.code, closed.state.scheduledScan, closed.state.cursor.kind, closed.state.scan, closed.traces.filter((a) => a === 'push_gate_closed').length,
+        read.result.request && read.result.request.meta.kind, read.state.scheduledScan, read.traces.filter((a) => a === 'push_gate_closed').length],
+      ['heartbeat', 'HEARTBEAT_REQUEST_READY', 'heartbeat', 'heartbeat', 'full', 1, 'heartbeat', 'heartbeat', 0]);
+  }
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
   waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
