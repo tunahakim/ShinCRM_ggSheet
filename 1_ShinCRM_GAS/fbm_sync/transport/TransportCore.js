@@ -77,6 +77,26 @@ FbmSync.sessionIdentityIsVerified = function (state) {
   var session = state && state.session || {};
   return session.expired !== true && session.identityVerified === true && !!String(session.sessionId || '') && String(session.identitySessionId || '') === String(session.sessionId || '');
 };
+/** Ghi danh tính tab FBM vừa đọc từ grid User vào phiên, chưa đánh dấu đã xác minh (dùng khi chỉ đọc để tự điền liên kết). */
+FbmSync.sessionIdentityRecord = function (state, identity) {
+  var value = identity || {};
+  state.session = state.session || {};
+  state.session.userId = String(value.userId || '');
+  state.session.accountUsername = String(value.username || '');
+  state.session.accountName = String(value.accountName || '');
+  return state;
+};
+/** Đánh dấu phiên đã xác minh đúng tài khoản liên kết; bên gọi đã đối chiếu `identity` với liên kết trước khi gọi. Cổng phát request chỉ cho request nghiệp vụ đi khi có dấu này (`sessionIdentityIsVerified`). */
+FbmSync.sessionIdentityVerify = function (state, identity) {
+  FbmSync.sessionIdentityRecord(state, identity);
+  var session = state.session;
+  session.expired = false;
+  if (!String(session.sessionId || '')) { session.sessionId = FbmSync.sessionGateToken(); }
+  session.identityVerified = true;
+  session.identitySessionId = String(session.sessionId);
+  session.identityVerifiedAt = Date.now();
+  return state;
+};
 FbmSync.sessionIdentityClear = function (state) {
   var session = (state || {}).session || {};
   session.identityVerified = false;

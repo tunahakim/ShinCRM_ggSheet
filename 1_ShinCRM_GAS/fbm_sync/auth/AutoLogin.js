@@ -332,7 +332,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   var expected = cursor.testOnly && cursor.expectedIdentity ? FbmSync.identityNormalize(cursor.expectedIdentity) : null;
   var expectedHasValue = expected && (expected.spreadsheetId || expected.userId || expected.username || expected.accountName);
   var match = expectedHasValue
-    ? { status: (expected.spreadsheetId && expected.spreadsheetId !== runtime.spreadsheetId) || (expected.userId && expected.userId !== runtime.userId) || (expected.username && expected.username !== runtime.username) || (expected.accountName && expected.accountName !== runtime.accountName) ? 'REBIND_REQUIRED' : 'BOUND' }
+    ? { status: FbmSync.identityMismatches(expected, FbmSync.identityFilledFields(expected, runtime)).length ? 'REBIND_REQUIRED' : 'BOUND' }
     : FbmSync.identityStatus(runtime);
   if (match.status !== 'BOUND') {
     FbmSync.sessionIdentityClear(state);
@@ -344,14 +344,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_mismatch'); }
     return { ok: false, code: state.lastFailureCode, request: null, identity: runtime, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
-  state.session.userId = identity.userId;
-  state.session.accountUsername = identity.username;
-  state.session.accountName = identity.accountName;
-  state.session.expired = false;
-  if (!String(state.session.sessionId || '')) { state.session.sessionId = FbmSync.sessionGateToken(); }
-  state.session.identityVerified = true;
-  state.session.identitySessionId = String(state.session.sessionId);
-  state.session.identityVerifiedAt = Date.now();
+  FbmSync.sessionIdentityVerify(state, identity);
   state.lastFailureCode = '';
   state.lastError = '';
   state.retryable = false;

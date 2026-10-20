@@ -114,18 +114,31 @@ FbmSync.bindingHasLinkedData = function () {
     });
   } catch (ignore) { return true; }
 };
-/** Đối chiếu nguyên văn nhận diện; không trim/đổi hoa thường khi so hai giá trị đã lưu. */
+/**
+ * Phép so danh tính duy nhất: trả lý do lệch giữa danh tính kỳ vọng và danh tính đang chạy, so nguyên văn (không trim, không đổi hoa thường).
+ * So mọi trường mà danh tính đang chạy có mặt (`undefined` là bên gọi không muốn so trường đó), kể cả khi trường kỳ vọng trống: liên kết cũ thiếu tên đăng nhập phải ra lệch chứ không ra khớp. SpreadsheetId đang chạy trống thì không so, vì trống nghĩa là không đọc được file.
+ */
+FbmSync.identityMismatches = function (expected, runtime) {
+  var want = expected || {}, got = runtime || {}, reasons = [];
+  if (got.spreadsheetId && String(got.spreadsheetId) !== String(want.spreadsheetId || '')) { reasons.push('spreadsheet_mismatch'); }
+  [['userId', 'user_mismatch'], ['username', 'username_mismatch'], ['accountName', 'account_mismatch']].forEach(function (pair) {
+    if (got[pair[0]] !== undefined && String(got[pair[0]]) !== String(want[pair[0]] || '')) { reasons.push(pair[1]); }
+  });
+  return reasons;
+};
+/** Bản nháp kỳ vọng có thể điền dở (đăng nhập thử trước khi lưu liên kết): chỉ đưa vào phép so các trường bản nháp đã điền. */
+FbmSync.identityFilledFields = function (expected, runtime) {
+  var want = expected || {}, got = runtime || {}, picked = {};
+  ['spreadsheetId', 'userId', 'username', 'accountName'].forEach(function (name) { if (want[name]) { picked[name] = got[name]; } });
+  return picked;
+};
+/** Trạng thái liên kết của file đang chạy, kèm đối chiếu danh tính đang chạy (nếu đưa vào) với liên kết qua `identityMismatches`. */
 FbmSync.identityStatus = function (runtime) {
   var actual = String((runtime && runtime.spreadsheetId) || FbmSync.currentSpreadsheetId() || ''), current = FbmSync.bindingRead(), incoming = runtime || {};
   var reasons = [];
   // Chỉ khi chưa có liên kết mới cần biết Sheet đã có ID FBM chưa; đã liên kết thì không đọc cả Sheet Customer/Activity mỗi lần Sidebar mở.
   if (!current.spreadsheetId) { if (FbmSync.bindingHasLinkedData()) { reasons.push('missing_binding_with_linked_data'); } }
-  else {
-    if (actual && current.spreadsheetId !== actual) { reasons.push('spreadsheet_mismatch'); }
-    if (incoming.userId !== undefined && String(incoming.userId) !== current.userId) { reasons.push('user_mismatch'); }
-    if (incoming.username !== undefined && String(incoming.username) !== String(current.username || '')) { reasons.push('username_mismatch'); }
-    if (incoming.accountName !== undefined && String(incoming.accountName) !== current.accountName) { reasons.push('account_mismatch'); }
-  }
+  else { reasons = reasons.concat(FbmSync.identityMismatches(current, Object.assign({}, incoming, { spreadsheetId: actual }))); }
   var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
   if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');

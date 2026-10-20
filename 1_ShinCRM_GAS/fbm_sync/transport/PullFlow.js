@@ -510,14 +510,7 @@ FbmSync.continueStep = function (rawResponse) {
       if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_probe_mismatch'); }
       return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
     }
-    state.session.userId = probedIdentity.userId;
-    state.session.accountUsername = probedIdentity.username;
-    state.session.accountName = probedIdentity.accountName;
-    state.session.expired = false;
-    if (!String(state.session.sessionId || '')) { state.session.sessionId = FbmSync.sessionGateToken(); }
-    state.session.identityVerified = true;
-    state.session.identitySessionId = String(state.session.sessionId);
-    state.session.identityVerifiedAt = Date.now();
+    FbmSync.sessionIdentityVerify(state, probedIdentity);
     if (state.scan === 'identity_probe') {
       state.metadata = state.metadata || {};
       state.metadata.identityProbe = probedRuntime;
@@ -578,9 +571,7 @@ FbmSync.continueStep = function (rawResponse) {
       state.lastError = identityUser.message; state.message = identityUser.message; FbmSync.stateWrite(state);
       return { ok: false, code: identityUser.code, status: FbmSync.statusView(), error: identityUser.message };
     }
-    state.session.userId = identityUser.userId;
-    state.session.accountName = identityUser.accountName;
-    state.session.accountUsername = identityUser.username;
+    FbmSync.sessionIdentityRecord(state, identityUser);
     state.metadata = state.metadata || {};
     state.metadata.identityProbe = {
       spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),
