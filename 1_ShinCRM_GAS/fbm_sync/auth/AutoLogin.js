@@ -168,8 +168,6 @@ FbmSync.applyTransportSession = function (state, response) {
   if (!captured) { return false; }
   state.session = state.session || {};
   state.session.cookie = String(captured);
-  var compact = state.session.cookie.indexOf('FHN_CRM_App') >= 0 ? state.session.cookie.slice(0, state.session.cookie.indexOf('FHN_CRM_App')) : '';
-  if (!state.session.userId && compact.length > 9) { state.session.userId = compact.slice(4, -5); }
   return true;
 };
 

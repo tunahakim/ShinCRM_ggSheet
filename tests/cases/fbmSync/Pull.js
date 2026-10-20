@@ -285,7 +285,6 @@ async function chay(so) {
     return identityFlowState;
   };
   builders.FbmSync.extractAuthorized = () => 'auth-customer';
-  builders.FbmSync.extractSessionIdentity = () => ({ userId: '2037', accountName: 'ANHLT' });
   const identityStarted = builders.FbmSync.authContinue('customer', {});
   check(so, 'Identity check sau authorize chi mo Customer grid, khong mo Activity', [identityStarted.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total], ['grid', 'identity_check', 'pull_customer', 2]);
   identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: false, activityAuthorized: false }, metadata: {} };

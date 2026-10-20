@@ -152,17 +152,9 @@ FbmSync.preflightLocalStep = function (state) {
 /** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
 FbmSync.authContinue = function (entity, response) {
   // Token gắn với phiên và phải lưu trước mọi request ghi.
-  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead(), identity = typeof FbmSync.extractSessionIdentity === 'function' ? FbmSync.extractSessionIdentity(response) : {};
+  // Không đối chiếu danh tính ở đây: cổng phát request buộc mọi `authorize` đi sau bước kiểm tra phiên (grid User so với liên kết), và response xác thực không mang danh tính (Nghiên cứu FBM ch02 2.7).
+  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead();
   if (!auth) { throw new Error('FBM không trả mã authorized cho ' + entity + '.'); }
-  if (identity.userId) { state.session.userId = identity.userId; }
-  if (identity.accountName) { state.session.accountName = identity.accountName; }
-  if (FbmSync.canWriteFbm(state.mode) && typeof FbmSync.identityPreflight === 'function') {
-    var identityCheck = FbmSync.identityStatus({ userId: state.session.userId, accountName: state.session.accountName });
-    if (identityCheck.status === 'REBIND_REQUIRED') {
-      state.phase = 'error'; state.lastFailureCode = 'REBIND_REQUIRED'; state.lastError = 'Liên kết tài khoản FBM không khớp; chiều ghi đã bị dừng.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      return null;
-    }
-  }
   state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
   if (entity === 'customer') {
     if (state.scan === 'identity_probe') {
