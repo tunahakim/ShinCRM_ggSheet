@@ -180,12 +180,13 @@ function soBan(hopCat) {
 const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetStructure.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
 /**
- * Dấu lần đẩy sạch đọc sổ nạp lại, cài đặt phạm vi và tài khoản đã liên kết; trên GAS ba thứ đó luôn có. Hộp chỉ nạp chặng đẩy thì cấp bản trung tính (không giới hạn phạm vi, chưa liên kết, sổ ở 0); hộp nạp tệp thật hoặc tự gán thì dùng bản của nó.
+ * Dấu lần đẩy sạch đọc sổ nạp lại, cài đặt phạm vi và tài khoản đã liên kết; trên GAS ba thứ đó luôn có. Hộp chỉ nạp chặng đẩy thì cấp bản trung tính cho cài đặt và sổ (không giới hạn phạm vi, sổ ở 0); hộp nạp tệp thật hoặc tự gán thì dùng bản của nó.
  */
 function capDauDaySach(hopCat) {
   const F = hopCat.FbmSync;
   if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ scopeLimited: false, scopeCodes: [] }); }
-  if (typeof F.bindingAccountName !== 'function') { F.bindingAccountName = () => ''; }
+  // Tài khoản đã liên kết đọc bằng hàm thật của Identity.js (kho trống thì chưa liên kết); không cấp hàm giả để hàm bị đổi tên là test hỏng ngay.
+  if (typeof F.boundIdentity !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/Identity.js'), hopCat, { filename: 'fbm_sync/reconcile/Identity.js' }); }
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
 }
 
