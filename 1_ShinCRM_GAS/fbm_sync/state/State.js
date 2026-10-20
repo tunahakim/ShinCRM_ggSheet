@@ -302,7 +302,7 @@ FbmSync.pushCleanNow = function () {
     rev: Number(reloadJournalRead().rev),
     failures: Object.keys(hashes).sort().map(function (key) { return key + '=' + hashes[key]; }).join('|'),
     scope: settings.scopeLimited === false ? '' : 'limited:' + (settings.scopeCodes || []).join(','),
-    account: FbmSync.bindingAccountName()
+    account: FbmSync.boundIdentity().accountName
   };
 };
 /** Dấu đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
