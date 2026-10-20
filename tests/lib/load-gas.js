@@ -91,16 +91,24 @@ function capOXacThucMacDinh(hopCat, ten) {
   if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
 }
 
-/** Mã người dùng FBM của phiên thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
+/** Mã người dùng FBM của liên kết thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
 const MA_NGUOI_DUNG_THU = '2037';
 
 /**
- * Tệp thật luôn có mã người dùng sau bước kiểm phiên, và request đọc khách thiếu mã thì không dựng được. Hộp cát dựng phiên giả không qua bước đó nên được cấp sẵn mã thử khi phiên giả để trống.
+ * Tệp thật chỉ chạy đồng bộ khi đã lưu liên kết tài khoản (`identityPreflight` chặn khi chưa có), nên mã người dùng của điều kiện quyền đọc khách luôn có. Hộp cát không lưu liên kết nên nguồn danh tính liên kết (`boundIdentity`) được cấp mã thử khi liên kết trống.
+ * Chỉ bọc nguồn, không bọc `scriptSettings`: test nào lưu liên kết thật thì mã của liên kết đó đi thẳng vào request, và mã trong phiên không bao giờ được dùng thay.
  */
-function capMaNguoiDungThu(hopCat) {
-  const goc = hopCat.FbmSync && hopCat.FbmSync.scriptSettings;
-  if (typeof goc !== 'function') { return; }
-  hopCat.FbmSync.scriptSettings = function () { const cfg = goc.apply(this, arguments); if (!cfg.userId) { cfg.userId = MA_NGUOI_DUNG_THU; } return cfg; };
+function capLienKetThu(hopCat) {
+  const F = hopCat.FbmSync;
+  if (!F || (F.boundIdentity && F.boundIdentity.laBanThu)) { return; }
+  const goc = F.boundIdentity;
+  const thu = function () {
+    const value = typeof goc === 'function' ? goc.apply(this, arguments) : { spreadsheetId: '', userId: '', username: '', accountName: '' };
+    if (!value.userId) { value.userId = MA_NGUOI_DUNG_THU; }
+    return value;
+  };
+  thu.laBanThu = true;
+  F.boundIdentity = thu;
 }
 
 /**
@@ -176,8 +184,12 @@ function napServer(hopCat, ...duongDans) {
   }
   duongDans.forEach((duongDan) => {
     if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
+    // Liên kết tài khoản đọc qua cửa đọc JSON của kho (`documentPropertyJson` trong State.js); bản thật luôn có nó.
+    if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.documentPropertyJson === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
+      vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
+    }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
-    if (duongDan === 'fbm_sync/read/GridRead.js') { capMaNguoiDungThu(hopCat); }
+    if (duongDan === 'fbm_sync/read/GridRead.js' || duongDan === 'fbm_sync/reconcile/Identity.js') { capLienKetThu(hopCat); }
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
   return hopCat;
