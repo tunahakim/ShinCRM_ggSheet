@@ -15,10 +15,10 @@ Việc viết lặp cùng mảng:
 
 ## Việc
 
-- [ ] Bước 1: một bộ đọc danh tính liên kết, lọc quyền khách theo liên kết.
-  - [ ] `FbmSync.identityNormalize(value)` (bốn trường, không trim, đối chiếu nguyên văn) và `FbmSync.boundIdentity()` ở `reconcile/Identity.js`; `bindingRead` đọc qua `documentPropertyJson` (hỏng thì báo, không trả `{}` im lặng). Bỏ `bindingAccountName`, `identityCheckTarget`, `loginExpectedIdentity`; bên gọi dùng hai hàm mới.
-  - [ ] `scriptSettings` lấy `userId`, `accountName` từ `boundIdentity()`; bỏ đoạn tách cookie. `owner` khi dựng giao dịch lấy qua `scriptSettings()` như PushFlow.
-  - [ ] Test: phiên trống mã nhưng liên kết có mã `7777` thì request đếm khách của Giữ phiên mang `GetCustomerValidate('7777')`; liên kết trống thì không dựng request (`FBM_USER_ID_MISSING`). Hộp cát không sửa đè `scriptSettings`.
+- [x] Bước 1: một bộ đọc danh tính liên kết, lọc quyền khách theo liên kết.
+  - [x] `FbmSync.identityNormalize(value)` (bốn trường, không trim, đối chiếu nguyên văn) và `FbmSync.boundIdentity()` ở `reconcile/Identity.js`; `bindingRead` đọc qua `documentPropertyJson` (hỏng thì báo, không trả `{}` im lặng). Bỏ `bindingAccountName`, `identityCheckTarget`, `loginExpectedIdentity`; bên gọi dùng hai hàm mới.
+  - [x] `scriptSettings` lấy `userId`, `accountName` từ `boundIdentity()`; bỏ đoạn tách cookie. `owner` khi dựng giao dịch lấy qua `scriptSettings()` như PushFlow.
+  - [x] Test: phiên trống mã nhưng liên kết có mã `7777` thì request đếm khách của Giữ phiên mang `GetCustomerValidate('7777')`; liên kết trống thì không dựng request (`FBM_USER_ID_MISSING`). Hộp cát không sửa đè `scriptSettings` nữa; chỉ cấp mã thử ở nguồn `boundIdentity` khi liên kết trống (`capLienKetThu`).
 - [ ] Bước 2: một hàm ghi phiên đã xác minh, một hàm so danh tính.
   - [ ] `FbmSync.sessionIdentityVerify(state, identity)` ở `transport/TransportCore.js` cạnh `sessionIdentityClear`; `loginIdentityContinue`, nhánh `session_probe`, `identity_user_grid` gọi hàm này (nhánh `identity_user_grid` chỉ ghi giá trị, không đánh dấu đã xác minh: dùng tham số rõ).
   - [ ] `identityStatus(runtime, expected)` nhận danh tính kỳ vọng; `loginIdentityContinue` bỏ phép so riêng.
