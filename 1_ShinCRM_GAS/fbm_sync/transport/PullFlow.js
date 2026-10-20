@@ -49,7 +49,8 @@ FbmSync.startRun = function (options) {
   }
   // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
   state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
-  state.identityTarget = state.scan === 'identity_check' && typeof FbmSync.identityCheckTarget === 'function' ? FbmSync.identityCheckTarget(opt.identity) : null;
+  // Kiểm tra liên kết đối chiếu bản nháp người dùng đang xem trên Sidebar; không gửi bản nháp thì đối chiếu liên kết đã lưu.
+  state.identityTarget = state.scan === 'identity_check' ? (opt.identity && typeof opt.identity === 'object' ? FbmSync.identityNormalize(opt.identity) : FbmSync.boundIdentity()) : null;
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }

@@ -14,11 +14,6 @@ FbmSync.loginBlockedResponse = function (response) {
 FbmSync.loginConfigDefault = function () {
   return { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30, configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, nextRetryAt: 0, lastError: '' };
 };
-FbmSync.loginExpectedIdentity = function (value) {
-  if (typeof FbmSync.identityCheckTarget === 'function') { return FbmSync.identityCheckTarget(value); }
-  var input = value && typeof value === 'object' ? value : {};
-  return { spreadsheetId: String(input.spreadsheetId || ''), userId: String(input.userId || ''), username: String(input.username || ''), accountName: String(input.accountName || '') };
-};
 
 /** Chỉ đọc cấu hình đã mã hóa và loại envelope trước khi trả ra Sidebar. */
 FbmSync.loginConfigRead = function () {
@@ -192,7 +187,7 @@ FbmSync.loginTestRequest = function (credentialRef, expectedIdentity, options) {
   if (state.activeRequestId || (state.runId && active)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.' }; }
   state.phase = 'checking_session';
   state.entity = '';
-  state.cursor = { kind: 'login', credentialRef: ref, testOnly: true, purpose: force ? 'force' : 'test', expectedIdentity: FbmSync.loginExpectedIdentity(expectedIdentity || FbmSync.bindingRead()) };
+  state.cursor = { kind: 'login', credentialRef: ref, testOnly: true, purpose: force ? 'force' : 'test', expectedIdentity: expectedIdentity && typeof expectedIdentity === 'object' ? FbmSync.identityNormalize(expectedIdentity) : FbmSync.boundIdentity() };
   state.message = force ? 'Đang hủy phiên cũ, đăng nhập và xác minh tài khoản FBM...' : 'Đang đăng nhập thử và xác minh tài khoản FBM...';
   state.lastError = '';
   state.lastFailureCode = '';
@@ -227,7 +222,7 @@ FbmSync.loginCursorNext = function (cursor, kind) {
     resumePhase: String(current.resumePhase || ''),
     resumeEntity: String(current.resumeEntity || ''),
     resumeHeartbeat: current.resumeHeartbeat === true,
-    expectedIdentity: current.expectedIdentity ? FbmSync.loginExpectedIdentity(current.expectedIdentity) : null
+    expectedIdentity: current.expectedIdentity ? FbmSync.identityNormalize(current.expectedIdentity) : null
   };
 };
 
@@ -334,7 +329,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   var runtime = { spreadsheetId: FbmSync.currentSpreadsheetId(), userId: identity.userId, username: identity.username, accountName: identity.accountName };
-  var expected = cursor.testOnly && cursor.expectedIdentity ? FbmSync.loginExpectedIdentity(cursor.expectedIdentity) : null;
+  var expected = cursor.testOnly && cursor.expectedIdentity ? FbmSync.identityNormalize(cursor.expectedIdentity) : null;
   var expectedHasValue = expected && (expected.spreadsheetId || expected.userId || expected.username || expected.accountName);
   var match = expectedHasValue
     ? { status: (expected.spreadsheetId && expected.spreadsheetId !== runtime.spreadsheetId) || (expected.userId && expected.userId !== runtime.userId) || (expected.username && expected.username !== runtime.username) || (expected.accountName && expected.accountName !== runtime.accountName) ? 'REBIND_REQUIRED' : 'BOUND' }

@@ -7,16 +7,21 @@ FbmSync.BINDING_CLEAR_KEY = 'FBM_SYNC_BINDING_CLEAR_V1';
 FbmSync.currentSpreadsheetId = function () {
   try { return String(shinOpenBook().getId() || ''); } catch (ignore) { return ''; }
 };
+/** Bản lưu thô của liên kết; kho hỏng thì ném lỗi có mã, không coi như chưa liên kết (trả rỗng sẽ mở đường đọc khách không lọc quyền và hiện sai "chưa liên kết"). */
 FbmSync.bindingRead = function () {
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.BINDING_KEY);
-    var value = raw ? JSON.parse(raw) : {};
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  } catch (ignore) { return {}; }
+  return FbmSync.documentPropertyJson(FbmSync.BINDING_KEY, 'liên kết tài khoản FBM') || {};
 };
-/** Tên đầy đủ trong binding là nguồn duy nhất cho cổng owner; không nhân bản vào Config. */
-FbmSync.bindingAccountName = function () {
-  return String(FbmSync.bindingRead().accountName || '');
+/** Bốn trường nhận diện ở dạng chuẩn; giữ nguyên văn (không trim, không đổi hoa thường) vì mọi phép đối chiếu so nguyên văn. */
+FbmSync.identityNormalize = function (value) {
+  var input = value && typeof value === 'object' ? value : {};
+  return { spreadsheetId: String(input.spreadsheetId || ''), userId: String(input.userId || ''), username: String(input.username || ''), accountName: String(input.accountName || '') };
+};
+/**
+ * Danh tính tài khoản đã liên kết: nguồn duy nhất cho mọi việc nghiệp vụ cần biết "tài khoản của Sheet này" (điều kiện quyền đọc khách, `owner` khi ghi).
+ * Danh tính trong phiên (`state.session`) chỉ nói tab FBM đang đăng nhập ai, để đối chiếu với liên kết; nó bị xóa mỗi lượt nên không được dùng thay liên kết.
+ */
+FbmSync.boundIdentity = function () {
+  return FbmSync.identityNormalize(FbmSync.bindingRead());
 };
 FbmSync.bindingCanUpgradeUsername = function (previous, next) {
   var oldValue = previous || {}, newValue = next || {};
@@ -125,16 +130,6 @@ FbmSync.identityStatus = function (runtime) {
   if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
   return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
-};
-/** Chốt bộ nhận diện mà lượt kiểm tra liên kết đang dùng mà không ghi binding. */
-FbmSync.identityCheckTarget = function (value) {
-  var input = value && typeof value === 'object' ? value : FbmSync.bindingRead();
-  return {
-    spreadsheetId: String(input.spreadsheetId || ''),
-    userId: String(input.userId || ''),
-    username: String(input.username || ''),
-    accountName: String(input.accountName || '')
-  };
 };
 FbmSync.identityPreflight = function (mode) {
   var status = FbmSync.identityStatus(), identityRecovery = mode === 'identity_check' || mode === 'identity_probe';
