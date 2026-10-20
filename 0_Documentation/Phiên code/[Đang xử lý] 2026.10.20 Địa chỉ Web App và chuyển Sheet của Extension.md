@@ -10,6 +10,7 @@ Cùng branch `feature/expensive-ops`. Chủ dự án duyệt 2026-10-20: Web App
 ## Số đo
 
 - `fbmProbeServiceUrl` (DEV, 2026-10-20): trong ngữ cảnh Web App, `ScriptApp.getService().getUrl()` trả đúng địa chỉ `/exec` của bản triển khai đang chạy.
+- DEV 2026-10-20 sau khi đẩy (@976, relay @977): trước khi mở link, `FBM_SYNC_RELAY_URL_V1` trống; mở link relay `/exec` một lần thì trang báo đã ghi và giá trị lưu đúng địa chỉ relay. Lời gọi cửa chạy hàm (có token) không ghi đè địa chỉ.
 
 ## Việc
 
@@ -30,5 +31,6 @@ Cùng branch `feature/expensive-ops`. Chủ dự án duyệt 2026-10-20: Web App
   - [x] Sidebar: mã chuyển Sheet mở hộp quyết định, chọn chuyển thì gửi kèm `switchFrom`.
 - [x] Mục 4: tài liệu 06 (ScriptProperties giữ địa chỉ Web App, bước mở link Web App khi cài, luật chuyển Sheet); `Cây thư mục code.md` nếu có tệp mới.
 - [ ] Mục 5: DEV.
-  - [ ] Đẩy DEV, mở link Web App relay một lần, kiểm `FBM_SYNC_RELAY_URL_V1` đúng địa chỉ relay; nhịp nền vẫn chạy.
+  - [x] Đẩy DEV, mở link Web App relay một lần, kiểm `FBM_SYNC_RELAY_URL_V1` đúng địa chỉ relay.
+  - [ ] Chủ dự án tải lại Extension (mã hợp đồng `8d2b578969a1`), mở lại Sidebar Sheet DEV: không có hộp hỏi (cùng Sheet); nhịp nền vẫn chạy.
   - [ ] Chủ dự án tải lại Extension và nhân bản Sheet; kiểm bản sao báo chưa có địa chỉ, sau khi triển khai và mở link thì Sidebar bản sao hỏi chuyển Sheet.
