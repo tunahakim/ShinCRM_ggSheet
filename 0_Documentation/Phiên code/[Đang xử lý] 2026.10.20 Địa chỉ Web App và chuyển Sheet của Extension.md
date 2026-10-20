@@ -32,5 +32,7 @@ Cùng branch `feature/expensive-ops`. Chủ dự án duyệt 2026-10-20: Web App
 - [x] Mục 4: tài liệu 06 (ScriptProperties giữ địa chỉ Web App, bước mở link Web App khi cài, luật chuyển Sheet); `Cây thư mục code.md` nếu có tệp mới.
 - [ ] Mục 5: DEV.
   - [x] Đẩy DEV, mở link Web App relay một lần, kiểm `FBM_SYNC_RELAY_URL_V1` đúng địa chỉ relay.
-  - [ ] Chủ dự án tải lại Extension (mã hợp đồng `8d2b578969a1`), mở lại Sidebar Sheet DEV: không có hộp hỏi (cùng Sheet); nhịp nền vẫn chạy.
+  - [x] Chủ dự án tải lại Extension (mã hợp đồng `8d2b578969a1`).
+  - [ ] Mở lại Sidebar Sheet DEV: không có hộp hỏi (cùng Sheet); nhịp nền vẫn chạy.
+- Phần còn lại làm khi chuyển sang Sheet mới, sau khi các việc đang dở đã gộp vào `main`; các bước ghi ở `2026.10.17 Todo.md`, mục "Chuyển sang Sheet mới".
   - [ ] Chủ dự án tải lại Extension và nhân bản Sheet; kiểm bản sao báo chưa có địa chỉ, sau khi triển khai và mở link thì Sidebar bản sao hỏi chuyển Sheet.
