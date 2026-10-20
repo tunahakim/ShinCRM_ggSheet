@@ -44,10 +44,10 @@ Cùng branch `feature/expensive-ops`, nối tiếp tệp `[Đã xử lý] 2026.1
   - [x] Trang thiếu giá trị: phát lại probe kèm `reloadFbmPage`; vẫn thiếu thì dừng `FBM_PAGE_IDENTITY_MISSING`.
   - [x] Sau đăng nhập: trang khớp thì tiếp tục, trang lệch thì dừng.
   - [x] Extension: `prepareFbmTab` điều hướng tab khi có `reloadFbmPage`.
-- [ ] Mục 6: nghiệm thu DEV và tài liệu.
+- [x] Mục 6: nghiệm thu DEV và tài liệu.
   - [x] Đẩy code lên GAS DEV (bản triển khai @970, relay @971).
   - [x] Hai pattern chạy trên HTML tab FBM thật (`/Main/zccrAccount.aspx`) ra đúng mã người dùng và tên đầy đủ.
   - [x] Sửa tài liệu 09/02 (nguồn mã người dùng) và 09/01 (mục "Xác minh tài khoản của phiên", bước 5 "Chuẩn bị tab FBM").
-  - [ ] Chủ dự án tải lại Extension (mã hợp đồng đổi sang `e5476b1e7f9c`; Extension cũ sẽ bị GAS dừng vì lệch mã).
-  - [ ] Cửa chạy hàm DEV trả HTTP 403 "Truy cập bị từ chối" từ sau lần đẩy này; tìm nguyên nhân rồi chạy lại.
-  - [ ] Chạy Giữ phiên và một lượt đồng bộ trên Sheet DEV; đọc Log xác nhận probe đi trước request đếm và không có lỗi thiếu mã người dùng.
+  - [x] Chủ dự án tải lại Extension (mã hợp đồng `e5476b1e7f9c`).
+  - [x] HTTP 403 "Truy cập bị từ chối" (19:55–21:13, cả cửa chạy hàm lẫn relay nền nên Log trống) là do quyền của script hết hạn; chủ dự án cấp lại quyền thì chạy lại. Nghi do dự án Google Cloud `test-project-cho-claude-opus` đang ở chế độ Testing (Google hủy quyền sau 7 ngày); chủ dự án tự chuyển sang Production.
+  - [x] Trên Sheet DEV: lượt nền 21:14 đi probe, so trang khớp rồi đọc khách, xong không lỗi; Giữ phiên 21:24 với phiên đã xác minh gửi thẳng request đếm, OK; Log không còn lỗi thiếu mã người dùng. Nhánh Giữ phiên khi phiên chưa xác minh chỉ có test offline, vì không dựng được trạng thái đó trên DEV mà không thêm công cụ.
