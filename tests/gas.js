@@ -56,12 +56,11 @@ async function callGas(functionName) {
   return text;
 }
 
-/** Mã bản triển khai Web App mà Extension gọi ở lượt nền, đọc từ đúng hằng GAS để không giữ bản sao. */
+/** Mã bản triển khai Web App relay nằm cùng tệp cấu hình chạy thử, vì địa chỉ relay là của bản triển khai trên Google, code không giữ nó. */
 function relayDeploymentId() {
-  const source = fs.readFileSync(path.join(GAS_DIR, 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
-  const match = source.match(/var FBM_SYNC_RELAY_WEB_APP_URL = 'https:\/\/script\.google\.com\/macros\/s\/([^/']+)\/exec';/);
-  if (!match) { throw new Error('Không đọc được FBM_SYNC_RELAY_WEB_APP_URL trong fbm_sync/transport/EntryPoints.js.'); }
-  return match[1];
+  const id = String(loadConfig().relayDeploymentId || '');
+  if (!id) { throw new Error('Tệp .dev-runner.json thiếu relayDeploymentId (mã bản triển khai "Dong bo FBM Sidebar UI").'); }
+  return id;
 }
 
 /**

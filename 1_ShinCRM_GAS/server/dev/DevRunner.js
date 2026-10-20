@@ -53,9 +53,9 @@ function devFormatResult(result) {
 }
 
 /**
- * Nhận lời gọi từ bên ngoài. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.
+ * Nhận lời gọi từ bên ngoài qua `doGet` (fbm_sync/transport/EntryPoints) khi lời gọi mang `token`. Trả về văn bản thuần, mở đầu bằng OK hoặc LOI để phía gọi đọc được kết quả mà không phải bóc HTML.
  */
-function doGet(e) {
+function devRunnerGet(e) {
   var params = (e && e.parameter) ? e.parameter : {};
   var reply = function (text) {
     return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);

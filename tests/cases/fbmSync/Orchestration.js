@@ -33,10 +33,15 @@ async function chay(so) {
   const clearedFailedBinding = identity.FbmSync.bindingWrite({});
   check(so, 'lỗi cầu nối đã kết thúc vẫn cho phép hủy liên kết', [clearedFailedBinding.ok, clearedFailedBinding.code, bindingData[identity.FbmSync.BINDING_KEY]], [true, 'IDENTITY_BINDING_CLEARED', undefined]);
 
+  // ScriptProperties giả có thật kho; `relayContextUrl` là địa chỉ ScriptApp trả trong ngữ cảnh đang chạy.
+  const relayScriptStore = { FBM_SYNC_KEY: 'relay-test-key' };
+  const relayScriptWrites = [];
+  const relayScriptProps = { getProperty: (name) => relayScriptStore[name] === undefined ? null : relayScriptStore[name], setProperty: (name, value) => { relayScriptWrites.push(name); relayScriptStore[name] = value; } };
+  let relayContextUrl = 'https://script.google.com/macros/s/relay-dep/exec';
   const relay = taoHopCat({
     FbmSync: {},
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => ({ getProperty: () => 'relay-test-key' }) },
-    ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/head-only/exec' }) },
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => relayScriptProps },
+    ScriptApp: { getService: () => ({ getUrl: () => relayContextUrl }), getScriptId: () => 'script-relay-test' },
     shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) },
     ERROR_CHANNEL_PENDING: 'pending', LOG_ERROR: 'error', errorMessage: (err) => String(err && err.message || err)
@@ -47,12 +52,30 @@ async function chay(so) {
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
   relay.reportError = (err, channel) => { relayLog.reports.push([String(err && err.message || err), channel]); };
   napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
-  const stableRelayConfig = relay.fbmSyncRelayConfig();
-  check(so, 'relay cap URL deployment co dinh, khong lay URL @HEAD theo context Sidebar', [stableRelayConfig.url, stableRelayConfig.url.indexOf('head-only') >= 0], ['https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec', false]);
+  const relayConfigError = () => { try { relay.fbmSyncRelayConfig(); return ''; } catch (err) { return String(err.message); } };
+  check(so, 'Chưa có địa chỉ Web App đã ghi: không cấp cấu hình relay, báo rõ phải mở link Web App một lần', /Chưa có địa chỉ Web App/.test(relayConfigError()), true);
+  relayScriptStore[relay.FbmSync.RELAY_URL_KEY] = JSON.stringify({ url: 'https://script.google.com/macros/s/cua-script-goc/exec', scriptId: 'script-goc' });
+  check(so, 'Địa chỉ Web App mang theo từ script gốc (bản sao Sheet) bị bỏ qua: vẫn không cấp cấu hình', /Chưa có địa chỉ Web App/.test(relayConfigError()), true);
+  delete relayScriptStore[relay.FbmSync.RELAY_URL_KEY];
+  relay.doPost({ postData: { contents: JSON.stringify({ key: 'sai-khoa', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } });
+  check(so, 'Lời gọi Web App sai khóa không ghi địa chỉ', relayScriptWrites.length, 0);
   const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
   check(so, 'Web App từ chối probe ngoài nhịp nền', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request], [false, 'RELAY_KIND_UNSUPPORTED', null]);
+  const configAfterPost = relay.fbmSyncRelayConfig();
+  check(so, 'Lời gọi Web App qua khóa ghi đúng địa chỉ Web App đang chạy; Sidebar cấp đúng địa chỉ đó cho Extension', [configAfterPost.url, relayScriptWrites], ['https://script.google.com/macros/s/relay-dep/exec', [relay.FbmSync.RELAY_URL_KEY]]);
+  relayContextUrl = 'https://script.google.com/macros/s/head-only/dev';
+  check(so, 'Ngữ cảnh không phải Web App /exec (Sidebar, @HEAD) không ghi được địa chỉ', (() => { try { relay.FbmSync.relayUrlRecord(relayScriptProps); return 'ghi'; } catch (err) { return /\/exec/.test(err.message); } })(), true);
+  relayContextUrl = 'https://script.google.com/macros/s/relay-dep/exec';
+  const pageOpen = relay.doGet({ parameter: {} });
+  check(so, 'Mở link Web App trên trình duyệt: báo đã ghi địa chỉ; địa chỉ không đổi thì không ghi lại ScriptProperties', [/đã ghi địa chỉ/.test(pageOpen.text), relayScriptWrites.length], [true, 1]);
+  relay.devRunnerGet = (event) => ({ text: 'runner:' + event.parameter.fn });
+  check(so, 'Lời gọi mang token chuyển cho cửa chạy hàm lúc phát triển', relay.doGet({ parameter: { token: 't', fn: 'x' } }).text, 'runner:x');
+  delete relay.devRunnerGet;
   // FBM-034: nhịp nền chạy cả khi Sidebar đóng, nên lỗi ở đây chỉ còn Log và tin chờ ở Sidebar lần mở sau. Trước đây doPost không qua runEntryPoint: Log nằm trong RAM rồi mất, exception chỉ trả về Extension.
   const relayPost = (body) => JSON.parse(relay.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).text);
+  // Địa chỉ đã ghi từ trên nên các lời gọi dưới không thêm dòng Log; đếm lại từ đầu.
+  relayLog.lines = []; relayLog.flushes = 0; relayLog.reports = [];
+  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' });
   check(so, 'FBM-034: nhịp nền thành công vẫn xả bộ đệm Log đúng một lần', relayLog.flushes, 1);
   relay.fbmSyncHeartbeatRequest = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
   const relayBoom = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });

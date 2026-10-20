@@ -71,16 +71,39 @@ function fbmSyncRetryPushFailures() {
   return { ok: true, total: keys.length, reset: reset.length, missing: missing.length, status: FbmSync.statusView() };
 }
 
-// ID deployment ổn định qua mỗi lần nâng revision. Không dùng getService().getUrl(),
-// vì khi chạy từ Sidebar nó có thể trả URL @HEAD không phải Web App công khai.
-var FBM_SYNC_RELAY_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX/exec';
+/**
+ * Địa chỉ Web App relay thuộc về bản triển khai của từng script, không thuộc code: code đi theo mọi bản sao Sheet nên hằng số trong code sẽ chỉ Extension của bản sao về Web App của Sheet gốc.
+ * Nguồn duy nhất là `ScriptApp.getService().getUrl()` đọc lúc GAS đang chạy trong chính Web App (trong ngữ cảnh Sidebar nó có thể trả địa chỉ @HEAD). Kèm `scriptId` vì bản sao mang theo ScriptProperties của script gốc.
+ */
+FbmSync.RELAY_URL_KEY = 'FBM_SYNC_RELAY_URL_V1';
+FbmSync.relayUrlStored = function (props) {
+  var raw = String(props.getProperty(FbmSync.RELAY_URL_KEY) || '');
+  if (!raw) { return ''; }
+  var value = JSON.parse(raw);
+  return value && value.scriptId === ScriptApp.getScriptId() ? String(value.url || '') : '';
+};
+/** Chỉ gọi trong ngữ cảnh Web App. Chỉ ghi khi địa chỉ đổi, nên lời gọi nền thường chỉ tốn một lần đọc ScriptProperties đã có sẵn. */
+FbmSync.relayUrlRecord = function (props) {
+  var url = String(ScriptApp.getService().getUrl() || '');
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)) { throw new Error('Web App không đọc được địa chỉ /exec của chính nó (nhận được "' + url + '").'); }
+  if (FbmSync.relayUrlStored(props) === url) { return { url: url, changed: false }; }
+  props.setProperty(FbmSync.RELAY_URL_KEY, JSON.stringify({ url: url, scriptId: ScriptApp.getScriptId(), at: Date.now() }));
+  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'relay_url_recorded', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Đã ghi địa chỉ Web App đồng bộ nền của script này; Sidebar sẽ gửi địa chỉ này cho Extension.' }); }
+  return { url: url, changed: true };
+};
+/** Địa chỉ cho cấu hình relay; chưa có thì dừng hẳn, không cấp cấu hình trỏ sai Web App. */
+FbmSync.relayUrlRequired = function (props) {
+  var url = FbmSync.relayUrlStored(props);
+  if (!url) { throw new Error('Chưa có địa chỉ Web App đồng bộ nền của Sheet này. Hãy mở link Web App một lần (Apps Script → Triển khai → Quản lý bản triển khai → URL ứng dụng web) rồi mở lại Sidebar.'); }
+  return url;
+};
 
 /** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. */
 function fbmSyncRelayConfig() {
-  var url = FBM_SYNC_RELAY_WEB_APP_URL;
-  var spreadsheetId = '';
-  try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
-  var props = PropertiesService.getScriptProperties(), key = String(props.getProperty('FBM_SYNC_KEY') || '');
+  var props = PropertiesService.getScriptProperties();
+  var url = FbmSync.relayUrlRequired(props);
+  var spreadsheetId = String(shinOpenBook().getId() || '');
+  var key = String(props.getProperty('FBM_SYNC_KEY') || '');
   if (!key) {
     var lock = LockService.getScriptLock();
     documentStoreWaitLock(lock, 10000);
@@ -103,11 +126,11 @@ function fbmSyncRotateRelayKey() {
   var lock = LockService.getScriptLock();
   documentStoreWaitLock(lock, 10000);
   try {
+    var props = PropertiesService.getScriptProperties();
+    var url = FbmSync.relayUrlRequired(props);
+    var spreadsheetId = String(shinOpenBook().getId() || '');
     var key = Utilities.getUuid();
-    PropertiesService.getScriptProperties().setProperty('FBM_SYNC_KEY', key);
-    var url = FBM_SYNC_RELAY_WEB_APP_URL;
-    var spreadsheetId = '';
-    try { spreadsheetId = String(shinOpenBook().getId() || ''); } catch (ignoreId) {}
+    props.setProperty('FBM_SYNC_KEY', key);
     return { url: url, key: key, spreadsheetId: spreadsheetId };
   } finally { lock.releaseLock(); }
 }
@@ -151,10 +174,22 @@ function doPost(event) {
     var body;
     // Thông báo lỗi JSON.parse có thể trích một đoạn nội dung gửi lên (chứa khóa relay), nên thay bằng câu không mang nội dung.
     try { body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}; } catch (badJson) { return reply({ ok: false, error: 'invalid_json' }); }
-    var expected = String(PropertiesService.getScriptProperties().getProperty('FBM_SYNC_KEY') || '');
+    var props = PropertiesService.getScriptProperties();
+    var expected = String(props.getProperty('FBM_SYNC_KEY') || '');
     if (!expected || body.key !== expected) { return reply({ ok: false, error: 'unauthorized' }); }
-    return reply(runEntryPoint('fbmRelay', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { return fbmSyncRelayHandle(body); }));
+    return reply(runEntryPoint('fbmRelay', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { FbmSync.relayUrlRecord(props); return fbmSyncRelayHandle(body); }));
   } catch (err) { return reply({ ok: false, error: errorMessage(err) }); }
+}
+/**
+ * Mở link Web App trên trình duyệt là bước cài đặt duy nhất cho địa chỉ relay: Web App ghi địa chỉ của chính nó. Ai mở link cũng chỉ ghi được đúng địa chỉ thật của script này.
+ * Lời gọi mang `token` là của cửa chạy hàm lúc phát triển (server/dev); gỡ thư mục đó thì nhánh này không còn.
+ */
+function doGet(event) {
+  var params = event && event.parameter ? event.parameter : {};
+  if (params.token !== undefined && typeof devRunnerGet === 'function') { return devRunnerGet(event); }
+  var result = runEntryPoint('fbmRelayUrlRecord', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { return FbmSync.relayUrlRecord(PropertiesService.getScriptProperties()); });
+  var text = result && result.url ? 'ShinCRM đã ghi địa chỉ Web App đồng bộ nền của Sheet này. Mở lại Sidebar để gửi địa chỉ cho Extension.' : 'ShinCRM chưa ghi được địa chỉ Web App; xem Sheet Log.';
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);
 }
 /** Phần nghiệp vụ của nhịp nền sau khi đã qua khóa; lỗi ném ra để `runEntryPoint` ghi Log. */
 function fbmSyncRelayHandle(body) {
