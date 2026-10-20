@@ -110,11 +110,13 @@ function fbmProbeCustomerActivities(customerId) {
   };
 }
 
-/** Giờ chạy xong của từng tiến trình nền, số phút còn tới hạn và các cờ quyết định lần hỏi nền có chạy hay không. */
+/** Giờ chạy xong của từng tiến trình nền, số phút còn tới hạn và các cờ quyết định lần hỏi nền có chạy hay không, kèm cổng của chặng đẩy mà Giữ phiên kế tiếp sẽ gặp. */
 function fbmProbeScheduleMarkers() {
   var props = FbmSync.props(), state = FbmSync.stateRead(), now = Date.now(), markers = {};
+  var stored = FbmSync.pushCleanRead(), current = FbmSync.pushCleanNow();
+  var gate = { direction: FbmSync.backgroundScheduleRead().direction, stored: stored, now: current, keepalive: FbmSync.pushGateDecide({ origin: 'background', scan: 'keepalive' }, stored, current), lastRun: { scan: state.scan, mode: state.mode, scheduleMode: state.scheduleMode, pushGate: state.pushGate, message: state.message } };
   Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) { var done = Number(props.getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0), due = FbmSync.scheduleDueAt(kind); markers[kind] = { doneAt: done ? new Date(done).toISOString() : '', dueInMin: Math.round((due - now) / 60000) }; });
-  return { now: new Date(now).toISOString(), master: FbmSync.masterEnabled(), background: FbmSync.backgroundEnabled(), markers: markers, phase: state.phase, origin: state.origin, scheduledScan: state.scheduledScan, chain: state.chain, activeRequestId: state.activeRequestId, deadlineAt: state.deadlineAt ? new Date(Number(state.deadlineAt)).toISOString() : '', failureCode: state.failureCode, message: state.message, sessionExpired: state.session && state.session.expired, due: FbmSync.scheduleDueKinds(now, []), trace: (function () { try { return JSON.parse(props.getProperty('FBM_SYNC_TRACE_V1') || '[]').slice(-25).map(function (t) { return new Date(Number(t.at)).toISOString().slice(11, 19) + ' ' + t.stage + ' ' + (t.operation || '') + ' ' + (t.code || t.failureCode || ''); }); } catch (e) { return String(e); } })() };
+  return { pushGate: gate, now: new Date(now).toISOString(), master: FbmSync.masterEnabled(), background: FbmSync.backgroundEnabled(), markers: markers, phase: state.phase, origin: state.origin, scheduledScan: state.scheduledScan, chain: state.chain, activeRequestId: state.activeRequestId, deadlineAt: state.deadlineAt ? new Date(Number(state.deadlineAt)).toISOString() : '', failureCode: state.failureCode, message: state.message, sessionExpired: state.session && state.session.expired, due: FbmSync.scheduleDueKinds(now, []), trace: (function () { try { return JSON.parse(props.getProperty('FBM_SYNC_TRACE_V1') || '[]').slice(-25).map(function (t) { return new Date(Number(t.at)).toISOString().slice(11, 19) + ' ' + t.stage + ' ' + (t.operation || '') + ' ' + (t.code || t.failureCode || ''); }); } catch (e) { return String(e); } })() };
 }
 
 /** Các dòng đang xung đột chờ quyết kèm giá trị ShinCRM, baseline và giờ đồng bộ, chỉ đọc, để soạn và đối chiếu nghiệm thu màn xung đột. */
