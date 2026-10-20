@@ -116,3 +116,9 @@ function fbmProbeScheduleMarkers() {
   Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) { var done = Number(props.getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0), due = FbmSync.scheduleDueAt(kind); markers[kind] = { doneAt: done ? new Date(done).toISOString() : '', dueInMin: Math.round((due - now) / 60000) }; });
   return { now: new Date(now).toISOString(), master: FbmSync.masterEnabled(), background: FbmSync.backgroundEnabled(), markers: markers, phase: state.phase, origin: state.origin, scheduledScan: state.scheduledScan, chain: state.chain, activeRequestId: state.activeRequestId, deadlineAt: state.deadlineAt ? new Date(Number(state.deadlineAt)).toISOString() : '', failureCode: state.failureCode, message: state.message, sessionExpired: state.session && state.session.expired, due: FbmSync.scheduleDueKinds(now, []), trace: (function () { try { return JSON.parse(props.getProperty('FBM_SYNC_TRACE_V1') || '[]').slice(-25).map(function (t) { return new Date(Number(t.at)).toISOString().slice(11, 19) + ' ' + t.stage + ' ' + (t.operation || '') + ' ' + (t.code || t.failureCode || ''); }); } catch (e) { return String(e); } })() };
 }
+
+/** Đo `ScriptApp.getService().getUrl()` khi chạy trong ngữ cảnh Web App (cửa chạy hàm là một bản triển khai Web App), để biết GAS có tự biết địa chỉ bản triển khai đang chạy không. */
+function fbmProbeServiceUrl() {
+  var url = String(ScriptApp.getService().getUrl() || '');
+  return { serviceUrl: url, relayConstant: FBM_SYNC_RELAY_WEB_APP_URL, scriptId: ScriptApp.getScriptId() };
+}
