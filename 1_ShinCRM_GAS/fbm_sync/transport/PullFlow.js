@@ -419,9 +419,7 @@ FbmSync.continueStep = function (rawResponse) {
     if (gateResponse) { return gateResponse; }
   }
   if (cursor.kind === 'session_probe' && !FbmSync.protocol.isLiveSessionResponse(rawResponse)) {
-    var probeFailure = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-    if (probeFailure && probeFailure.request) { return probeFailure; }
-    return probeFailure;
+    return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
   }
   // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
   // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
@@ -483,9 +481,7 @@ FbmSync.continueStep = function (rawResponse) {
     var probedIdentity = FbmSync.identityUser(response);
     if (!probedIdentity.ok) {
       if (typeof FbmSync.protocol.isUnauthenticatedResponse === 'function' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse)) {
-        var probeRecovery = FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-        if (probeRecovery && probeRecovery.request) { return probeRecovery; }
-        if (probeRecovery) { return probeRecovery; }
+        return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
       }
       FbmSync.sessionIdentityClear(state);
       state.phase = 'error'; state.cursor = {}; state.lastFailureCode = probedIdentity.code || 'IDENTITY_PROBE_INCOMPLETE';

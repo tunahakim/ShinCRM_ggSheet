@@ -294,7 +294,7 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
 /** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. */
 FbmSync.pushConfigErrors = function (candidate, settings) {
   var cfg = settings || FbmSync.scriptSettings();
-  if (!String(cfg.accountName || '').trim()) { return 'Thiếu tên đầy đủ trong liên kết tài khoản FBM; chiều đẩy đã bị dừng.'; }
+  if (!String(cfg.accountName || '').trim()) { return 'Phiên FBM chưa có tên đầy đủ của tài khoản đã xác minh; chiều đẩy đã bị dừng.'; }
   if (candidate.kind === 'create' && candidate.entity === 'customer' && (!String(cfg.customerPrefix || '').trim() || !String(cfg.customerCodeLength || '').trim())) { return 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.'; }
   return '';
 };
@@ -307,14 +307,14 @@ FbmSync.validateAutoCustomerCode = function (code, settings) {
   return { ok: true };
 };
 
-/** Owner của Activity phải khớp binding đã xác nhận trước khi cấp bất kỳ request push nào. */
+/** Owner của Activity phải khớp tên đầy đủ của tài khoản phiên đã xác minh (cùng là tài khoản liên kết) trước khi cấp request ghi. Trước bước kiểm tra phiên chưa có tên nên không kết luận gì. */
 FbmSync.pushOwnerError = function (candidate, settings) {
   if (!candidate || candidate.entity !== 'activity') { return ''; }
   var cfg = settings || FbmSync.scriptSettings(), configured = String(cfg.accountName || '');
   var owner = String(candidate.record && candidate.record.owner || '');
   if (!configured) { return ''; }
   if (owner && owner !== configured) {
-    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đã liên kết "' + configured + '".';
+    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đang đăng nhập "' + configured + '".';
   }
   return '';
 };

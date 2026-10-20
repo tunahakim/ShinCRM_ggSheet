@@ -215,7 +215,7 @@ FbmSync.chainStart = function (kind) {
   if (kind === 'heartbeat') {
     state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
     FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('heartbeat')), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.cursorStartEnvelope(state), status: FbmSync.statusView() };
   }
   state.scheduledScan = '';
   FbmSync.stateWrite(state);
@@ -302,7 +302,7 @@ function fbmSyncHeartbeatRequest(options) {
       if (!openedRequest) { return { ok: !!(opened && opened.ok), code: opened && opened.code || 'CHAIN_START_EMPTY', request: null, status: FbmSync.statusView(), error: opened && opened.error }; }
       return { ok: true, code: 'CHAIN_REQUEST_READY', request: openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest), status: FbmSync.statusView() };
     }
-    var heartbeatRequest = FbmSync.sessionSystemRequest('heartbeat'), heartbeatEnvelope = FbmSync.nextEnvelope(heartbeatRequest), currentState = FbmSync.stateRead();
+    var heartbeatEnvelope = FbmSync.cursorStartEnvelope(state), currentState = FbmSync.stateRead();
     return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
   } finally { lock.releaseLock(); }
 }

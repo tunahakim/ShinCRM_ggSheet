@@ -4,23 +4,18 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 // Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
 FbmSync.CUSTOMER_PAGE_ROWS = 50;
 
-/**
- * Đọc cấu hình runtime. Cookie và token lấy từ phiên hiện tại; mã người dùng và tên tài khoản lấy từ liên kết (`boundIdentity`), không lấy từ phiên:
- * phiên bị xóa mỗi lượt, nên Giữ phiên chạy sau một lượt hỏng trước bước kiểm tra phiên sẽ thấy phiên trống mã.
- */
+/** Đọc cấu hình runtime. Cookie, token và danh tính (mã người dùng, tên đầy đủ) lấy từ phiên; danh tính chỉ có khi phiên đã xác minh (`sessionVerifiedIdentity`). */
 FbmSync.scriptSettings = function () {
-  var currentState = {}, session = {};
-  try { currentState = FbmSync.stateRead() || {}; session = currentState.session || {}; } catch (ignore) { currentState = {}; session = {}; }
-  var cookie = String(session.cookie || '');
-  var bound = typeof FbmSync.boundIdentity === 'function' ? FbmSync.boundIdentity() : { userId: '', accountName: '' };
+  var currentState = FbmSync.stateRead() || {}, session = currentState.session || {};
+  var identity = FbmSync.sessionVerifiedIdentity(currentState);
   var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
   return {
     baseUrl: 'https://fbo.com.vn:8888',
-    cookie: cookie,
+    cookie: String(session.cookie || ''),
     customerAuthorized: String(session.customerAuthorized || ''),
     activityAuthorized: String(session.activityAuthorized || ''),
-    userId: String(bound.userId || ''),
-    accountName: String(bound.accountName || ''),
+    userId: identity.userId,
+    accountName: identity.accountName,
     customerPrefix: String(accountSettings.customerPrefix || ''),
     customerCodeLength: String(accountSettings.customerCodeLength || '')
   };
@@ -57,7 +52,7 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
     var cfg = FbmSync.scriptSettings(), opt = options || {}, payload = gridPayload(entity, opt, cfg);
     if (entity === 'customer') {
       // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
-      if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('thiếu mã người dùng FBM nên không dựng request đọc khách; lưu liên kết tài khoản FBM rồi chạy lại.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
+      if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('phiên FBM chưa được xác minh tài khoản nên chưa có mã người dùng; không dựng request đọc khách.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
       payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
     }
     var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;

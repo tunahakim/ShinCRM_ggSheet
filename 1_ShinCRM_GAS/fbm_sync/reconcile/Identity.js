@@ -16,10 +16,7 @@ FbmSync.identityNormalize = function (value) {
   var input = value && typeof value === 'object' ? value : {};
   return { spreadsheetId: String(input.spreadsheetId || ''), userId: String(input.userId || ''), username: String(input.username || ''), accountName: String(input.accountName || '') };
 };
-/**
- * Danh tính tài khoản đã liên kết: nguồn duy nhất cho mọi việc nghiệp vụ cần biết "tài khoản của Sheet này" (điều kiện quyền đọc khách, `owner` khi ghi).
- * Danh tính trong phiên (`state.session`) chỉ nói tab FBM đang đăng nhập ai, để đối chiếu với liên kết; nó bị xóa mỗi lượt nên không được dùng thay liên kết.
- */
+/** Danh tính tài khoản đã liên kết: giá trị chủ dự án khai báo, chỉ dùng để đối chiếu với danh tính đọc từ FBM. Request nghiệp vụ dùng danh tính phiên đã xác minh (`sessionVerifiedIdentity`), không dùng giá trị này. */
 FbmSync.boundIdentity = function () {
   return FbmSync.identityNormalize(FbmSync.bindingRead());
 };

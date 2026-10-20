@@ -264,11 +264,16 @@ async function chay(so) {
   const legacyAccount = workflowGas();
   legacyAccount.hop.FbmSync.configValue = (name) => name === 'FBM_ACCOUNT_NAME' ? 'Tên còn sót trong Config' : '';
   legacyAccount.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
-  check(so, 'ten tai khoan cua binding la nguon owner duy nhat, Config cu khong the rebind hay khoa phien', [
+  const ownerBeforeVerify = legacyAccount.hop.FbmSync.scriptSettings().accountName;
+  const verifiedOwner = legacyAccount.hop.FbmSync.stateRead();
+  legacyAccount.hop.FbmSync.sessionIdentityVerify(verifiedOwner, { userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
+  legacyAccount.hop.FbmSync.stateWrite(verifiedOwner);
+  check(so, 'owner lay tu phien da xac minh (chua xac minh thi rong), khong lay tu lien ket hay Config cu; Config cu khong the rebind hay khoa phien', [
+    ownerBeforeVerify,
     legacyAccount.hop.FbmSync.scriptSettings().accountName,
     legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' }).status,
     legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Tên còn sót trong Config' }).status
-  ], ['Lê Tuấn Anh', 'BOUND', 'REBIND_REQUIRED']);
+  ], ['', 'Lê Tuấn Anh', 'BOUND', 'REBIND_REQUIRED']);
 
   const engine = workflowGas();
   const started = engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
@@ -759,7 +764,8 @@ async function chay(so) {
   scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
   scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
-  check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
+  // Phiên chưa xác minh nên Giữ phiên mở bằng probe User.
+  check(so, 'Chrome startup co the hoi GAS ngay mot luot theo cau hinh', [startup.ok, startup.code, startup.request && startup.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'session_probe']);
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
   waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
   waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });

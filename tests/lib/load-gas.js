@@ -91,24 +91,27 @@ function capOXacThucMacDinh(hopCat, ten) {
   if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
 }
 
-/** Mã người dùng FBM của liên kết thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
+/** Mã người dùng FBM thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
 const MA_NGUOI_DUNG_THU = '2037';
 
 /**
- * Tệp thật chỉ chạy đồng bộ khi đã lưu liên kết tài khoản (`identityPreflight` chặn khi chưa có), nên mã người dùng của điều kiện quyền đọc khách luôn có. Hộp cát không lưu liên kết nên nguồn danh tính liên kết (`boundIdentity`) được cấp mã thử khi liên kết trống.
- * Chỉ bọc nguồn, không bọc `scriptSettings`: test nào lưu liên kết thật thì mã của liên kết đó đi thẳng vào request, và mã trong phiên không bao giờ được dùng thay.
+ * Tệp thật chỉ dựng request đọc khách sau khi phiên đã xác minh (cổng phát request chèn probe User trước), nên mã người dùng của điều kiện quyền luôn có. Nhiều test dựng request trực tiếp, không qua probe, nên nguồn danh tính phiên (`sessionVerifiedIdentity`) được cấp mã thử khi trống.
+ * Chỉ bọc nguồn, không bọc `scriptSettings`: test nào đi qua probe thật thì mã của grid User đi thẳng vào request. Cổng vẫn đọc `sessionIdentityIsVerified` thật, nên test nào kiểm "phiên chưa xác minh phải probe trước" vẫn thấy đúng hành vi.
  */
-function capLienKetThu(hopCat) {
+function capPhienThu(hopCat) {
   const F = hopCat.FbmSync;
-  if (!F || (F.boundIdentity && F.boundIdentity.laBanThu)) { return; }
-  const goc = F.boundIdentity;
+  if (!F) { return; }
+  // Hộp cát chỉ nạp tệp dựng request, không nạp cổng phiên (TransportCore): cấp danh tính thử tối thiểu; nạp TransportCore sau thì hàm thật thay vào và được bọc lại.
+  if (typeof F.sessionVerifiedIdentity !== 'function') { const gia = () => ({ userId: MA_NGUOI_DUNG_THU, username: '', accountName: '' }); gia.laBanThu = true; F.sessionVerifiedIdentity = gia; return; }
+  if (F.sessionVerifiedIdentity.laBanThu) { return; }
+  const goc = F.sessionVerifiedIdentity;
   const thu = function () {
-    const value = typeof goc === 'function' ? goc.apply(this, arguments) : { spreadsheetId: '', userId: '', username: '', accountName: '' };
+    const value = goc.apply(this, arguments);
     if (!value.userId) { value.userId = MA_NGUOI_DUNG_THU; }
     return value;
   };
   thu.laBanThu = true;
-  F.boundIdentity = thu;
+  F.sessionVerifiedIdentity = thu;
 }
 
 /**
@@ -189,7 +192,7 @@ function napServer(hopCat, ...duongDans) {
       vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
     }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
-    if (duongDan === 'fbm_sync/read/GridRead.js' || duongDan === 'fbm_sync/reconcile/Identity.js') { capLienKetThu(hopCat); }
+    if (duongDan === 'fbm_sync/transport/TransportCore.js' || duongDan === 'fbm_sync/read/GridRead.js') { capPhienThu(hopCat); }
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
   return hopCat;

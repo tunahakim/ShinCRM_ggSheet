@@ -19,16 +19,17 @@ Cùng branch `feature/expensive-ops`, nối tiếp tệp `[Đã xử lý] 2026.1
 
 ## Việc
 
-- [ ] Mục 1: Giữ phiên qua cổng kiểm tra phiên.
-  - [ ] Cổng `nextEnvelope` (TransportCore): đổi danh sách miễn probe thành đúng ba loại `login`, `identity_user_grid`, `session_probe`; `heartbeat` và `authorize` phải qua probe khi phiên chưa xác minh.
-  - [ ] Tách đoạn "vào probe, lưu cursor quay về, cấp request probe" trong `nextEnvelope` thành `FbmSync.sessionGateProbeRequest(state, resumeCursor)`. Thêm `FbmSync.cursorStartEnvelope()`: phiên đã xác minh thì dựng request từ cursor (`requestForCursor`) rồi bọc, chưa xác minh thì cấp probe với cursor quay về là cursor hiện tại. Nhờ vậy request đọc khách không bao giờ được dựng trước khi phiên được xác minh.
-  - [ ] Scheduler: hai chỗ mở Giữ phiên (`chainStart('heartbeat')`, `fbmSyncHeartbeatRequest`) gọi `cursorStartEnvelope()` thay cho `nextEnvelope(sessionSystemRequest('heartbeat'))`.
-  - [ ] Vai trò dữ liệu: cursor `heartbeat` là đầu vào; probe xác minh phiên và ghi danh tính; nhánh probe trả cursor về `heartbeat` và dựng request đếm với mã của phiên.
-- [ ] Mục 2: danh tính nghiệp vụ lấy từ phiên đã xác minh.
-  - [ ] `FbmSync.sessionVerifiedIdentity(state)` cạnh `sessionIdentityVerify`: trả mã, tên đăng nhập, tên đầy đủ của phiên khi `sessionIdentityIsVerified`, ngược lại trả rỗng.
-  - [ ] `scriptSettings` lấy `userId`, `accountName` từ hàm trên; bỏ `catch` im lặng khi đọc state.
-  - [ ] Sửa thông điệp `FBM_USER_ID_MISSING` (GridRead) và thông điệp thiếu tên đầy đủ (PushFlow) theo nguồn mới; sửa docstring `scriptSettings` và `boundIdentity`.
-  - [ ] Hộp cát test: bỏ `capLienKetThu`, cấp danh tính thử ở phiên đã xác minh.
+- [x] Mục 1: Giữ phiên qua cổng kiểm tra phiên.
+  - [x] Cổng `nextEnvelope` (TransportCore): đổi danh sách miễn probe thành đúng ba loại `login`, `identity_user_grid`, `session_probe`; `heartbeat` và `authorize` phải qua probe khi phiên chưa xác minh.
+  - [x] Thêm `FbmSync.cursorStartEnvelope()`, dùng lại `sessionGateResumeProbeRequest` đã có: phiên đã xác minh thì dựng request từ cursor (`requestForCursor`) rồi bọc, chưa xác minh thì cấp probe với cursor quay về là cursor hiện tại. Nhờ vậy request đọc khách không bao giờ được dựng trước khi phiên được xác minh.
+  - [x] Scheduler: hai chỗ mở Giữ phiên (`chainStart('heartbeat')`, `fbmSyncHeartbeatRequest`) gọi `cursorStartEnvelope()` thay cho `nextEnvelope(sessionSystemRequest('heartbeat'))`.
+  - [x] Vai trò dữ liệu: cursor `heartbeat` là đầu vào; probe xác minh phiên và ghi danh tính; nhánh probe trả cursor về `heartbeat` và dựng request đếm với mã của phiên.
+- [x] Mục 2: danh tính nghiệp vụ lấy từ phiên đã xác minh.
+  - [x] `FbmSync.sessionVerifiedIdentity(state)` cạnh `sessionIdentityVerify`: trả mã, tên đăng nhập, tên đầy đủ của phiên khi `sessionIdentityIsVerified`, ngược lại trả rỗng.
+  - [x] `scriptSettings` lấy `userId`, `accountName` từ hàm trên; bỏ `catch` im lặng khi đọc state.
+  - [x] Sửa thông điệp `FBM_USER_ID_MISSING` (GridRead) và thông điệp thiếu tên đầy đủ (PushFlow) theo nguồn mới; sửa docstring `scriptSettings` và `boundIdentity`.
+  - [x] Hộp cát test: bỏ `capLienKetThu`, cấp mã thử ở nguồn `sessionVerifiedIdentity` (`capPhienThu`); các phép kiểm Giữ phiên cũ dựng phiên đã xác minh hoặc đổi kỳ vọng sang luồng probe trước.
+  - [x] Sửa lỗi gặp trên đường: probe lần thử lại (`sessionGateHandleProbeFailure`) trả envelope trần thay vì `{ ok, request }`, nên bên gọi không thấy request kế tiếp.
 - [ ] Mục 3: so liên kết với giá trị trích từ trang.
   - [ ] `payloadCookieTransport` cấp thêm capture `pageUserId` (nhóm mã giữa 4 ký tự đầu và 5 ký tự hex trước `FHN_CRM_App` của payload cookie) và `pageAccountName` (khối menu `"username":"…"`), cùng nguồn `page_html`. Pattern nằm ở GAS, Extension áp nguyên trạng.
   - [ ] `FbmSync.pageIdentity(rawResponse)`: đọc hai capture từ response hiện tại, không lưu vào state.

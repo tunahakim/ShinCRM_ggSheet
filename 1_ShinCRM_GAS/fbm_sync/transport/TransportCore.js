@@ -69,6 +69,8 @@ FbmSync.sessionGateMeta = function (state) {
 };
 /** Nhóm request hệ thống chỉ cổng phiên được quyền dựng và phát. */
 FbmSync.SESSION_SYSTEM_KINDS = ['login', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
+/** Request hệ thống được đi khi phiên chưa xác minh: chính các bước xác minh. Giữ phiên đọc dữ liệu khách (request đếm mang điều kiện quyền) nên không thuộc nhóm này. */
+FbmSync.SESSION_PROBE_EXEMPT_KINDS = ['login', 'identity_user_grid', 'session_probe'];
 FbmSync.isSessionSystemRequest = function (request) {
   var kind = String(request && request.meta && request.meta.kind || '');
   return FbmSync.SESSION_SYSTEM_KINDS.indexOf(kind) >= 0;
@@ -96,6 +98,14 @@ FbmSync.sessionIdentityVerify = function (state, identity) {
   session.identitySessionId = String(session.sessionId);
   session.identityVerifiedAt = Date.now();
   return state;
+};
+/**
+ * Danh tính tài khoản FBM dùng trong request nghiệp vụ (điều kiện quyền đọc khách, `owner` khi ghi): giá trị đọc từ FBM của phiên đã xác minh, không phải liên kết. Liên kết là giá trị khai báo, chỉ để đối chiếu.
+ * Phiên chưa xác minh thì trả rỗng, nên request đọc khách không dựng được trước bước kiểm tra phiên.
+ */
+FbmSync.sessionVerifiedIdentity = function (state) {
+  var session = state && state.session || {}, verified = FbmSync.sessionIdentityIsVerified(state);
+  return { userId: verified ? String(session.userId || '') : '', username: verified ? String(session.accountUsername || '') : '', accountName: verified ? String(session.accountName || '') : '' };
 };
 FbmSync.sessionIdentityClear = function (state) {
   var session = (state || {}).session || {};
@@ -267,6 +277,15 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
   return FbmSync.sessionSystemEnvelope('session_probe');
 };
 /**
+ * Mở request đầu của cursor đã lưu (Giữ phiên). Request đọc khách mang mã người dùng của phiên đã xác minh nên không dựng được trước khi xác minh:
+ * phiên chưa xác minh thì mở bằng probe, nhánh probe dựng lại request từ cursor sau khi xác minh.
+ */
+FbmSync.cursorStartEnvelope = function (state) {
+  var current = state || FbmSync.stateRead();
+  if (FbmSync.sessionIdentityIsVerified(current)) { return FbmSync.nextEnvelope(FbmSync.requestForCursor(current)); }
+  return FbmSync.sessionGateResumeProbeRequest(current, current.cursor, 'Đang kiểm tra tab và tài khoản FBM...');
+};
+/**
  * Dấu "phiên hết hạn" và cờ cổng phiên còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
  * Không tốn request hỏi riêng: bỏ dấu và cờ cổng của lượt cũ, request việc thật của lượt mới tự nhận diện phiên; phiên chết thì cổng đăng nhập theo chu kỳ chờ như mọi response khác.
  * Cờ "đã thử đăng nhập" chỉ chặn lặp đăng nhập trong một lượt; để sót sang lần hỏi sau thì phiên chết lần nữa bị dừng nhầm thay vì đăng nhập lại. Giãn cách giữa các lần đăng nhập do chu kỳ thử lại giữ, không do cờ này.
@@ -290,7 +309,7 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
     current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';
     current.lastFailureCode = 'SESSION_PROBE_RETRY';
     FbmSync.stateWrite(current);
-    return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe'));
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe')), status: FbmSync.statusView() };
   }
   if (gate.probeOnly === true || gate.loginAttempted === true) {
     var code = gate.probeOnly === true ? 'SESSION_PROBE_UNCERTAIN' : 'SESSION_PROBE_FAILED_AFTER_LOGIN';
@@ -396,7 +415,7 @@ FbmSync.nextEnvelope = function (request) {
     var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
-    var requestNeedsGate = !FbmSync.isSessionSystemRequest(request) || cursorNeedsGate || requestKind === 'authorize';
+    var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
     var loginFlowOwnsSystemRequest = typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(pendingState);
     if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
       var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
