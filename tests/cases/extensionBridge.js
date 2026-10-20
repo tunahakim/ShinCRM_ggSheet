@@ -553,14 +553,14 @@ async function chay(so) {
       chrome: {
         tabs: {
           query: () => Promise.resolve([tab]),
-          update(tabId, options, done) { state.updates.push(options); setImmediate(() => done(Object.assign({}, tab, options))); },
+          update(tabId, options, done) { state.updates.push(options); setImmediate(() => { done(Object.assign({}, tab, options)); if (options.url) { setTimeout(() => state.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); } }); },
           reload(tabId, options, done) {
             state.reloads += 1;
             setImmediate(() => { done(); if (behaviour.reloadCompletes) { setTimeout(() => state.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); } });
           },
           onUpdated: { addListener(fn) { state.listeners.push(fn); }, removeListener(fn) { state.listeners = state.listeners.filter((item) => item !== fn); } },
           sendMessage(tabId, message, done) {
-            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answersAfterReload && state.reloads > 0) { done({ ready: true, version: '21.22' }); } return; }
+            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answers || (behaviour.answersAfterReload && state.reloads > 0)) { done({ ready: true, version: '21.22' }); } return; }
             if (message.type === 'FBM_EXECUTE_V2') { state.executes += 1; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
           }
         },
@@ -598,6 +598,16 @@ async function chay(so) {
   check(so, 'Tab FBM tải mãi không xong, tải lại cũng không xong: hết hạn envelope thì báo FBM_TAB_NOT_READY qua kênh background_sync, không chờ vô hạn và không còn hẹn giờ giữ worker', [
     ketQuaTai.code, tai.state.reloads, tai.state.executes, tai.state.bodies.map((item) => [item.kind, item.command, item.payload.code, item.hop]), tai.context.workerKeepAliveTimer, tai.state.listeners.length
   ], ['FBM_TAB_NOT_READY', 1, 0, [['background_sync', 'transport_failure', 'FBM_TAB_NOT_READY', 3]], null, 0]);
+
+  const reloadRequest = (id, url) => { const item = tabRequest(id); item.request.meta.reloadFbmPage = url; return item; };
+  const doiTrang = tabWorker({ id: 8, status: 'complete', autoDiscardable: false }, { answers: true });
+  const ketQuaDoiTrang = await doiTrang.context.relayRun(relayConfig, reloadRequest('tab-doi-trang', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx'), 0, 'heartbeat');
+  check(so, 'GAS cấp reloadFbmPage: Extension đổi tab tới đúng URL đó, chờ tải xong rồi mới gửi request; không tải lại tab', [
+    ketQuaDoiTrang.ok, doiTrang.state.updates.map((item) => item.url), doiTrang.state.reloads, doiTrang.state.executes, doiTrang.state.trails.filter((item) => /^fbm_(tab|page)_/.test(item))
+  ], [true, ['https://fbo.com.vn:8888/Main/zccrAccount.aspx'], 0, 1, ['fbm_tab_preparing:complete', 'fbm_page_reloading', 'fbm_tab_sent', 'fbm_tab_replied']]);
+  const ngoaiMien = tabWorker({ id: 9, status: 'complete', autoDiscardable: false }, { answers: true });
+  const ketQuaNgoaiMien = await ngoaiMien.context.relayRun(relayConfig, reloadRequest('tab-ngoai-mien', 'https://example.com/'), 0, 'heartbeat');
+  check(so, 'URL reloadFbmPage ngoài miền FBM: không đổi trang, không gửi request, báo FBM_TAB_NOT_READY', [ketQuaNgoaiMien.code, ngoaiMien.state.updates.length, ngoaiMien.state.executes], ['FBM_TAB_NOT_READY', 0, 0]);
 
   // Mọi lời chờ của worker phải có hạn: hẹn giờ chỉ nằm ở các công cụ chờ, hàm gọi tab/executor/mạng phải chờ qua công cụ có hạn.
   const unboundedWaits = (source) => source.split(/\n(?=function \w+\()/).map((chunk) => ({ name: (chunk.match(/^function (\w+)\(/) || [])[1] || '', body: chunk })).filter((item) => item.name).filter((item) => {

@@ -130,14 +130,31 @@ function prepareFbmTab(request, onStage) {
       return waitFbmTabComplete(tab.id, deadlineAt, function () { return chromeApi(function (done) { return chrome.tabs.reload(tab.id, {}, done); }); }).then(function (reloaded) {
         return readyFbmTab(Object.assign({}, tab, reloaded || {}, { id: tab.id, status: 'complete', discarded: false }), deadlineAt);
       });
+    }).then(function (readyTab) {
+      return openFbmPageIfAsked(readyTab, request, deadlineAt, note);
     }).catch(function (error) {
       throw Object.assign(new Error('Tab FBM không phản hồi kể cả sau khi tự tải lại: ' + String(error && error.message || error)), { code: 'FBM_TAB_NOT_READY' });
     });
   });
 }
+/**
+ * GAS cấp `meta.reloadFbmPage` khi trang đang mở không có mã hoặc tên người dùng để đối chiếu (tab đứng ở trang Login, trang lỗi hay trang tải từ trước khi đăng nhập). Extension chỉ đổi trang tới đúng URL đó, chờ tải xong và có executor; không tự quyết khi nào cần.
+ * Chỉ nhận URL trong miền FBM để lệnh hỏng không đưa tab ra trang khác.
+ */
+function openFbmPageIfAsked(tab, request, deadlineAt, note) {
+  var url = String(request && request.meta && request.meta.reloadFbmPage || '');
+  if (!url) { return Promise.resolve(tab); }
+  if (url.indexOf('https://fbo.com.vn:8888/') !== 0) { return Promise.reject(Object.assign(new Error('Địa chỉ tải lại trang FBM không thuộc miền FBM.'), { code: 'FBM_TAB_NOT_READY' })); }
+  note('fbm_page_reloading');
+  return waitFbmTabComplete(tab.id, deadlineAt, function () {
+    return chromeApi(function (done) { return chrome.tabs.update(tab.id, { url: url }, done); });
+  }).then(function (loaded) {
+    return readyFbmTab(Object.assign({}, tab, loaded || {}, { id: tab.id, status: 'complete', discarded: false }), deadlineAt);
+  });
+}
 var FBM_EXECUTOR_VERSION = '21.22';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '24e64684554a';
+var FBM_CONTRACT_VERSION = 'e5476b1e7f9c';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
