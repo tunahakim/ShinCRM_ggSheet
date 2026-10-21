@@ -15,6 +15,11 @@ var CHANGE_SIGNAL = {
   installed: false,
   timers: [],
   lastFrameAt: 0,
+  /** Lúc tin thật cuối cùng đến. Khác `lastFrameAt`: watchdog kéo `lastFrameAt` lên lúc tab ẩn, nên không dùng được để biết kênh im bao lâu khi ẩn. */
+  lastRealFrameAt: 0,
+  /** Lúc tab ẩn (0 khi đang hiện) và khoảng im dài nhất giữa hai tin thật trong lúc ẩn. */
+  hiddenAt: 0,
+  hiddenGapMax: 0,
   dead: false,
   deadReported: false,
   resumed: false,
@@ -34,7 +39,10 @@ function changeSignalAsk(reason) {
 
 /** Tin bất kỳ từ kênh (tín hiệu hoặc nhịp sống) đều chứng tỏ kênh còn thông. */
 function changeSignalOnFrame(now) {
-  CHANGE_SIGNAL.lastFrameAt = now === undefined ? Date.now() : now;
+  var at = now === undefined ? Date.now() : now;
+  if (CHANGE_SIGNAL.hiddenAt && CHANGE_SIGNAL.lastRealFrameAt) { CHANGE_SIGNAL.hiddenGapMax = Math.max(CHANGE_SIGNAL.hiddenGapMax, at - CHANGE_SIGNAL.lastRealFrameAt); }
+  CHANGE_SIGNAL.lastRealFrameAt = at;
+  CHANGE_SIGNAL.lastFrameAt = at;
   if (!CHANGE_SIGNAL.dead) { return; }
   CHANGE_SIGNAL.dead = false;
   if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
@@ -108,6 +116,22 @@ function changeSignalReceive(message) {
       changeSignalAskTracked();
     }, delay);
   });
+}
+
+/** Tab ẩn: bắt đầu đo khoảng im của kênh trong lúc ẩn. */
+function changeSignalOnHidden(now) {
+  CHANGE_SIGNAL.hiddenAt = now === undefined ? Date.now() : now;
+  CHANGE_SIGNAL.hiddenGapMax = 0;
+}
+
+/**
+ * Tab hiện lại: kênh có im quá `CHANNEL_SILENCE_MS` lúc ẩn không (trình duyệt có thể bỏ đói kênh khi tab ẩn). Cùng ngưỡng watchdog dùng để coi kênh chết, nên kênh ẩn mà vẫn có tin đều được tin như lúc tab hiện; tin lẻ bị rơi vẫn do nhịp hỏi an toàn vớt. Không biết lúc ẩn hoặc chưa từng có tin thật thì coi là im.
+ */
+function changeSignalSilentWhileHidden(now) {
+  var at = now === undefined ? Date.now() : now, hiddenAt = CHANGE_SIGNAL.hiddenAt;
+  CHANGE_SIGNAL.hiddenAt = 0;
+  if (!hiddenAt || !CHANGE_SIGNAL.lastRealFrameAt) { return true; }
+  return Math.max(CHANGE_SIGNAL.hiddenGapMax, at - CHANGE_SIGNAL.lastRealFrameAt) > sheetLinkMs('CHANNEL_SILENCE_MS', 180000);
 }
 
 /** Gọi theo nhịp bắt tay. Thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im. */

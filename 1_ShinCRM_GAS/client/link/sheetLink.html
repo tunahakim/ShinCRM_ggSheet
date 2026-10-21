@@ -607,8 +607,15 @@ function sheetLinkReplayContext() {
   return SHEET_LINK_LAST_CONTEXT ? sheetLinkApplyContext(SHEET_LINK_LAST_CONTEXT) : sheetLinkProbeSelectionAndReload('sidebar-open', { silent: true });
 }
 
-/** Tab hiện lại: trình duyệt có thể đã bỏ đói kênh `/bind` khi tab ẩn, nên hỏi một lần cho cả RAM lẫn sheet `!` đang xem. */
+/** Tab ẩn: kênh bắt đầu đo khoảng im để lúc hiện lại biết có cần hỏi không. */
+function sheetLinkOnHidden() {
+  changeSignalOnHidden();
+}
+
+/** Tab hiện lại: hỏi một lần cho cả RAM lẫn sheet `!` đang xem chỉ khi còn việc chờ, kênh không đáng tin, hoặc kênh im quá ngưỡng lúc ẩn (trình duyệt có thể đã bỏ đói kênh `/bind`). Kênh vẫn có tin suốt lúc ẩn thì thay đổi đã đến qua kênh; hỏi thêm chỉ tốn một lượt GAS. */
 function sheetLinkOnVisible() {
+  var silent = changeSignalSilentWhileHidden();
+  if (!silent && !sheetLinkLeaveNeedsFlush()) { return null; }
   return changeSignalAsk('visible');
 }
 

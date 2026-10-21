@@ -234,6 +234,7 @@ function selectionPollVisibilityChanged() {
   if (document.hidden) {
     selectionPollClearSafety();
     selectionPollEvaluate();
+    if (typeof sheetLinkOnHidden === 'function') { sheetLinkOnHidden(); }
     return;
   }
   selectionPollWake();

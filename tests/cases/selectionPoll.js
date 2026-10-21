@@ -644,6 +644,22 @@ async function chayView(so) {
   check(so, 'mở Sidebar, đổi sang sheet !, tab hiện lại: mỗi sự kiện sinh đúng một lời hỏi probeSelectionAndReload',
     [open, enter, visible].map((hop) => tenGoi(hop, 'probeSelectionAndReload').map((item) => item.reason)),
     [['sidebar-open'], ['view-enter'], ['visible']]);
+
+  // Tab hiện lại chỉ hỏi khi kênh im quá ngưỡng lúc ẩn, còn việc chờ hoặc Extension không trả lời.
+  const anRoiHien = async (frames, visibleAt, extensionAlive) => {
+    const hop = dungHopView(); hop.SHEET_LINK_LAST_SHEET = '!Lead';
+    hop._clock.now = 10000; hop.changeSignalOnFrame(10000);
+    hop.document.hidden = true; hop._clock.now = 11000; hop._documentListeners.visibilitychange();
+    frames.forEach((at) => hop.changeSignalOnFrame(at));
+    hop._clock.now = visibleAt; hop.SHEET_LINK_LAST_ACK = extensionAlive === false ? 0 : visibleAt; hop.document.hidden = false;
+    hop._documentListeners.visibilitychange();
+    await new Promise((resolve) => setImmediate(resolve));
+    return tenGoi(hop, 'probeSelectionAndReload').filter((item) => item.reason === 'visible').length;
+  };
+  const deu = Array.from({ length: 29 }, (_, i) => 30000 + i * 20000);
+  check(so, 'tab hiện lại: kênh có tin đều lúc ẩn thì không hỏi; im quá CHANNEL_SILENCE_MS (cả khoảng giữa lúc ẩn) hoặc Extension không trả lời thì hỏi đúng một lần',
+    [await anRoiHien(deu, 600000), await anRoiHien([], 200000), await anRoiHien([30000, 250000, 260000], 270000), await anRoiHien(deu, 600000, false)],
+    [0, 1, 1, 1]);
   check(so, 'vào sheet ! không gọi bộ vẽ riêng ngoài quyết định của lời hỏi', tenGoi(enter, 'renderViewIfDirty'), []);
   enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 3, col: 2 });
   enter.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 5, col: 1 });
