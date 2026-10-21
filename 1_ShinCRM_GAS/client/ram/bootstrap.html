@@ -109,11 +109,11 @@ async function sidebarBoot(options) {
     collapseScan();
     bootTellProblems(BOOT_LAST_SUMMARY);
 
-    // Ghi timing là quan sát không bắt buộc; không để một lỗi log khiến lượt nạp dữ liệu đã thành công bị coi là thất bại.
-    try {
-      await callServer('logClientTiming', [timing]);
-    } catch (timingError) {
-      if (typeof console !== 'undefined' && console.warn) { console.warn('Không ghi được timing lượt nạp.', timingError); }
+    // Ghi timing là quan sát không bắt buộc: chỉ gọi khi GAS báo vết đang bật, và không giữ màn khóa chờ lời gọi này.
+    if (core.timingTrace === true) {
+      callServer('logClientTiming', [timing], { silent: true }).catch(function (timingError) {
+        if (typeof console !== 'undefined' && console.warn) { console.warn('Không ghi được timing lượt nạp.', timingError); }
+      });
     }
     return { ok: true, core: core, summary: BOOT_LAST_SUMMARY };
   } catch (err) {

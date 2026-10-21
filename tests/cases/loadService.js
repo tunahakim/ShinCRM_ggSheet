@@ -10,6 +10,9 @@
  * **Con trỏ gói đi ngược từ hàng cuối lên, và phải dừng.** Một con trỏ không tiến làm trình duyệt treo với dải tiến trình chạy mãi, nên phép kiểm ở đây tự chạy hết vòng lặp thật thay vì tin vào `done`.
  */
 
+const fs = require('fs');
+const path = require('path');
+const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { trongLanChay } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
@@ -57,7 +60,7 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'ok', 'pendingMessages', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'ok', 'pendingMessages', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
@@ -83,6 +86,10 @@ function chay(so) {
   const tatVet = dungNap([['LOG_TRACE', 'off']]).hop.loadCore();
   check(so, 'LOG_TRACE off không hiện cảnh báo bật log',
     tatVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), false);
+  check(so, 'gói nạp báo vết nguồn sidebar có bật không, để Sidebar bỏ lời gọi ghi thời gian khi tắt', [batVet.timingTrace, tatVet.timingTrace], [true, false]);
+  const nguonBoot = fs.readFileSync(path.join(GAS_DIR, 'client', 'ram', 'bootstrap.html'), 'utf8');
+  check(so, 'Sidebar chỉ gọi logClientTiming khi vết bật và không chờ lời gọi đó trước khi nhả màn khóa',
+    [/await\s+callServer\('logClientTiming'/.test(nguonBoot), /if \(core\.timingTrace === true\) \{\s*callServer\('logClientTiming'/.test(nguonBoot)], [false, true]);
 
   const coSo = dungNap(null, { viewsStaleRevision: '4', reloadJournal: JSON.stringify({ rev: 6, floor: 0, changedAt: 1, entries: [{ r: 6, t: 1, customer: ['KH0001'] }] }) });
   const goiSo = coSo.hop.loadCore();

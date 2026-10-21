@@ -301,6 +301,8 @@ function loadCore(options) {
       reload: reloadStateRead(),
       warnings: warnings,
       pendingMessages: takePendingMessages(),
+      // Dòng thời gian mở Sidebar là dòng vết: tắt vết thì `logClientTiming` không ghi gì, nên Sidebar không gọi.
+      timingTrace: logTraceCoversSource(LOAD_SOURCE),
       ms: ms
     };
   };
