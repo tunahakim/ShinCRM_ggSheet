@@ -141,12 +141,18 @@ async function chay(so) {
   check(so, 'chưa từng có xung đột thì không ghi Log', conflictLogs.length, 0);
 
   // FBM-022: đọc Sheet lỗi thì preflight chặn có mã, không báo 0 bản ghi như Sheet trống; Sheet và hash chỉ tính một lần mỗi lượt preflight.
-  const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash;
+  const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash, savedIdentityPreflight = hop.FbmSync.identityPreflight;
   hop.FbmSync.readLocal = () => { throw new Error('Exception: Service Spreadsheets timed out'); };
+  // Sheet chưa liên kết thì kiểm liên kết phải đọc Sheet tìm ID FBM cũ: đọc lỗi thì ném cho cửa vào ghi Log, không giả làm "cần liên kết lại".
+  let unboundReadError = '';
+  try { hop.FbmSync.identityStatus(); } catch (err) { unboundReadError = String(err && err.message); }
+  check(so, 'Sheet chưa liên kết mà đọc Sheet lỗi thì kiểm liên kết ném lỗi thật, không trả REBIND_REQUIRED', /timed out/.test(unboundReadError), true);
+  hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const readFailed = hop.FbmSync.runPreflight({ mode: 'write' }), readModeSkips = hop.FbmSync.runPreflight({ mode: 'read' });
   const readFailedIssue = readFailed.blocking.find((item) => item.code === 'FBM_LOCAL_READ_FAILED');
   check(so, 'FBM-022: đọc Sheet Customer/Activity lỗi thì preflight chiều có đẩy chặn bằng FBM_LOCAL_READ_FAILED, không trả tóm tắt 0 bản ghi; chiều Lấy không quét hai Sheet này nên không có lỗi quét',
     [readFailed.ok, !!readFailedIssue, /timed out/.test(readFailedIssue && readFailedIssue.message), readFailed.hashSummary, readModeSkips.issues.some((item) => item.code === 'FBM_LOCAL_READ_FAILED'), readModeSkips.hashSummary], [false, true, true, null, false, null]);
+  hop.FbmSync.identityPreflight = savedIdentityPreflight;
   const localReads = { customer: 0, activity: 0 };
   let hashCalls = 0;
   hop.FbmSync.readLocal = (entity) => { localReads[entity] += 1; return entity === 'activity'
