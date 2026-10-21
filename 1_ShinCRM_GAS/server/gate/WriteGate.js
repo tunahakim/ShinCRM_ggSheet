@@ -158,17 +158,21 @@ function writeGatePlans(records, olds) {
 }
 
 /**
- * Dựng bảng tra "mã danh mục → tập giá trị hợp lệ" cho các trường SELECT trong lô ghi.
+ * Dựng bảng tra "mã danh mục → tập giá trị hợp lệ" cho các trường SELECT mà lô ghi thật sự gửi lên.
  *
  * Đọc sheet `Category` **một lần** cho cả lô chứ không đọc mỗi trường một lần — một lần mở sheet là một vòng gọi mạng, và một lô ghi thường có nhiều trường SELECT cùng lúc.
  *
+ * Chỉ lấy danh mục của trường có khóa trong ít nhất một bản ghi, cùng luật với `writeGateBuild` (chỉ kiểm khóa bên gọi gửi): lượt sửa không chạm trường SELECT nào thì không đọc sheet. Xét theo khóa chứ không theo giá trị rỗng, vì `normalize` có thể biến ô rỗng thành giá trị, và thiếu danh mục ở đây là phép kiểm bị bỏ qua âm thầm.
+ *
  * Trường không có `source` (chỉ có `options`) thì không cần tra sheet, nên bỏ qua ở đây và phép kiểm `selectAllowed[spec.source]` trả `undefined` cho chúng.
  */
-function writeGateSelectCatalog(fields) {
+function writeGateSelectCatalog(fields, plans) {
   var sources = {};
   Object.keys(fields).forEach(function (ten) {
     var spec = fields[ten];
-    if (spec.type === 'SELECT' && spec.source) { sources[spec.source] = true; }
+    if (spec.type !== 'SELECT' || !spec.source) { return; }
+    var sent = plans.some(function (plan) { return Object.prototype.hasOwnProperty.call(plan.record, ten); });
+    if (sent) { sources[spec.source] = true; }
   });
 
   var sourceNames = Object.keys(sources);
@@ -373,7 +377,7 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
 
   // Đọc bảng danh mục một lần cho cả lô, chỉ khi nguồn là `user` — nguồn `pull` bỏ qua mọi phép kiểm giá trị. `Category` đọc từ sheet chứ không từ bộ nhớ, vì giá trị danh mục có thể đã đổi giữa hai lượt mở sidebar.
   var selectAllowed = null;
-  if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields); }
+  if (source === 'user') { selectAllowed = writeGateSelectCatalog(fields, plans); }
 
   plans.forEach(function (plan) { writeGateBuild(plan, names, fields, source, invalid, selectAllowed); });
   var conflicts = edits.length ? writeGateConflicts(edits, current.rows, fields, context, source) : [];

@@ -158,6 +158,14 @@ function chay(so) {
   napServer(hop, 'server/data/DataSchema.js', 'server/gate/FieldLogic.js', 'server/gate/WriteGate.js');
   const ghiQuyen = (value) => { const plan = { moi: false, record: { fbmSyncPermission: value }, values: {} }, invalid = []; hop.writeGateBuild(plan, ['fbmSyncPermission'], hop.DATA_SCHEMA.customer, 'user', invalid, {}); return [plan.values.fbmSyncPermission === undefined ? null : plan.values.fbmSyncPermission, invalid.length]; };
   check(so, 'ô Cho phép đồng bộ FBM chỉ nhận đúng chữ của năm giá trị; giá trị cũ hoặc lệch hoa thường bị từ chối', [ghiQuyen('Cho phép'), ghiQuyen('Cấm đồng bộ'), ghiQuyen('Ngừng đồng bộ'), ghiQuyen('cho phép')], [['Cho phép', 0], ['Cấm đồng bộ', 0], [null, 1], [null, 1]]);
+
+  section('Cửa ghi — chỉ đọc danh mục của trường SELECT bản ghi gửi lên');
+  let catReads = 0;
+  hop.categoryReadAll = () => { catReads++; return { categories: { '@CAT_TINH_THANH': ['Hà Nội'], '@CAT_NHOM_KH': ['VIP'] } }; };
+  const catalog = (records) => { catReads = 0; const allowed = hop.writeGateSelectCatalog(hop.DATA_SCHEMA.customer, records.map((record) => ({ record }))); return [catReads, Object.keys(allowed).sort()]; };
+  check(so, 'lượt sửa không có trường SELECT không đọc sheet Category', catalog([{ name: 'A' }, { phone: '0901' }]), [0, []]);
+  check(so, 'có trường SELECT (kể cả ô gửi rỗng) thì đọc một lần và chỉ lấy danh mục của trường đó', catalog([{ name: 'A' }, { province: '' }, { province: 'Hà Nội' }]), [1, ['@CAT_TINH_THANH']]);
+  check(so, 'nhiều trường SELECT trong lô vẫn chỉ đọc Category một lần', catalog([{ province: 'Hà Nội', customerGroup: 'VIP' }]), [1, ['@CAT_NHOM_KH', '@CAT_TINH_THANH']]);
 }
 
 module.exports = { chay };
