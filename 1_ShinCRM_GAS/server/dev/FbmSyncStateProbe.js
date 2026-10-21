@@ -140,3 +140,14 @@ function fbmProbeServiceUrl() {
   var url = String(ScriptApp.getService().getUrl() || '');
   return { serviceUrl: url, stored: FbmSync.relayUrlStored(PropertiesService.getScriptProperties()), scriptId: ScriptApp.getScriptId() };
 }
+
+/** Kích thước từng khóa DocumentProperties (gộp các khóa shard theo tiền tố), để đo gói ghi gộp của đồng bộ trước khi tối ưu. */
+function fbmProbePropertySizes() {
+  var all = documentProps().getProperties(), groups = {}, total = 0;
+  Object.keys(all).forEach(function (key) {
+    var group = key.replace(/\d+$/, '#'), bytes = String(all[key]).length;
+    groups[group] = groups[group] || { keys: 0, bytes: 0 };
+    groups[group].keys += 1; groups[group].bytes += bytes; total += bytes;
+  });
+  return Object.keys(groups).sort(function (a, b) { return groups[b].bytes - groups[a].bytes; }).slice(0, 25).map(function (group) { return group + ': ' + groups[group].keys + ' khóa, ' + groups[group].bytes + ' ký tự'; }).concat(['Tổng: ' + total + ' ký tự, ' + Object.keys(all).length + ' khóa']);
+}
