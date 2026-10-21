@@ -6,7 +6,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 
 ## 1. Phiên đang làm
 
-- Phiên đang mở: chuyển sang Sheet DEV mới (nhân bản) và bỏ mã Sheet viết cứng trong code, branch `feature/sheet-move`. Tiến độ ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.21 Chuyển sang Sheet mới.md`; phần nghiệm thu chuyển Sheet của Extension cũng hoàn tất `0_Documentation/Phiên code/[Đang xử lý] 2026.10.20 Địa chỉ Web App và chuyển Sheet của Extension.md`. Thứ tự việc kế tiếp ở `0_Documentation/Phiên code/2026.10.17 Todo.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
+- Chưa mở phiên nào. Thứ tự việc kế tiếp ở `0_Documentation/Phiên code/2026.10.17 Todo.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
 - Việc kế tiếp nằm trong Todo và các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
 - Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.
 - ShinCRM độc lập đã xong phần chính. Không tự mở rộng sang bot tra cứu, Zalobot hoặc nạp 1.700 khách thật khi checklist chưa cho phép.
