@@ -15,12 +15,12 @@ Branch `feature/sheet-move` từ `main`. Tách từ mục 1 của `2026.10.17 To
 
 ## Checklist
 
-- [ ] 1. `server/sheet/Book.js`: bỏ hằng số mã Sheet; thêm công cụ ghi và đọc cặp {mã Sheet, mã script}; `shinOpenBook` dùng Sheet đang mở, đường ngoài đọc cặp và báo lỗi rõ khi chưa có. Test: cùng script thì mở đúng Sheet; mã script khác (bản sao mang kho gốc) thì báo lỗi, không mở; chỉ ghi khi đổi.
-- [ ] 2. `loadCore` gọi công cụ ghi ngay sau khi lấy Sheet, kể cả nhánh vượt trần ngân sách ô. Đo chi phí trên DEV.
-- [ ] 3. Công cụ DEV: `tests/check-sheet.js` và `server/dev/Smoke.js` không còn dùng hằng số; mã Sheet DEV nằm ở `.dev-runner.json` (`spreadsheetId`).
-- [ ] 4. Chạy test, đẩy lên Sheet DEV cũ, kiểm Sidebar Sheet cũ vẫn chạy và lời gọi từ ngoài (`dumpRecentLog`) vẫn đọc đúng Sheet.
-- [ ] 5. Trỏ công cụ sang script mới: `scriptId` trong `1_ShinCRM_GAS/.clasp.json` (bỏ `projectId` cũ); đẩy code; tạo bản triển khai cửa chạy hàm và relay mới; sửa `.dev-runner.json` (`deploymentId`, `relayDeploymentId`, `spreadsheetId`).
+- [x] 1. `server/sheet/Book.js`: bỏ hằng số mã Sheet; thêm công cụ ghi và đọc cặp {mã Sheet, mã script}; `shinOpenBook` dùng Sheet đang mở, đường ngoài đọc cặp và báo lỗi rõ khi chưa có. Test: cùng script thì mở đúng Sheet; mã script khác (bản sao mang kho gốc) thì báo lỗi, không mở; chỉ ghi khi đổi.
+- [x] 2. `loadCore` gọi công cụ ghi ngay sau khi lấy Sheet, kể cả nhánh vượt trần ngân sách ô. Đo chi phí trên DEV.
+- [x] 3. Công cụ DEV: `tests/check-sheet.js` và `server/dev/Smoke.js` không còn dùng hằng số; mã Sheet DEV nằm ở `.dev-runner.json` (`spreadsheetId`).
+- [x] 4. Chạy test (2735 đạt). Không đẩy lên Sheet DEV cũ: Sheet cũ giữ nguyên code cũ làm đường lui, code mới đẩy thẳng sang script mới.
+- [x] 5. Trỏ công cụ sang script mới: `scriptId` trong `1_ShinCRM_GAS/.clasp.json` (bỏ `projectId` cũ); đẩy code; tạo bản triển khai cửa chạy hàm và relay mới; sửa `.dev-runner.json` (`deploymentId`, `relayDeploymentId`, `spreadsheetId`). Làm 2026-10-21: cửa chạy hàm `AKfycbw1CXay…` @1, relay `AKfycbxy1eoR…` @2; `smokeTest` qua cửa chạy hàm mở đúng Sheet mới. Ghi nhận: Web App của script gắn Sheet vẫn có Sheet đang mở (`smokeTest` chạy trước khi cặp được ghi), nên đường mở theo cặp là lưới cho các ngữ cảnh không có Sheet đang mở.
 - [ ] 6. Chủ dự án mở Sidebar bản sao, cấp quyền khi Google hỏi: ShinCRM chạy bình thường. Mở URL Web App relay một lần (trang báo đã ghi địa chỉ), mở lại Sidebar: phải hiện hộp hỏi Extension đang đồng bộ cho Sheet DEV cũ. Thử "Giữ Sheet cũ" (màn cài đặt báo Sheet này chưa nhận đồng bộ nền, Log ghi lựa chọn), rồi "Chuyển sang Sheet này" (Log ghi lựa chọn; nhịp nền chỉ vào Sheet mới).
 - [ ] 7. Chủ dự án nhập lại tên đăng nhập và mật khẩu FBM ở Sheet mới (kho mật khẩu mã hóa theo Sheet). Gặp `REBIND_REQUIRED` thì hỏi chủ dự án trước khi khai báo lại liên kết hay xóa dữ liệu thử.
-- [ ] 8. Giữ Sheet DEV cũ làm đường lui một thời gian; xong thì tắt hai bản triển khai cũ (cửa chạy hàm @976, relay @977).
+- [ ] 8. Giữ Sheet DEV cũ làm đường lui một thời gian; xong thì tắt hai bản triển khai cũ (cửa chạy hàm @976, relay @977). Mã cũ để trả lại nếu cần lùi: script `1OkMs18_5fd9_UzkGIrDAZatc2zbWIVi6q_yAO0_VbDrtVOpx-zDMBY-K` (`projectId` `test-project-cho-claude-opus`), cửa chạy hàm `AKfycbxWM4kaJmtGZnWQ6cHQbW8Y87qvOHTmAIkxlkVTGVjamlFxe5zUzNJ2Wxr3AQ7t03rV`, relay `AKfycbx0ueI_gR2zzkTUGV5lTAXty0zotK2owAd5zPy0Z0SzJkJjRa0dIvbMREAoVJm3iFrX`.
 - [ ] 9. Tick Mục 5 ở tệp Web App, đổi hai tệp sang `[Đã xử lý]`, sửa `AGENTS.md` mục 1, cập nhật memory `gas-auth-expires-weekly`.
