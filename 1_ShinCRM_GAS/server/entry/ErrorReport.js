@@ -4,10 +4,12 @@
  * Vì sao không gộp vào `LogGate.gs`: hai việc có **hai luật ngược nhau**. Ghi log không được phép hỏng hay ném lỗi, còn hiển thị lỗi có thể gọi `SpreadsheetApp.getUi()` — dịch vụ không dùng được trong trigger nền. Trộn chung sẽ để lỗi của kênh hiển thị làm mất dòng log cần giữ.
  *
  * Bảng kênh theo cửa vào, đúng theo tài liệu 10 Phần 8:
- *   - Trigger nền → ghi log rồi ném lại; không dùng thông báo nhỏ của Google Sheets.
+ *   - Trigger sửa ô và thêm/xóa sheet → không có người nhìn, nên lưu kho chờ; vẫn ghi log rồi ném lại. Không dùng thông báo nhỏ của Google Sheets.
  *   - Lệnh menu → `getUi().alert()`, được phép vì chính người dùng vừa bấm.
  *   - Hàm sidebar gọi qua `google.script.run` → **ném lại** để `withFailureHandler` hiện; không lưu kho chờ.
  *   - `doPost` từ Extension → không có người, nên lưu kho chờ.
+ *
+ * Kho chờ được lấy cả lúc mở Sidebar lẫn ở mỗi lời hỏi chọn ô và nạp lại của Sidebar đang mở, nên lỗi nền hiện ngay ở Sidebar đang mở chứ không đợi lần mở sau.
  *
  * **Luật xuyên suốt: ghi log rồi ném lại, không nuốt.** Ném lại không phải nuốt, và nó mua thêm một thứ miễn phí — email báo thực thi thất bại mà Google tự gửi.
  */
@@ -48,7 +50,10 @@ function errorPendingPush(message) {
       list = [logNow() + ' — ' + ERROR_PENDING_LOST_MESSAGE];
     }
 
-    list.push(logNow() + ' — ' + message);
+    // Lỗi lặp ở mỗi lần sửa ô là cùng một câu: đã có trong kho thì người dùng sẽ thấy nó, thêm nữa chỉ đẩy các lỗi khác ra khỏi năm chỗ.
+    var suffix = ' — ' + message;
+    if (list.some(function (item) { return String(item).slice(-suffix.length) === suffix; })) { return; }
+    list.push(logNow() + suffix);
     while (list.length > ERROR_PENDING_MAX) { list.shift(); }
 
     props.setProperty(ERROR_PENDING_KEY, JSON.stringify(list));
@@ -63,7 +68,7 @@ var ERROR_PENDING_LOST_MESSAGE = 'Kho câu báo lỗi chờ bị hỏng nên cá
 /**
  * Lấy các câu đang chờ ra và **xóa** khỏi kho. Nhả nghĩa là hiện rồi xóa.
  *
- * `loadCore` gọi hàm này lúc mở hoặc nạp lại sidebar, rồi client hiện kết quả bằng hộp thoại lớn. Không bao giờ ném lỗi: một kho chờ không đọc được không được phép làm sập lượt mở sidebar, vì lúc đó người dùng mất cả nội dung lẫn đường vào.
+ * `loadCore` gọi hàm này lúc mở hoặc nạp lại sidebar, `probeSelectionAndReload` gọi ở mỗi lời hỏi của Sidebar đang mở; client hiện kết quả bằng hộp thoại lớn. Kho đã nằm trong bản đọc `DocumentProperties` của lời gọi nên kho rỗng không tốn lệnh nào. Không bao giờ ném lỗi: một kho chờ không đọc được không được phép làm sập lượt mở sidebar, vì lúc đó người dùng mất cả nội dung lẫn đường vào.
  */
 function takePendingMessages() {
   var props = documentProps();

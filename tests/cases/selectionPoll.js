@@ -734,6 +734,15 @@ async function chayView(so) {
   check(so, 'cờ lượt chạy đổi qua một cửa và không còn đường hoãn nạp theo đồng bộ phía Sidebar (sync-finished, refreshDeferredBySync, hẹn giờ debounce)',
     [fbm.FBM_SYNC_CLIENT.running, (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length, /sheetLinkSyncFinished|refreshDeferredBySync|SHEET_LINK_RELOAD_TIMER|forceImmediate|syncRunning/.test(sidebarSources)],
     [false, 1, false]);
+
+  // Lỗi nền GAS đã xóa khỏi kho khi trả về, nên Sidebar phải hiện ngay ở lời trả đó.
+  const cho = dungHopPoll();
+  const daHien = [];
+  cho.bootTellPendingMessages = (messages) => { daHien.push(messages); return null; };
+  cho.callServer = () => syncValue({ ok: true, selection: null, customerId: '', reload: { revision: 0 }, pendingMessages: ['lỗi nền'] });
+  batDau(cho);
+  await cho.sheetLinkProbeSelectionAndReload('wake');
+  check(so, 'lời hỏi chọn ô và nạp lại mang câu chờ thì Sidebar hiện bằng hộp báo lỗi sẵn có', daHien, [['lỗi nền']]);
 }
 
 module.exports = { chay: async (so) => { await chay(so); await chayView(so); } };

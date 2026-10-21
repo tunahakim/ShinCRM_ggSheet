@@ -146,6 +146,14 @@ function chay(so) {
   const khoMoi = JSON.parse(json.stubs._props.LOG_PENDING);
   check(so, 'kho câu chờ hỏng lúc thêm câu: bắt đầu danh sách mới, câu đầu nói các câu cũ đã mất, câu mới vẫn được giữ',
     [khoMoi.length, khoMoi[0].indexOf(jh.ERROR_PENDING_LOST_MESSAGE) >= 0, /Lỗi mới\.$/.test(khoMoi[1])], [2, true, true]);
+  jh.errorPendingPush('Lỗi mới.');
+  jh.errorPendingPush('Lỗi khác.');
+  check(so, 'kho câu chờ: câu đã có trong kho không thêm lần nữa, câu khác vẫn vào',
+    JSON.parse(json.stubs._props.LOG_PENDING).length, 3);
+  // Trigger không có người nhìn: lỗi phải vào kho chờ để Sidebar hiện, không chỉ nằm ở Log.
+  const nguonTrigger = fs.readFileSync(path.join(GAS, 'server/Triggers.js'), 'utf8');
+  check(so, 'trigger sửa ô và thêm/xóa sheet báo lỗi qua kho chờ',
+    ['shinOnEdit', 'shinOnChange'].map((ten) => new RegExp("runEntryPoint\\('" + ten + "', 'core', ERROR_CHANNEL_PENDING").test(nguonTrigger)), [true, true]);
 
   // Quét chống tái phạm: JSON trong kho chỉ đọc qua công cụ chung, nên không còn đường "hỏng thì coi là rỗng" tự viết.
   // Ngoại lệ: chính công cụ; EntryPoints.js đọc ScriptProperties (không phải DocumentProperties) và JSON thân request.

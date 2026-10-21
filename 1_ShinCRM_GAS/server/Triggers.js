@@ -141,7 +141,7 @@ function shinOnEdit(event) {
   var sheet = event.range.getSheet();
   var result;
   try {
-    result = runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_THROW, function () {
+    result = runEntryPoint('shinOnEdit', 'core', ERROR_CHANNEL_PENDING, function () {
     var name = sheet.getName();
     if (name.charAt(0) === '!') {
       if (shinViewEditMarksControls(sheet, range, event)) {
@@ -185,7 +185,7 @@ function shinOnEdit(event) {
 function shinOnChange(event) {
   var type = String(event && event.changeType || '').toUpperCase();
   if (type === 'EDIT' || type === 'FORMAT') { return null; }
-  return runEntryPoint('shinOnChange', 'core', ERROR_CHANNEL_THROW, function () {
+  return runEntryPoint('shinOnChange', 'core', ERROR_CHANNEL_PENDING, function () {
     var book = shinOpenBook();
     var active = book.getActiveSheet();
     var name = active && typeof active.getName === 'function' ? active.getName() : '';

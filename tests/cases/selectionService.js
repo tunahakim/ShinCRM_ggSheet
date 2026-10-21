@@ -46,6 +46,9 @@ function chay(so) {
   lead.getRange(7, 1).setValue('CUS-000007');
 
   check(so, 'Customer tra cột mã khách của Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000004');
+  hop.errorPendingPush('Lỗi trigger thử.');
+  const coCauCho = hop.probeSelectionAndReload({}).pendingMessages;
+  check(so, 'lời hỏi của Sidebar đang mở trả câu chờ rồi xóa kho', [coCauCho.length, /Lỗi trigger thử\.$/.test(coCauCho[0]), hop.probeSelectionAndReload({}).pendingMessages], [1, true, []]);
 
   state.sheetName = 'Activity';
   check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000099');

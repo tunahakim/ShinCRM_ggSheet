@@ -268,6 +268,7 @@ function probeSelectionAndReload(input) {
       payload: payload,
       view: selectionViewDecision(selection.sheetName, latest),
       processedRevision: payload ? journal.rev : 0,
+      pendingMessages: takePendingMessages(),
       ms: Date.now() - started
     };
   });
