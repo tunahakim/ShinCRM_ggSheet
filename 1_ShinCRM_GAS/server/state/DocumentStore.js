@@ -160,6 +160,29 @@ function documentStoreFacade(defer) {
 var DOCUMENT_STORE_THROUGH = documentStoreFacade(false);
 var DOCUMENT_STORE_DEFERRED = documentStoreFacade(true);
 
+/**
+ * Công cụ duy nhất đọc một khóa JSON từ kho. `shape` là `'object'` hoặc `'array'`; chưa có khóa thì trả `null`.
+ * Đọc kho lỗi ném `DOCUMENT_PROPERTIES_READ_FAILED`; JSON hỏng hoặc sai dạng ném `DOCUMENT_PROPERTY_CORRUPT`. Không coi hỏng là rỗng: coi là rỗng thì lần ghi kế tiếp đè mất dữ liệu thật. Thông điệp không chứa giá trị khóa vì có thể là dữ liệu đăng nhập.
+ */
+function documentPropertyJson(props, key, context, shape) {
+  var raw;
+  try { raw = props.getProperty(key); } catch (err) {
+    var readFailure = new Error('Không đọc được ' + context + ' từ DocumentProperties; thử lại sau ít phút.');
+    readFailure.code = 'DOCUMENT_PROPERTIES_READ_FAILED';
+    throw readFailure;
+  }
+  if (raw === null || raw === undefined || raw === '') { return null; }
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch (notJson) { parsed = null; }
+  var fits = shape === 'array' ? Array.isArray(parsed) : !!parsed && typeof parsed === 'object' && !Array.isArray(parsed);
+  if (!fits) {
+    var corrupt = new Error('Dữ liệu ' + context + ' trong DocumentProperties bị hỏng (' + key + '); đã dừng để không ghi đè.');
+    corrupt.code = 'DOCUMENT_PROPERTY_CORRUPT';
+    throw corrupt;
+  }
+  return parsed;
+}
+
 /** Kho cho mọi code: trong một lần gọi là kho có bản đọc (ghi chờ trong khóa tài liệu, ghi thẳng ngoài khóa), ngoài đó là kho thật. */
 function documentProps() { return documentStoreActive() ? DOCUMENT_STORE_THROUGH : documentStoreReal(); }
 

@@ -11,9 +11,7 @@ function shinRangeTouchesColumn(range, column) {
 function shinHeaderSnapshotKey(sheetName) { return 'SHIN_HEADER_SNAPSHOT_' + String(sheetName || ''); }
 
 function shinHeaderSnapshotRead(sheet) {
-  var raw = documentProps().getProperty(shinHeaderSnapshotKey(sheet.getName()));
-  if (!raw) { return null; }
-  try { var parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; } catch (ignore) { return null; }
+  return documentMemoRead(documentProps(), shinHeaderSnapshotKey(sheet.getName()), 'ảnh chụp hàng 1 của sheet ' + sheet.getName(), 'array');
 }
 
 function shinHeaderValues(sheet) {
@@ -63,12 +61,8 @@ function shinRangeTouchesViewSource(sheet, range) {
 function shinViewCodeIsValid(code) {
   var value = String(code || '').trim();
   if (!/^@(CUS|ACT)_/.test(value)) { return false; }
-  try {
-    var entity = value.indexOf('@CUS_') === 0 ? 'customer' : 'activity';
-    return selectionColumnIndex(shinOpenSheet(ENTITY_SHEETS[entity]), value) > 0;
-  } catch (ignore) {
-    return false;
-  }
+  var entity = value.indexOf('@CUS_') === 0 ? 'customer' : 'activity';
+  return selectionColumnIndex(shinOpenSheet(ENTITY_SHEETS[entity]), value) > 0;
 }
 
 function shinDefaultCodeMap(sheet, entity) {

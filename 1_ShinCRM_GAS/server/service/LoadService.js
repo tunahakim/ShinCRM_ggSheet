@@ -289,9 +289,7 @@ function loadCore(options) {
       blocked: false,
       settings: SETTINGS,
       spreadsheetId: book.getId(),
-      selectionHints: typeof selectionReadPlan === 'function' ? {
-        readPlan: selectionReadPlan()
-      } : null,
+      selectionHints: { readPlan: selectionReadPlan() },
       schema: DATA_SCHEMA,
       config: config,
       categories: danhMuc.categories,

@@ -12,12 +12,8 @@ var VIEW_TAB_TINT_KEY = 'viewTabTint';
 
 /** Bảng màu gốc `{ sheetId: màu }` của các tab đang bị cam che. */
 function viewTabTintRead() {
-  try {
-    var parsed = JSON.parse(documentProps().getProperty(VIEW_TAB_TINT_KEY) || '{}');
-    return parsed && parsed.sheets && typeof parsed.sheets === 'object' && !Array.isArray(parsed.sheets) ? parsed.sheets : {};
-  } catch (khongDocDuoc) {
-    return {};
-  }
+  var parsed = documentMemoRead(documentProps(), VIEW_TAB_TINT_KEY, 'màu gốc tab sheet quản trị', 'object');
+  return parsed && parsed.sheets && typeof parsed.sheets === 'object' && !Array.isArray(parsed.sheets) ? parsed.sheets : {};
 }
 
 function viewTabTintIsStaleColor(color) {

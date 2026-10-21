@@ -13,25 +13,21 @@ function recordHoldsAssertLocked() {
 
 function recordHoldsKey(entity, id) { return String(entity) + ':' + String(id === null || id === undefined ? '' : id).trim(); }
 
-function recordHoldsParse(raw) {
-  if (raw === null || raw === undefined || raw === '') { return {}; }
-  var holds;
-  try { holds = JSON.parse(raw); } catch (error) { throw new Error('Sổ bận ' + RECORD_HOLDS_KEY + ' hỏng (không đọc được JSON): ' + error.message); }
-  if (!holds || typeof holds !== 'object' || Array.isArray(holds)) { throw new Error('Sổ bận ' + RECORD_HOLDS_KEY + ' hỏng: không phải một bảng mục giữ.'); }
-  return holds;
+function recordHoldsLoad() {
+  return documentPropertyJson(documentProps(), RECORD_HOLDS_KEY, 'sổ bận', 'object') || {};
 }
 
 /** Đọc sổ trong khóa tài liệu. */
 function recordHoldsRead() {
   recordHoldsAssertLocked();
-  return recordHoldsParse(documentProps().getProperty(RECORD_HOLDS_KEY));
+  return recordHoldsLoad();
 }
 
 /**
  * Nhìn sổ khi chưa cầm khóa, chỉ để biết có cần lấy khóa hay không. Chỉ đúng cho chủ mà mỗi lúc chỉ có một lượt chạy (đồng bộ FBM, nhờ khóa điều phối): không ai khác ghi mục của chủ đó, nên "không có mục" đọc ngoài khóa vẫn đúng lúc cầm khóa.
  */
 function recordHoldsPeekOwner(by) {
-  var holds = recordHoldsParse(documentProps().getProperty(RECORD_HOLDS_KEY));
+  var holds = recordHoldsLoad();
   return Object.keys(holds).some(function (key) { return holds[key] && holds[key].by === by; });
 }
 

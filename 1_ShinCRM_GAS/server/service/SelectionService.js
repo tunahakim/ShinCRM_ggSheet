@@ -182,20 +182,16 @@ function selectionReadPlan() {
   definitions.forEach(function (definition) {
     var key = definition.sheetName || definition.prefix;
     if (!plan[key]) { plan[key] = []; }
-    try {
-      var sourceSheet = definition.sheetName || (definition.entity === 'activity' ? ENTITY_SHEETS.activity : ENTITY_SHEETS.customer);
-      var map = readColumnMap(sourceSheet);
-      var codes = definition.entity
-        ? [definition.entity === 'customer' ? DATA_SCHEMA.customer.id.code : DATA_SCHEMA.activity.customerId.code]
-        : sheetCoreColumns(definition.sheetCore).map(function (pair) { return pair[0]; });
-      codes.forEach(function (code) {
-        var column = Number(map.map[code] || 0);
-        if (!column) { return; }
-        plan[key].push(selectionPlanItem(key, code, column, !!definition.entity));
-      });
-    } catch (ignore) {
-      // Client thiếu plan phải fail-open và hỏi GAS; không đoán cột.
-    }
+    var sourceSheet = definition.sheetName || (definition.entity === 'activity' ? ENTITY_SHEETS.activity : ENTITY_SHEETS.customer);
+    var map = readColumnMap(sourceSheet);
+    var codes = definition.entity
+      ? [definition.entity === 'customer' ? DATA_SCHEMA.customer.id.code : DATA_SCHEMA.activity.customerId.code]
+      : sheetCoreColumns(definition.sheetCore).map(function (pair) { return pair[0]; });
+    codes.forEach(function (code) {
+      var column = Number(map.map[code] || 0);
+      if (!column) { return; }
+      plan[key].push(selectionPlanItem(key, code, column, !!definition.entity));
+    });
   });
   return plan;
 }

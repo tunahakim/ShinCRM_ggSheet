@@ -20,12 +20,7 @@ var ENTRY_POINT_LOG_ON_CHANGE = ['probeSelectionAndReload', 'getReloadState', 'r
 var ENTRY_FAILURES_KEY = 'entryFailures';
 
 function entryFailuresRead() {
-  try {
-    var parsed = JSON.parse(documentProps().getProperty(ENTRY_FAILURES_KEY) || '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch (khongDocDuoc) {
-    return {};
-  }
+  return documentMemoRead(documentProps(), ENTRY_FAILURES_KEY, 'bộ nhớ lỗi trùng của cửa vào', 'object') || {};
 }
 
 function entryFailuresWrite(map) {

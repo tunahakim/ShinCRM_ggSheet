@@ -22,15 +22,13 @@ var RELOAD_FLAG_PARTS = ['category', 'config', 'core'];
  */
 function reloadJournalRead() {
   var props = documentProps();
-  var raw = props.getProperty(RELOAD_JOURNAL_KEY);
-  if (!raw) {
+  var parsed = documentPropertyJson(props, RELOAD_JOURNAL_KEY, 'sổ nhật ký nạp lại', 'object');
+  if (!parsed) {
     var legacy = Number(props.getProperty(RELOAD_LEGACY_REVISION_KEY) || 0);
     var seed = isFinite(legacy) && legacy > 0 ? legacy + 1 : 0;
     return { rev: seed, floor: seed, changedAt: 0, entries: [], stored: false };
   }
-  var parsed;
-  try { parsed = JSON.parse(raw); } catch (error) { parsed = null; }
-  if (!parsed || !isFinite(Number(parsed.rev)) || !Array.isArray(parsed.entries)) {
+  if (!isFinite(Number(parsed.rev)) || !Array.isArray(parsed.entries)) {
     throw new Error('Sổ nhật ký nạp lại (khóa ' + RELOAD_JOURNAL_KEY + ' trong DocumentProperties) bị hỏng nên không biết dữ liệu nào đã đổi. Báo người phát triển; không sửa tay khóa này.');
   }
   return { rev: Number(parsed.rev), floor: Number(parsed.floor) || 0, changedAt: Number(parsed.changedAt) || 0, entries: parsed.entries, stored: true };

@@ -38,14 +38,14 @@ function errorMessage(err) {
 function errorPendingPush(message) {
   try {
     var props = documentProps();
-    var list = [];
-
+    var list;
     try {
-      var raw = props.getProperty(ERROR_PENDING_KEY);
-      var parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) { list = parsed; }
-    } catch (khongPhaiJson) {
-      list = [];
+      list = documentPropertyJson(props, ERROR_PENDING_KEY, 'kho câu báo lỗi chờ', 'array') || [];
+    } catch (khoHong) {
+      // Kho hỏng thì các câu cũ đã mất; bắt đầu lại và nói rõ điều đó trong chính kho. Đọc kho lỗi thì không ghi đè lên thứ chưa đọc được.
+      if (khoHong.code !== 'DOCUMENT_PROPERTY_CORRUPT') { throw khoHong; }
+      logEvent({ source: 'error_report', action: 'pending_push', outcome: LOG_ERROR, reason: khoHong.code, detail: { key: ERROR_PENDING_KEY } });
+      list = [logNow() + ' — ' + ERROR_PENDING_LOST_MESSAGE];
     }
 
     list.push(logNow() + ' — ' + message);
@@ -53,9 +53,12 @@ function errorPendingPush(message) {
 
     props.setProperty(ERROR_PENDING_KEY, JSON.stringify(list));
   } catch (khongGhiDuocKhoCho) {
-    console.error('errorPendingPush thất bại: ' + errorMessage(khongGhiDuocKhoCho));
+    logEvent({ source: 'error_report', action: 'pending_push', outcome: LOG_ERROR, reason: khongGhiDuocKhoCho.code || 'ERROR_PENDING_WRITE_FAILED', detail: { error: errorMessage(khongGhiDuocKhoCho), message: String(message) } });
   }
 }
+
+/** Câu thay cho các câu báo lỗi cũ khi kho câu chờ hỏng. */
+var ERROR_PENDING_LOST_MESSAGE = 'Kho câu báo lỗi chờ bị hỏng nên các câu báo lỗi cũ đã mất; chi tiết các lỗi đó vẫn ở sheet Log.';
 
 /**
  * Lấy các câu đang chờ ra và **xóa** khỏi kho. Nhả nghĩa là hiện rồi xóa.
@@ -63,18 +66,23 @@ function errorPendingPush(message) {
  * `loadCore` gọi hàm này lúc mở hoặc nạp lại sidebar, rồi client hiện kết quả bằng hộp thoại lớn. Không bao giờ ném lỗi: một kho chờ không đọc được không được phép làm sập lượt mở sidebar, vì lúc đó người dùng mất cả nội dung lẫn đường vào.
  */
 function takePendingMessages() {
+  var props = documentProps();
+  var list;
   try {
-    var props = documentProps();
-    var raw = props.getProperty(ERROR_PENDING_KEY);
-    if (!raw) { return []; }
-
-    props.deleteProperty(ERROR_PENDING_KEY);
-
-    var parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    list = documentPropertyJson(props, ERROR_PENDING_KEY, 'kho câu báo lỗi chờ', 'array');
   } catch (khongDocDuocKhoCho) {
-    return [];
+    logEvent({ source: 'error_report', action: 'pending_take', outcome: LOG_ERROR, reason: khongDocDuocKhoCho.code || 'ERROR_PENDING_READ_FAILED', detail: { key: ERROR_PENDING_KEY } });
+    // Đọc kho lỗi thì để nguyên kho cho lần mở sau; kho hỏng thì xóa và nói các câu cũ đã mất.
+    if (khongDocDuocKhoCho.code !== 'DOCUMENT_PROPERTY_CORRUPT') { return [errorMessage(khongDocDuocKhoCho)]; }
+    list = [ERROR_PENDING_LOST_MESSAGE];
   }
+  if (!list) { return []; }
+  try {
+    props.deleteProperty(ERROR_PENDING_KEY);
+  } catch (khongXoaDuocKhoCho) {
+    logEvent({ source: 'error_report', action: 'pending_take', outcome: LOG_ERROR, reason: khongXoaDuocKhoCho.code || 'ERROR_PENDING_WRITE_FAILED', detail: { error: errorMessage(khongXoaDuocKhoCho) } });
+  }
+  return list;
 }
 
 /**
@@ -114,6 +122,9 @@ function probeErrorReport() {
   report.push('Lấy lần hai (kho phải sạch): ' + layLai.length + ' câu');
   report.push('Kênh throw không hiện gì và không ném: ' + (reportError(new Error('không được hiện'), ERROR_CHANNEL_THROW) === undefined));
   report.push('Kho chờ sau cùng: ' + takePendingMessages().length + ' câu');
+
+  documentProps().setProperty(ERROR_PENDING_KEY, '{hỏng');
+  report.push('Kho hỏng, lấy ra: ' + JSON.stringify(takePendingMessages()) + ' · kho sau đó: ' + JSON.stringify(documentProps().getProperty(ERROR_PENDING_KEY)));
 
   report.forEach(function (line) { Logger.log(line); });
   return report;

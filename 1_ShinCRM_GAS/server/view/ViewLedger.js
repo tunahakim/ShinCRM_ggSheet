@@ -15,12 +15,7 @@
 var VIEW_LEDGER_KEY = 'viewLedger';
 
 function viewLedgerRead() {
-  try {
-    var parsed = JSON.parse(documentProps().getProperty(VIEW_LEDGER_KEY) || '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch (khongDocDuoc) {
-    return {};
-  }
+  return documentMemoRead(documentProps(), VIEW_LEDGER_KEY, 'sổ vẽ sheet quản trị', 'object') || {};
 }
 
 function viewLedgerEntry(sheetName) {
