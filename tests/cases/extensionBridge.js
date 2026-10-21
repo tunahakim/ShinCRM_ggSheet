@@ -309,7 +309,7 @@ async function chay(so) {
   check(so, 'executor login nhan du lieu database va don vi theo cac shape FBM', executorSource.indexOf('function loginListValue') >= 0 && executorSource.indexOf("'FHN_CRM_App'") >= 0 && executorSource.indexOf("'CTY'") >= 0, true);
   check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
   check(so, 'Sidebar ket thuc waiter bang loi bridge ro rang, khong gui lai request FBM', syncSource.indexOf('if (data.retryable)') < 0 && syncSource.indexOf('retryCount: 0') < 0 && syncSource.indexOf('client_extension_failure') >= 0, true);
-  check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && syncSource.indexOf('Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()])') >= 0, true);
+  check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && syncSource.indexOf("callServer('fbmGetPanelBundle')") >= 0, true);
   check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);
   const autoFillStart = syncSource.indexOf('function fbmSyncAutoFill()');
   const autoFillEnd = syncSource.indexOf('function fbmSyncConfirmIdentity()');

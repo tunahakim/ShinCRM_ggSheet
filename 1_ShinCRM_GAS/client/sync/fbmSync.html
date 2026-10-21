@@ -55,26 +55,35 @@ function syncPanelToggle() {
   FBM_SYNC_CLIENT.statusReady = false;
   FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; FBM_SYNC_CLIENT.loginPasswordMode = 'saved'; FBM_SYNC_CLIENT.loginPasswordFocused = false; FBM_SYNC_CLIENT.loginPasswordTimer = null; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
-  if (typeof fbmSyncStatusOnce !== 'function') { return null; }
-  return Promise.all([fbmSyncStatusOnce(true), fbmSyncLoadIdentityStatus(), fbmSyncLoadSettings()]).then(function (results) { return fbmSyncLoadLoginStatus().then(function () { return results[0]; }); }).catch(function (error) {
+  if (typeof callServer !== 'function') { return null; }
+  // Một lời gọi trả cả bốn phần; nạp liên kết, cài đặt trước rồi mới vẽ status để màn vẽ một lần với đủ dữ liệu.
+  var ticket = fbmSyncStatusTicket();
+  return callServer('fbmGetPanelBundle').then(function (bundle) {
+    if (!bundle || !bundle.status) { throw new Error('GAS không trả gói mở màn đồng bộ.'); }
+    fbmSyncApplyIdentityStatus(bundle.identity);
+    fbmSyncApplySettings(bundle.settings);
+    var status = fbmSyncStatusApply(bundle.status, ticket, true);
+    return fbmSyncApplyLoginStatus(bundle.login).then(function () { return status; });
+  }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'sidebar_open');
     return null;
   });
 }
 function fbmSyncLoadIdentityStatus() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetIdentityStatus').then(function (identity) {
-    FBM_SYNC_CLIENT.identityStatus = identity || {};
-    var binding = identity && identity.binding || {};
-    if (!fbmSyncAccountIsEditing()) {
-      FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: String(binding.spreadsheetId || ''), userId: String(binding.userId || ''), username: String(binding.username || ''), accountName: String(binding.accountName || '') };
-    }
-    if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
-    return identity;
-  }).catch(function (error) {
+  return callServer('fbmGetIdentityStatus').then(fbmSyncApplyIdentityStatus).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái liên kết FBM.');
     return null;
   });
+}
+function fbmSyncApplyIdentityStatus(identity) {
+  FBM_SYNC_CLIENT.identityStatus = identity || {};
+  var binding = identity && identity.binding || {};
+  if (!fbmSyncAccountIsEditing()) {
+    FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: String(binding.spreadsheetId || ''), userId: String(binding.userId || ''), username: String(binding.username || ''), accountName: String(binding.accountName || '') };
+  }
+  if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+  return identity;
 }
 /** Copy a newly probed identity into the editable draft without saving the binding. */
 function fbmSyncApplyIdentityProbeDraft(status) {
@@ -110,9 +119,9 @@ function fbmSyncSetAccountNotice(scope, kind, message) {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, fbmSyncAccountNoticeBlocks(name)); }
   return notice;
 }
-function fbmSyncLoadLoginStatus() {
-  if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetLoginConfig').then(function (login) {
+/** Nạp cấu hình đăng nhập GAS trả; username bị che thì hỏi Extension tên thật và sửa lại kho GAS. */
+function fbmSyncApplyLoginStatus(login) {
+  return Promise.resolve(login).then(function (login) {
     FBM_SYNC_CLIENT.loginStatus = login || {};
     FBM_SYNC_CLIENT.loginPasswordMode = FBM_SYNC_CLIENT.loginStatus.configured === true ? 'saved' : 'draft';
     if (FBM_SYNC_CLIENT.loginStatus.configured === true && FBM_SYNC_CLIENT.loginStatus.credentialRef && (!fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus) || /\*/.test(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus)))) {
@@ -132,10 +141,7 @@ function fbmSyncLoadLoginStatus() {
     }
     if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return FBM_SYNC_CLIENT.loginStatus;
-  }).then(function (result) { if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return result; }).catch(function (error) {
-    fbmSyncPaintError(error, 'Không tải được cấu hình đăng nhập FBM.');
-    return null;
-  });
+  }).then(function (result) { if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return result; });
 }
 
 function fbmSyncLoginPasswordMarkerVisible(login) {
@@ -199,13 +205,10 @@ function fbmSyncBlurLoginPassword(input) {
   }
   return true;
 }
-function fbmSyncLoadSettings() {
-  if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetSyncSettings').then(function (result) { FBM_SYNC_CLIENT.syncSettings = result && result.settings || {}; if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return FBM_SYNC_CLIENT.syncSettings; }).catch(function (error) {
-    FBM_SYNC_CLIENT.syncSettings = {};
-    fbmSyncPaintError(error, 'Không tải được cài đặt đồng bộ FBM.');
-    return null;
-  });
+function fbmSyncApplySettings(settings) {
+  FBM_SYNC_CLIENT.syncSettings = settings || {};
+  if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
+  return FBM_SYNC_CLIENT.syncSettings;
 }
 /** Đưa cấu hình Web App/khóa sang Extension; không gửi cookie hay payload FBM. */
 var FBM_SYNC_RELAY_CONFIGURE_FLIGHT = null;

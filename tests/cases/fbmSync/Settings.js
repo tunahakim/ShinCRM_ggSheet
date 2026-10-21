@@ -146,6 +146,27 @@ function chay(so) {
   check(so, 'Lưu cài đặt chung: đổi công tắc tổng trước khi lưu, null thì không đụng công tắc, công tắc lỗi thì không lưu; kết quả mang status mới',
     [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase, masterFailed.code],
     [[['set_master_switch', false], ['save', 2], ['save', 3], ['set_master_switch', true]], true, { phase: 'idle', masterEnabled: false }, 'idle', 'SYNC_RUNNING']);
+
+  // Gói mở màn: bốn phần đọc qua đúng hàm đọc của từng cửa, một lời gọi; một phần ném lỗi thì cả gói ném để Sidebar báo.
+  const bundleReads = [];
+  let identityFails = false;
+  const bundleHop = taoHopCat({ runEntryPoint: (name, source, channel, fn) => fn(), FbmSync: {
+    transportValue: (value) => value,
+    stateRead: () => ({ phase: 'idle' }),
+    controlDispatch: (action) => { bundleReads.push(action); return { phase: 'idle', masterEnabled: true }; },
+    controlDispatchLocked: (action, args) => { bundleReads.push(action); if (identityFails) { throw new Error('Không đọc được liên kết.'); } return { status: 'BOUND', runtime: args.runtime }; },
+    currentSpreadsheetId: () => 'sheet-1',
+    syncSettingsPublic: () => ({ approvalThreshold: 5 }),
+    loginConfigPublic: () => { bundleReads.push('login'); return { configured: true }; }
+  } });
+  napServer(bundleHop, 'server/service/FbmSyncService.js');
+  const bundle = bundleHop.fbmGetPanelBundle();
+  identityFails = true;
+  let bundleError = null;
+  try { bundleHop.fbmGetPanelBundle(); } catch (error) { bundleError = error.message; }
+  check(so, 'Gói mở màn Đồng bộ FBM trả đủ bốn phần trong một lời gọi; phần liên kết lỗi thì cả gói ném lỗi',
+    [bundleReads.slice(0, 3), bundle.ok, bundle.status.phase, bundle.identity.status, bundle.settings.approvalThreshold, bundle.settings.spreadsheetId, bundle.login.configured, bundleError],
+    [['status', 'identity_status', 'login'], true, 'idle', 'BOUND', 5, 'sheet-1', true, 'Không đọc được liên kết.']);
   escHop.FbmSync.stateWrite({ runId: 'r-live', phase: 'pull_customer' });
   const refused = escHop.FbmSync.stateReset();
   const staleAllowed = escHop.FbmSync.stateReset(Date.now() + escHop.FbmSync.STALE_RUN_MS + 1000);

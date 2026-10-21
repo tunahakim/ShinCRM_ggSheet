@@ -103,15 +103,17 @@ async function testSharedShellLifecycle(so) {
   hop.FBM_SYNC_CLIENT.viewEpoch = 0;
   hop.FBM_SYNC_CLIENT.statusRequestSeq = 0;
   hop.FBM_SYNC_CLIENT.lastServerUpdatedAt = 0;
+  const openCalls = [];
   hop.callServer = (name) => {
-    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ phase: 'idle', masterEnabled: true, counts: {} }); }
-    if (name === 'fbmGetIdentityStatus') { return Promise.resolve({ status: 'UNBOUND', binding: {} }); }
-    if (name === 'fbmGetSyncSettings') { return Promise.resolve({ settings: {} }); }
-    if (name === 'fbmGetLoginConfig') { return Promise.resolve({ configured: false }); }
+    openCalls.push(name);
+    if (name === 'fbmGetPanelBundle') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: { approvalThreshold: 7 }, login: { configured: false } }); }
     return Promise.resolve({ ok: true });
   };
 
   await hop.syncPanelToggle();
+  check(so, 'Mở màn Đồng bộ FBM chỉ gọi GAS một lần và nạp đủ bốn phần của gói',
+    [openCalls, hop.FBM_SYNC_CLIENT.statusReady, hop.FBM_SYNC_CLIENT.identityDraft.userId, hop.FBM_SYNC_CLIENT.syncSettings.approvalThreshold, hop.FBM_SYNC_CLIENT.loginStatus.configured, hop.FBM_SYNC_CLIENT.loginPasswordMode],
+    [['fbmGetPanelBundle'], true, 'u-1', 7, false, 'draft']);
   check(so, 'mo FBM dung chung header body va an info footer cua man truoc',
     [hop.FBM_SYNC_CLIENT.active,
       dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active'),
@@ -148,6 +150,13 @@ async function testSharedShellLifecycle(so) {
   hop.fbmSyncPaint = (status) => { remountStatus = status; };
   await hop.syncPanelToggle();
   check(so, 'cờ active lệch với DOM vẫn cho phép icon Đồng bộ tự gắn lại shell', remountStatus, hop.FBM_SYNC_CLIENT.lastStatus);
+  const openErrorPaint = hop.fbmSyncPaintError, openErrors = [], openCallServer = hop.callServer;
+  hop.fbmSyncPaintError = (error, fallback, action) => { openErrors.push([error.message, action]); };
+  hop.callServer = () => Promise.reject(new Error('GAS hỏng'));
+  hop.FBM_SYNC_CLIENT.active = false;
+  const openFailed = await hop.syncPanelToggle();
+  hop.fbmSyncPaintError = openErrorPaint; hop.callServer = openCallServer;
+  check(so, 'Gói mở màn lỗi thì báo lỗi một lần trên màn đồng bộ, không nuốt lỗi', [openFailed, openErrors], [null, [['GAS hỏng', 'sidebar_open']]]);
 }
 
 async function testOwnRunId(so) {
