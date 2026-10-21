@@ -164,7 +164,11 @@ function fbmSyncToggleMaster() {
   if (FBM_SYNC_CLIENT.masterToggleFlight) { return FBM_SYNC_CLIENT.masterToggleFlight; }
   var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
   fbmSyncPaint(next);
-  return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(fbmSyncStatusOnce).catch(function (error) {
+  var ticket = fbmSyncStatusTicket();
+  return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) {
+    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không đổi được công tắc đồng bộ.'); }
+    return fbmSyncStatusFromResult(result, ticket);
+  }).catch(function (error) {
     var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled });
     if (typeof fbmSyncPaintError === 'function') { fbmSyncPaintError(error, 'Không đổi được công tắc đồng bộ.'); }
     fbmSyncPaint(rollback);

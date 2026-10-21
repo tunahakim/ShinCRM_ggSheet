@@ -128,6 +128,24 @@ function chay(so) {
   check(so, 'FBM-044: state hỏng thì status trả "kẹt" kèm nút đặt lại và ghi Log, không ném lỗi', [stuck.code, stuck.resetOffered, stuck.phase, escLogs.some((event) => event.action === 'state_stuck')], ['SYNC_STATE_STUCK', true, 'error', true]);
   const escReset = escHop.FbmSync.stateReset();
   check(so, 'FBM-044: đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log', [escReset.ok, escData.FBM_SYNC_STATE_V1, escData.FBM_SYNC_PENDING_PUSHES_V1, escHop.FbmSync.stateRead().phase, escLogs.some((event) => event.action === 'state_reset')], [true, undefined, '{"activity:ACT-1":{"hash":"h"}}', 'idle', true]);
+
+  // Lưu cài đặt chung gộp công tắc tổng: một lời gọi Sidebar, đổi công tắc trước, công tắc lỗi thì không lưu cài đặt, luôn trả status mới.
+  const saveOrder = [];
+  let masterReply = { ok: true };
+  const saveHop = taoHopCat({ runEntryPoint: (name, source, channel, fn) => fn(), FbmSync: {
+    transportValue: (value) => value,
+    controlDispatchLocked: (action, args) => { saveOrder.push([action, args.enabled]); return masterReply; },
+    syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return { ok: true, settings }; },
+    statusView: () => ({ phase: 'idle', masterEnabled: false })
+  } });
+  napServer(saveHop, 'server/service/FbmSyncService.js');
+  const withMaster = saveHop.fbmSaveSyncSettings({ approvalThreshold: 2 }, false);
+  const withoutMaster = saveHop.fbmSaveSyncSettings({ approvalThreshold: 3 }, null);
+  masterReply = { ok: false, code: 'SYNC_RUNNING' };
+  const masterFailed = saveHop.fbmSaveSyncSettings({ approvalThreshold: 4 }, true);
+  check(so, 'Lưu cài đặt chung: đổi công tắc tổng trước khi lưu, null thì không đụng công tắc, công tắc lỗi thì không lưu; kết quả mang status mới',
+    [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase, masterFailed.code],
+    [[['set_master_switch', false], ['save', 2], ['save', 3], ['set_master_switch', true]], true, { phase: 'idle', masterEnabled: false }, 'idle', 'SYNC_RUNNING']);
   escHop.FbmSync.stateWrite({ runId: 'r-live', phase: 'pull_customer' });
   const refused = escHop.FbmSync.stateReset();
   const staleAllowed = escHop.FbmSync.stateReset(Date.now() + escHop.FbmSync.STALE_RUN_MS + 1000);

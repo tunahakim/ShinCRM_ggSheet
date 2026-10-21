@@ -531,8 +531,9 @@ async function chay(so) {
   dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
   const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
   const scopeLines = [{ code: 'ALT00010', kind: 'fbm', status: 'matched', customerId: 'CUS-020061', fbmCode: 'ALT00010' }, { code: 'ALT00099', kind: 'fbm', status: 'fbm_new', customerId: '', fbmCode: 'ALT00099' }];
-  hop.callServer = (name, args) => { if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0], scopeLines: scopeLines }); };
-  hop.fbmSyncStatusOnce = () => Promise.resolve(null);
+  const settingsCalls = [];
+  hop.callServer = (name, args) => { settingsCalls.push([name, args && args[1]]); if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0], scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
+  hop.fbmSyncStatusOnce = () => Promise.reject(new Error('Lưu cài đặt chung không được hỏi lại trạng thái.'));
   const savedNotices = [], noticeSetter = hop.fbmSyncSetSettingsNotice;
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
   await hop.fbmSyncSaveSyncSettings(null);
@@ -540,6 +541,7 @@ async function chay(so) {
   check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
     [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
     [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
+  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS; công tắc tổng không đổi thì gửi null', settingsCalls, [['fbmSaveSyncSettings', null]]);
   check(so, 'Dòng mã FBM mang cảnh báo độ dài hiện thêm độ dài đã cài sau câu mã chưa có trên Sheet',
     /ALT0010: mã FBM chưa có trên Sheet.*\(8 ký tự\)/.test(hop.fbmSyncSettingsScopeLinesText([{ code: 'ALT0010', kind: 'fbm', status: 'fbm_new', lengthExpected: 8 }])), true);
   check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);

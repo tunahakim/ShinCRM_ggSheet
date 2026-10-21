@@ -63,7 +63,15 @@ function fbmGetBackgroundSwitch() { return runEntryPoint('fbmGetBackgroundSwitch
 function fbmGetIdentityStatus(runtime) { return runEntryPoint('fbmGetIdentityStatus', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('identity_status', { runtime: runtime || {} }); }); }
 function fbmSaveIdentityBinding(binding) { return runEntryPoint('fbmSaveIdentityBinding', 'sidebar', 'throw', function () { return FbmSync.controlDispatchLocked('save_identity_binding', { binding: binding || {} }); }); }
 function fbmGetSyncSettings() { return runEntryPoint('fbmGetSyncSettings', 'sidebar', 'throw', function () { var spreadsheetId = FbmSync.currentSpreadsheetId(); var settings = typeof FbmSync.syncSettingsPublic === 'function' ? FbmSync.syncSettingsPublic() : { approvalThreshold: FbmSync.approvalThreshold() }; settings.spreadsheetId = spreadsheetId; settings.account = typeof FbmSync.accountSettingsPublic === 'function' ? FbmSync.accountSettingsPublic() : { customerPrefix: '', customerCodeLength: '' }; settings.extension = typeof FbmSync.extensionConfigPublic === 'function' ? FbmSync.extensionConfigPublic() : { pollMinutes: 5, runOnStartup: true }; settings.background = typeof FbmSync.backgroundSchedulePublic === 'function' ? FbmSync.backgroundSchedulePublic() : {}; return fbmPublicResult({ ok: true, settings: settings }); }); }
-function fbmSaveSyncSettings(settings) { return runEntryPoint('fbmSaveSyncSettings', 'sidebar', 'throw', function () { if (typeof FbmSync.syncSettingsSave !== 'function') { throw new Error('Kho tham số phiên chưa được nạp.'); } return fbmPublicResult(FbmSync.syncSettingsSave(settings || {})); }); }
+/** Nút Lưu cài đặt chung gồm cả công tắc tổng: `masterEnabled` là true/false khi người dùng đổi công tắc, null khi không đổi. Đổi công tắc qua đúng lệnh của `fbmSetMasterSwitch`, rồi lưu cài đặt, rồi trả status mới trong cùng lời gọi. */
+function fbmSaveSyncSettings(settings, masterEnabled) { return runEntryPoint('fbmSaveSyncSettings', 'sidebar', 'throw', function () {
+  if (typeof FbmSync.syncSettingsSave !== 'function') { throw new Error('Kho tham số phiên chưa được nạp.'); }
+  if (typeof masterEnabled === 'boolean') {
+    var master = FbmSync.controlDispatchLocked('set_master_switch', { enabled: masterEnabled });
+    if (!master || master.ok === false) { return fbmPublicResult(master); }
+  }
+  return Object.assign({}, fbmPublicResult(FbmSync.syncSettingsSave(settings || {})), { status: FbmSync.statusView() });
+}); }
 function fbmSaveAccountSettings(settings) { return runEntryPoint('fbmSaveAccountSettings', 'sidebar', 'throw', function () { if (typeof FbmSync.accountSettingsSave !== 'function') { throw new Error('Kho cài đặt tài khoản FBM chưa được nạp.'); } return fbmPublicResult(FbmSync.accountSettingsSave(settings || {})); }); }
 function fbmSaveExtensionConfig(config) { return runEntryPoint('fbmSaveExtensionConfig', 'sidebar', 'throw', function () { var result = FbmSync.extensionConfigSave(config || {}); return fbmPublicResult(result); }); }
 function fbmSaveBackgroundSchedule(schedule) { return runEntryPoint('fbmSaveBackgroundSchedule', 'sidebar', 'throw', function () { var result = FbmSync.backgroundScheduleSave(schedule || {}); return fbmPublicResult(result); }); }

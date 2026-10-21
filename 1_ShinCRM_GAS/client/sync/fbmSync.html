@@ -780,19 +780,32 @@ function fbmSyncClearAccountNotice(scope) {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, []); }
 }
 /** Lấy status một lần, không tạo vòng polling khi không chạy. */
-/** Đọc trạng thái GAS và vẽ khi còn mới. Luôn trả đúng status GAS đọc được, kể cả khi không vẽ: bên chờ lượt nền và bên báo lỗi dựa vào giá trị này. */
+/** Phiếu lấy ngay trước mỗi lời gọi GAS sẽ trả status (hỏi trạng thái hoặc thao tác đổi state): chụp lượt mở, số thứ tự lời gọi và cờ đang chạy lúc gửi, để status về muộn không vẽ đè status mới hơn. */
+function fbmSyncStatusTicket() {
+  return { epoch: FBM_SYNC_CLIENT.viewEpoch, seq: ++FBM_SYNC_CLIENT.statusRequestSeq, running: FBM_SYNC_CLIENT.running };
+}
+/** Vẽ status GAS vừa trả khi còn mới theo phiếu. Luôn trả đúng status nhận được, kể cả khi không vẽ: bên chờ lượt nền và bên báo lỗi dựa vào giá trị này. */
+function fbmSyncStatusApply(status, ticket, freshOpen) {
+  var snapshot = status && (status.status || status) || {}, updatedAt = Number(snapshot.updatedAt || 0);
+  // Status của lượt mở/checkbox cũ không được phép vẽ đè loading của lượt mới.
+  if (ticket.epoch !== FBM_SYNC_CLIENT.viewEpoch || ticket.seq < FBM_SYNC_CLIENT.statusRequestSeq) { return status; }
+  if (FBM_SYNC_CLIENT.running && !ticket.running) { return status; }
+  if (updatedAt && updatedAt < FBM_SYNC_CLIENT.lastServerUpdatedAt) { return status; }
+  if (updatedAt) { FBM_SYNC_CLIENT.lastServerUpdatedAt = updatedAt; }
+  FBM_SYNC_CLIENT.statusReady = true;
+  fbmSyncPaint(status, freshOpen);
+  return status;
+}
+/** Thao tác đổi state của GAS trả kèm status mới; vẽ thẳng từ đó, không hỏi lại GAS. Thiếu status là hợp đồng GAS sai, báo lỗi chứ không đoán. */
+function fbmSyncStatusFromResult(result, ticket) {
+  if (!result || !result.status) { throw new Error('GAS không trả trạng thái đồng bộ sau thao tác.'); }
+  return fbmSyncStatusApply(result.status, ticket);
+}
+/** Đọc trạng thái GAS và vẽ khi còn mới. */
 function fbmSyncStatusOnce(freshOpen) {
-  var epoch = FBM_SYNC_CLIENT.viewEpoch, requestSeq = ++FBM_SYNC_CLIENT.statusRequestSeq, runningWhenRequested = FBM_SYNC_CLIENT.running;
+  var ticket = fbmSyncStatusTicket();
   return callServer('fbmGetSyncStatus').then(function (status) {
-    var snapshot = status && (status.status || status) || {}, updatedAt = Number(snapshot.updatedAt || 0);
-    // Status của lượt mở/checkbox cũ không được phép vẽ đè loading của lượt mới.
-    if (epoch !== FBM_SYNC_CLIENT.viewEpoch || requestSeq < FBM_SYNC_CLIENT.statusRequestSeq) { return status; }
-    if (FBM_SYNC_CLIENT.running && !runningWhenRequested) { return status; }
-    if (updatedAt && updatedAt < FBM_SYNC_CLIENT.lastServerUpdatedAt) { return status; }
-    if (updatedAt) { FBM_SYNC_CLIENT.lastServerUpdatedAt = updatedAt; }
-    FBM_SYNC_CLIENT.statusReady = true;
-    fbmSyncPaint(status, freshOpen);
-    return status;
+    return fbmSyncStatusApply(status, ticket, freshOpen);
   }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'status_load');
     throw error;
@@ -936,6 +949,7 @@ function fbmSyncResolveConflict(entity, id, choice, merged) {
   var item = FBM_SYNC_CLIENT.conflict, fbmValues = {}, shinValues = {};
   if (!item || item.id !== id) { return Promise.reject(new Error('Màn xung đột không còn hiện bản ghi ' + id + '; mở lại chế độ xử lý xung đột.')); }
   (item.fields || []).forEach(function (field) { fbmValues[field.field] = field.right; shinValues[field.field] = field.left; });
+  var ticket = fbmSyncStatusTicket();
   return callServer('fbmConfirmConflict', [entity, id, choice, merged, fbmValues, shinValues, item.snapshot]).then(function (result) {
     var code = result && result.code;
     if (code === 'CONFLICT_SHEET_CHANGED') { return fbmSyncConflictSheetChanged(item, result.conflicts, choice, merged); }
@@ -949,7 +963,7 @@ function fbmSyncResolveConflict(entity, id, choice, merged) {
     }
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không giải quyết được conflict.'); }
     fbmSyncShowConflict(null);
-    return Number(result.remaining || 0) > 0 ? fbmSyncOpenConflict() : fbmSyncStatusOnce();
+    return Number(result.remaining || 0) > 0 ? fbmSyncOpenConflict() : fbmSyncStatusFromResult(result, ticket);
   }).catch(function (error) {
     return fbmSyncStatusOnce().then(function (status) {
       var snapshot = status && (status.status || status) || {};
@@ -986,9 +1000,10 @@ function fbmSyncConflictSheetChanged(item, conflicts, choice, merged) {
   });
 }
 function fbmSyncRetryPushFailures() {
+  var ticket = fbmSyncStatusTicket();
   return callServer('fbmRetryPushFailures').then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không mở lại được bản ghi lỗi.'); }
-    return fbmSyncStatusOnce();
+    return fbmSyncStatusFromResult(result, ticket);
   });
 }
 /** Hiển thị lỗi thao tác ngay trong màn hình hiện tại, không để Promise bị từ chối im lặng. */
@@ -1271,17 +1286,15 @@ function fbmSyncSaveSyncSettings(button) {
   // GAS tách, bỏ trùng, kiểm ký tự và đổi mã ra khách; client gửi nguyên chuỗi người dùng gõ.
   var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), scopeLimited: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.scopeLimitedId), scopeCodes: scopeCodesInput ? String(scopeCodesInput.value || '') : '', requestGapMinSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId), requestGapMaxSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId) };
   var draft = fbmSyncConfigState('module').draft || {}, desiredMaster = draft.enabled !== false, currentMaster = fbmSyncConfigMasterEnabled();
-  var masterSave = desiredMaster === currentMaster ? Promise.resolve({ ok: true }) : callServer('fbmSetMasterSwitch', [desiredMaster]);
-  return masterSave.then(function (masterResult) {
-    if (!masterResult || masterResult.ok === false) { throw new Error(masterResult && (masterResult.message || masterResult.code) || 'Không đổi được công tắc module.'); }
-    return callServer('fbmSaveSyncSettings', [payload]);
-  }).then(function (result) {
+  // Một lời gọi: GAS đổi công tắc tổng (chỉ khi người dùng đổi), lưu cài đặt rồi trả status mới.
+  var ticket = fbmSyncStatusTicket();
+  return callServer('fbmSaveSyncSettings', [payload, desiredMaster === currentMaster ? null : desiredMaster]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); }
     FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload);
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); }
     var scopeText = fbmSyncSettingsScopeLinesText(result.scopeLines);
     if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', (result.scopeLines || []).some(function (line) { return line.lengthExpected; }) ? 'warning' : 'success', 'Đã lưu cài đặt chung.' + (scopeText ? '\n' + scopeText : '')); }
-    return fbmSyncStatusOnce();
+    return fbmSyncStatusFromResult(result, ticket);
   }).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveLoginPolicy(button) {

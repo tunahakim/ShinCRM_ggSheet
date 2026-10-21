@@ -129,7 +129,7 @@ async function chay(so) {
   hop.callServer = (name, args) => {
     calls.push({ name, args: args || [] });
     if (name === 'fbmGetSyncStatus') return Promise.resolve(Object.assign(idle(), { masterEnabled, backgroundEnabled }));
-    if (name === 'fbmSetMasterSwitch') { masterEnabled = args && args[0] === true; return Promise.resolve(Object.assign(idle(), { masterEnabled })); }
+    if (name === 'fbmSetMasterSwitch') { masterEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: masterEnabled, status: Object.assign(idle(), { masterEnabled, backgroundEnabled }) }); }
     if (name === 'fbmSetBackgroundSwitch') { backgroundEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: backgroundEnabled }); }
     return Promise.resolve({ ok: true, settings: {}, status: idle() });
   };
@@ -160,9 +160,11 @@ async function chay(so) {
 
   const master = dom.document.createElement('button');
   master.id = 'fbm-sync-master-switch';
+  const callsBeforeMaster = calls.length;
   click(dom, master);
   await tick();
   check(so, 'cong tac tong gui dung mot lenh GAS va cap nhat trang thai', [calls.filter((item) => item.name === 'fbmSetMasterSwitch').length, hop.FBM_SYNC_CLIENT.lastStatus.masterEnabled], [1, false]);
+  check(so, 'Công tắc tổng vẽ trạng thái từ kết quả lệnh, không hỏi lại fbmGetSyncStatus', calls.slice(callsBeforeMaster).map((item) => item.name), ['fbmSetMasterSwitch']);
 
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
