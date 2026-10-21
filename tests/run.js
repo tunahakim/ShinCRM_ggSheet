@@ -25,6 +25,7 @@ const NHOM_CA = [
   require('./cases/entryPoint'),
   require('./cases/dateText'),
   require('./cases/sheetGrid'),
+  require('./cases/book'),
   require('./cases/cellBudget'),
   require('./cases/setupSheets'),
   require('./cases/columnFormat'),

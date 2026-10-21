@@ -42,6 +42,7 @@ function taoStubsGas(options) {
   const gia = taoBook(chon.sheets || []);
   const props = Object.assign({}, chon.props || {});
   const userProps = Object.assign({}, chon.userProps || {});
+  const scriptProps = {};
   const daLog = [];
   const daConsole = [];
   const khoa = { dem: 0, demNha: 0, dangGiu: false, chanKhoa: chon.chanKhoa === true, msCuoi: 0 };
@@ -115,6 +116,8 @@ function taoStubsGas(options) {
       })
     },
 
+    ScriptApp: { getScriptId: () => 'script-gia' },
+
     PropertiesService: {
       // `khoDem` đếm lệnh gọi kho thật, để chứng minh bản đọc trong một lần gọi (server/state/DocumentStore.js) thật sự gom được lệnh đọc.
       getDocumentProperties: () => ({
@@ -123,6 +126,11 @@ function taoStubsGas(options) {
         setProperty: (key, value) => { khoDem.ghi += 1; props[key] = String(value); },
         setProperties: (values) => { khoDem.ghi += 1; Object.keys(values).forEach((key) => { props[key] = String(values[key]); }); },
         deleteProperty: (key) => { khoDem.ghi += 1; delete props[key]; }
+      }),
+      // Kho của script không đếm vào `khoDem`: các test đếm lệnh kho tài liệu, còn kho script chỉ giữ cặp mã Sheet của `server/sheet/Book.js`.
+      getScriptProperties: () => ({
+        getProperty: (key) => (Object.prototype.hasOwnProperty.call(scriptProps, key) ? scriptProps[key] : null),
+        setProperty: (key, value) => { scriptProps[key] = String(value); }
       }),
       getUserProperties: () => ({
         getProperty: (key) => { khoDem.userDoc += 1; return Object.prototype.hasOwnProperty.call(userProps, key) ? userProps[key] : null; },

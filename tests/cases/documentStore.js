@@ -156,8 +156,8 @@ function chay(so) {
     ['shinOnEdit', 'shinOnChange'].map((ten) => new RegExp("runEntryPoint\\('" + ten + "', 'core', ERROR_CHANNEL_PENDING").test(nguonTrigger)), [true, true]);
 
   // Quét chống tái phạm: JSON trong kho chỉ đọc qua công cụ chung, nên không còn đường "hỏng thì coi là rỗng" tự viết.
-  // Ngoại lệ: chính công cụ; EntryPoints.js đọc ScriptProperties (không phải DocumentProperties) và JSON thân request.
-  const NGOAI_LE_JSON = ['server/state/DocumentStore.js', 'fbm_sync/transport/EntryPoints.js'];
+  // Ngoại lệ: chính công cụ; EntryPoints.js (địa chỉ Web App, JSON thân request) và Book.js (cặp mã Sheet) đọc ScriptProperties, không phải DocumentProperties.
+  const NGOAI_LE_JSON = ['server/state/DocumentStore.js', 'fbm_sync/transport/EntryPoints.js', 'server/sheet/Book.js'];
   const tuParse = cacTepJs(GAS, GAS).filter((tep) => !tep.startsWith('server/dev/') && NGOAI_LE_JSON.indexOf(tep) < 0).filter((tep) => {
     const nguon = fs.readFileSync(path.join(GAS, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     return /\.getProperty\s*\(/.test(nguon) && /JSON\.parse\s*\(/.test(nguon);

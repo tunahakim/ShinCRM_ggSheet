@@ -236,6 +236,8 @@ function loadCore(options) {
   var execute = function () {
     var batDau = Date.now();
     var book = shinOpenBook();
+    // Lời gọi từ ngoài (Web App, đồng bộ nền) không có Sheet đang mở, chỉ mở được theo cặp ghi ở đây.
+    shinBookBindingRecord(book, PropertiesService.getScriptProperties());
     var budget = cellBudgetMeasure(book);
 
     if (budget.exceeded) {

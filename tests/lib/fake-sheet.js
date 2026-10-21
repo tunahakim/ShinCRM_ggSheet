@@ -395,7 +395,7 @@ function taoSheet(ten, dem, luoi) {
 /**
  * Dựng một tệp giả kèm bộ đếm lệnh gọi.
  *
- * `getActiveSpreadsheet` cố ý **ném lỗi**, mô phỏng đường chạy khi không có ai ngồi trước máy — đúng đường mà `shinOpenBook` phải đi được, và cũng là đường đã từng làm lộ ra lỗi "reading from storage ... NOT_FOUND". `openById` thì trả về tệp giả bất kể ID, nên cổng chặn chạy nhầm tệp không được kiểm ở đây; nó chỉ kiểm được trên Google, nơi có tệp thật để mà nhầm.
+ * `getActiveSpreadsheet` trả tệp giả như lúc Sidebar, menu hay trigger chạy trên Sheet của script. Đường gọi từ ngoài (không có tệp đang mở, mở theo cặp mã đã ghi) có ca riêng ở `tests/cases/book.js`.
  */
 function taoBook(tenSheets) {
   const dem = { setValues: 0, deleteRows: 0, insertSheet: 0, insertRows: 0, insertColumns: 0, deleteColumns: 0, setNumberFormat: 0, setDataValidation: 0, toast: 0 };
@@ -440,9 +440,7 @@ function taoBook(tenSheets) {
   };
 
   const SpreadsheetApp = {
-    getActiveSpreadsheet() {
-      throw new Error('Tệp giả: không có tệp đang mở, đúng như lúc chạy không có ai ngồi trước máy.');
-    },
+    getActiveSpreadsheet: () => book,
     openById: () => book,
     flush: () => undefined,
     newDataValidation() {

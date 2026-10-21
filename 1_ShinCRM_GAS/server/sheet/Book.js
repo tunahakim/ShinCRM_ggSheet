@@ -1,23 +1,46 @@
 /**
- * Cửa duy nhất lấy tệp Sheet để làm việc, kèm cổng chặn chạy nhầm tệp. Mọi hàm phải lấy tệp qua đây, không gọi thẳng `SpreadsheetApp`.
+ * Cửa duy nhất lấy tệp Sheet để làm việc. Mọi hàm phải lấy tệp qua đây, không gọi thẳng `SpreadsheetApp`.
  *
- * Tách riêng thành một tệp vì hai lý do. Một, nó là thứ mọi tệp khác đều cần, nên nằm chung với code dựng khung thì nó bị lôi theo
- * số phận của code dựng khung. Hai, ID tệp là hằng số phải có đúng một chỗ; hai chỗ là hai chỗ để sửa một quên một.
+ * Code không chứa mã Sheet nào: code đi theo mọi bản sao, nên một mã viết cứng hoặc chặn bản sao, hoặc tệ hơn là cho Web App của bản sao ghi vào Sheet gốc.
  */
 
-/** ID tệp Sheet mới. Chốt cứng làm cổng chặn: chạy nhầm trên tệp đang đi bán hàng thì dừng ngay. */
-var SETUP_EXPECTED_SPREADSHEET_ID = '1jEQMWMn5jRUBDGXrQxbK0hpld6gGwlAXSZpoRQm8lpI';
+/** Khóa ScriptProperties giữ cặp {mã Sheet, mã script}. Bản sao mang theo ScriptProperties của script gốc, nên cặp chỉ có giá trị khi mã script khớp. */
+var BOOK_BINDING_KEY = 'SHIN_BOOK_BINDING_V1';
+
+/** Tệp đã mở theo cặp trong lần chạy này; đường gọi từ ngoài gọi `shinOpenBook` nhiều lần, chỉ đọc kho một lần. */
+var BOOK_OPENED_BY_BINDING = null;
+
+/** Cặp đã ghi trong kho, `null` khi chưa ghi, `false` khi hỏng. */
+function shinBookBindingParse(props) {
+  var raw = String(props.getProperty(BOOK_BINDING_KEY) || '');
+  if (!raw) { return null; }
+  var value = null;
+  try { value = JSON.parse(raw); } catch (notJson) { value = null; }
+  return value && typeof value === 'object' ? value : false;
+}
+
+/** Mã Sheet script này đã ghi, rỗng khi chưa ghi hoặc cặp thuộc script khác (kho mang theo từ Sheet gốc). Hỏng thì báo lỗi, không đoán. */
+function shinBookBindingRead(props) {
+  var value = shinBookBindingParse(props);
+  if (value === false) { throw new Error('Cặp mã Sheet trong ScriptProperties (' + BOOK_BINDING_KEY + ') bị hỏng; mở Sidebar trên Sheet này để ghi lại.'); }
+  return value && value.scriptId === ScriptApp.getScriptId() ? String(value.spreadsheetId || '') : '';
+}
+
+/** Ghi Sheet đang mở làm Sheet của script này. Chỉ gọi từ đường có Sheet đang mở, nơi biết chắc giá trị đúng, nên cặp hỏng cũng được ghi đè. Chỉ ghi khi khác, nên lượt mở Sidebar thường chỉ tốn một lần đọc. */
+function shinBookBindingRecord(book, props) {
+  var id = book.getId(), value = shinBookBindingParse(props);
+  if (value && value.scriptId === ScriptApp.getScriptId() && String(value.spreadsheetId || '') === id) { return { spreadsheetId: id, changed: false }; }
+  props.setProperty(BOOK_BINDING_KEY, JSON.stringify({ spreadsheetId: id, scriptId: ScriptApp.getScriptId(), at: Date.now() }));
+  logEvent({ source: 'core', action: 'bookBindingRecorded', outcome: LOG_OK, reason: value === false ? 'Cặp mã Sheet trong kho bị hỏng, đã ghi lại theo Sheet đang mở.' : 'Đã ghi Sheet của script này cho các lời gọi từ ngoài (Web App, đồng bộ nền).', detail: { sheetName: book.getName() } });
+  return { spreadsheetId: id, changed: true };
+}
 
 /**
  * Trả về tệp Sheet để làm việc.
  *
- * Có hai đường gọi hàm và chúng khác nhau ở một điểm chí tử. Mở từ menu hoặc bấm Run trong editor thì có "tệp đang mở".
- * Gọi từ bên ngoài để chạy khi không có ai ngồi trước máy thì KHÔNG có tệp đang mở, và
- * `SpreadsheetApp.getActiveSpreadsheet()` lúc đó ném lỗi "reading from storage ... NOT_FOUND"
- * chứ không lịch sự trả về null. Nên phải bọc try rồi mở thẳng theo ID.
- *
- * Cổng chặn tệp sai vẫn còn nguyên tác dụng ở đường thứ nhất: nếu bản code này bị dán vào tệp đang đi bán hàng
- * thì tệp đang mở không khớp ID và hàm ném lỗi ngay. Đường thứ hai mở đúng một ID nên không có đường đi nhầm.
+ * Có hai đường gọi hàm. Mở Sidebar, menu, trigger hay bấm Run trong editor thì có "tệp đang mở": script gắn với Sheet nên đó luôn là Sheet của chính nó.
+ * Gọi từ bên ngoài (Web App, cửa chạy hàm) thì KHÔNG có tệp đang mở, và `SpreadsheetApp.getActiveSpreadsheet()` lúc đó ném lỗi "reading from storage ... NOT_FOUND"
+ * chứ không trả về null. Đường này mở theo cặp `shinBookBindingRecord` đã ghi lúc mở Sidebar; chưa có thì dừng hẳn, không đoán Sheet nào.
  */
 function shinOpenBook() {
   var active = null;
@@ -32,16 +55,15 @@ function shinOpenBook() {
     active = null;
     activeId = '';
   }
+  if (active && activeId) { return active; }
 
-  if (!active || !activeId) {
-    return SpreadsheetApp.openById(SETUP_EXPECTED_SPREADSHEET_ID);
+  if (BOOK_OPENED_BY_BINDING) { return BOOK_OPENED_BY_BINDING; }
+  var boundId = shinBookBindingRead(PropertiesService.getScriptProperties());
+  if (!boundId) {
+    throw new Error('Script này chưa biết Sheet của nó (Sheet mới nhân bản hoặc chưa từng mở Sidebar). Mở Sidebar ShinCRM trên Sheet này một lần rồi thử lại.');
   }
-
-  if (activeId !== SETUP_EXPECTED_SPREADSHEET_ID) {
-    throw new Error('Dừng lại: đang chạy trên tệp "' + active.getName() + '" (ID ' + activeId + '), không phải tệp dành cho bản mới. Không làm gì cả.');
-  }
-
-  return active;
+  BOOK_OPENED_BY_BINDING = SpreadsheetApp.openById(boundId);
+  return BOOK_OPENED_BY_BINDING;
 }
 
 /** Lấy một sheet theo tên, ném lỗi nói rõ tên nào thiếu thay vì trả về null cho bên gọi tự đoán. */

@@ -24,8 +24,8 @@ function smokeDiag() {
   buoc('getActiveSpreadsheet().getId', function () {
     return SpreadsheetApp.getActiveSpreadsheet().getId();
   });
-  buoc('openById', function () {
-    return SpreadsheetApp.openById(SETUP_EXPECTED_SPREADSHEET_ID).getName();
+  buoc('shinOpenBook', function () {
+    return shinOpenBook().getName();
   });
   buoc('Session.getEffectiveUser', function () {
     return Session.getEffectiveUser().getEmail() || '(rỗng)';
@@ -45,7 +45,6 @@ function smokeTest() {
     'ShinCRM chặng 1.0 — thử đường ống',
     'Tên tệp: ' + file.getName(),
     'ID tệp: ' + actualId,
-    'Đúng tệp mới: ' + (actualId === SETUP_EXPECTED_SPREADSHEET_ID ? 'ĐÚNG' : 'SAI — dừng lại, đây không phải tệp dành cho bản mới'),
     'Múi giờ: ' + file.getSpreadsheetTimeZone(),
     'Các sheet đang có: ' + file.getSheets().map(function (sheet) { return sheet.getName(); }).join(', ')
   ];
