@@ -4,8 +4,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /** Khóa liên kết Spreadsheet ↔ tài khoản FBM; không lưu cookie hay mật khẩu. */
 FbmSync.BINDING_KEY = 'FBM_SYNC_BINDING_V1';
 FbmSync.BINDING_CLEAR_KEY = 'FBM_SYNC_BINDING_CLEAR_V1';
+/** Không đọc được file thì ném cho cửa vào ghi Log: trả rỗng làm mọi phép so Spreadsheet bị bỏ qua và lưu được liên kết của file khác. */
 FbmSync.currentSpreadsheetId = function () {
-  try { return String(shinOpenBook().getId() || ''); } catch (ignore) { return ''; }
+  return String(shinOpenBook().getId() || '');
 };
 /** Bản lưu thô của liên kết; kho hỏng thì ném lỗi có mã, không coi như chưa liên kết (trả rỗng sẽ mở đường đọc khách không lọc quyền và hiện sai "chưa liên kết"). */
 FbmSync.bindingRead = function () {
@@ -46,11 +47,10 @@ FbmSync.bindingWrite = function (binding) {
   if (!spreadsheetId && !userId && !username && !accountName) { return FbmSync.bindingClear(); }
   if (!spreadsheetId || !userId || !username || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã số user, tên đăng nhập hoặc tên đầy đủ FBM.' }; }
   var actual = FbmSync.currentSpreadsheetId();
-  if (actual && actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
+  if (actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
   var previous = FbmSync.bindingRead();
   var nextIdentity = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName };
-  var cleared = {};
-  try { cleared = JSON.parse(FbmSync.props().getProperty(FbmSync.BINDING_CLEAR_KEY) || '{}') || {}; } catch (ignoreClear) { cleared = {}; }
+  var cleared = FbmSync.documentPropertyJson(FbmSync.BINDING_CLEAR_KEY, 'dấu gỡ liên kết tài khoản FBM') || {};
   var sameBinding = previous.spreadsheetId === spreadsheetId && previous.userId === userId && String(previous.username || '') === username && previous.accountName === accountName;
   var rebindBlocked = FbmSync.bindingHasLinkedData() && !sameBinding && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && (previous.spreadsheetId || cleared.spreadsheetId);
   if (rebindBlocked) {
@@ -91,6 +91,7 @@ FbmSync.connectionSave = function (input) {
     }
     return { ok: true, binding: allEmpty ? {} : bindingResult.binding, identityStatus: FbmSync.identityStatus(), login: loginResult, credentialMode: mode };
   } catch (error) {
+    var rollbackFailure = '';
     try {
       if (oldBindingRaw === null || oldBindingRaw === undefined || oldBindingRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_KEY); } else { props.setProperty(FbmSync.BINDING_KEY, ''); } }
       else { props.setProperty(FbmSync.BINDING_KEY, oldBindingRaw); }
@@ -98,18 +99,22 @@ FbmSync.connectionSave = function (input) {
       else { props.setProperty(loginKey, oldLoginRaw); }
       if (oldClearRaw === null || oldClearRaw === undefined || oldClearRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); } else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, ''); } }
       else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, oldClearRaw); }
-    } catch (rollbackError) {}
-    return { ok: false, code: 'CONNECTION_SAVE_ROLLED_BACK', message: String(error && error.message || error) };
+    } catch (rollbackError) { rollbackFailure = String(rollbackError && rollbackError.message || rollbackError); }
+    // Khôi phục cũng hỏng thì liên kết và credential có thể nửa cũ nửa mới: phải nói rõ để người dùng lưu lại, không báo như đã khôi phục.
+    var failed = rollbackFailure
+      ? { ok: false, code: 'CONNECTION_ROLLBACK_FAILED', message: 'Không lưu được liên kết tài khoản FBM (' + String(error && error.message || error) + ') và không khôi phục được bản cũ (' + rollbackFailure + '); hãy lưu lại liên kết.' }
+      : { ok: false, code: 'CONNECTION_SAVE_ROLLED_BACK', message: String(error && error.message || error) };
+    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'connection_save_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: failed.message, detail: { code: failed.code } }); }
+    return failed;
   }
 };
+/** Đọc Sheet lỗi thì ném: coi như "có dữ liệu" sẽ hiện lý do sai "cần liên kết lại" thay cho lỗi thật. */
 FbmSync.bindingHasLinkedData = function () {
-  try {
-    return ['customer', 'activity'].some(function (entity) {
-      return (FbmSync.readLocal(entity) || []).some(function (record) {
-        return String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted';
-      });
+  return ['customer', 'activity'].some(function (entity) {
+    return (FbmSync.readLocal(entity) || []).some(function (record) {
+      return String(record && record.fbmId || '').trim() && String(record.recordStatus || 'active') !== 'deleted';
     });
-  } catch (ignore) { return true; }
+  });
 };
 /**
  * Phép so danh tính duy nhất: trả lý do lệch giữa danh tính kỳ vọng và danh tính đang chạy, so nguyên văn (không trim, không đổi hoa thường).
