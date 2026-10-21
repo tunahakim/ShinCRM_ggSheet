@@ -61,7 +61,7 @@ FbmSync.propertyFlushFailed = function (err) {
   var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
   failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
   var stored = null;
-  try { stored = JSON.parse(documentStoreReal().getProperty(FbmSync.STATE_KEY) || 'null'); } catch (ignoreStored) { stored = null; }
+  try { stored = documentPropertyJson(documentStoreReal(), FbmSync.STATE_KEY, 'state đồng bộ', 'object'); } catch (storedFailed) { stored = { runId: '', phase: 'không đọc được state cũ: ' + (storedFailed.code || storedFailed.message) }; }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { context: 'flush', error: String(err && err.message || err), runId: stored && String(stored.runId || ''), phase: stored && String(stored.phase || ''), cursor: stored && stored.cursor || {} } }); }
   return failure;
 };

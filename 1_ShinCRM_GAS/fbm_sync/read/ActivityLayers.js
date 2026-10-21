@@ -113,8 +113,7 @@ FbmSync.readListDoneReader = function () {
 };
 
 FbmSync.readWaitRead = function () {
-  var raw = FbmSync.props().getProperty(FbmSync.READ_WAIT_KEY), value = raw ? JSON.parse(raw) : {};
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return FbmSync.documentPropertyJson(FbmSync.READ_WAIT_KEY, 'danh sách giao dịch chờ đọc lại') || {};
 };
 FbmSync.readWaitWrite = function (waits) {
   var props = FbmSync.props();

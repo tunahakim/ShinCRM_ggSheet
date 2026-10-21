@@ -26,14 +26,13 @@ FbmSync.backgroundEnabled = function () { return FbmSync.backgroundScheduleRead(
 FbmSync.setBackgroundEnabled = function (enabled) { var saved = FbmSync.backgroundScheduleSave({ enabled: enabled === true }); return { ok: true, enabled: saved.schedule.enabled }; };
 FbmSync.extensionConfigDefault = function () { return { pollMinutes: 5, runOnStartup: true }; };
 FbmSync.extensionConfigRead = function () {
+  // Hỏng thì ném (như cài đặt đồng bộ): rơi về mặc định rồi lưu là xóa âm thầm cài đặt của người dùng.
   var fallback = FbmSync.extensionConfigDefault();
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.EXTENSION_CONFIG_KEY), parsed = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== 'object') { return fallback; }
-    var minutes = Number(parsed.pollMinutes);
-    fallback.pollMinutes = isFinite(minutes) ? Math.max(1, Math.min(60, Math.round(minutes))) : fallback.pollMinutes;
-    fallback.runOnStartup = parsed.runOnStartup !== false;
-  } catch (ignore) {}
+  var parsed = FbmSync.documentPropertyJson(FbmSync.EXTENSION_CONFIG_KEY, 'cài đặt nhịp Extension');
+  if (!parsed) { return fallback; }
+  var minutes = Number(parsed.pollMinutes);
+  fallback.pollMinutes = isFinite(minutes) ? Math.max(1, Math.min(60, Math.round(minutes))) : fallback.pollMinutes;
+  fallback.runOnStartup = parsed.runOnStartup !== false;
   return fallback;
 };
 FbmSync.extensionConfigSave = function (input) {
@@ -54,21 +53,20 @@ FbmSync.backgroundScheduleDefault = function () {
   };
 };
 FbmSync.backgroundScheduleRead = function () {
+  // Hỏng thì ném (như cài đặt đồng bộ): rơi về lịch mặc định rồi lưu là xóa âm thầm lịch người dùng đã đặt.
   var fallback = FbmSync.backgroundScheduleDefault();
-  try {
-    var raw = FbmSync.props().getProperty(FbmSync.BACKGROUND_SCHEDULE_KEY), parsed = raw ? JSON.parse(raw) : {};
-    fallback.enabled = parsed && parsed.enabled !== false;
-    fallback.direction = ['read', 'push', 'write'].indexOf(String(parsed && parsed.direction || '')) >= 0 ? String(parsed.direction) : fallback.direction;
-    ['customerFull', 'activityFull', 'heartbeat', 'detail'].forEach(function (kind) {
-      var item = parsed && parsed[kind] || {}, minutes = Number(item.minutes);
-      fallback[kind].enabled = item.enabled !== false;
-      fallback[kind].minutes = isFinite(minutes) ? Math.max(0, Math.min(FbmSync.SCHEDULE_MAX_MINUTES, Math.round(minutes))) : fallback[kind].minutes;
-      if (kind === 'detail') {
-        var batch = Number(item.customersPerRun);
-        fallback.detail.customersPerRun = isFinite(batch) && batch >= 1 ? Math.floor(batch) : fallback.detail.customersPerRun;
-      }
-    });
-  } catch (ignore) {}
+  var parsed = FbmSync.documentPropertyJson(FbmSync.BACKGROUND_SCHEDULE_KEY, 'lịch đồng bộ nền') || {};
+  fallback.enabled = parsed && parsed.enabled !== false;
+  fallback.direction = ['read', 'push', 'write'].indexOf(String(parsed && parsed.direction || '')) >= 0 ? String(parsed.direction) : fallback.direction;
+  ['customerFull', 'activityFull', 'heartbeat', 'detail'].forEach(function (kind) {
+    var item = parsed && parsed[kind] || {}, minutes = Number(item.minutes);
+    fallback[kind].enabled = item.enabled !== false;
+    fallback[kind].minutes = isFinite(minutes) ? Math.max(0, Math.min(FbmSync.SCHEDULE_MAX_MINUTES, Math.round(minutes))) : fallback[kind].minutes;
+    if (kind === 'detail') {
+      var batch = Number(item.customersPerRun);
+      fallback.detail.customersPerRun = isFinite(batch) && batch >= 1 ? Math.floor(batch) : fallback.detail.customersPerRun;
+    }
+  });
   return fallback;
 };
 /** Trần chu kỳ lịch nền: 7 ngày, tính bằng phút. */

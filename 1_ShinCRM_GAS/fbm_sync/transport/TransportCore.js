@@ -8,7 +8,7 @@ FbmSync.masterEnabled = function () {
   var value;
   try { value = FbmSync.props().getProperty(FbmSync.MASTER_SWITCH_KEY); } catch (err) {
     var failure = new Error('Không đọc được công tắc đồng bộ FBM; đã dừng để an toàn, thử lại sau ít phút.');
-    failure.code = 'FBM_DOCUMENT_PROPERTIES_READ_FAILED';
+    failure.code = 'DOCUMENT_PROPERTIES_READ_FAILED';
     throw failure;
   }
   return value !== 'false';

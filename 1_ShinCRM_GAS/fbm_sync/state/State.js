@@ -44,7 +44,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
   var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
   // State cũ chỉ để ghi chi tiết Log khi ghi hỏng, nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties.
   var previous = null, loadPrevious = function () {
-    try { previous = key === FbmSync.STATE_KEY ? JSON.parse(FbmSync.props().getProperty(key) || 'null') : null; } catch (ignorePrevious) { previous = null; }
+    try { previous = key === FbmSync.STATE_KEY ? FbmSync.documentPropertyJson(key, 'state đồng bộ') : null; } catch (previousFailed) { previous = { runId: '', phase: 'không đọc được state cũ: ' + (previousFailed.code || previousFailed.message) }; }
   };
   try {
     if (typeof Utilities !== 'undefined' && Utilities.newBlob) { bytes = Utilities.newBlob(text).getBytes().length; }
@@ -67,26 +67,9 @@ FbmSync.documentPropertySet = function (key, value, context) {
     return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
 };
-/**
- * Đọc một property JSON dạng object; chưa có thì trả `null`.
- * Lỗi dịch vụ hoặc JSON hỏng thì ném lỗi có mã, không coi như "chưa có": coi như trống thì lần ghi kế tiếp đè mất cursor, hash chờ xác nhận hay cấu hình thật (FBM-025, FBM-026). Thông điệp không chứa giá trị property vì có thể là envelope đăng nhập.
- */
+/** Đọc một property JSON dạng object của đồng bộ qua công cụ chung `documentPropertyJson` (cursor, hash chờ xác nhận, cấu hình: hỏng thì ném, không coi là trống — FBM-025, FBM-026). */
 FbmSync.documentPropertyJson = function (key, context) {
-  var raw;
-  try { raw = FbmSync.props().getProperty(key); } catch (err) {
-    var readFailure = new Error('Không đọc được ' + context + ' từ DocumentProperties; thử lại sau ít phút.');
-    readFailure.code = 'FBM_DOCUMENT_PROPERTIES_READ_FAILED';
-    throw readFailure;
-  }
-  if (!raw) { return null; }
-  var parsed = null;
-  try { parsed = JSON.parse(raw); } catch (ignoreParse) { parsed = null; }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    var corrupt = new Error('Dữ liệu ' + context + ' trong DocumentProperties bị hỏng (' + key + '); đã dừng để không ghi đè.');
-    corrupt.code = 'FBM_DOCUMENT_PROPERTY_CORRUPT';
-    throw corrupt;
-  }
-  return parsed;
+  return documentPropertyJson(FbmSync.props(), key, context, 'object');
 };
 
 /** Khóa riêng cho state/cursor đồng bộ; không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. */
@@ -408,7 +391,7 @@ FbmSync.stateWriteMinimal = function (full, failure) {
   return null;
 };
 // Lỗi kho state: gặp ở lần đọc status thì người dùng không tự thoát được, nên GAS mở nút "Đặt lại phiên đồng bộ" (FBM-044).
-FbmSync.STATE_STORAGE_CODES = ['FBM_DOCUMENT_PROPERTIES_READ_FAILED', 'FBM_DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTIES_QUOTA', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED'];
+FbmSync.STATE_STORAGE_CODES = ['DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTIES_QUOTA', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED'];
 FbmSync.stateStorageError = function (error) { return !!error && FbmSync.STATE_STORAGE_CODES.indexOf(String(error.code || '')) >= 0; };
 /** Snapshot thay cho status khi kho state hỏng: ghi Log và trả lý do kèm cờ mở nút đặt lại. */
 FbmSync.stateStuckView = function (error) {

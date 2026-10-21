@@ -81,7 +81,7 @@ FbmSync.syncSettingsRead = function () {
     var valid = fbmSyncSettingsValidate(fbmSyncSettingsNormalize(parsed, true));
     if (!valid.ok) {
       var invalid = new Error('Dữ liệu cài đặt đồng bộ FBM trong DocumentProperties không hợp lệ (' + FbmSync.SYNC_SETTINGS_KEY + '); đã dừng để không ghi đè.');
-      invalid.code = 'FBM_DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
+      invalid.code = 'DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
     }
     // Ghi lại dạng tối giản để loại bỏ các key cài đặt cũ khỏi kho hiện tại.
     if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {

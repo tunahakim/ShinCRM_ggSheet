@@ -63,7 +63,7 @@ FbmSync.accountSettingsRead = function () {
     var valid = fbmAccountSettingsValidate(parsed);
     if (!valid.ok) {
       var invalid = new Error('Dữ liệu cài đặt tài khoản FBM trong DocumentProperties không hợp lệ (' + FbmSync.ACCOUNT_SETTINGS_KEY + '); đã dừng để không ghi đè.');
-      invalid.code = 'FBM_DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
+      invalid.code = 'DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
     }
     if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
       var normalizedWrite;

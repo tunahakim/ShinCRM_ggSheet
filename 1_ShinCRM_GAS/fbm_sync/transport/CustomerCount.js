@@ -9,7 +9,7 @@ FbmSync.RECOUNT_MESSAGE = 'Số khách FBM vừa đổi, quét thêm một lần
 
 /** Số khách mốc, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Nằm ngoài state vì `stateStart` xóa `session` mỗi lượt. */
 FbmSync.customerBaselineRead = function () {
-  var raw = FbmSync.props().getProperty(FbmSync.CUSTOMER_BASELINE_KEY), parsed = raw ? JSON.parse(raw) : null, total = parsed ? Number(parsed.total) : NaN;
+  var parsed = documentMemoRead(FbmSync.props(), FbmSync.CUSTOMER_BASELINE_KEY, 'số khách mốc FBM', 'object'), total = parsed ? Number(parsed.total) : NaN;
   return isFinite(total) && total >= 0 ? total : null;
 };
 FbmSync.customerBaselineWrite = function (total) {

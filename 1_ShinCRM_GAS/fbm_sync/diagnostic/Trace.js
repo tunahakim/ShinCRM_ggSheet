@@ -43,9 +43,8 @@ FbmSync.traceAppend = function (events) {
 /** Gộp sự kiện vào khóa trace trong kho, bỏ trùng với dòng đã có. */
 FbmSync.traceStore = function (events) {
   if (!Array.isArray(events) || !events.length) { return 0; }
+  var props = FbmSync.props(), rows = documentMemoRead(props, FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [];
   try {
-    var props = FbmSync.props(), rows = JSON.parse(props.getProperty(FbmSync.TRACE_KEY) || '[]');
-    if (!Array.isArray(rows)) { rows = []; }
     var seen = {};
     rows.forEach(function (item) { if (item && item.stage) { seen[[item.stage, item.runId, item.requestId, item.at].join('|')] = true; } });
     var added = 0;
@@ -57,7 +56,11 @@ FbmSync.traceStore = function (events) {
     });
     if (added) { props.setProperty(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT))); }
     return added;
-  } catch (ignore) { return 0; }
+  } catch (writeFailed) {
+    // Trace chỉ để chẩn đoán: ghi hỏng (thường là chạm trần dung lượng kho) thì báo vào Log, không làm hỏng lời gọi đồng bộ đã chạy xong.
+    logEvent({ source: 'fbm_sync', action: 'trace_store', outcome: LOG_ERROR, reason: writeFailed.code || 'FBM_TRACE_WRITE_FAILED', detail: { error: String(writeFailed && writeFailed.message || writeFailed), events: events.length } });
+    return 0;
+  }
 };
 
 FbmSync.traceEvent = function (stage, extra) {
@@ -70,8 +73,7 @@ FbmSync.traceEvent = function (stage, extra) {
 
 FbmSync.traceRead = function (limit) {
   var rows = [], take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT));
-  try { rows = JSON.parse(FbmSync.props().getProperty(FbmSync.TRACE_KEY) || '[]'); } catch (ignore) { rows = []; }
-  if (!Array.isArray(rows)) { rows = []; }
+  rows = documentMemoRead(FbmSync.props(), FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [];
   // Sự kiện còn gom trong bộ nhớ của lần gọi này cũng phải hiện ở status, nếu không Sidebar thấy trace trễ một lần gọi.
   if (FbmSync.propertyBuffer && FbmSync.propertyBuffer.tracePending.length) { rows = rows.concat(FbmSync.propertyBuffer.tracePending); }
   return rows.slice(-take);
