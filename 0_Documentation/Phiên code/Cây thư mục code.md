@@ -124,6 +124,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
+│       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger vào kho câu chờ và hiện ở Sidebar đang mở.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
 │       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Sidebar/Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService.
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
