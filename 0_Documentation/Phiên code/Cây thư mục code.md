@@ -77,7 +77,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
 │   ├── state\
 │   │   ├── ReloadDecision.js    Hàm thuần nhận thay đổi, ReloadState, chính sách và localDraft tùy chọn rồi trả quyết định signal, reload RAM và render view.
-│   │   ├── DocumentStore.js      Cửa duy nhất vào DocumentProperties và khóa: bản đọc theo một lần gọi, lõi ghi thẳng, đồng bộ FBM ghi gộp trong khóa điều phối; lấy khóa xong thì đọc lại kho.
+│   │   ├── DocumentStore.js      Cửa duy nhất vào DocumentProperties và khóa: bản đọc theo một lần gọi, lõi ghi thẳng, đồng bộ FBM ghi gộp trong khóa điều phối; lấy khóa xong thì đọc lại kho; công cụ duy nhất đọc JSON từ kho (hỏng thì ném lỗi có mã).
+│   │   ├── DocumentMemo.js       Đọc bộ nhớ phụ dựng lại được trong kho: hỏng thì ghi Log, báo người dùng qua kho câu chờ, xóa khóa rồi làm như chưa có.
 │   │   ├── RecordHolds.js        Sổ bận: bản ghi nào đang bị tiến trình nào giữ, vì sao. Chỉ Cửa bản ghi gọi và chỉ trong khóa; phiên ngắn không ghi kho, sổ hỏng thì ném lỗi.
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
