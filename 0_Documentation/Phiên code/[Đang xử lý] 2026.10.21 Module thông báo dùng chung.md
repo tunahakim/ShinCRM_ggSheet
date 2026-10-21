@@ -1,0 +1,32 @@
+# Module thông báo dùng chung (hợp đồng và lõi GAS)
+
+Branch `feature/notice-module`. Tách từ mục 1 của `2026.10.17 Todo.md`.
+
+## Bối cảnh
+
+- Chủ dự án định hướng 2026-10-21: một module thông báo dùng chung; nơi nào cần báo chỉ gọi module và truyền JSON; mỗi kênh (Sidebar, sau này bot Telegram/Zalo, Extension) đọc JSON đó và hiện theo cách của mình. Lõi không biết kênh (Tài liệu 01 mục 1.4).
+- Thay kho câu chờ `LOG_PENDING`, các kênh `alert`/`throw`/`pending` của `reportError`, `getUi().alert()` của lệnh menu, bộ nhớ lỗi trùng `entryFailures`.
+- Tiền đề mới: ShinCRM chỉ chạy khi Sidebar mở, Sidebar là nơi người dùng luôn nhìn thấy; lỗi lệnh menu và lỗi Sidebar không mở được cũng báo ở Sidebar (chủ dự án chốt 2026-10-21).
+- Lỗi tự hết khi đúng việc gây ra nó chạy thành công lần sau; việc ít chạy lại thì có nút ✕.
+- Kênh Telegram/Zalo chưa làm. Phần chỉ thấy trên Sidebar ghi vào danh sách nghiệm thu của mục làm lại UI, không điều khiển Chrome.
+
+## Checklist
+
+- [x] Đọc Tài liệu 01 mục 1.4, 10, 10A
+- [x] Đọc code hiện có: `EntryPoint.js`, `ErrorReport.js`, `DocumentMemo.js`, `DocumentStore.js`, `client/ui/notices.html`, chỗ dùng kho chờ
+- [ ] Trình phương án ba phần + hợp đồng JSON, chờ chủ dự án duyệt
+- [ ] Viết hợp đồng vào Tài liệu 10 và 10A (thay Phần 8, kho chờ, bảng tham số)
+- [ ] Viết `server/notice/NoticeGate.js`: cổng phát, giải, bỏ, liệt kê
+- [ ] Test offline cổng thông báo (ghi đè cùng khóa, tự hết, ✕ chỉ cho loại bỏ tay, kho hỏng, trần số thông báo)
+- [ ] `runEntryPoint`: bỏ tham số kênh, lỗi phát thông báo theo cửa vào, thành công thì giải
+- [ ] Bỏ `ErrorReport.js` (kho chờ, ba kênh), thay mọi chỗ gọi `errorPendingPush`
+- [ ] Bỏ `entryFailures`, Log theo chuyển trạng thái đọc từ cổng thông báo
+- [ ] `Menu.js`: bỏ `getUi().alert()` (lỗi vẽ sheet, bảng tra nhanh)
+- [ ] `loadCore`, `probeSelectionAndReload`: trả `notices` thay `pendingMessages`
+- [ ] Cửa vào Sidebar bấm ✕
+- [ ] Sidebar cũ: nhận `notices` qua `noticeSet` tối thiểu, không viết lại UI
+- [ ] Cập nhật `Cây thư mục code.md`
+- [ ] `node tests/run.js` xanh
+- [ ] Hàm dò GAS `probeNoticeGate` + `node tests/gas.js probeNoticeGate --push` trên Sheet DEV mới
+- [ ] Ghi phần cần nghiệm thu trên Sidebar vào mục 4 của Todo
+- [ ] Commit, hỏi chủ dự án trước khi gộp vào `main`
