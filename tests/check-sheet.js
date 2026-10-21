@@ -114,7 +114,10 @@ function compareCodes(actual, expected) {
 
 async function main() {
   const decl = loadDeclaration();
-  const fileId = decl.SETUP_EXPECTED_SPREADSHEET_ID;
+  // Mã Sheet DEV thuộc cấu hình chạy thử của máy này, không thuộc code: code đi theo mọi bản sao Sheet.
+  const runnerConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '1_ShinCRM_GAS', '.dev-runner.json'), 'utf8'));
+  const fileId = String(runnerConfig.spreadsheetId || '');
+  if (!fileId) { throw new Error('Tệp 1_ShinCRM_GAS/.dev-runner.json thiếu spreadsheetId (mã Sheet DEV).'); }
 
   console.log('ShinCRM — nghiệm thu khung sheet thật qua đường xuất CSV');
   console.log('Tệp: ' + fileId);

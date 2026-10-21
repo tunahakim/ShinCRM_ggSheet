@@ -55,7 +55,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── ColumnFormat.js       Khuôn hiển thị của từng cột, khai một chỗ cho cả SetupSheets và WriteGate dùng chung. Chống mất chữ số đầu của mã số thuế: `@` nghĩa là chữ, không phải số.
 │   │   └── SheetLayout.js        Khai khung năm sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
 │   ├── sheet\                    Mọi tệp chạm SpreadsheetApp. Ranh giới quan trọng nhất của cây này: tệp trong đây phải nghiệm thu trên Google, tệp ngoài đây kiểm được offline.
-│   │   ├── Book.js               Mở đúng tệp Sheet. Tách riêng vì đường mở khi có người ngồi trước máy khác đường mở lúc chạy tự động.
+│   │   ├── Book.js               Mở đúng tệp Sheet, không chứa mã Sheet viết cứng. Lời gọi từ ngoài mở theo cặp mã Sheet và mã script ghi lúc mở Sidebar.
 │   │   ├── SheetHeader.js        Cửa duy nhất đặt hàng tiêu đề: đối chiếu theo mã, mã thiếu nối vào cuối, không đổi chỗ cột đã có (FBM-056).
 │   │   ├── SheetIo.js            Đọc hàng 1 thành bảng tra "mã cột → số cột". Mọi thao tác cột đi qua đây, không ai được đếm cột bằng tay.
 │   │   ├── SheetReadCopy.js      Tầng 1 đọc ô thô và tờ nháp của một lần gọi GAS (hàng mã, số dòng, đối tượng sheet, múi giờ, dòng đã đọc); bỏ khi vừa cầm khóa, tự `flush` trước lần đọc kế khi còn lệnh ghi chờ.
@@ -297,6 +297,7 @@ tests\
     ├── entryPoint.js             Cửa vào Sidebar tự gọi ghi Log theo chuyển trạng thái lỗi.
     ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
     ├── sheetGrid.js              Lưới là hữu hạn, setValues không tự nới, và ca rỗng là ca thường xuyên chứ không phải ngoại lệ.
+    ├── book.js                   Bản sao mang kho của script gốc: lời gọi từ ngoài không được mở Sheet gốc.
     ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
     ├── setupSheets.js            Chạy lại lần thứ hai có phá gì không: giá trị người dùng đã vặn phải còn nguyên, và tên mới nối dưới dòng cuối của chính cột tham số.
     ├── columnFormat.js           Khuôn chống mất chữ số đầu của mã số thuế: bảng khuôn khớp kiểu cột, cửa ghi đặt lại khuôn trước khi ghi, dựng và kiểm sheet áp khuôn đúng ô.
