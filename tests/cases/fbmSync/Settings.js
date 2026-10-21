@@ -94,9 +94,15 @@ function chay(so) {
   const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps }, configGet: () => 'LEGACY-' });
   napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
-  check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném FBM_DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
+  check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
     [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
-    ['FBM_DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTY_CORRUPT', '{"customerPrefix":"ALT"', '{"approvalThreshold":']);
+    ['DOCUMENT_PROPERTY_CORRUPT', 'DOCUMENT_PROPERTY_CORRUPT', '{"customerPrefix":"ALT"', '{"approvalThreshold":']);
+  brokenData.FBM_SYNC_BACKGROUND_SCHEDULE_V1 = '{"enabled":false';
+  brokenData.FBM_SYNC_EXTENSION_CONFIG_V1 = '[5]';
+  napServer(brokenHop, 'fbm_sync/state/Scheduler.js');
+  check(so, 'lịch đồng bộ nền và nhịp Extension JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về lịch mặc định (đang tắt thành bật) rồi ghi đè',
+    [brokenCode(() => brokenHop.FbmSync.backgroundScheduleRead()), brokenCode(() => brokenHop.FbmSync.extensionConfigRead()), brokenData.FBM_SYNC_BACKGROUND_SCHEDULE_V1],
+    ['DOCUMENT_PROPERTY_CORRUPT', 'DOCUMENT_PROPERTY_CORRUPT', '{"enabled":false']);
 
   // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
   const escData = {}, escLogs = [];

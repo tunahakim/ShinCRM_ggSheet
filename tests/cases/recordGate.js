@@ -26,6 +26,7 @@ function taoCua(opts) {
     deleteGateRemove: (req) => { xoa.push(req.ids.slice()); return { ok: true }; }
   });
   hop.documentLockRun = (fn) => { hop.DOCUMENT_STORE.docLockDepth += 1; try { return fn(); } finally { hop.DOCUMENT_STORE.docLockDepth -= 1; } };
+  vm.runInContext(docTep('server/state/DocumentStore.js').match(/function documentPropertyJson[\s\S]*?\n}\n/)[0], hop);
   ['server/state/RecordHolds.js', 'server/gate/RecordGate.js'].forEach((tep) => vm.runInContext(docTep(tep), hop, { filename: tep }));
   return { hop, kho, dem, ghi, xoa };
 }

@@ -195,6 +195,9 @@ function napServer(hopCat, ...duongDans) {
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
     vm.runInContext(docTep('server/state/DocumentStore.js'), hopCat, { filename: 'server/state/DocumentStore.js' });
   }
+  if (typeof hopCat.documentMemoRead !== 'function' && duongDans.indexOf('server/state/DocumentMemo.js') < 0) {
+    vm.runInContext(docTep('server/state/DocumentMemo.js'), hopCat, { filename: 'server/state/DocumentMemo.js' });
+  }
   if (typeof hopCat.sheetReadHeader !== 'function') {
     TEP_TANG_SHEET.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
   }
