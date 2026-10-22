@@ -31,11 +31,10 @@ var WRITE_GATE_MACHINE_FIELDS = {
 /**
  * Trường máy điền cho bản ghi **người dùng** tạo mới; người dùng không sửa được chúng ở bất kỳ lượt lưu nào.
  *
- * Khác `WRITE_GATE_MACHINE_FIELDS` ở chỗ nguồn `pull` được ghi thẳng: `enteredBy` là người tạo trên FBM, lượt kéo mang giá trị thật của FBM (09/03 mục "Người tạo trên FBM"). Bản ghi người dùng tạo lấy tên ở tham số `USER_NAME` của Config chứ không hỏi module FBM, vì lõi không được phụ thuộc `fbm_sync`; người dùng gõ đúng tên tài khoản FBM thì hai đường ra cùng một tên.
+ * Khác `WRITE_GATE_MACHINE_FIELDS` ở chỗ nguồn `pull` được ghi thẳng: `enteredBy` là người tạo trên FBM, lượt kéo mang giá trị thật của FBM (09/03 mục "Người tạo trên FBM"). Bản ghi người dùng tạo lấy tên ở cài đặt `USER_NAME` (phần Vận hành) chứ không hỏi module FBM, vì lõi không được phụ thuộc `fbm_sync`; người dùng gõ đúng tên tài khoản FBM thì hai đường ra cùng một tên.
  */
-var WRITE_GATE_CREATOR_CONFIG_NAME = 'USER_NAME';
 var WRITE_GATE_USER_CREATE_FIELDS = {
-  enteredBy: function () { return String(configGet(WRITE_GATE_CREATOR_CONFIG_NAME, '') || '').trim(); }
+  enteredBy: function () { return settingsValue('core_ops', USER_NAME_SETTING); }
 };
 
 /** Mốc hiện tại theo độ mịn của trường. `precision: 'day'` thì cắt phần giờ, để ô ngày là ngày trơn chứ không phải ngày kèm giờ ẩn. */
@@ -178,15 +177,40 @@ function writeGateSelectCatalog(fields, plans) {
   var sourceNames = Object.keys(sources);
   if (!sourceNames.length) { return {}; }
 
-  var cat = categoryReadAll();
+  return writeGateSelectAllowed(categoryReadAll(), sourceNames);
+}
+
+/** Công cụ tính (thuần): bảng "mã danh mục → tập giá trị hợp lệ" từ Category đã đọc. Danh mục chưa có giá trị nào thì không có mục, nên trường đó không bị chặn (Category trống là chưa khai, không phải mọi giá trị đều sai). */
+function writeGateSelectAllowed(category, sourceNames) {
   var allowed = {};
   sourceNames.forEach(function (src) {
-    var values = cat.categories[src];
+    var values = category.categories[src];
     if (!values || !values.length) { return; }
     allowed[src] = {};
     values.forEach(function (v) { allowed[src][String(v).trim()] = true; });
   });
   return allowed;
+}
+
+/**
+ * Công cụ kiểm (thuần) một giá trị người dùng nhập cho một trường: làm sạch, ép kiểu, bắt buộc, `validate`, rồi giá trị SELECT phải có trong Category (`source`) hoặc trong danh sách cố định (`options`). Trả `{ value }` hoặc `{ reason }`.
+ *
+ * Cửa ghi và ngầm định gõ tay cùng gọi hàm này, nên một giá trị lọt qua bộ kiểm ngầm định thì cũng lọt qua cửa ghi, và ngược lại.
+ */
+function writeGateCheckValue(value, spec, record, selectAllowed) {
+  var ep = writeGateCast(value, spec, true);
+  if (ep.reason) { return ep; }
+  var loi = fieldLogicRequired(ep.value, spec) || fieldLogicValidate(ep.value, spec, record || {});
+  if (!loi && spec.type === 'SELECT' && spec.source && selectAllowed
+      && selectAllowed[spec.source] && String(ep.value).trim()
+      && !selectAllowed[spec.source][String(ep.value).trim()]) {
+    loi = '"' + spec.label + '" không chấp nhận giá trị "' + ep.value + '".';
+  }
+  // Trường có danh sách cố định trong schema (không lấy từ Category) thì so khớp đúng chữ: logic đồng bộ đọc đúng chuỗi này.
+  if (!loi && spec.type === 'SELECT' && spec.options && String(ep.value) !== '' && spec.options.indexOf(String(ep.value)) < 0) {
+    loi = '"' + spec.label + '" chỉ nhận một trong các giá trị: ' + spec.options.join(', ') + '.';
+  }
+  return loi ? { reason: loi } : ep;
 }
 
 /**
@@ -215,22 +239,8 @@ function writeGateBuild(plan, names, fields, source, invalid, selectAllowed) {
       return;
     }
 
-    var ep = writeGateCast(plan.record[ten], spec, laUser);
+    var ep = laUser ? writeGateCheckValue(plan.record[ten], spec, plan.record, selectAllowed) : writeGateCast(plan.record[ten], spec, false);
     if (ep.reason) { invalid.push(writeGateInvalid(plan, ten, spec, ep.reason)); return; }
-
-    if (laUser) {
-      var loi = fieldLogicRequired(ep.value, spec) || fieldLogicValidate(ep.value, spec, plan.record);
-      if (!loi && spec.type === 'SELECT' && spec.source && selectAllowed
-          && selectAllowed[spec.source] && String(ep.value).trim()
-          && !selectAllowed[spec.source][String(ep.value).trim()]) {
-        loi = '"' + (spec.label || ten) + '" không chấp nhận giá trị "' + ep.value + '".';
-      }
-      // Trường có danh sách cố định trong schema (không lấy từ Category) thì so khớp đúng chữ: logic đồng bộ đọc đúng chuỗi này.
-      if (!loi && spec.type === 'SELECT' && spec.options && String(ep.value) !== '' && spec.options.indexOf(String(ep.value)) < 0) {
-        loi = '"' + (spec.label || ten) + '" chỉ nhận một trong các giá trị: ' + spec.options.join(', ') + '.';
-      }
-      if (loi) { invalid.push(writeGateInvalid(plan, ten, spec, loi)); return; }
-    }
 
     plan.values[ten] = ep.value;
   });
@@ -362,7 +372,7 @@ function writeGateGone(entity, gone, batDau) {
 /**
  * Bốn bước bên trong khóa: đọc bối cảnh, kiểm hết, cấp mã, ghi. Tách khỏi `writeGateSave` để phần lấy và nhả khóa còn đọc được bằng mắt.
  *
- * **Cấp mã đứng sau mọi phép kiểm.** Cấp mã là một lệnh ghi — nó ghi bộ đếm xuống `Config`. Cấp trước rồi kiểm sau nghĩa là một lượt lưu bị chặn vì lỗi gõ vẫn làm bộ đếm nhảy, và luật "hoặc trọn vẹn, hoặc không xảy ra" đã hỏng ngay ở lệnh ghi đầu tiên.
+ * **Cấp mã đứng sau mọi phép kiểm.** Cấp mã là một lệnh ghi — nó ghi bộ đếm vào DocumentProperties. Cấp trước rồi kiểm sau nghĩa là một lượt lưu bị chặn vì lỗi gõ vẫn làm bộ đếm nhảy, và luật "hoặc trọn vẹn, hoặc không xảy ra" đã hỏng ngay ở lệnh ghi đầu tiên.
  */
 function writeGateRun(entity, records, source, fields, batDau, olds) {
   var context = entityReadContext(entity);
@@ -445,7 +455,7 @@ function writeGateRun(entity, records, source, fields, batDau, olds) {
     changedIds: moi.map(function (plan) { return String(plan.id || '').trim(); }).concat(touched.filter(function (plan) {
       return after[plan.id] !== before[plan.id];
     }).map(function (plan) { return plan.id; })).filter(function (id) { return !!id; }),
-    // Cấp mã mới chỉ đổi bộ đếm (DocumentProperties), không đổi Config; Sidebar nhận bộ đếm mới qua đây để mã xem trước trên form khách mới đúng.
+    // Cấp mã mới chỉ đổi bộ đếm (DocumentProperties), không đổi cài đặt; Sidebar nhận bộ đếm mới qua đây để mã xem trước trên form khách mới đúng.
     counters: moi.length ? idGateCounterValues() : undefined,
     ms: ms
   };

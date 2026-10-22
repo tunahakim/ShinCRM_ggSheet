@@ -6,7 +6,7 @@
  * Lỗi chặn vẽ (hàng 1 sai, lọc sai, sắp xếp sai, công thức trong cột ShinCRM vẽ) dừng trước khi chạm ô nào và trả về các khối `{ title, lines, hint }` cho màn thông báo của Sidebar; không còn note trên ô.
  */
 
-/** Áp dụng hiến pháp đọc cột: Code Schema, rồi Sheet Schema, cuối cùng mặc định TEXT. */
+/** Áp dụng hiến pháp đọc cột: Code Schema, rồi kiểu cột tự thêm ở Cài đặt, cuối cùng mặc định TEXT. */
 function viewFieldMaps(sheetSchema, sourceHeaders) {
   var byCode = {};
   Object.keys(DATA_SCHEMA).forEach(function (entity) {
@@ -185,7 +185,7 @@ function viewReadInputs(sheet, name) {
     filterRow: filterRow,
     filterValues: filterValues,
     sortPairs: viewSortPairs(top.header, sortRows.map(function (row) { return top.rows[row]; })),
-    config: configReadAll(),
+    settings: settingsRead(settingsSection('core_data')),
     customer: entityReadContext('customer', undefined, { data: 'all' }),
     activity: entityReadContext('activity', undefined, { data: 'all' }),
     formulaColumns: viewReadFormulaColumns(sheet, viewDrawnColumns(top.header), top.lastRow),
@@ -208,7 +208,7 @@ function viewFormulaProblem(header, writable, formulaColumns) {
 function viewRenderPlan(inputs, name) {
   var header = inputs.header;
   var sourceHeaders = inputs.customer.columnMap.headerRow.concat(inputs.activity.columnMap.headerRow);
-  var fieldByCode = viewFieldMaps(inputs.config.sheetSchema, sourceHeaders);
+  var fieldByCode = viewFieldMaps(inputs.settings.columnTypes, sourceHeaders);
   var sourceFieldByCode = viewSourceFieldMaps(fieldByCode, sourceHeaders);
   var writable;
   try {
@@ -234,8 +234,8 @@ function viewRenderPlan(inputs, name) {
 
   var localSort = sortSpecParse(inputs.sortPairs, sourceFieldByCode);
   if (localSort.errors.length) { problems.push(viewProblem('Quy tắc sắp xếp của sheet sai (hai cột sắp xếp, hàng 4–13)', localSort.errors)); }
-  var configSort = localSort.specs.length || localSort.errors.length ? { specs: [], errors: [] } : sortSpecParse(inputs.config.sort, sourceFieldByCode);
-  if (configSort.errors.length) { problems.push(viewProblem('Sắp xếp chung trong Config sai', configSort.errors)); }
+  var configSort = localSort.specs.length || localSort.errors.length ? { specs: [], errors: [] } : sortSpecParse(inputs.settings.sort, sourceFieldByCode);
+  if (configSort.errors.length) { problems.push(viewProblem('Sắp xếp chung trong Cài đặt sai', configSort.errors, 'Sửa ở Cài đặt › Dữ liệu › Sắp xếp chung.')); }
 
   var formulas = viewFormulaProblem(header, writable, inputs.formulaColumns);
   if (formulas) { problems.push(formulas); }

@@ -27,7 +27,7 @@ function chay(so) {
 
   let nen;
   try {
-    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config'], tep: TEP_NEN.concat(['server/service/SelectionService.js']) });
+    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category'], tep: TEP_NEN.concat(['server/service/SelectionService.js']) });
     nen.book.insertSheet('!Lead');
   } catch (err) {
     return ghiLoiNap(so, 'nạp được SelectionService', err);
@@ -276,7 +276,7 @@ function chay(so) {
   const canDoc = hop.probeSelectionAndReload({ previousSelectionContext: truoc.selection, previousCustomerId: 'CUS-CU', needsSelection: true });
   check(so, 'vị trí không đổi thì không đọc; Sidebar báo needsSelection (Extension đọc hỏng ở sheet kho) thì GAS đọc thay',
     [dungYen.customerId, canDoc.customerId, canDoc.selection.customerIdChanged], ['CUS-CU', 'CUS-000005', true]);
-  check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Config'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
+  check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Category'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
   check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
 
   section('SelectionService — signal entities nạp trọn đúng một thực thể trong cùng lời hỏi');

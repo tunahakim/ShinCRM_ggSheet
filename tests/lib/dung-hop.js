@@ -12,7 +12,7 @@ const { taoStubsGas } = require('./gas-stubs');
 /**
  * Bộ tệp máy chủ mà mọi ca kiểm chạm sheet đều cần, xếp theo chiều phụ thuộc.
  *
- * Thứ tự ở đây **không** quyết định việc hàm nào gọi được hàm nào — Apps Script dùng chung một vùng tên nên hàm nào cũng thấy hàm nào, bất kể tệp nạp trước hay sau. Xếp theo chiều phụ thuộc là để người đọc thấy được tầng: mở tệp → khai hình → đọc/ghi ô → tham số → log → tiện ích → đọc bản ghi → trạng thái → cửa ghi và cửa xóa → gom lượt nạp → vỏ bọc lỗi.
+ * Thứ tự ở đây **không** quyết định việc hàm nào gọi được hàm nào — Apps Script dùng chung một vùng tên nên hàm nào cũng thấy hàm nào, bất kể tệp nạp trước hay sau. Xếp theo chiều phụ thuộc là để người đọc thấy được tầng: mở tệp → khai hình → đọc/ghi ô → log → tiện ích → đọc bản ghi → trạng thái → cửa ghi và cửa xóa → gom lượt nạp → vỏ bọc lỗi.
  *
  * Ba tệp cố ý **không** có trong danh sách này, và lý do thuộc về từng tệp chứ không phải một luật chung:
  *   - `server/sheet/SetupSheets.js` — dựng khung sheet, chỉ ca kiểm nói về việc dựng sheet mới cần, và nó tự nạp thêm.
@@ -32,11 +32,13 @@ const TEP_NEN = [
   'server/util/DateText.js',
   'server/util/TextNormalize.js',
   'server/sheet/CellBudget.js',
-  'server/config/ConfigParams.js',
-  'server/config/ConfigSheetSetup.js',
   'server/sheet/EntityRead.js',
   'server/sheet/CategoryRead.js',
-  'server/sheet/ConfigRead.js',
+  'server/view/SortSpec.js',
+  'server/data/SettingsSections.js',
+  'server/settings/SettingsKinds.js',
+  'server/settings/SettingsGate.js',
+  'server/settings/SettingsService.js',
   'server/state/ReloadDecision.js',
   'server/state/DirtyState.js',
   'server/state/UserPrefs.js',
@@ -88,6 +90,8 @@ function ghiHangMa(hop, sheet, tenSheet, themCot) {
     return hop.LOG_HEADERS.slice();
   }
 
+  // Sheet ngoài bố cục (ví dụ sheet `Config` đời cũ chờ chuyển) là sheet tự do: không có hàng mã.
+  if (!hop.SHEET_LAYOUT[tenSheet]) { return []; }
   let codes = hop.sheetCoreColumns(tenSheet).map((cot) => cot[0]);
   if (themCot) { codes = [codes[0], '@COT_RIENG_CUA_TOI'].concat(codes.slice(1)); }
   sheet.getRange(1, 1, 1, codes.length).setValues([codes]);
@@ -96,31 +100,20 @@ function ghiHangMa(hop, sheet, tenSheet, themCot) {
 }
 
 /**
- * Dựng hộp cát. `sheets` là tên các sheet có trong tệp giả, `props` là `DocumentProperties` ban đầu, `userProps` là `UserProperties` ban đầu, `thamSo` là các cặp `[tên, giá trị]` ghi vào khối tham số của `Config`.
+ * Dựng hộp cát. `sheets` là tên các sheet có trong tệp giả, `props` là `DocumentProperties` ban đầu, `userProps` là `UserProperties` ban đầu, `caiDat` là các phần cài đặt đã lưu `{ tênPhần: giá trị }`, gieo thẳng vào khóa kho `SETTINGS:<tên phần>` như sau một lần `settingsSave`.
  *
  * Trả về cả `dem` — bộ đếm lệnh gọi của tệp giả. Đó là thứ làm cho luật "cả lượt chỉ tốn một lệnh ghi" đo được ngay trên máy, thay vì phải tin vào con số mà chính code cần kiểm tự báo.
  */
 function dungHop(chon) {
   const y = chon || {};
-  const tenSheets = y.sheets || ['Config', 'Log'];
-  const stubs = taoStubsGas({ sheets: tenSheets, props: y.props, userProps: y.userProps });
+  const tenSheets = y.sheets || ['Log'];
+  const props = Object.assign({}, y.props || {});
+  Object.keys(y.caiDat || {}).forEach((ten) => { props['SETTINGS:' + ten] = JSON.stringify(y.caiDat[ten]); });
+  const stubs = taoStubsGas({ sheets: tenSheets, props: props, userProps: y.userProps });
   const hop = napServer(taoHopCat(stubs), ...(y.tep || TEP_NEN));
 
   const ra = { hop: hop, stubs: stubs, book: stubs._book, dem: stubs._dem, daConsole: stubs._daConsole, props: stubs._props, userProps: stubs._userProps, sheet: (ten) => stubs._book.getSheetByName(ten) };
   tenSheets.forEach((ten) => { ra[ten] = { sheet: stubs._book.getSheetByName(ten), codes: ghiHangMa(hop, stubs._book.getSheetByName(ten), ten, y.themCot) }; });
-
-  if (ra.Config) {
-    const codes = ra.Config.codes;
-    ra.Config.cotTen = codes.indexOf('@CFG_THAM_SO') + 1;
-    ra.Config.cotGiaTri = codes.indexOf('@CFG_THAM_SO_GIA_TRI') + 1;
-    ra.Config.firstDataRow = hop.SHEET_LAYOUT.Config.firstDataRow;
-
-    (y.thamSo || []).forEach((cap, i) => {
-      ra.Config.sheet.getRange(ra.Config.firstDataRow + i, ra.Config.cotTen).setValue(cap[0]);
-      ra.Config.sheet.getRange(ra.Config.firstDataRow + i, ra.Config.cotGiaTri).setValue(cap[1]);
-    });
-  }
-
   return ra;
 }
 

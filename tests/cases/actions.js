@@ -220,10 +220,9 @@ function chay(so) {
   hop3.ACTIONS.reloadCustomerSheet();
   hop3.ACTIONS.reloadActivitySheet();
   hop3.ACTIONS.reloadCategorySheet();
-  hop3.ACTIONS.reloadConfigSheet();
-  check(so, 'menu nạp lại gọi đúng API GAS cho sheet hiện tại và bốn sheet mặc định',
-    hop3._manualReloads,
-    ['reloadCurrentSheet', 'reloadCustomer', 'reloadActivity', 'reloadCategory', 'reloadConfig']);
+  check(so, 'menu nạp lại gọi đúng API GAS cho sheet hiện tại và ba sheet mặc định',
+    [hop3._manualReloads, typeof hop3.ACTIONS.reloadConfigSheet],
+    [['reloadCurrentSheet', 'reloadCustomer', 'reloadActivity', 'reloadCategory'], 'undefined']);
 
   checkThrows(so, 'không có form nào mà bấm Hủy thì hét lên — đó là dấu hiệu màn và ngăn xếp đã lệch nhau',
     () => hop3.ACTIONS.cancelForm(), 'Không có form nào');

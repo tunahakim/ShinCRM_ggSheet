@@ -6,7 +6,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 
 ## 1. Phiên đang làm
 
-- Phiên đang mở: module thông báo dùng chung (mục 1 của Todo), branch `feature/notice-module`, tiến độ ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.21 Module thông báo dùng chung.md`. Sau đó làm mục 2 và chặng 3a của Todo.
+- Phiên đang mở: bỏ sheet Config, lõi cài đặt (mục 2 của Todo), branch `feature/config-core`, tiến độ ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Lõi cài đặt bỏ sheet Config.md`. Sau đó làm chặng 3a của Todo.
 - Thứ tự việc kế tiếp ở `0_Documentation/Phiên code/2026.10.17 Todo.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
 - Việc kế tiếp nằm trong Todo và các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
 - Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.

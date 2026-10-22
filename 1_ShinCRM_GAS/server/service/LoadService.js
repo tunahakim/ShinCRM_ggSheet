@@ -1,7 +1,7 @@
 /**
  * Hai đường nạp dữ liệu lên RAM của sidebar: `loadCore` và `loadActivityChunk`. Tài liệu 05 Phần 4, Phần 11, Phần 12.
  *
- * Tệp này biết **trình tự** và **kích cỡ**: cái gì đọc trước cái gì, gói bao nhiêu hàng, hết gói chưa, tốn bao nhiêu mili giây. Nó không tự đọc ô nào — việc đọc thuộc `EntityRead.gs`, `CategoryRead.gs`, `ConfigRead.gs`, và việc đo lưới thuộc `CellBudget.gs`. Giữ ranh giới đó vì trình tự là thứ sẽ đổi nhiều lần khi có dữ liệu thật để đo, còn phép đọc thì không.
+ * Tệp này biết **trình tự** và **kích cỡ**: cái gì đọc trước cái gì, gói bao nhiêu hàng, hết gói chưa, tốn bao nhiêu mili giây. Nó không tự đọc ô nào — việc đọc thuộc `EntityRead.gs`, `CategoryRead.gs`, cổng cài đặt (`server/settings/`), và việc đo lưới thuộc `CellBudget.gs`. Giữ ranh giới đó vì trình tự là thứ sẽ đổi nhiều lần khi có dữ liệu thật để đo, còn phép đọc thì không.
  *
  * **Vì sao chia hai luồng.** Apps Script không có trạng thái giữa hai lần gọi, nên mỗi vòng chạm máy chủ tốn hai tới năm giây tiền đi đường, bất kể đọc một ô hay một nghìn ô. Cách duy nhất để sidebar dùng được ngay là nạp **một lần** rồi giữ hết trong một biến JavaScript. Nhưng `activity` là phần nặng nhất và không cần thiết để tra một khách, nên nó xuống luồng nền: `loadCore` trả về phần vừa đủ để vẽ và để tra cứu, `loadActivityChunk` chạy tiếp phía sau. Nhờ vậy khung hình đầu tiên tới sau vài giây thay vì vài chục giây.
  *
@@ -9,7 +9,7 @@
  *
  * **Máy chủ nhận dạng bản ghi bằng mã, không bằng vị trí.** Vị trí đổi mỗi lần sheet được sắp lại, còn mã thì không. Đường chọn khách riêng đọc mã trực tiếp từ live model hoặc cột mã hiện tại.
  *
- * **Hai dòng "nạp xong" đều là dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Công tắc là tham số `LOG_TRACE` ở sheet `Config`. Một lượt mở sidebar trơn để lại **không** dòng nào, vì "mọi thứ bình thường" không đáng ghi ba lần mỗi lượt; lượt nào có lỗi thì vòng đệm vết tự bung ra sheet kèm dòng lỗi, nên đúng lúc cần chẩn đoán vẫn có đủ số liệu. Dòng cảnh báo vượt trần ngân sách ô thì vẫn `logEvent` — nó không phải chuyện bình thường.
+ * **Hai dòng "nạp xong" đều là dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Công tắc là `LOG_TRACE` trong Cài đặt › Vận hành. Một lượt mở sidebar trơn để lại **không** dòng nào, vì "mọi thứ bình thường" không đáng ghi ba lần mỗi lượt; lượt nào có lỗi thì vòng đệm vết tự bung ra sheet kèm dòng lỗi, nên đúng lúc cần chẩn đoán vẫn có đủ số liệu. Dòng cảnh báo vượt trần ngân sách ô thì vẫn `logEvent` — nó không phải chuyện bình thường.
  */
 
 /** Nguồn ghi log của mọi đường trong tệp này. Sidebar gọi qua `google.script.run` nên theo bảng ở tài liệu 10 Phần 8, nguồn là `sidebar` và kênh báo lỗi là ném lại cho `withFailureHandler`. */
@@ -117,13 +117,11 @@ function reloadCategory(options) {
   return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, execute);
 }
 
-/** Nạp riêng toàn bộ Config. */
+/** Nạp riêng gói cài đặt `config`. Ngầm định kiểm lại với Category nên đọc Category (bản đọc chung của lần gọi). */
 function reloadConfig(options) {
   var execute = function () {
     var started = Date.now();
-    resetSettingsCache();
-    var config = configReadAll();
-    config.params = configUserParams(configParams());
+    var config = settingsReadAll(categoryReadAll());
     return {
       ok: true,
       reloadMode: 'config',
@@ -155,7 +153,7 @@ function reloadEntityAll(entity) {
 }
 
 /**
- * Chạy một kế hoạch nạp của sổ nhật ký trong cùng lời gọi (07A mục 4): nạp lõi, hoặc từng phần đổi bằng các hàm nạp riêng. Thứ tự Config, Category trước dữ liệu để Sidebar áp bản ghi với cấu hình mới.
+ * Chạy một kế hoạch nạp của sổ nhật ký trong cùng lời gọi (07A mục 4): nạp lõi, hoặc từng phần đổi bằng các hàm nạp riêng. Thứ tự cài đặt, Category trước dữ liệu để Sidebar áp bản ghi với cấu hình mới.
  * Một thực thể nạp cả sheet thì mã của thực thể đó không đọc lại; mã của thực thể kia vẫn nạp theo mã.
  */
 function reloadByPlan(plan) {
@@ -209,23 +207,18 @@ function reloadCurrentSheet() {
       result.target = 'category';
       return result;
     }
-    if (name === 'Config') {
-      result = reloadConfig();
-      result.target = 'config';
-      return result;
-    }
     if (name && name.charAt(0) === '!' && typeof renderViewSheet === 'function') {
       result = renderViewSheet(name);
       return { ok: true, target: 'view', sheetName: name, view: result, reload: reloadStateRead() };
     }
-    throw new Error('Sheet hiện tại "' + name + '" không thuộc Customer, Activity, Category, Config hoặc sheet quản trị.');
+    throw new Error('Sheet hiện tại "' + name + '" không thuộc Customer, Activity, Category hoặc sheet quản trị.');
   });
 }
 
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *
- * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, reload, warnings, notices, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
+ * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, reload, warnings, notices, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `notices` khi vượt trần ngân sách ô.
  *
  * **Đo ngân sách ô là việc đầu tiên, trước khi đọc một ô dữ liệu nào.** Vượt trần thì dừng ngay tại đó. Phép đo không đọc ô nào nên nó gần như miễn phí, còn đọc dữ liệu trong một tệp đã quá ì là cách chắc nhất để lượt chạy chết ở giữa đường — và chết ở giữa đường thì người dùng thấy sidebar treo, không thấy nguyên nhân.
  *
@@ -254,10 +247,8 @@ function loadCore(options) {
 
     // Revision đọc trước mọi ô dữ liệu: thay đổi ghi trong lúc đọc mang revision lớn hơn nên lời hỏi sau của Sidebar tự thấy.
     var processed = reloadStateRead().revision;
-    resetSettingsCache();
-    var config = configReadAll();
-    config.params = configUserParams(configParams());
     var danhMuc = categoryReadAll();
+    var config = settingsReadAll(danhMuc);
     var khach = entityReadAll('customer');
     var soGiaoDich = entityRowCount('activity');
     // Nạp lõi từ lời hỏi nạp lại trả trọn Activity trong cùng gói; lượt mở Sidebar thì Activity xuống luồng nạp nền theo gói.
@@ -266,10 +257,6 @@ function loadCore(options) {
 
     var warnings = danhMuc.warnings.slice();
     if (budget.warning) { warnings.push(budget.warning); }
-    var traceMode = String(config.params[LOG_TRACE_CONFIG_NAME] || '').trim();
-    if (traceMode && traceMode.toLowerCase() !== 'off') {
-      warnings.push('LOG_TRACE đang bật (' + traceMode + '). Sheet Log có thể chứa dữ liệu nhạy cảm nguyên văn; hãy tắt LOG_TRACE sau khi kiểm tra xong.');
-    }
 
     logTrace({
       source: LOAD_SOURCE,

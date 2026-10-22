@@ -16,11 +16,11 @@ function homNay() {
   return formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
 }
 
-/** Hộp cát có cả `Config` và `Log`, kèm khóa dọn log đã đặt sẵn cho hôm nay. */
-function dungLog(thamSo, props) {
+/** Hộp cát có sheet `Log` và phần vận hành đã lưu `vanHanh`, kèm khóa dọn log đã đặt sẵn cho hôm nay. */
+function dungLog(vanHanh, props) {
   return dungHop({
-    sheets: ['Config', 'Log'],
-    thamSo: thamSo,
+    sheets: ['Log'],
+    caiDat: vanHanh ? { core_ops: vanHanh } : {},
     props: Object.assign({ LOG_LAST_CLEANUP: homNay() }, props || {})
   });
 }
@@ -113,7 +113,7 @@ function chay(so) {
     [saiKieu.hop.flushLog(), docLog(saiKieu)[0][6]], [1, 'quên bọc trong đối tượng']);
 
   // Ca hỏng có thật và hay xảy ra nhất: chủ tệp xóa hoặc đổi tên sheet Log. Phải tự dựng lại, không được làm chết lượt chạy.
-  const mat = dungHop({ sheets: ['Config'], props: { LOG_LAST_CLEANUP: homNay() } });
+  const mat = dungHop({ sheets: [], props: { LOG_LAST_CLEANUP: homNay() } });
   mat.hop.logEvent({ source: 'core', action: 'save', outcome: '✅ ok', reason: 'sau khi dựng lại' });
   const soDongMat = mat.hop.flushLog();
   const logMoi = mat.book.getSheetByName('Log');
@@ -124,7 +124,7 @@ function chay(so) {
     mat.daConsole.some((dong) => dong.indexOf('error') === 0 && dong.indexOf('dựng lại') !== -1), true);
 
   // Luật 2 của tệp: không bao giờ ném lỗi ra ngoài. Ở đây tệp Sheet giả bị làm cho không dựng nổi sheet Log.
-  const hong = dungHop({ sheets: ['Config'], props: { LOG_LAST_CLEANUP: homNay() } });
+  const hong = dungHop({ sheets: [], props: { LOG_LAST_CLEANUP: homNay() } });
   hong.book.insertSheet = () => { throw new Error('giả vờ Google chặn việc dựng sheet'); };
   hong.hop.logEvent({ source: 'core', action: 'save', outcome: '✅ ok', reason: 'ghi vào chỗ hỏng' });
   let ketQuaHong;
@@ -147,7 +147,7 @@ function chay(so) {
   check(so, 'cắt năm dòng chỉ tốn một lệnh deleteRows', tranDong.dem.deleteRows - xoaTruoc, 1);
 
   // Trần tuổi dòng. Hộp cát này KHÔNG đặt sẵn khóa dọn log, nên phép quét được phép chạy.
-  const tuoi = dungHop({ sheets: ['Config', 'Log'] });
+  const tuoi = dungHop({ sheets: ['Log'] });
   nhoiLog(tuoi, [['2020-01-01 00:00:00', 'cũ 1'], ['2020-01-02 00:00:00', 'cũ 2'], ['2020-01-03 00:00:00', 'cũ 3']]);
   const xoaTruocTuoi = tuoi.dem.deleteRows;
   tuoi.hop.logEvent({ source: 'core', action: 'save', outcome: '✅ ok', reason: 'mới' });
@@ -165,7 +165,7 @@ function chay(so) {
     docLog(tuoi).map((dong) => dong[6]), ['mới', 'cũ 4', 'mới 2']);
 
   // Không đoán được ngày của một dòng thì không có quyền xóa nó — kể cả khi dòng ngay sau nó rõ ràng là quá cũ.
-  const oLucRong = dungHop({ sheets: ['Config', 'Log'] });
+  const oLucRong = dungHop({ sheets: ['Log'] });
   nhoiLog(oLucRong, [['', 'không có ô Lúc'], ['2020-01-01 00:00:00', 'cũ 1']]);
   const xoaTruocRong = oLucRong.dem.deleteRows;
   oLucRong.hop.logEvent({ source: 'core', action: 'save', outcome: '✅ ok', reason: 'mới' });
@@ -204,7 +204,7 @@ function chay(so) {
 
   // FBM-018: lượt bị Google cắt ở 6 phút không chạy `finally`, nên dòng "Bắt đầu bước" phải tự lên sheet ngay khi chế độ vết bật.
   // Kiểm bằng Trace.js thật nạp chung với LogGate thật, và KHÔNG gọi flushLog — giả lập đúng lượt chết giữa đường.
-  const vetBat = dungLog([['LOG_TRACE', 'fbm_sync']]);
+  const vetBat = dungLog({ LOG_TRACE: 'fbm_sync' });
   vetBat.hop.FbmSync = {};
   napServer(vetBat.hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js');
   const stateVet = { runId: 'run-018', mode: 'read', scan: 'full', origin: 'manual', metadata: {}, counts: {} };

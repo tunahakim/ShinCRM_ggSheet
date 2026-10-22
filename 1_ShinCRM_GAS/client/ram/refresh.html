@@ -159,7 +159,7 @@ function refreshCategoryApply(result) {
   return applied;
 }
 
-/** Thay toàn bộ Config trong RAM; không reset Store và không đọc lại Customer/Activity. */
+/** Thay toàn bộ gói cài đặt `config` trong RAM; không reset Store và không đọc lại Customer/Activity. */
 function refreshConfigApply(result) {
   if (!result || !result.ok || !result.config) { return { ok: false, applied: false }; }
   Store.config = result.config;

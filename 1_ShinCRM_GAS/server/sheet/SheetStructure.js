@@ -22,6 +22,13 @@ function sheetBookDeleteBlank(sheet) {
   sheetReadCopyDrop(name);
 }
 
+/** Xóa sheet `Config` đời cũ: sheet có dữ liệu duy nhất ShinCRM được xóa, và chỉ `settingsMigrateFromConfig` gọi sau khi đã đọc lại kho thật khớp đủ. Xóa hàm này cùng hàm chuyển. */
+function sheetBookDeleteLegacyConfig(sheet) {
+  if (sheet.getName() !== 'Config') { throw new Error('Chỉ xóa được sheet Config đời cũ, nhận "' + sheet.getName() + '".'); }
+  shinOpenBook().deleteSheet(sheet);
+  sheetReadCopyDrop('Config');
+}
+
 /** Đưa người dùng tới sheet này. Chỉ đổi chỗ đang xem, không đổi dữ liệu, nên không áp chính sách ghi. */
 function sheetActivate(sheet) {
   shinOpenBook().setActiveSheet(sheet);

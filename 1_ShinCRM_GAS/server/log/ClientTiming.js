@@ -30,7 +30,7 @@ function clientTimingRounds(value) {
  *
  * Ghi **một** dòng cho cả lượt, không phải một dòng mỗi vòng. Lý do giống chỗ chọn ghi log ở gói cuối của `loadActivityChunk`: sáu dòng cho một lượt mở sidebar sẽ làm loãng sheet `Log` tới mức không tìm ra thứ đáng xem, mà thứ đáng xem ở đây là bản tổng — riêng từng vòng thì đã nằm trong khóa `vong` của cùng dòng đó.
  *
- * **Dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Nên dòng này chỉ ra sheet khi tham số `LOG_TRACE` ở sheet `Config` phủ nguồn `sidebar`. Tắt công tắc thì một lượt mở sidebar trơn không tốn dòng log nào — và vì đây là lượt gọi riêng, không nằm trong lượt chạy đã lỗi, nên tắt là tắt hẳn chứ không có đường tự bung ra như các dòng vết khác.
+ * **Dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Nên dòng này chỉ ra sheet khi `LOG_TRACE` trong Cài đặt › Vận hành phủ nguồn `sidebar`. Tắt công tắc thì một lượt mở sidebar trơn không tốn dòng log nào — và vì đây là lượt gọi riêng, không nằm trong lượt chạy đã lỗi, nên tắt là tắt hẳn chứ không có đường tự bung ra như các dòng vết khác.
  */
 function logClientTiming(timing) {
   return runEntryPoint('logClientTiming', LOAD_SOURCE, function () {

@@ -80,7 +80,7 @@ FbmSync.preflightCandidates = function (issues, mode, scan) {
   var gate = { valid: {} }, candidates = [], settings = {}, settingsOk = true, conflictPending = 0, blockWrite = mode === 'write';
   try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (settingsError) {
     settingsOk = false;
-    FbmSync.preflightIssue(issues, 'FBM_SETTINGS_READ_FAILED', 'error', 'Config', 'Không đọc được cài đặt đồng bộ FBM trước phiên: ' + String(settingsError && settingsError.message || settingsError), blockWrite);
+    FbmSync.preflightIssue(issues, 'FBM_SETTINGS_READ_FAILED', 'error', 'Cài đặt', 'Không đọc được cài đặt đồng bộ FBM trước phiên: ' + String(settingsError && settingsError.message || settingsError), blockWrite);
   }
   try {
     conflictPending = FbmSync.conflictQueue(scan).length;
@@ -106,7 +106,7 @@ FbmSync.preflightCandidates = function (issues, mode, scan) {
       var entity = candidate.entity;
       if (candidate.hold) { FbmSync.preflightIssue(issues, holdCodes[candidate.hold.code], 'warn', entity, candidate.hold.reason, false); } else { candidates.push(candidate); }
       if (settingsOk && candidate.kind === 'create' && entity === 'customer' && (!String(settings.customerPrefix || '').trim() || !String(settings.customerCodeLength || '').trim())) {
-        FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_MISSING', 'error', 'Config', 'Ứng viên tạo Customer ' + String(candidate.id || '') + ' cần tiền tố và độ dài mã khách FBM.', blockWrite);
+        FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_MISSING', 'error', 'Cài đặt', 'Ứng viên tạo Customer ' + String(candidate.id || '') + ' cần tiền tố và độ dài mã khách FBM.', blockWrite);
       }
     });
   } catch (candidateError) {
@@ -138,9 +138,9 @@ FbmSync.preflightResult = function (mode, issues, local) {
   return { ok: blocking.length === 0, mode: mode, issues: issues, blocking: blocking, warnings: issues.filter(function (item) { return !item.blocking; }), candidateCount: local ? local.candidateCount : 0, hashSummary: local ? local.hashSummary : null, conflictPending: local ? local.conflictPending : null };
 };
 
-/** Phần rẻ: Config, Category lõi, liên kết tài khoản, phạm vi khách; không đọc bản ghi Customer/Activity. */
+/** Phần rẻ: Category lõi, cài đặt kéo từ FBM, liên kết tài khoản, phạm vi khách; không đọc bản ghi Customer/Activity. */
 FbmSync.preflightGates = function (options) {
-  var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], params: {}, category: { categories: {} } }, issues = (core.issues || []).slice(), params = core.params || {};
+  var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], category: { categories: {} } }, issues = (core.issues || []).slice();
   if (typeof FbmSync.identityPreflight === 'function') {
     // Both identity actions are recovery tools: they must remain usable when
     // existing FBM IDs require a rebind. Ordinary read/write/background runs
@@ -157,7 +157,7 @@ FbmSync.preflightGates = function (options) {
     // Khách bị xóa khỏi Sheet sau khi lưu danh sách: lượt vẫn chạy cho phần còn lại nhưng phải báo, không bỏ qua im lặng.
     if (scope && scope.notFound.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_CODE_NOT_FOUND', 'warn', 'fbm_sync', 'Mã khách ShinCRM trong danh sách khách chỉ định không còn trên Sheet Customer, lượt này bỏ qua: ' + scope.notFound.join(', ') + '.', false); }
   }
-  if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, params, core.category); }
+  if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, core.category); }
   return FbmSync.preflightResult(mode, issues, null);
 };
 
@@ -191,9 +191,9 @@ FbmSync.logPreflight = function (result) {
 };
 
 /** Chiều lấy cần giá trị Xác thực mặc định hợp lệ trước khi ghi khách mới; thiếu thì dừng lượt, không ghi giá trị sai. */
-FbmSync.preflightVerifyStatus = function (issues, params, category) {
-  var value = String(params && params[FBM_VERIFY_STATUS_CONFIG_NAME] || '').trim(), source = DATA_SCHEMA.customer.verifyStatus.source;
-  var allowed = category && category.categories && category.categories[source] || [];
-  if (!value) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_MISSING', 'error', 'Config', 'Chưa chọn giá trị Xác thực mặc định cho khách kéo từ FBM. Vào sheet Config, chọn ô ' + FBM_VERIFY_STATUS_CONFIG_NAME + ' rồi chạy lại.', true); return; }
-  if (allowed.indexOf(value) < 0) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_INVALID', 'error', 'Config', 'Giá trị Xác thực mặc định "' + value + '" không còn trong danh mục Xác thực ở sheet Category. Vào sheet Config, chọn lại ô ' + FBM_VERIFY_STATUS_CONFIG_NAME + ' rồi chạy lại.', true); }
+FbmSync.preflightVerifyStatus = function (issues, category) {
+  var stored = (settingsValue('defaults_fbm_pull', 'values').customer || {}).verifyStatus;
+  var checked = (settingsDefaultsChecked('defaults_fbm_pull', category).customer || {}).verifyStatus;
+  if (!String(stored === undefined || stored === null ? '' : stored).trim()) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_MISSING', 'error', 'Cài đặt', 'Chưa chọn giá trị Xác thực cho khách mới kéo từ FBM. Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn giá trị rồi chạy lại.', true); return; }
+  if (!checked) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_INVALID', 'error', 'Cài đặt', 'Giá trị Xác thực "' + stored + '" cho khách mới kéo từ FBM không còn trong danh mục Xác thực ở sheet Category. Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn lại rồi chạy lại.', true); }
 };

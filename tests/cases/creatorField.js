@@ -9,7 +9,7 @@ const { trongLanChay } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
 
 function dungDay(tenNguoiDung) {
-  return dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'], thamSo: [['USER_NAME', tenNguoiDung]], tep: TEP_NEN });
+  return dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'], caiDat: { core_ops: { USER_NAME: tenNguoiDung } }, tep: TEP_NEN });
 }
 
 function giaoDich(them) {

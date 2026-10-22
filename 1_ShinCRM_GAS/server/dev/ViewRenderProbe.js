@@ -1,7 +1,7 @@
 /** Probe DEV tách lượt vẽ một sheet quản trị thành từng đoạn. Chạy trong một lần gọi như đường thật (bản đọc kho và tờ nháp đang mở). */
 
 var VIEW_RENDER_PROBE_PARTS = [
-  'documentLockRun', 'viewRenderSheetLocked', 'viewReadInputs', 'configReadAll', 'entityReadContext', 'viewReadFormulaColumns', 'viewRenderPlan',
+  'documentLockRun', 'viewRenderSheetLocked', 'viewReadInputs', 'settingsRead', 'entityReadContext', 'viewReadFormulaColumns', 'viewRenderPlan',
   'viewRenderRows', 'viewEntityRows', 'viewWritePlan', 'viewWriteApply',
   'sheetReadBlock', 'sheetReadLastRow', 'sheetGridReadBlock', 'sheetReadRows', 'sheetReadFormulas', 'sheetCellsWrite', 'viewLedgerEntry', 'viewLedgerWrite', 'viewTabColorSync', 'reloadStateRead', 'filterCellMatches'
 ];
@@ -27,7 +27,7 @@ function measureViewRender() {
 /** Probe DEV đo giá từng lệnh Google của tầng 1 trên các sheet bộ vẽ đọc, để chọn kế hoạch đọc ít lệnh nhất. */
 function measureSheetReadCalls() {
   var book = shinOpenBook();
-  var names = ['Customer', 'Activity', 'Config'].concat(shinViewSheetNames(book).slice(0, 1));
+  var names = ['Customer', 'Activity', 'Category'].concat(shinViewSheetNames(book).slice(0, 1));
   var out = [];
   function time(label, fn) { var t = Date.now(); var r = fn(); out.push('  ' + label + ' ' + (Date.now() - t) + ' ms' + (r !== undefined ? ' → ' + r : '')); return r; }
   for (var round = 1; round <= 2; round++) {

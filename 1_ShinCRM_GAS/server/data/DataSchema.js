@@ -76,6 +76,13 @@ var DATA_SCHEMA = {
 /** Bốn kiểu dữ liệu, không có kiểu thứ năm. Tài liệu 02 Phần 2.1. */
 var DATA_TYPES = ['TEXT', 'NUMBER', 'DATE', 'SELECT'];
 
+/** Mã cột này đã là của một trường trong `DATA_SCHEMA` chưa; cột của code thì kiểu do code quyết định, không do cài đặt. */
+function dataSchemaHasCode(code) {
+  return Object.keys(DATA_SCHEMA).some(function (entity) {
+    return Object.keys(DATA_SCHEMA[entity]).some(function (name) { return DATA_SCHEMA[entity][name].code === code; });
+  });
+}
+
 /** Hai độ chi tiết của mốc thời gian. Tài liệu 03 Phần 2, thuộc tính `precision`. */
 var DATE_PRECISIONS = ['day', 'minute'];
 

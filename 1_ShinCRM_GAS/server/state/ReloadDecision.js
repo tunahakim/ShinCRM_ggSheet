@@ -7,7 +7,7 @@
  * không biến hàm quyết định thành một cửa ghi ẩn.
  *
  * Sheet quản trị chỉ vẽ khi có người xem, qua lời hỏi chung của Sidebar;
- * không đường nào vẽ mọi sheet `!` một lượt. Dữ liệu kho hay Config đổi chỉ
+ * không đường nào vẽ mọi sheet `!` một lượt. Dữ liệu kho hay cài đặt đổi chỉ
  * làm mọi view cũ (`signal.allViews`). Người dùng sửa ô điều khiển của một
  * sheet `!` thì chỉ gắn cờ cho đúng sheet đó (`signal.viewSheets`); cờ này
  * vẽ cả khi người dùng tắt tự làm mới vì đó là lệnh trực tiếp.
@@ -134,6 +134,8 @@ function reloadDecisionForChange(input) {
   if (surface === 'category' || entity === 'category') {
     decision.kind = 'category';
     decision.signal.category = true;
+    // Ngầm định gõ tay kiểm với Category mỗi lần nạp gói cài đặt, nên Category đổi thì gói cài đặt cũng phải nạp lại.
+    decision.signal.config = true;
     decision.signal.allViews = true;
     reloadDecisionWithRam(decision, 'category', [], change, 'Category đổi.');
     decision.notifySidebar = true;
@@ -148,10 +150,10 @@ function reloadDecisionForChange(input) {
     var configNeedsFullCore = change.configAffectsSchema === true || change.forceFullCore === true;
     if (configNeedsFullCore) { decision.signal.allCore = true; }
     reloadDecisionWithRam(decision, configNeedsFullCore ? 'fullCore' : 'config', [], change, configNeedsFullCore
-      ? 'Config ảnh hưởng Schema nên phải nạp lại full core.'
-      : 'Config đổi, nạp riêng toàn bộ khối Config.');
+      ? 'Cài đặt ảnh hưởng Schema nên phải nạp lại full core.'
+      : 'Cài đặt đổi, nạp riêng gói cài đặt.');
     decision.notifySidebar = true;
-    decision.reason = 'Config đổi.';
+    decision.reason = 'Cài đặt đổi.';
     return decision;
   }
 

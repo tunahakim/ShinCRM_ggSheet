@@ -151,10 +151,10 @@ function selectionPlanItem(key, code, column, withValue) {
   return { token: key + ':' + code, headerAddress: letters + '1', expectedValue: code, valueAddressTemplate: withValue ? letters + '{row}' : '' };
 }
 
-/** Sheet xem tự do: mọi sheet ngoài bốn sheet kho và sheet `!`. GAS chỉ đọc hộ ô mã khi Extension không đọc được, không bao giờ ghi. */
+/** Sheet xem tự do: mọi sheet ngoài ba sheet kho và sheet `!`. GAS chỉ đọc hộ ô mã khi Extension không đọc được, không bao giờ ghi. */
 function selectionIsFreeSheet(sheetName) {
   var name = String(sheetName || '');
-  return !!name && name.charAt(0) !== '!' && [ENTITY_SHEETS.customer, ENTITY_SHEETS.activity, 'Category', 'Config'].indexOf(name) < 0;
+  return !!name && name.charAt(0) !== '!' && [ENTITY_SHEETS.customer, ENTITY_SHEETS.activity, 'Category'].indexOf(name) < 0;
 }
 
 /** Cột mã khách của sheet xem tự do, từ đúng một lần đọc hàng 1: `@CUS_MA_KH` trước, thiếu thì `@ACT_MA_KH`. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán. Chỉ dùng khi không có Extension đọc. */
@@ -174,7 +174,6 @@ function selectionReadPlan() {
     { sheetName: ENTITY_SHEETS.customer, entity: 'customer' },
     { sheetName: ENTITY_SHEETS.activity, entity: 'activity' },
     { sheetName: 'Category', sheetCore: 'Category' },
-    { sheetName: 'Config', sheetCore: 'Config' },
     { prefix: '!', entity: 'customer' },
     { prefix: '!', entity: 'activity' }
   ];

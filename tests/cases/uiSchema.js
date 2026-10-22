@@ -14,7 +14,7 @@ const MAN = ['view', 'customerForm', 'activityForm', 'noteForm'];
 /** Tên hành động của tài liệu 04 Phần 7, trừ `deleteSelectedActivities` mà chủ dự án bỏ ngày 06/09/2026, cộng `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng. */
 const TEN_HANH_DONG = [
   'toggleFollowSelection', 'toggleAutoRenderView', 'toggleSearchPanel', 'toggleSyncPanel', 'showFbmAutoSyncComingSoon', 'setActivityView',
-  'renderActiveViewSheet', 'toggleNotices', 'noticeDismiss', 'reloadAll', 'reloadCurrentSheet', 'reloadCustomerSheet', 'reloadActivitySheet', 'reloadCategorySheet', 'reloadConfigSheet', 'openCustomerForm', 'openCustomerFormBlank',
+  'renderActiveViewSheet', 'toggleNotices', 'noticeDismiss', 'reloadAll', 'reloadCurrentSheet', 'reloadCustomerSheet', 'reloadActivitySheet', 'reloadCategorySheet', 'openCustomerForm', 'openCustomerFormBlank',
   'openActivityForm', 'openNoteForm', 'saveForm', 'cancelForm',
   'deleteActivity', 'undoDelete', 'setCurrentCustomer'
 ];
@@ -229,7 +229,7 @@ function chay(so) {
     daDung.view.body === hop.UI_SCHEMA.view.body, true);
   check(so, 'header view dựng thành nhóm start/end, giữ thứ tự icon và menu',
     [daDung.view.header.map((n) => n.className).join('|'), daDung.view.header[0].elements.map((n) => n.icon).join('|'), daDung.view.header[0].elements[1].toggle, daDung.view.header[0].elements[3].menu.length, daDung.view.header[0].elements[4].menu.length, daDung.view.header[1].elements.map((n) => n.icon).join('|')],
-    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'search|bolt|table|refresh|sync|more', 'followSelection', 6, 2, 'pencil|addUser']);
+    ['shin-header-group shin-header-group-start|shin-header-group shin-header-group-end', 'search|bolt|table|refresh|sync|more', 'followSelection', 5, 2, 'pencil|addUser']);
   check(so, 'nút chân dựng thành Button có nhãn chữ, không thành Icon',
     [daDung.noteForm.footer[0].role, daDung.noteForm.footer[0].label], ['button', 'LƯU GHI CHÚ']);
 }

@@ -3,7 +3,7 @@ const { napServer, trongLanChay, dongSoCuoi } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function taoHop() {
-  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
   const hop = nen.hop;
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   hop.shinViewSheetNames = () => ['!Lead', '!Chăm sóc'];

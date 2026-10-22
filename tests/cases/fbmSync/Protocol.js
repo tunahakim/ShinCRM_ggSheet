@@ -55,11 +55,13 @@ async function chay(so) {
   check(so, 'chi FBM thay doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, local, Object.assign({}, same, { companyName: 'fbm' }), 'customer').fbmChanged, true);
   check(so, 'parse malformed tra loi co cau truc', !!hop.FbmSync.protocol.parse('{').parseError, true);
 
-  const emptyConfig = taoHopCat({ FbmSync: {}, configGet: () => '' });
+  const emptyConfig = taoHopCat({ FbmSync: {} });
   napServer(emptyConfig, 'fbm_sync/schema/FbmFields.js');
+  emptyConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: '' });
   check(so, 'nguong chấp thuận rỗng dùng mặc định 10', emptyConfig.FbmSync.approvalThreshold(), 10);
-  const zeroConfig = taoHopCat({ FbmSync: {}, configGet: () => '0' });
+  const zeroConfig = taoHopCat({ FbmSync: {} });
   napServer(zeroConfig, 'fbm_sync/schema/FbmFields.js');
+  zeroConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: 0 });
   check(so, 'nguong chấp thuận 0 vẫn được giữ nguyên', zeroConfig.FbmSync.approvalThreshold(), 0);
 }
 

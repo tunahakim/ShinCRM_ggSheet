@@ -16,7 +16,7 @@ const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 /** Hộp máy chủ có cả năm sheet, khóa dọn log đặt sẵn để phép quét tuổi log không chen vào. */
 function dungMayChu() {
   return dungHop({
-    sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+    sheets: ['Customer', 'Activity', 'Category', 'Log'],
     props: { LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }
   });
 }

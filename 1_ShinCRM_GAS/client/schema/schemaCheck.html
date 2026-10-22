@@ -24,7 +24,7 @@ var SCHEMA_CHECK_CODE_PATTERN = /^@[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
  *
  * `input.dataSchema` là bắt buộc. Các mục còn lại thiếu thì phép kiểm tương ứng bị bỏ qua và có tên trong `skipped`:
  * `categoryCodes` (mảng mã `@CAT_` có thật trên sheet), `functionTables` (đưa được bảng nào thì soi bảng đó — `{ DEFAULTS }`,
- * `{ NORMALIZERS, VALIDATORS }`, hay cả ba), `configDefaultCodes` (mảng mã cột có dòng trong bảng ngầm định gõ tay của `Config`),
+ * `{ NORMALIZERS, VALIDATORS }`, hay cả ba),
  * và bộ ba `uiSchema` + `actions` + `slots`.
  *
  * Phần kiểm `UI_SCHEMA` gọi `screenBuild` và `renderFieldPath` của hai tệp nhúng **sau** tệp này. Chạy được vì lời gọi xảy ra
@@ -122,21 +122,6 @@ function checkSchema(input) {
       });
     });
   });
-
-  // Luật một nguồn ngầm định của tài liệu 03 Phần 2.
-  if (Array.isArray(input.configDefaultCodes)) {
-    Object.keys(dataSchema).forEach(function (entity) {
-      var fields = dataSchema[entity];
-      Object.keys(fields).forEach(function (fieldName) {
-        var field = fields[fieldName];
-        if (field.default && input.configDefaultCodes.indexOf(field.code) !== -1) {
-          problems.push(entity + '.' + fieldName + ' có `default` trong DATA_SCHEMA và đồng thời có dòng trong bảng ngầm định của Config. Chỉ được một nơi.');
-        }
-      });
-    });
-  } else {
-    skipped.push('luật một nguồn ngầm định giữa DATA_SCHEMA và Config');
-  }
 
   // Bản khai bố cục: tên hành động, tên slot, đường dẫn trường. **`[RÀNG BUỘC CỨNG]`** tài liệu 04 Phần 7.
   if (input.uiSchema && input.actions && input.slots) {

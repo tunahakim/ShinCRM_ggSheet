@@ -31,7 +31,7 @@ function fieldLogicNow(moc) {
  *
  * Đây không phải mã thật. Mã thật do cửa cấp mã phía máy chủ phát ra bên trong khóa của cửa ghi — **`[RÀNG BUỘC CỨNG]`** tài liệu 06 Phần 8. Con số ở đây chỉ để ô mã trên form không trống trơn, và nó không bao giờ đi đâu cả: trường `id` khai `readonly` nên bộ thu thập lúc lưu bỏ qua nó. Nếu về sau ai bỏ `readonly` khỏi `id` thì mã đoán này sẽ lọt xuống sheet — đó là lý do dòng này viết dài hơn phần code.
  *
- * Chưa nạp `Config` thì trả rỗng chứ không đoán số 1, vì một ô mã hiện `CUS-000001` trong khi sheet đã có nghìn khách là thứ gây hiểu sai nặng hơn một ô trống.
+ * Chưa nạp gói cài đặt thì trả rỗng chứ không đoán số 1, vì một ô mã hiện `CUS-000001` trong khi sheet đã có nghìn khách là thứ gây hiểu sai nặng hơn một ô trống.
  */
 function fieldLogicNextCode(entity, tien) {
   var counters = (Store && Store.config && Store.config.counters) || {};
@@ -88,7 +88,7 @@ var DEFAULTS = {
 var FIELD_LOGIC_CARRY_DEFAULTS = ['carryForwardPriority', 'carryForwardDueAt', 'carryForwardProduct'];
 
 /**
- * Bản ghi trắng của một form thêm mới: mọi trường có `default` đều chạy hàm ngầm định, theo đúng thứ tự khai trong `DATA_SCHEMA`.
+ * Bản ghi trắng của một form thêm mới: `seed` vào trước, rồi ngầm định gõ tay khi nhập trên Sidebar (`Store.config.defaults`, GAS đã kiểm và bỏ giá trị lệch), rồi mọi trường có `default` chạy hàm ngầm định theo đúng thứ tự khai trong `DATA_SCHEMA`. Một trường không có cả hai loại ngầm định: GAS chặn lúc lưu cài đặt.
  *
  * Trả về cả `record` lẫn `carried` — danh sách tên trường vừa nhận giá trị kế tục — vì tài liệu 03 Phần 4 đòi ô kế tục phải nhìn ra được bằng mắt, và chỗ duy nhất biết điều đó là đây.
  *
@@ -99,6 +99,9 @@ function fieldLogicNewRecord(entity, seed) {
   var carried = [];
 
   Object.keys(seed || {}).forEach(function (k) { record[k] = seed[k]; });
+
+  var typed = (Store.config && Store.config.defaults && Store.config.defaults[entity]) || {};
+  Object.keys(typed).forEach(function (ten) { if (record[ten] === undefined) { record[ten] = typed[ten]; } });
 
   Object.keys(Schema[entity]).forEach(function (ten) {
     var khai = Schema[entity][ten];

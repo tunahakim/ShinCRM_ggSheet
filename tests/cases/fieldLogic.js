@@ -92,6 +92,15 @@ function chay(so) {
   check(so, 'seed đè được cả trường có ngầm định, vì bên gọi biết rõ hơn',
     hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000001', workDate: '2026-01-01' }).record.workDate, '2026-01-01');
 
+  // Ngầm định gõ tay khi nhập trên Sidebar: GAS đã kiểm với Category trước khi gửi, form trống chép vào; seed vẫn thắng.
+  const configCu = hop.Store.config;
+  hop.Store.config = { defaults: { customer: { verifyStatus: 'Chưa xác thực', province: 'Hà Nội' } } };
+  check(so, 'form khách trống điền ngầm định đã lưu, seed đè được ngầm định gõ tay',
+    [hop.fieldLogicNewRecord('customer', { province: 'Đà Nẵng' }).record.verifyStatus, hop.fieldLogicNewRecord('customer', { province: 'Đà Nẵng' }).record.province],
+    ['Chưa xác thực', 'Đà Nẵng']);
+  check(so, 'ngầm định của thực thể này không lan sang thực thể khác', hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000001' }).record.verifyStatus, undefined);
+  hop.Store.config = configCu;
+
   // Bảng DEFAULTS thiếu tên là lỗi bảng khai, phải hét lên chứ không im lặng để trống ô.
   const luu = hop.DEFAULTS.today;
   delete hop.DEFAULTS.today;

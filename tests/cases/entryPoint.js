@@ -17,7 +17,7 @@ function docLog(nen) {
 function chay(so) {
   section('EntryPoint — cửa vào tự động ghi Log theo chuyển trạng thái');
   let nen;
-  try { nen = dungHop({ sheets: ['Config', 'Log'] }); } catch (err) { return ghiLoiNap(so, 'nạp EntryPoint', err); }
+  try { nen = dungHop({ sheets: ['Log'] }); } catch (err) { return ghiLoiNap(so, 'nạp EntryPoint', err); }
   const hop = nen.hop;
   const goi = (name, fn) => hop.runEntryPoint(name, 'sidebar', fn);
   const hong = (message) => () => { throw new Error(message); };

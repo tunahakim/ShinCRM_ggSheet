@@ -33,7 +33,7 @@ const NHOM_CA = [
   require('./cases/creatorField'),
   require('./cases/entityRead'),
   require('./cases/categoryRead'),
-  require('./cases/configRead'),
+  require('./cases/settingsMigrate'),
   require('./cases/idGate'),
   require('./cases/dirtyState'),
   require('./cases/documentStore'),

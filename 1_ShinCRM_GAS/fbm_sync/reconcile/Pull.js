@@ -60,6 +60,8 @@ FbmSync.pullWrite = function (entity, records) {
   // Đọc cục bộ, nối khách cha, so ba chiều và ghi trong một hàm quyết: một lần Lưu hay Xóa của người dùng không chen được vào giữa lúc đọc và lúc ghi.
   var change = FbmSync.recordChange(function (gate) {
   var localRecords = gate.read(entity, FbmSync.recordSchemas());
+  // Ngầm định chỉ đọc khi lô thật sự có bản ghi mới: lô chỉ cập nhật không cần, và không bị chặn vì thiếu ngầm định.
+  var newDefaults = null;
   if (entity === 'activity') {
     var linked = FbmSync.linkActivityCustomers(records, gate.read('customer', FbmSync.recordSchemas()), categoryGate);
     records = linked.records;
@@ -145,7 +147,8 @@ FbmSync.pullWrite = function (entity, records) {
       // Mã lạ không được tạo dòng thiếu dữ liệu; người dùng bổ sung Category rồi chạy lại.
       if (categoryErrors.length) { skipped += 1; FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; chưa tạo bản ghi mới.'); return; }
       // Chỉ bản ghi mới nhận các giá trị mặc định này; record đã có không bị xóa quan hệ cha và giữ Xác thực của mình.
-      writes.push(entity === 'customer' ? Object.assign({ parentCompanyName: '' }, incoming, { verifyStatus: FbmSync.pullVerifyStatus() }) : incoming);
+      newDefaults = newDefaults || FbmSync.pullDefaults(entity, categoryReadAll());
+      writes.push(Object.assign(entity === 'customer' ? { parentCompanyName: '' } : {}, incoming, newDefaults));
       FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.synced, 'Tạo bản ghi mới từ FBM; cửa ghi sẽ cấp mã nội bộ và ngày tạo.');
       return;
     }
