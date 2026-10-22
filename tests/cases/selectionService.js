@@ -46,9 +46,11 @@ function chay(so) {
   lead.getRange(7, 1).setValue('CUS-000007');
 
   check(so, 'Customer tra cột mã khách của Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000004');
-  hop.errorPendingPush('Lỗi trigger thử.');
-  const coCauCho = hop.probeSelectionAndReload({}).pendingMessages;
-  check(so, 'lời hỏi của Sidebar đang mở trả câu chờ rồi xóa kho', [coCauCho.length, /Lỗi trigger thử\.$/.test(coCauCho[0]), hop.probeSelectionAndReload({}).pendingMessages], [1, true, []]);
+  hop.noticeRaise({ topic: 'entry_failure', scope: 'shinOnEdit', source: 'core', title: 'Lỗi trigger thử.' });
+  const coThongBao = hop.probeSelectionAndReload({}).notices;
+  check(so, 'lời hỏi của Sidebar đang mở trả danh sách thông báo và không xóa kho khi trả',
+    [coThongBao.length, coThongBao[0].key, coThongBao[0].title, hop.probeSelectionAndReload({}).notices.length],
+    [1, 'entry_failure:shinOnEdit', 'Lỗi trigger thử.', 1]);
 
   state.sheetName = 'Activity';
   check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000099');
@@ -237,14 +239,14 @@ function chay(so) {
     (ghiO(nen, 'Customer', 9, '@CUS_MA_KH', 'CUS-000009'), nen.dem.setValues > JSON.parse(demTruoc).setValues), true);
 
   const calls = [];
-  hop.runEntryPoint = function (name, source, channel, fn) {
-    calls.push([name, source, channel]);
+  hop.runEntryPoint = function (name, source, fn) {
+    calls.push([name, source]);
     return fn();
   };
   const finalViewReport = hop.viewProbeSelection();
   check(so, 'chỉ giữ một cổng selection/reload và cửa nghiệm thu view',
     [typeof hop.probeSelectionFull, typeof hop.probeSelectionCheap, calls, typeof finalViewReport[finalViewReport.length - 1]],
-    ['undefined', 'undefined', [['viewProbeSelection', 'sidebar', 'throw']], 'string']);
+    ['undefined', 'undefined', [['viewProbeSelection', 'sidebar']], 'string']);
 
   section('SelectionService — sheet xem tự do: GAS đọc hộ cột mã khi không có Extension, chỉ đọc');
   const tuDo = (ten, hang1, dong) => {

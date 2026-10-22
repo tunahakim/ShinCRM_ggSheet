@@ -51,7 +51,8 @@ const TEP_NEN = [
   'server/gate/RecordGate.js',
   'server/service/SelectionService.js',
   'server/service/LoadService.js',
-  'server/entry/ErrorReport.js',
+  'server/data/NoticeTopics.js',
+  'server/notice/NoticeGate.js',
   'server/entry/EntryPoint.js'
 ];
 

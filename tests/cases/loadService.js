@@ -60,7 +60,7 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'ok', 'pendingMessages', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'notices', 'ok', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
@@ -74,11 +74,10 @@ function chay(so) {
     ['!', 'Activity', 'Category', 'Config', 'Customer']);
   check(so, 'ms là số, không phải chuỗi', typeof rong.ms, 'number');
 
-  const coLoiCho = dungNap(null, { LOG_PENDING: JSON.stringify(['2026-09-08 09:00:00 — lỗi nền']) });
-  const goiCoLoiCho = coLoiCho.hop.loadCore();
-  check(so, 'loadCore nhả kho lỗi chờ đúng một lần để sidebar hiện bằng hộp thoại lớn',
-    [goiCoLoiCho.pendingMessages, coLoiCho.hop._props.LOG_PENDING, coLoiCho.hop.loadCore().pendingMessages],
-    [['2026-09-08 09:00:00 — lỗi nền'], undefined, []]);
+  const coThongBao = dungNap(null, { 'NOTICE:entry_failure:shinOnEdit': JSON.stringify({ key: 'entry_failure:shinOnEdit', topic: 'entry_failure', scope: 'shinOnEdit', level: 'error', clear: 'on_success', source: 'core', title: 'lỗi nền', lines: [], hint: '', actions: [], at: '2026-09-08 09:00:00' }) });
+  check(so, 'loadCore trả danh sách thông báo và không xóa kho khi trả (thông báo chỉ hết theo cách hết của nó)',
+    [coThongBao.hop.loadCore().notices.map((item) => item.title), coThongBao.hop.loadCore().notices.length],
+    [['lỗi nền'], 1]);
 
   const batVet = dungNap([['LOG_TRACE', 'sidebar']]).hop.loadCore();
   check(so, 'LOG_TRACE đang bật được cảnh báo qua gói nạp thay cho toast nhỏ',
@@ -130,7 +129,7 @@ function chay(so) {
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
   check(so, 'gói bị chặn chỉ có các khóa điều khiển, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
-    Object.keys(bao).sort(), ['blocked', 'budget', 'ms', 'ok', 'pendingMessages', 'reload'].sort());
+    Object.keys(bao).sort(), ['blocked', 'budget', 'ms', 'notices', 'ok', 'reload'].sort());
   check(so, 'gói bị chặn vẫn mang bảng thủ phạm để người dùng biết dọn sheet nào',
     bao.budget.sheets.length > 0, true);
   check(so, 'gói bị chặn vẫn mang trạng thái nạp lại', typeof bao.reload.revision, 'number');
@@ -307,7 +306,8 @@ const TEP_RENDER = [
   'server/gate/DeleteGate.js',
   'server/service/SelectionService.js',
   'server/service/LoadService.js',
-  'server/entry/ErrorReport.js',
+  'server/data/NoticeTopics.js',
+  'server/notice/NoticeGate.js',
   'server/entry/EntryPoint.js',
   'server/view/FilterMessages.js',
   'server/view/FilterParser.js',
