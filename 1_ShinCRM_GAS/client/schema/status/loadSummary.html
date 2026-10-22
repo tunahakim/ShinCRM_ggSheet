@@ -6,7 +6,7 @@ STATUS_SCHEMA.loadSummary = function (model) {
     statusSchemaBox([
       statusSchemaText('Thời gian lượt nạp này', 'strong'),
       statusSchemaKeyValues(model.timing),
-      statusSchemaText('Ba phần dưới cộng lại bằng phần trên. Năm con số này luôn hiện ở đây, nhưng chỉ được ghi vào sheet Log ở dòng sidebarBoot khi tham số LOG_TRACE ở sheet Config đang bật; ngày thường thì tắt để log không đầy dòng báo mọi thứ bình thường.')
+      statusSchemaText('Ba phần dưới cộng lại bằng phần trên. Năm con số này luôn hiện ở đây, nhưng chỉ được ghi vào sheet Log ở dòng sidebarBoot khi Ghi log chi tiết (LOG_TRACE) trong Cài đặt › Vận hành đang bật; ngày thường thì tắt để log không đầy dòng báo mọi thứ bình thường.')
     ]),
   ];
   if (model.warnings.length) {

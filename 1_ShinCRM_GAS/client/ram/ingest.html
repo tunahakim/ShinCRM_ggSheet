@@ -52,7 +52,6 @@ function ingestCore(payload) {
   var check = checkSchema({
     dataSchema: payload.schema,
     categoryCodes: Object.keys(payload.categories),
-    configDefaultCodes: Object.keys(payload.config.defaults),
     functionTables: { DEFAULTS: typeof DEFAULTS === 'undefined' ? null : DEFAULTS },
     uiSchema: typeof UI_SCHEMA === 'undefined' ? null : UI_SCHEMA,
     actions: typeof ACTIONS === 'undefined' ? null : ACTIONS,
