@@ -14,8 +14,8 @@ Branch `feature/notice-module`. Tách từ mục 1 của `2026.10.17 Todo.md`.
 
 - [x] Đọc Tài liệu 01 mục 1.4, 10, 10A
 - [x] Đọc code hiện có: `EntryPoint.js`, `ErrorReport.js`, `DocumentMemo.js`, `DocumentStore.js`, `client/ui/notices.html`, chỗ dùng kho chờ
-- [ ] Trình phương án ba phần + hợp đồng JSON, chờ chủ dự án duyệt
-- [ ] Viết hợp đồng vào Tài liệu 10 và 10A (thay Phần 8, kho chờ, bảng tham số)
+- [x] Trình phương án ba phần + hợp đồng JSON. Chủ dự án duyệt 2026-10-22 cả bốn điểm đề xuất: menu vẫn ném lại; lỗi hàm Sidebar cũng lưu kho; bảng tra nhanh thành thông báo `info`; viết lại tài liệu 10 Phần 8. Không `count`/`lastSeenAt`, thông báo hết thì xóa hẳn
+- [x] Viết hợp đồng vào Tài liệu 10 và 10A (thay Phần 8, kho chờ, bảng tham số)
 - [ ] Viết `server/notice/NoticeGate.js`: cổng phát, giải, bỏ, liệt kê
 - [ ] Test offline cổng thông báo (ghi đè cùng khóa, tự hết, ✕ chỉ cho loại bỏ tay, kho hỏng, trần số thông báo)
 - [ ] `runEntryPoint`: bỏ tham số kênh, lỗi phát thông báo theo cửa vào, thành công thì giải
