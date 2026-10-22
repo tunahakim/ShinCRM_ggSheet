@@ -39,23 +39,6 @@ function fbmAccountSettingsValidate(input) {
   return { ok: true, settings: normalized };
 }
 
-function fbmAccountSettingsLegacyValue(names) {
-  for (var i = 0; i < names.length; i += 1) {
-    try {
-      var value = typeof configGet === 'function' ? configGet(names[i], '') : '';
-      if (String(value || '').trim()) { return value; }
-    } catch (ignore) {}
-  }
-  return '';
-}
-
-function fbmAccountSettingsLegacy() {
-  return fbmAccountSettingsNormalize({
-    customerPrefix: fbmAccountSettingsLegacyValue(['FBM_MA_KH_PREFIX', 'FBM_MA_KH_TIEN_TO']),
-    customerCodeLength: fbmAccountSettingsLegacyValue(['FBM_MA_KH_LENGTH', 'FBM_MA_KH_DO_DAI'])
-  }, true);
-}
-
 FbmSync.accountSettingsRead = function () {
   // Đọc lỗi hoặc JSON hỏng phải ném lỗi: rơi về giá trị cũ rồi ghi đè sẽ xóa âm thầm cài đặt của người dùng.
   var props = fbmAccountSettingsProps(), parsed = props ? FbmSync.documentPropertyJson(FbmSync.ACCOUNT_SETTINGS_KEY, 'cài đặt tài khoản FBM') : null;
@@ -73,14 +56,7 @@ FbmSync.accountSettingsRead = function () {
     }
     return valid.settings;
   }
-  var migrated = fbmAccountSettingsLegacy();
-  if (props) {
-    var migratedWrite;
-    if (typeof FbmSync.documentPropertySet === 'function') { migratedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(migrated), 'account_settings_migration'); }
-    else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(migrated)); migratedWrite = { ok: true }; }
-    if (!migratedWrite.ok) { return migrated; }
-  }
-  return migrated;
+  return fbmAccountSettingsCloneDefault();
 };
 
 FbmSync.accountSettingsSave = function (input) {

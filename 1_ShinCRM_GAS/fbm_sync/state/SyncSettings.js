@@ -66,14 +66,6 @@ function fbmSyncSettingsValidate(input) {
   return { ok: true, settings: normalized };
 }
 
-function fbmSyncSettingsLegacy() {
-  var result = fbmSyncSettingsCloneDefault(), raw = '';
-  try { raw = typeof configGet === 'function' ? configGet('FBM_SYNC_APPROVAL_THRESHOLD', '') : ''; } catch (ignore) { raw = ''; }
-  var threshold = Number(raw);
-  if (isFinite(threshold) && threshold >= 0) { result.approvalThreshold = Math.floor(threshold); }
-  return result;
-}
-
 FbmSync.syncSettingsRead = function () {
   // Đọc lỗi hoặc JSON hỏng phải ném lỗi: rơi về giá trị cũ rồi ghi đè sẽ xóa âm thầm cài đặt của người dùng.
   var props = fbmSyncSettingsProps(), parsed = props ? FbmSync.documentPropertyJson(FbmSync.SYNC_SETTINGS_KEY, 'cài đặt đồng bộ FBM') : null;
@@ -92,14 +84,7 @@ FbmSync.syncSettingsRead = function () {
     }
     return valid.settings;
   }
-  var migrated = fbmSyncSettingsLegacy();
-  if (props) {
-    var migratedWrite;
-    if (typeof FbmSync.documentPropertySet === 'function') { migratedWrite = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(migrated), 'sync_settings_migration'); }
-    else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(migrated)); migratedWrite = { ok: true }; }
-    if (!migratedWrite.ok) { return migrated; }
-  }
-  return migrated;
+  return fbmSyncSettingsCloneDefault();
 };
 
 FbmSync.syncSettingsSave = function (input) {

@@ -155,8 +155,6 @@ FbmSync.identityStatus = function (runtime) {
   // Chỉ khi chưa có liên kết mới cần biết Sheet đã có ID FBM chưa; đã liên kết thì không đọc cả Sheet Customer/Activity mỗi lần Sidebar mở.
   if (!current.spreadsheetId) { if (FbmSync.bindingHasLinkedData()) { reasons.push('missing_binding_with_linked_data'); } }
   else { reasons = reasons.concat(FbmSync.identityMismatches(current, Object.assign({}, incoming, { spreadsheetId: actual }))); }
-  var expectedId = String(FbmSync.configValue('FBM_SPREADSHEET_ID') || '');
-  if (expectedId && actual && expectedId !== actual) { reasons.push('configured_spreadsheet_mismatch'); }
   var status = reasons.length ? 'REBIND_REQUIRED' : (current.spreadsheetId ? 'BOUND' : 'UNBOUND');
   return { ok: status !== 'REBIND_REQUIRED', status: status, code: status === 'REBIND_REQUIRED' ? 'REBIND_REQUIRED' : '', spreadsheetId: actual, binding: { spreadsheetId: current.spreadsheetId || '', userId: current.userId || '', username: current.username || '', accountName: current.accountName || '' }, reasons: reasons };
 };
@@ -246,16 +244,6 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
   var tax = FbmSync.customerTaxKey(incoming && (incoming.taxNumber || incoming.ma_so_thue)), matches = tax && localByTaxNumber && localByTaxNumber[tax] || [];
   if (matches.length === 1 && !String(matches[0].fbmId || '').trim() && !String(matches[0].fbmCustomerCode || '').trim()) { return matches[0]; }
   return null;
-};
-
-/**
- * Giá trị "Xác thực" cho khách mới kéo từ FBM, đọc từ ô Config. FBM không có trường này nên chỉ gán lúc tạo khách mới; khách đã có giữ giá trị của mình.
- * Preflight đã chặn ô trống hoặc giá trị không còn trong Category; ô trống mà vẫn tới đây thì ném lỗi chứ không ghi chuỗi đoán.
- */
-FbmSync.pullVerifyStatus = function () {
-  var value = String(configGet(FBM_VERIFY_STATUS_CONFIG_NAME, '') || '').trim();
-  if (!value) { var error = new Error('Chưa chọn giá trị Xác thực mặc định cho khách kéo từ FBM (Config ' + FBM_VERIFY_STATUS_CONFIG_NAME + ').'); error.code = 'FBM_VERIFY_STATUS_DEFAULT_MISSING'; throw error; }
-  return value;
 };
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. */
