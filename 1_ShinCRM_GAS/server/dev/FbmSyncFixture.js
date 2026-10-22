@@ -31,6 +31,13 @@ function fbmDevSetVerifyStatusDefault() {
   return { ok: true, value: saved.values.values.customer.verifyStatus };
 }
 
+/** Đặt ngưỡng chấp thuận đẩy về mặc định của code qua đúng cửa lưu cài đặt đồng bộ mà Sidebar dùng. */
+function fbmDevResetApprovalThreshold() {
+  var saved = FbmSync.syncSettingsSave({ approvalThreshold: FbmSync.DEFAULT_APPROVAL_THRESHOLD });
+  if (!saved.ok) { throw new Error(saved.message); }
+  return { approvalThreshold: saved.settings.approvalThreshold };
+}
+
 var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
 // Phạm vi live chủ dự án cho phép trên DEV: khách FBM ALT00010 và khách đã tạo thật CUS-020061.
 var FBM_DEV_DEFAULT_TEST_CODES = ['ALT00010', 'CUS-020061'];
