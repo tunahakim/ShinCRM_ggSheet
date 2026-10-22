@@ -221,7 +221,7 @@ function seedFakeData() {
   return report;
 }
 
-/** Xóa hết hàng dữ liệu của `Customer`, `Activity` và `Category`, giữ nguyên ba hàng tiêu đề. Không chạm `Config` và `Log`. */
+/** Xóa hết hàng dữ liệu của `Customer`, `Activity` và `Category`, giữ nguyên ba hàng tiêu đề. Không chạm `Log`. */
 function wipeFakeData() {
   var lines = ['ShinCRM — xóa dữ liệu giả khỏi Customer, Activity, Category'];
 

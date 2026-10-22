@@ -146,19 +146,6 @@ function reloadMatrixProbeFindCategoryCell(sheet) {
   return { cell: sheet.getRange(row, column), row: row, column: column };
 }
 
-function reloadMatrixProbeFindConfigCell(sheet) {
-  var map = readColumnMap('Config');
-  var keyColumn = map.map['@CFG_THAM_SO'];
-  var valueColumn = map.map['@CFG_THAM_SO_GIA_TRI'];
-  var last = Math.max(SHEET_FIRST_DATA_ROW, sheet.getLastRow());
-  var keys = sheet.getRange(SHEET_FIRST_DATA_ROW, keyColumn, Math.max(1, last - SHEET_FIRST_DATA_ROW + 1), 1).getValues();
-  var row = SHEET_FIRST_DATA_ROW;
-  for (var i = 0; i < keys.length; i++) {
-    if (String(keys[i][0] || '').trim() === LOG_TRACE_CONFIG_NAME) { row = SHEET_FIRST_DATA_ROW + i; break; }
-  }
-  return { cell: sheet.getRange(row, valueColumn), row: row, column: valueColumn };
-}
-
 function reloadMatrixProbeAssert(report, label, condition, detail) {
   report.push((condition ? 'DAT' : 'LOI') + ' | ' + label + (detail ? ' | ' + detail : ''));
   if (!condition) { throw new Error(label + (detail ? ': ' + detail : '')); }
@@ -189,7 +176,6 @@ function reloadMatrixProbe() {
   try {
     var prefProps = PropertiesService.getUserProperties();
     prefProps.setProperty(USER_PREFS.autoRenderView.key, 'true');
-    resetSettingsCache();
 
     temporaryView = createViewSheet(RELOAD_MATRIX_PROBE_VIEW);
     var viewSheet = book.getSheetByName(RELOAD_MATRIX_PROBE_VIEW);
@@ -284,23 +270,15 @@ function reloadMatrixProbe() {
     var categoryAfter = reloadMatrixProbeState();
     reloadMatrixProbeRestoreCell(categoryCell.cell, categorySnapshot);
     SpreadsheetApp.flush();
-    resetSettingsCache();
     reloadMatrixProbeAssert(report, 'Category cột @ phát phần Category + làm mọi view cũ', categoryAfter.revision > categoryBefore.revision && categoryAfter.category === true && reloadStateRead().viewsStaleRevision === categoryAfter.revision, JSON.stringify({ revision: categoryAfter.revision, category: categoryAfter.category, rendered: categoryResult && categoryResult.rendered && categoryResult.rendered.length }));
 
-    var configCell = reloadMatrixProbeFindConfigCell(book.getSheetByName('Config'));
-    var configSnapshot = reloadMatrixProbeSnapshotCell(configCell.cell);
+    // Lưu lại phần vận hành với giá trị đang có: đi đúng cổng màn Cài đặt dùng, không đổi giá trị nào nên không cần khôi phục.
     var configBefore = reloadMatrixProbeState();
-    var configValue = String(configSnapshot.value === null || configSnapshot.value === undefined ? '' : configSnapshot.value) + ' ';
-    configCell.cell.setValue(configValue);
-    SpreadsheetApp.flush();
-    var configResult = shinOnEdit({ range: configCell.cell, oldValue: configSnapshot.value, value: configValue });
+    var configResult = settingsSave('core_ops', {});
     recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var configAfter = reloadMatrixProbeState();
-    reloadMatrixProbeRestoreCell(configCell.cell, configSnapshot);
-    SpreadsheetApp.flush();
-    resetSettingsCache();
-    reloadMatrixProbeAssert(report, 'Config cột @ phát phần Config + làm mọi view cũ', configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === false && reloadStateRead().viewsStaleRevision === configAfter.revision, JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore, rendered: configResult && configResult.rendered && configResult.rendered.length }));
+    reloadMatrixProbeAssert(report, 'Lưu cài đặt phát phần config + làm mọi view cũ', configResult.ok && configAfter.revision > configBefore.revision && configAfter.config === true && configAfter.allCore === false && reloadStateRead().viewsStaleRevision === configAfter.revision, JSON.stringify({ revision: configAfter.revision, config: configAfter.config, allCore: configAfter.allCore }));
 
     var viewOrdinaryColumn = viewSheet.getLastColumn();
     var viewRow1Before = reloadMatrixProbeState();
@@ -353,7 +331,6 @@ function reloadMatrixProbe() {
       shinViewSheetNames(book).forEach(renderViewSheet);
       reloadMatrixProbeRestoreProperties(propSnapshot);
       reloadMatrixProbeRestoreUserPrefs(userPrefsSnapshot);
-      resetSettingsCache();
     } catch (cleanupError) {
       throw new Error('Probe không dọn sạch được: ' + errorMessage(cleanupError));
     }

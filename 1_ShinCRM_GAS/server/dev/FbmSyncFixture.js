@@ -21,18 +21,14 @@ function fbmPrepareAltTest() {
   return { ok: true, customerCode: 'ALT00010', deleted: false, writesToFbm: 0, cases: cases };
 }
 
-/** Gieo dòng Config mới (nếu thiếu) rồi chọn giá trị Xác thực mặc định (ưu tiên giá trị "chưa xác thực" của danh mục DEV), để chiều lấy trên DEV không bị preflight chặn. */
+/** Chọn ngầm định Xác thực khi kéo từ FBM (ưu tiên giá trị "chưa xác thực" của danh mục DEV) qua đúng cổng lưu cài đặt, để chiều lấy trên DEV không bị preflight chặn. */
 function fbmDevSetVerifyStatusDefault() {
-  setupSheets();
   var values = categoryReadAll().categories[DATA_SCHEMA.customer.verifyStatus.source] || [];
   var value = values.filter(function (item) { return String(item).normalize('NFC').toLowerCase().indexOf('chưa'.normalize('NFC')) === 0; })[0] || values[0] || '';
-  var map = readColumnMap('Config'), sheet = shinOpenSheet('Config'), first = SHEET_LAYOUT.Config.firstDataRow, last = sheet.getLastRow();
-  var names = sheet.getRange(first, columnIndex(map, '@CFG_THAM_SO'), Math.max(1, last - first + 1), 1).getValues().map(function (row) { return String(row[0] || '').trim(); });
-  var at = names.indexOf(FBM_VERIFY_STATUS_CONFIG_NAME);
-  if (at < 0 || !value) { return { ok: false, row: at, value: value }; }
-  sheet.getRange(first + at, columnIndex(map, '@CFG_THAM_SO_GIA_TRI')).setValue(value);
-  resetSettingsCache();
-  return { ok: true, row: first + at, value: configGet(FBM_VERIFY_STATUS_CONFIG_NAME, '') };
+  if (!value) { throw new Error('Category chưa có giá trị Xác thực nào để chọn làm ngầm định.'); }
+  var saved = settingsSave('defaults_fbm_pull', { values: { customer: { verifyStatus: value } } });
+  if (!saved.ok) { throw new Error('Không lưu được ngầm định kéo FBM: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
+  return { ok: true, value: saved.values.values.customer.verifyStatus };
 }
 
 var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
