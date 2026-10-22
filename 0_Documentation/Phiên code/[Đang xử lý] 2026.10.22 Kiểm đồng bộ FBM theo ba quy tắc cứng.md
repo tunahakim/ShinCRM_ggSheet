@@ -117,3 +117,60 @@ Mức: **Nặng** = có thể sai dữ liệu, ghi đè âm thầm, ghi FBM sai 
 - `activityBatchMismatch` và `scanJobMismatch` gần giống hệt; bốn chỗ tự gán `phase='error'` thay vì một công cụ đặt lỗi.
 - Ngày Việt Nam chuẩn hóa ba chỗ với hai nguồn múi giờ (`Fingerprint.js:32` cứng `Asia/Ho_Chi_Minh`, `GridRead.js:167` theo múi giờ script).
 - `threeWay` hai chế độ, tự hash baseline thì bỏ `categoryGate`.
+
+## Phương án đề xuất (chờ chủ dự án chốt)
+
+Ký hiệu cho bảng (c): **R1** lỗi không có đường xảy ra; **R2** một việc một công cụ; **R3** người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu; **R4** tiến trình lớn ghép từ tiến trình nhỏ.
+
+### P1. Một cửa cho mọi lượt, tiến trình đăng nhập có người điều phối riêng (N1, phần login của N2)
+- (a) Gốc: ô state là tài nguyên độc quyền (một tab FBM, một phiên cookie) nhưng không có một cửa duy nhất cấp quyền dùng ô: đăng nhập thử và hủy phiên cũ đi đường riêng ngoài khóa, kiểm "đang chạy" và ghi ô ở hai lần khác nhau. Mục đích lượt (thử, ép, tự đăng nhập giữa lượt) không do người điều phối giữ mà rải vào từng bước dưới dạng cờ.
+- (b) Dùng lại: `controlDispatchLocked` + `runSlice` + `stateStart` (đã kiểm và ghi trong cùng một lần cầm khóa cho lượt đồng bộ); vòng `fbmSyncLoop` ở Sidebar; các bước `loginAdapterContinue`/`loginAuthorizeContinue`/`loginIdentityContinue` giữ phần làm việc, bỏ phần rẽ nhánh. Giữ **một ô state** và quy tắc một lượt tại một thời điểm (không tách ô: hai lượt song song vẫn tranh cùng tab và cookie). Đăng nhập thử và hủy phiên cũ thành lệnh `start` với loại lượt `login_test`/`login_force`; tiến trình đăng nhập có một người điều phối `loginRun` nhận "làm gì sau khi đăng nhập xong" lúc khởi chạy (kết thúc lượt / nối lại cursor đang chờ / khởi chạy lượt đồng bộ) và ghi vào cursor; các bước chỉ trả dữ liệu `{ok, identity, code}`. GAS trả kết luận lượt (`result.ok`, mã, lời) để Sidebar hiện; Sidebar bỏ `fbmSyncLoginTestLoop` và bỏ việc tự nối "đăng nhập rồi chạy".
+- (c) R1: bịt bằng kiến trúc đường "lượt khác ghi đè giữa chừng" (mọi lượt chỉ vào ô qua `stateStart` trong khóa, `runInProgress` từ chối lượt thứ hai) và đường "bước sau đọc nhầm lượt" (cursor mang runId, `continue` đối chiếu runId); không còn phép kiểm nào thay. R2: một cửa khởi chạy, một vòng Sidebar. R3: bước login là công cụ trả dữ liệu, chỉ `loginRun` quyết. R4: lượt đồng bộ gặp phiên hết hạn gọi `loginRun` như một công cụ, đăng nhập thử cũng gọi đúng `loginRun`.
+
+### P2. Tách cổng request và bảng điều phối chặng (N2, N4 phần GAS, lõi V24)
+- (a) Gốc: `nextEnvelope` vừa là cổng phát vừa là người quyết (công tắc, ngân sách, dừng, phiên); `continueStep` là một switch ôm mọi chặng và cổng phiên; nối chuỗi nền viết ở bốn chỗ.
+- (b) Dùng lại: `nextEnvelope` giữ đúng việc dựng envelope, cấp id, ghi request đang chờ; các phép kiểm công tắc/ngân sách/dừng gom thành một công cụ kiểm thuần trả quyết định, `runSlice` gọi trước; cổng phiên (`sessionGate*`) thành một tiến trình nhỏ gọi từ `runSlice` khi response báo hết phiên. `continueStep` đổi thành bảng `cursor.kind → hàm điều phối chặng`. Một hàm nối chuỗi nền duy nhất cho heartbeat, `chainAdvance`, `chainTail`, nhánh heartbeat của `continue`. Lõi V24: kho "máy chạy nền" trong GAS (mã máy, tên, lúc giao, lần hỏi cuối); `fbmSyncHeartbeatRequest` nhận mã máy và trả lệnh dừng nhịp cho máy không được giao; màn chọn máy ở mục 4.
+- (c) R1: bịt đường "chặng quên kiểm công tắc/ngân sách" (kiểm nằm ở người điều phối, chặng không tự phát request) và đường "hai máy nhận việc" (chỉ máy được giao nhận request). Còn phép kiểm: máy được giao im lặng quá số nhịp thì báo lỗi, vì GAS không chủ động gọi được Extension. R2: một cổng phát, một hàm nối chuỗi. R3: chặng trả request mong muốn, người điều phối phát. R4: `runSlice` gọi tiến trình cổng phiên và tiến trình chặng.
+
+### P3. State là dữ liệu truyền qua công cụ (N3, phần đặt lỗi của N10)
+- (a) Gốc: không có hợp đồng "người điều phối đọc state một lần, công cụ nhận và trả"; công cụ tự `stateRead`/`stateWrite`, nên hai bản state cùng sống trong một lời gọi và bản ghi sau đè bản trước (lỗi `identityBlocks` đã xác nhận).
+- (b) Dùng lại: `runSlice` đã cầm khóa và kho đã ghi gộp (`withPropertyBuffer`). Quy ước: `runSlice` đọc state một lần, truyền vào chặng; công cụ chỉ trả kết quả (patch, số đếm, vấn đề); `runSlice` ghi một lần. `scriptSettings(state)` nhận state qua tham số. `stateWrite` thành công cụ ghi thuần, hiệu ứng phụ (đóng bước, Log request chưa trả lời) chuyển lên người điều phối. Một công cụ `runFail(state, code, message)` thay bốn chỗ gán tay và hai hàm mismatch. `pendingPushClear` đi cùng lần ghi kho cuối, sau khi `recordChange` trả đạt.
+- (c) R1: bịt đường "hai bản state đè nhau" (công cụ không còn gọi `stateRead`/`stateWrite`; test tĩnh chặn hai hàm này ngoài danh sách người điều phối). Còn phép kiểm: ghi Sheet rồi ghi kho không nguyên tử được vì là hai kho khác nhau; giữ thiết kế "ghi lại idempotent" và test nhánh lỗi giữa chừng. R2: một công cụ đặt lỗi. R3: đúng định nghĩa quy tắc. R4: không đổi.
+
+### P4. Cài đặt FBM về cổng cài đặt chung, một cửa cho mỗi công tắc (N5, lỗi ngưỡng)
+- (a) Gốc: năm kho cài đặt FBM có bộ đọc/kiểm/lưu riêng, ghi ngoài khóa; một công tắc có nhiều cửa; trạng thái lần thử đăng nhập lẫn với cài đặt.
+- (b) Dùng lại: cổng `settingsSave`/`settingsValue`/`settingsDefaultsChecked` và bảng khai phần `fbmSettingsSections`. Khai các phần `fbm_sync`, `fbm_account`, `fbm_login` (bật/tắt, chính sách, tên đăng nhập), `fbm_extension`, `fbm_background`. Cổng cần thêm: kiểu `boolean`, `codeList`, `number` có khoảng giá trị (ô trống là chưa đặt, không thành 0), và một hàm kiểm cả phần thuần (khai trong phần) cho ràng buộc giữa các trường (khoảng nghỉ min ≤ max, tiền tố đi cùng độ dài). Đổi mã khách chỉ định ra khách (đọc Sheet) là bước của người điều phối lưu phần `fbm_sync`, truyền kết quả vào hàm kiểm. Trạng thái lần thử đăng nhập và credential ref chuyển sang kho state riêng. Cờ `pullDefault` thành trường `syncPermission` trong `defaults_fbm_pull`. Mỗi công tắc một lệnh của `controlDispatchLocked`. `approvalThreshold` đọc qua `settingsValue`, bỏ `catch`. Hàm chuyển một lần từ khóa cũ sang khóa `SETTINGS:` theo mẫu `settingsMigrateFromConfig`.
+- (c) R1: bịt đường "ô trống thành 0" và "lưu giá trị chưa kiểm" (chỉ `settingsWrite` ghi, chỉ sau `settingsValidate`); đường "hai cửa đặt công tắc lệch nhau" mất vì chỉ còn một cửa. R2: một cổng cài đặt. R3: hàm kiểm cả phần thuần, người điều phối đọc Sheet rồi truyền vào. R4: lưu cài đặt FBM gọi người điều phối `settingsSave`.
+
+### P5. Không còn lỗi im lặng, Extension một cổng gọi GAS (N6, lỗi 404, phần gọi GAS của N9)
+- (a) Gốc: Extension thiếu một cổng gọi GAS (hai đường xử lý lỗi khác nhau); các `catch` rỗng và nhánh `typeof ... === 'function'` là phép kiểm phòng thứ tự nạp không còn cần (GAS nạp mọi tệp trước khi chạy).
+- (b) Dùng lại: `relayRun` làm người điều phối duy nhất; gom `fbmHeartbeatNow` và closure `post` thành một hàm gọi GAS nhận cả hai kiểu lỗi, ghi `noteChainStep` một lần với kind, requestId, hop, mã thật, `httpStatus`; `postRelay` chỉ fetch và trả kết quả. Hộp đen thêm ô "lỗi relay gần nhất" không bị bước sau đè, `heartbeat_request` kế tiếp mang lên Log. Thử lại có giãn cách chỉ khi nộp kết quả có request đang chờ ở GAS; số lần và khoảng nghỉ do GAS cấp trong envelope (như `meta.requestGap`), nằm trong hạn `gasReplyMs`. GAS bỏ `catch` rỗng và nhánh `typeof`, dùng `logEvent`/`noticeRaise` sẵn có; Sidebar bỏ `.catch` trả null.
+- (c) R1: bịt đường "kết quả FBM bị bỏ vì nộp hỏng mà không ai biết" (một cổng, mọi lỗi đi một đường ghi hộp đen). Còn phép kiểm: 404 xảy ra khi GAS chưa chạy nên chỉ báo trễ ở lần gọi được kế tiếp; Extension không ghi được Sheet `Log`. R2: một cổng gọi GAS. R3: `postRelay` không tự ghi chẩn đoán. R4: đường Sidebar dùng cùng hàm chuẩn bị tab và gửi tab.
+
+### P6. Lượt chờ chấp thuận có hạn và có thông báo (N7)
+- (a) Gốc: `awaiting_approval` tính là đang chạy (chặn mọi lượt nền, kể cả Giữ phiên) nhưng nằm ngoài danh sách thu hồi và không phát thông báo.
+- (b) Dùng lại: `preflightApply` gọi `noticeRaise` (topic chờ chấp thuận) khi đặt phase; `recoverStaleRun` thêm luật hạn chờ duyệt đọc từ phần cài đặt `fbm_sync`: quá hạn thì đóng lượt về `paused` mã `SYNC_APPROVAL_EXPIRED`, ghi Log, đổi thông báo. Chưa ghi gì lên FBM nên đóng là an toàn; lượt nền kế tiếp preflight lại và chờ duyệt lại nếu vẫn vượt ngưỡng.
+- (c) R1: bịt đường "đứng im vô hạn" bằng luật hạn trong cửa thu hồi duy nhất. R2: dùng cổng thông báo và cửa thu hồi sẵn có. R3, R4: không đổi.
+
+### P7. Sidebar chỉ khởi chạy và hiển thị (N8)
+- (a) Gốc: DTO trạng thái chưa mang kết luận nghiệp vụ (đang chạy, bước, kết luận, quyết định xung đột), nên Sidebar tự suy từ phase/cursor.
+- (b) Dùng lại: `statusView` thêm trường kết luận (`running`, `pipeline` luôn có, `result`), danh sách phase ở một nơi trong GAS; xung đột: Sidebar chỉ gửi lựa chọn từng trường, GAS (`confirm_conflict`) quyết PA và giá trị; xóa credential và sửa tên đăng nhập do GAS điều phối, Extension làm theo lệnh. Phần vẽ lại màn làm ở mục 4.
+- (c) R1: bịt đường "Sidebar báo thành công khi GAS kết luận lỗi" và "năm danh sách phase lệch nhau". R2, R3, R4: Sidebar không xếp lại công cụ của GAS.
+
+### P8. Extension không làm nghiệp vụ (phần còn lại của N9)
+- (a) Gốc: luồng login FBM, quyết tải lại tab và điểm dừng lô nằm ở Extension.
+- (b) Dùng lại: tải lại tab chỉ khi envelope có lệnh; luồng login FBM chuyển sang GAS thành dãy request thường (GAS tính MD5 bằng `Utilities.computeDigest`), Extension chỉ fetch và ghi `localStorage` theo lệnh; cắt gói quét giữ ở Extension vì là truyền tin (danh sách giữ lại do GAS cấp).
+- (c) R1: bịt đường "Extension quyết khác GAS". R2, R3: Extension một việc là chuyển request. R4: không đổi.
+
+### P9. Một công cụ cho mỗi phép tính trùng (N10)
+- (a) Gốc: không có công cụ chung cho hash dòng FBM, điều kiện "cần đẩy", gate danh mục của một lời gọi và chuẩn hóa ngày.
+- (b) Dùng lại: một hàm hash trên một hình dạng (record đã đổi tên; mọi chỗ đổi dòng thô sang record trước); một vị từ "cần đẩy" cho cả preflight và chặng đẩy; gate danh mục theo bản chụp của lời gọi như `readLocal`, bỏ cache `defineProperty`; một hàm ngày theo hằng múi giờ dự án; `threeWay` chỉ nhận hash.
+- (c) R1: bịt đường "preflight đếm khác tập đẩy" và "hash lệch hình dạng". R2: đúng định nghĩa. R3, R4: không đổi.
+
+### Thứ tự chặng 3b đề xuất
+1. Bịt lỗi thật, nhỏ và độc lập: mất `identityBlocks`; `approvalThreshold`; P6; P5.
+2. P1.
+3. P2.
+4. P3.
+5. P4.
+6. P9, rồi phần hợp đồng của P7, rồi P8.
