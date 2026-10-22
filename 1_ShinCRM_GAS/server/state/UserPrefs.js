@@ -59,7 +59,7 @@ function userPrefsFromValues(values) {
  * Trả về cả khối chứ không phải riêng núm vừa ghi, để client thay nguyên khối và không bao giờ có hai nguồn lệch nhau. Tên núm sai hay giá trị sai thì ném lỗi — khác hẳn chiều đọc, vì ở đây lỗi là do code gọi sai, không phải do dữ liệu cũ.
  */
 function userPrefsWrite(name, value) {
-  return runEntryPoint('userPrefsWrite', 'sidebar', 'throw', function () {
+  return runEntryPoint('userPrefsWrite', 'sidebar', function () {
     var khai = USER_PREFS[name];
     if (!khai) {
       throw new Error('Không có núm chọn "' + name + '". Các núm hiện có: ' + Object.keys(USER_PREFS).join(', ') + '.');

@@ -34,6 +34,10 @@ var SETTINGS = {
    * Đo trên GAS DEV 2026-10-17 (`measureSheetReadGap`): một lệnh `getValues` lạnh tốn 70–130 ms dù 1 hay 100 dòng, mỗi dòng thêm chỉ 0,2–0,4 ms; hòa vốn khoảng 100 ms / 0,3 ms ≈ 300 dòng.
    */
   SHEET_READ_MERGE_GAP_ROWS: 300,
+  /** Trần số thông báo đang còn trong kho; vượt thì gỡ cái cũ nhất. Tài liệu 10 Phần 8. */
+  NOTICE_MAX: 20,
+  /** Trần ký tự của một thông báo, tính chung tiêu đề, các dòng và gợi ý; giữ mỗi khóa DocumentProperties dưới 9 KB kể cả chữ tiếng Việt ba byte. Tài liệu 10 Phần 8. */
+  NOTICE_CHARS_MAX: 2500,
   /** Hạn giữ log, tính theo ngày. Tài liệu 10 Phần 6. */
   LOG_RETENTION_DAYS: 30,
   /** Trần số dòng của sheet `Log`. Tài liệu 10 Phần 6. */

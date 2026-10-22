@@ -3,7 +3,7 @@
  *
  * **Tên tệp khi đẩy lên Google là cả đường dẫn.** `client/Sidebar.html` ở máy trở thành tệp tên `client/Sidebar` trên Google, nên mọi lời gọi `createTemplateFromFile` và `include` phải ghi đủ đường dẫn, không được ghi tên cụt. Ghi tên cụt là lỗi đã từng xảy ra ở dự án cũ, và nó chỉ lộ ra lúc chạy thật chứ không lộ lúc đẩy code.
  *
- * **Luồng mở tệp dựng menu và mở sidebar.** `onOpen` là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp) nên chỉ dựng thực đơn; `shinAutoShowSidebar` là trigger cài đặt có quyền UI để mở sidebar. Cả hai không ghép việc phụ như nhả kho lỗi vào đây. Kho lỗi được đưa qua `loadCore` khi sidebar đã có kênh hộp thoại lớn để hiển thị.
+ * **Luồng mở tệp dựng menu và mở sidebar.** `onOpen` là trigger đơn (simple trigger — trigger Google tự gọi, chạy với quyền hạn hẹp) nên chỉ dựng thực đơn; `shinAutoShowSidebar` là trigger cài đặt có quyền UI để mở sidebar. Cả hai không ghép việc phụ vào đây. Lệnh menu không bật hộp thoại báo lỗi: lỗi đi qua cổng thông báo (`runEntryPoint`) và Sidebar hiện khi đọc `notices`.
  */
 
 /** Tên thực đơn trên thanh menu. */
@@ -27,9 +27,9 @@ function onOpen() {
 
 }
 
-/** Trigger cài đặt mở sidebar khi tệp được mở. Không báo alert vì đây không phải lệnh người dùng vừa bấm. */
+/** Trigger cài đặt mở sidebar khi tệp được mở. Lỗi hiện ở Sidebar lần mở sau qua cổng thông báo. */
 function shinAutoShowSidebar() {
-  return shinShowSidebar(ERROR_CHANNEL_THROW);
+  return runEntryPoint('shinAutoShowSidebar', 'core', sidebarShow);
 }
 
 /** Cài một trigger mở sidebar duy nhất trên Spreadsheet hiện tại. `false` nghĩa là trigger đã có. */
@@ -44,18 +44,15 @@ function shinInstallSidebarOpenTrigger() {
 }
 
 function shinRenderCurrentView(source) {
-  var fromSidebar = source === 'sidebar';
-  return runEntryPoint('shinRenderCurrentView', fromSidebar ? 'sidebar' : 'core', fromSidebar ? ERROR_CHANNEL_THROW : ERROR_CHANNEL_ALERT, function () {
+  return runEntryPoint('shinRenderCurrentView', source === 'sidebar' ? 'sidebar' : 'core', function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var result = renderViewSheet(sheet.getName());
-    // Lỗi vẽ đã vào sổ và Log; bấm từ menu thì báo ngay bằng hộp thoại, bấm từ Sidebar thì Sidebar hiện màn thông báo.
-    if (!result.ok && !fromSidebar) { SpreadsheetApp.getUi().alert('Sheet "' + result.sheetName + '" chưa được vẽ lại', viewProblemsText(result.problems), SpreadsheetApp.getUi().ButtonSet.OK); }
-    return result;
+    // Lỗi vẽ đã vào sổ vẽ và Log; Sidebar hiện khối lỗi khi đứng ở sheet đó, dù lượt vẽ chạy từ menu hay từ Sidebar.
+    return renderViewSheet(sheet.getName());
   });
 }
 
 function shinPrepareCurrentView() {
-  return runEntryPoint('shinPrepareCurrentView', 'core', ERROR_CHANNEL_ALERT, function () {
+  return runEntryPoint('shinPrepareCurrentView', 'core', function () {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     return prepareViewSheet(sheet.getName());
   });
@@ -65,7 +62,7 @@ function shinCreateViewSheet() {
   var ui = SpreadsheetApp.getUi();
   var answer = ui.prompt('Tạo sheet quản trị mới', 'Nhập tên sheet. ShinCRM sẽ tự thêm dấu ! ở đầu nếu bạn không nhập.', ui.ButtonSet.OK_CANCEL);
   if (answer.getSelectedButton() !== ui.Button.OK) { return { ok: false, cancelled: true }; }
-  return runEntryPoint('shinCreateViewSheet', 'core', ERROR_CHANNEL_ALERT, function () {
+  return runEntryPoint('shinCreateViewSheet', 'core', function () {
     return createViewSheet(answer.getResponseText());
   });
 }
@@ -80,33 +77,38 @@ function shinResetConfig() {
     ui.ButtonSet.YES_NO
   );
   if (answer !== ui.Button.YES) { return { ok: false, cancelled: true }; }
-  return runEntryPoint('shinResetConfig', 'core', ERROR_CHANNEL_ALERT, function () {
+  return runEntryPoint('shinResetConfig', 'core', function () {
     return resetConfigToDefaults();
   });
 }
 
 function shinShowFilterQuickReference() {
-  return runEntryPoint('shinShowFilterQuickReference', 'core', ERROR_CHANNEL_ALERT, function () {
-    SpreadsheetApp.getUi().alert('Bảng tra nhanh cú pháp lọc', FILTER_QUICK_REFERENCE, SpreadsheetApp.getUi().ButtonSet.OK);
+  return runEntryPoint('shinShowFilterQuickReference', 'core', function () {
+    // Hiện ở Sidebar qua cổng thông báo, không bật hộp thoại (Tài liệu 10 Phần 8).
+    noticeRaise({ topic: 'filter_reference', scope: '', source: 'core', title: 'Bảng tra nhanh cú pháp lọc', lines: FILTER_QUICK_REFERENCE.split('\n') });
     return true;
   });
 }
 
 /**
- * Mở sidebar. Đây là lệnh menu nên kênh báo lỗi là `getUi().alert()` — được phép vì chính người dùng vừa bấm.
+ * Lệnh menu mở sidebar; tự cài trigger mở sidebar khi tệp được mở nếu chưa có.
  *
  * Hàm này **không nạp dữ liệu**. Nó chỉ dựng khung; sidebar tự gọi `loadCore` qua `google.script.run` sau khi khung đã hiện. Tách như vậy vì thời gian nạp thuộc về sidebar, nơi có chỗ vẽ chỉ báo tiến trình — còn nếu nạp ở đây thì người dùng bấm menu rồi ngồi nhìn một khoảng trống vài giây không có gì báo là hệ thống đang chạy.
  */
-function shinShowSidebar(errorChannel) {
-  return runEntryPoint('shinShowSidebar', 'core', errorChannel || ERROR_CHANNEL_ALERT, function () {
-    if (!errorChannel) { shinInstallSidebarOpenTrigger(); }
-    var html = HtmlService.createTemplateFromFile('client/Sidebar')
-      .evaluate()
-      .setTitle(MENU_TITLE);
-
-    SpreadsheetApp.getUi().showSidebar(html);
-    return true;
+function shinShowSidebar() {
+  return runEntryPoint('shinShowSidebar', 'core', function () {
+    shinInstallSidebarOpenTrigger();
+    return sidebarShow();
   });
+}
+
+/** Dựng khung sidebar và hiện nó. Dùng chung cho lệnh menu và trigger mở tệp. */
+function sidebarShow() {
+  var html = HtmlService.createTemplateFromFile('client/Sidebar')
+    .evaluate()
+    .setTitle(MENU_TITLE);
+  SpreadsheetApp.getUi().showSidebar(html);
+  return true;
 }
 
 /**

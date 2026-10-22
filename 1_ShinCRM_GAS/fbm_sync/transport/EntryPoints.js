@@ -183,7 +183,7 @@ function doPost(event) {
     var props = PropertiesService.getScriptProperties();
     var expected = String(props.getProperty('FBM_SYNC_KEY') || '');
     if (!expected || body.key !== expected) { return reply({ ok: false, error: 'unauthorized' }); }
-    return reply(runEntryPoint('fbmRelay', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { FbmSync.relayUrlRecord(props); return fbmSyncRelayHandle(body); }));
+    return reply(runEntryPoint('fbmRelay', 'fbm_sync', function () { FbmSync.relayUrlRecord(props); return fbmSyncRelayHandle(body); }));
   } catch (err) { return reply({ ok: false, error: errorMessage(err) }); }
 }
 /**
@@ -193,7 +193,7 @@ function doPost(event) {
 function doGet(event) {
   var params = event && event.parameter ? event.parameter : {};
   if (params.token !== undefined && typeof devRunnerGet === 'function') { return devRunnerGet(event); }
-  var result = runEntryPoint('fbmRelayUrlRecord', 'fbm_sync', ERROR_CHANNEL_PENDING, function () { return FbmSync.relayUrlRecord(PropertiesService.getScriptProperties()); });
+  var result = runEntryPoint('fbmRelayUrlRecord', 'fbm_sync', function () { return FbmSync.relayUrlRecord(PropertiesService.getScriptProperties()); });
   var text = result && result.url ? 'ShinCRM đã ghi địa chỉ Web App đồng bộ nền của Sheet này. Mở lại Sidebar để gửi địa chỉ cho Extension.' : 'ShinCRM chưa ghi được địa chỉ Web App; xem Sheet Log.';
   return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);
 }

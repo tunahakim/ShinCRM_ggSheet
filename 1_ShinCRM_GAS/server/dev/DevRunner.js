@@ -24,7 +24,7 @@ var DEV_RUNNER_ALLOWED = [
   'devLogTraceOn', 'devLogTraceOff', 'formulaProbeCreate', 'formulaProbeRemove', 'measureReloadCosts', 'measureTabColorBatch',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeConfigRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'measureProbeCheap', 'measureProbeFull', 'measureEntitySignal', 'reloadRecords', 'reloadConfig', 'renderAllManagedViews', 'renderAllManagedViewsIfAllowed',
-  'probeErrorReport', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
+  'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeCreateSheet', 'viewProbeAutoRender', 'viewProbeTabTint', 'viewWipeLegacyKeys',
   'measureReloadJournalBaseline', 'measureBasketFlushBreakdown', 'measureSaveBreakdown', 'measureSheetReadGap', 'measureSheetReadPrefetch', 'measureSheetReadCopy', 'measureConfigReads', 'measureViewRender', 'measureSheetReadCalls', 'probeTriggerState', 'shinInstallTriggers', 'shinInstallSidebarOpenTrigger', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmSyncStart', 'fbmGetSyncStatus', 'fbmContinueSync', 'fbmReportSyncTransportFailure', 'fbmCancelSync', 'fbmStartIdentityCheck', 'fbmStartIdentityProbe', 'fbmSyncStartActivityBulk', 'fbmSyncPreflight', 'fbmSyncContinue', 'fbmSyncCancel', 'fbmSyncStatus', 'fbmSyncStateProbe', 'fbmGetMasterSwitch', 'fbmSetMasterSwitch', 'fbmGetBackgroundSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmSyncHeartbeatRequest', 'fbmSyncHeartbeat', 'fbmSyncHeartbeatTransportFailure', 'fbmSyncTrace', 'fbmGetSyncTrace', 'fbmLogSyncTrace', 'fbmSupervisorTrigger', 'fbmGetLoginConfig', 'fbmSetAutoLogin', 'fbmStartLoginTest', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmGetSyncSettings', 'fbmGetPanelBundle', 'fbmSaveSyncSettings', 'fbmSaveAccountSettings', 'fbmSaveExtensionConfig', 'fbmSaveBackgroundSchedule', 'fbmSaveLoginPolicy'
@@ -85,7 +85,7 @@ function devRunnerGet(e) {
     }
     var started = new Date().getTime();
     // Bọc như mọi cửa vào: hàm dò có ghi thì cần danh sách thay đổi chờ ghi nhận của lần chạy.
-    var result = runEntryPoint('dev:' + name, 'core', ERROR_CHANNEL_THROW, function () { return scope[name](); });
+    var result = runEntryPoint('dev:' + name, 'core', function () { return scope[name](); });
     var elapsed = new Date().getTime() - started;
     return reply('OK\nHàm: ' + name + '\nHết: ' + elapsed + ' ms\n\n' + devFormatResult(result));
   } catch (loi) {

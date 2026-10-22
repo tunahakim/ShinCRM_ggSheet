@@ -1,7 +1,7 @@
 /**
- * Nghiệm thu DEV: lỗi trong trigger sửa ô phải vào kho câu chờ để Sidebar đang mở hiện ra.
+ * Nghiệm thu DEV: lỗi trong trigger sửa ô phải thành thông báo `entry_failure:shinOnEdit` để Sidebar đang mở hiện ra.
  *
- * Chạy đúng `shinOnEdit` trên ô mã khách đầu tiên của Customer, chỉ thay tạm `shinReloadDecision` bằng hàm ném lỗi rồi trả lại ngay. Không đọc kho bằng `takePendingMessages` để câu chờ còn nguyên cho Sidebar lấy ở lời hỏi kế tiếp.
+ * Chạy đúng `shinOnEdit` trên ô mã khách đầu tiên của Customer, chỉ thay tạm `shinReloadDecision` bằng hàm ném lỗi rồi trả lại ngay. Thông báo còn nguyên tới khi trigger chạy thành công hoặc người dùng bấm ✕.
  */
 function probeTriggerErrorPending() {
   var sheet = shinOpenBook().getSheetByName(ENTITY_SHEETS.customer);
@@ -16,5 +16,5 @@ function probeTriggerErrorPending() {
   } finally {
     shinReloadDecision = real;
   }
-  return ['Trigger ném: ' + thrown, 'Kho câu chờ: ' + documentProps().getProperty(ERROR_PENDING_KEY)].join('\n');
+  return ['Trigger ném: ' + thrown, 'Thông báo: ' + documentProps().getProperty(NOTICE_KEY_PREFIX + noticeKey('entry_failure', 'shinOnEdit'))].join('\n');
 }

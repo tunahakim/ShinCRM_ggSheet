@@ -33,7 +33,7 @@ function clientTimingRounds(value) {
  * **Dòng vết, không phải dòng luôn ghi.** Chủ dự án chốt ngày 05/09/2026: bật debug thì ghi chi tiết, ngày thường ẩn hết. Nên dòng này chỉ ra sheet khi tham số `LOG_TRACE` ở sheet `Config` phủ nguồn `sidebar`. Tắt công tắc thì một lượt mở sidebar trơn không tốn dòng log nào — và vì đây là lượt gọi riêng, không nằm trong lượt chạy đã lỗi, nên tắt là tắt hẳn chứ không có đường tự bung ra như các dòng vết khác.
  */
 function logClientTiming(timing) {
-  return runEntryPoint('logClientTiming', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('logClientTiming', LOAD_SOURCE, function () {
     var nguon = timing && typeof timing === 'object' ? timing : {};
     var detail = {};
 

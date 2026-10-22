@@ -228,7 +228,7 @@ function selectionLogChannelSilence(silent) {
  * context lần trước rồi thực thi output.
  */
 function probeSelectionAndReload(input) {
-  return runEntryPoint('probeSelectionAndReload', 'sidebar', 'throw', function () {
+  return runEntryPoint('probeSelectionAndReload', 'sidebar', function () {
     var started = Date.now();
     var request = input || {};
     var requestId = selectionReloadRequestId(request);
@@ -268,7 +268,7 @@ function probeSelectionAndReload(input) {
       payload: payload,
       view: selectionViewDecision(selection.sheetName, latest),
       processedRevision: payload ? journal.rev : 0,
-      pendingMessages: takePendingMessages(),
+      notices: noticeList(),
       ms: Date.now() - started
     };
   });
@@ -298,7 +298,7 @@ function selectionCustomerCell(context, snapshot) {
 
 /** Nghiệm thu trên Google: chọn hàng dữ liệu và hàng tiêu đề để đối chiếu mã khách cùng thời gian thật. */
 function viewProbeSelection() {
-  return runEntryPoint('viewProbeSelection', 'sidebar', 'throw', function () {
+  return runEntryPoint('viewProbeSelection', 'sidebar', function () {
     var started = Date.now();
     var context = selectionProbeContext();
     var snapshot = selectionSnapshotFromContext(context);

@@ -63,6 +63,13 @@ function logGateWriteCount() {
   return LOG_WRITE_CALLS;
 }
 
+/** Câu lỗi ngắn cho mắt người đọc. Lấy `message` chứ không lấy cả `stack`: `stack` thuộc sheet `Log`, nơi có chỗ và có người đi tìm nó. */
+function errorMessage(err) {
+  if (!err) { return 'Lỗi không rõ nguyên nhân.'; }
+  if (err.message) { return String(err.message); }
+  return String(err);
+}
+
 /** Mốc thời gian hiện tại theo khuôn của cột `Lúc`. */
 function logNow() {
   return Utilities.formatDate(new Date(), LOG_TIMEZONE, LOG_TIME_FORMAT);
