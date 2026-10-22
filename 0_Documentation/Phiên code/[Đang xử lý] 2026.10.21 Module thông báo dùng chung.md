@@ -16,17 +16,17 @@ Branch `feature/notice-module`. Tách từ mục 1 của `2026.10.17 Todo.md`.
 - [x] Đọc code hiện có: `EntryPoint.js`, `ErrorReport.js`, `DocumentMemo.js`, `DocumentStore.js`, `client/ui/notices.html`, chỗ dùng kho chờ
 - [x] Trình phương án ba phần + hợp đồng JSON. Chủ dự án duyệt 2026-10-22 cả bốn điểm đề xuất: menu vẫn ném lại; lỗi hàm Sidebar cũng lưu kho; bảng tra nhanh thành thông báo `info`; viết lại tài liệu 10 Phần 8. Không `count`/`lastSeenAt`, thông báo hết thì xóa hẳn
 - [x] Viết hợp đồng vào Tài liệu 10 và 10A (thay Phần 8, kho chờ, bảng tham số)
-- [ ] Viết `server/notice/NoticeGate.js`: cổng phát, giải, bỏ, liệt kê
-- [ ] Test offline cổng thông báo (ghi đè cùng khóa, tự hết, ✕ chỉ cho loại bỏ tay, kho hỏng, trần số thông báo)
-- [ ] `runEntryPoint`: bỏ tham số kênh, lỗi phát thông báo theo cửa vào, thành công thì giải
-- [ ] Bỏ `ErrorReport.js` (kho chờ, ba kênh), thay mọi chỗ gọi `errorPendingPush`
-- [ ] Bỏ `entryFailures`, Log theo chuyển trạng thái đọc từ cổng thông báo
-- [ ] `Menu.js`: bỏ `getUi().alert()` (lỗi vẽ sheet, bảng tra nhanh)
-- [ ] `loadCore`, `probeSelectionAndReload`: trả `notices` thay `pendingMessages`
-- [ ] Cửa vào Sidebar bấm ✕
-- [ ] Sidebar cũ: nhận `notices` qua `noticeSet` tối thiểu, không viết lại UI
-- [ ] Cập nhật `Cây thư mục code.md`
-- [ ] `node tests/run.js` xanh
-- [ ] Hàm dò GAS `probeNoticeGate` + `node tests/gas.js probeNoticeGate --push` trên Sheet DEV mới
-- [ ] Ghi phần cần nghiệm thu trên Sidebar vào mục 4 của Todo
+- [x] Viết `server/notice/NoticeGate.js`: cổng phát, giải, bỏ, liệt kê
+- [x] Test offline cổng thông báo (ghi đè cùng khóa, tự hết, ✕ cho mọi thông báo, kho hỏng, trần số thông báo)
+- [x] `runEntryPoint`: bỏ tham số kênh, lỗi phát thông báo theo cửa vào, thành công thì giải
+- [x] Bỏ `ErrorReport.js` (kho chờ, ba kênh), thay mọi chỗ gọi `errorPendingPush`
+- [x] Bỏ `entryFailures`, Log theo chuyển trạng thái đọc từ cổng thông báo
+- [x] `Menu.js`: bỏ `getUi().alert()` (lỗi vẽ sheet, bảng tra nhanh)
+- [x] `loadCore`, `probeSelectionAndReload`: trả `notices` thay `pendingMessages`
+- [x] Cửa vào Sidebar bấm ✕
+- [x] Sidebar cũ: nhận `notices` qua `noticeSet` tối thiểu, không viết lại UI
+- [x] Cập nhật `Cây thư mục code.md`
+- [x] `node tests/run.js` xanh
+- [x] Hàm dò GAS `probeNoticeGate` + `node tests/gas.js probeNoticeGate --push` trên Sheet DEV mới (2026-10-22 đạt; `getProperties` lạnh 37 ms với 27 khóa; `probeTriggerErrorPending` ra thông báo `entry_failure:shinOnEdit`)
+- [x] Ghi phần cần nghiệm thu trên Sidebar vào mục 4 của Todo
 - [ ] Commit, hỏi chủ dự án trước khi gộp vào `main`
