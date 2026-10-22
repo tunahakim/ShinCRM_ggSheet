@@ -10,8 +10,8 @@ Branch `feature/config-core`. Tách từ mục 2 của `2026.10.17 Todo.md`.
 
 ## Checklist
 
-- [ ] Đọc tệp prompt chuyển Config, tài liệu chính thức phần Config, tài liệu 01 phần liên quan
-- [ ] Đọc code: `Settings.js`, `ConfigParams.js`, `ConfigSheetSetup.js`, `ConfigRead.js`, chỗ đọc `@CFG_`, `SyncSettings.js`/`AccountSettings.js` (đã chuyển Config sang kho)
-- [ ] Đo `measureConfigReads` trước khi sửa
-- [ ] Thử bản sao tệp Sheet DEV có mang DocumentProperties không
+- [x] Đọc tệp prompt chuyển Config, tài liệu chính thức phần Config, tài liệu 01 phần liên quan
+- [x] Đọc code: `Settings.js`, `ConfigParams.js`, `ConfigSheetSetup.js`, `ConfigRead.js`, chỗ đọc `@CFG_`, `SyncSettings.js`/`AccountSettings.js` (đã chuyển Config sang kho)
+- [x] Đo `measureConfigReads` trước khi sửa (2026-10-22: lượt lạnh `configParams` 1487 ms gồm mở Sheet lần đầu; lượt ấm `configReadAll` 8–10 ms, `reloadConfig` 9–10 ms; đọc thật 1 lần mỗi lượt, còn lại dùng bản nhớ)
+- [ ] Thử bản sao tệp Sheet DEV có mang DocumentProperties không (cần chủ dự án tạo bản sao, sau khi có hàm xem cài đặt)
 - [ ] Trình phương án ba phần, chờ duyệt
