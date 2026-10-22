@@ -1,7 +1,7 @@
 /**
  * Cửa cấp mã bản ghi: đọc bộ đếm trong Document Properties, cấp một dải mã liền mạch, ghi bộ đếm mới. Tài liệu 06 Phần 7.
  *
- * Bộ đếm là trạng thái hệ thống, không phải núm vặn người dùng, nên không nằm trên sheet: người dùng không gõ nhầm được, và sheet `Config` bỏ đi được mà không mất bộ đếm.
+ * Bộ đếm là trạng thái hệ thống, không phải núm vặn người dùng, nên không nằm trên sheet: người dùng không gõ nhầm được.
  *
  * **Cửa này không bao giờ tự lấy khóa** `[RÀNG BUỘC CỨNG]`. Nó luôn chạy bên trong khóa mà cửa ghi đang giữ. Nhờ vậy trong cả hệ chỉ có đúng một chỗ lấy khóa, và không có đường nào để một luồng tự khóa chính mình. Gọi hàm ở đây từ ngoài khóa là sai, và cái sai đó im lặng: hai người bấm Lưu cùng lúc sẽ nhận cùng một mã, rồi một bản ghi đè lên bản kia.
  *
@@ -14,7 +14,7 @@ var ID_GATE_PREFIXES = { customer: 'CUS-', activity: 'ACT-' };
 /** Số chữ số của phần đuôi. Đổi con số này là đổi khuôn mã của toàn bộ dữ liệu cũ, nên nó nằm đây một mình để không ai đổi nhầm. */
 var ID_GATE_DIGITS = 6;
 
-/** Khóa Document Properties giữ bộ đếm của từng thực thể. Tên giữ như dòng tham số cũ trong `Config` để bước di chuyển một lần tìm được giá trị cũ. */
+/** Khóa Document Properties giữ bộ đếm của từng thực thể. Tên giữ như dòng tham số cũ của sheet `Config` để hàm chuyển một lần (`settingsMigrateFromConfig`) nhận đúng giá trị cũ. */
 var ID_GATE_COUNTER_KEYS = { customer: 'ID_COUNTER_CUSTOMER', activity: 'ID_COUNTER_ACTIVITY' };
 
 function idGateCounterKey(entity) {
@@ -61,7 +61,7 @@ function idGateMaxOnSheet(context) {
 /**
  * Giá trị bộ đếm đang lưu của một thực thể. Trả về `{ current, stored }`; `stored` sai nghĩa là Document Properties chưa có khóa này.
  *
- * Di chuyển một lần: khi chưa có khóa thì lấy số ở dòng tham số cũ cùng tên trong sheet `Config` (nếu sheet còn), để mã không bị cấp lại cho bản ghi đã xóa ở cuối sheet. Lần cấp mã đầu tiên ghi khóa, từ đó dòng cũ không còn ai đọc. Giá trị lưu không phải số nguyên không âm thì ném lỗi chứ không tự về 0, vì về 0 rồi ghi đè là xóa âm thầm bộ đếm.
+ * Chưa có khóa thì bộ đếm là 0; lưới an toàn của `idGateIssue` nhảy lên số lớn nhất đang có trên sheet. Giá trị lưu không phải số nguyên không âm thì ném lỗi chứ không tự về 0, vì về 0 rồi ghi đè là xóa âm thầm bộ đếm.
  */
 function idGateCounterRead(entity) {
   var key = idGateCounterKey(entity);
@@ -72,11 +72,10 @@ function idGateCounterRead(entity) {
     }
     return { current: Number(raw), stored: true };
   }
-  var legacy = shinOpenBook().getSheetByName('Config') ? configParams()[key] : '';
-  return { current: idGateNumberOf(legacy), stored: false };
+  return { current: 0, stored: false };
 }
 
-/** Nhận bộ đếm từ nơi lưu đời cũ, chỉ khi kho mới chưa có khóa; kho mới đã có thì giữ nguyên để không kéo bộ đếm lùi. */
+/** Nhận bộ đếm từ nơi lưu đời cũ (hàm chuyển từ sheet `Config`), chỉ khi kho mới chưa có khóa; kho mới đã có thì giữ nguyên để không kéo bộ đếm lùi. */
 function idGateAdoptCounter(entity, value) {
   var key = idGateCounterKey(entity), props = documentProps();
   if (props.getProperty(key) !== null) { return false; }
@@ -130,7 +129,7 @@ function probeIdGate() {
     var context = entityReadContext(entity);
     var o = idGateCounterRead(entity);
     var maxSheet = idGateMaxOnSheet(context);
-    report.push(entity + ': bộ đếm ' + o.current + (o.stored ? '' : ' (chưa chuyển sang Document Properties, đang đọc từ Config)') + ' — max trên sheet ' + maxSheet + ' — mã kế tiếp sẽ là ' + idGateFormat(entity, Math.max(o.current, maxSheet) + 1));
+    report.push(entity + ': bộ đếm ' + o.current + (o.stored ? '' : ' (chưa có khóa, tính từ số lớn nhất trên sheet)') + ' — max trên sheet ' + maxSheet + ' — mã kế tiếp sẽ là ' + idGateFormat(entity, Math.max(o.current, maxSheet) + 1));
   });
 
   report.forEach(function (line) { Logger.log(line); });

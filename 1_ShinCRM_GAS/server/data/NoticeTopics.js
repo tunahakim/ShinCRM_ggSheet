@@ -14,6 +14,10 @@ var NOTICE_TOPICS = {
   notice_corrupt: { level: 'warning', clear: 'dismiss' },
   /** Không đọc được kho thông báo. Không lưu, chỉ trả trong danh sách; lần đọc sau được thì tự mất. */
   notice_unreadable: { level: 'error', clear: 'on_success' },
+  /** Cài đặt đã lưu không còn hợp lệ với dữ liệu hiện tại (ví dụ ngầm định chọn giá trị đã xóa khỏi Category); giá trị lệch bị bỏ qua. Phạm vi là tên phần cài đặt; lần kiểm sau khớp lại thì tự hết. */
+  settings_stale: { level: 'warning', clear: 'on_success' },
+  /** `LOG_TRACE` đang bật nên sheet Log có thể chứa dữ liệu khách nguyên văn. Tự hết khi tắt. */
+  log_trace_on: { level: 'warning', clear: 'on_success' },
   /** Bảng tra nhanh cú pháp lọc, mở từ lệnh menu. */
   filter_reference: { level: 'info', clear: 'dismiss' }
 };

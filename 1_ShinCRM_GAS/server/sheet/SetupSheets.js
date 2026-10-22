@@ -1,7 +1,7 @@
 /**
- * Hàm dựng khung tệp Sheet: năm sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi; Config đi qua lớp chuẩn bị riêng để có migration, ghi chú và validation.
+ * Hàm dựng khung tệp Sheet: bốn sheet với đúng số hàng tiêu đề và đúng mã cột của phần lõi. Cài đặt người dùng nằm ở DocumentProperties (`server/settings/`), không có sheet.
  *
- * Dựng bằng code chứ không gõ tay vì hàng 1 là căn cứ duy nhất để code nhận cột — một mã gõ lệch một chữ không có gì bắt được cho tới lúc nạp. Tệp này không giữ danh sách cột nào của riêng nó, nó hỏi `sheetCoreColumns()`; danh sách tên tham số hỏi `ConfigParams.gs`.
+ * Dựng bằng code chứ không gõ tay vì hàng 1 là căn cứ duy nhất để code nhận cột — một mã gõ lệch một chữ không có gì bắt được cho tới lúc nạp. Tệp này không giữ danh sách cột nào của riêng nó, nó hỏi `sheetCoreColumns()`.
  *
  * Chỉ dựng phần cột của **lõi**. Tám cột thuần đồng bộ do `fbm_sync` tự dựng ở giai đoạn 3, nằm ngoài vùng ghi nên chạy lại không đụng tới.
  */
@@ -18,7 +18,7 @@ function setupSheetsLocked() {
   var file = shinOpenBook();
   var report = ['ShinCRM — dựng khung sheet', 'Tệp: ' + file.getName(), ''];
 
-  Object.keys(SHEET_LAYOUT).filter(function (sheetName) { return sheetName !== 'Config'; }).forEach(function (sheetName) {
+  Object.keys(SHEET_LAYOUT).forEach(function (sheetName) {
     var layout = SHEET_LAYOUT[sheetName];
     var columns = sheetCoreColumns(sheetName);
     var sheet = file.getSheetByName(sheetName) || sheetBookCreate(sheetName);
@@ -40,13 +40,7 @@ function setupSheetsLocked() {
     report.push('✅ ' + sheetName + ': ' + columns.length + ' cột lõi, ' + headerRows + ' hàng tiêu đề, dữ liệu từ hàng ' + layout.firstDataRow);
   });
 
-  var configResult = prepareConfigSheet(file);
-  report.push('✅ Config: ' + CONFIG_COLUMNS.length + ' cột lõi, ' + SHEET_HEADER_ROWS + ' hàng tiêu đề, dữ liệu từ hàng ' + SHEET_FIRST_DATA_ROW);
   report.push('');
-  report.push('Khối tham số của Config: ' + configResult.seeded.total + ' tên trong danh mục, thêm mới ' + configResult.seeded.added.length
-    + (configResult.seeded.added.length ? ' (' + configResult.seeded.added.join(', ') + ')' : ' — các tên đã có sẵn, giá trị giữ nguyên'));
-  if (configResult.migration.found) { report.push('Đã chuyển hai bộ đếm cũ sang Document Properties và xóa hai cột bộ đếm cũ.'); }
-
   setupColumnFormats().forEach(function (line) { report.push(line); });
 
   // Sheet trắng của Google tên "Trang tính1" hoặc "Sheet1"; xóa nếu nó còn trống, vì để lại thì nó lọt vào danh sách sheet cần nạp.
@@ -164,27 +158,6 @@ function verifySheets() {
       lines.push('✅ ' + sheetName + ' — ' + expected.length + ' mã cột lõi đúng, đóng băng ' + layout.headerRows + ' hàng' + extraText);
     }
   });
-
-  // Đọc qua chính `configParams()` chương trình dùng, không dựng đường đọc thứ hai. Nó ném lỗi khi có tên trùng, nên bọc lại: một tên trùng không được giết cả bản báo cáo.
-  try {
-    // Xóa bộ nhớ tạm trước khi đọc: nghiệm thu phải nói về sheet **đang** như thế nào.
-    resetSettingsCache();
-    var params = configParams();
-    var names = configParamNames();
-    var missing = names.filter(function (name) { return !Object.prototype.hasOwnProperty.call(params, name); });
-
-    if (missing.length) {
-      problems.push('Config, khối tham số: thiếu ' + missing.join(', '));
-      lines.push('❌ Config, khối tham số — thiếu ' + missing.join(', ') + '. Chạy setupSheets để gieo.');
-    } else {
-      lines.push('✅ Config, khối tham số — đủ ' + names.length + ' tên: ' + names.map(function (name) {
-        return name + ' = ' + (params[name] ? '"' + params[name] + '"' : '(trống, dùng mặc định)');
-      }).join(', '));
-    }
-  } catch (loiThamSo) {
-    problems.push('Config, khối tham số: ' + loiThamSo.message);
-    lines.push('❌ Config, khối tham số — ' + loiThamSo.message);
-  }
 
   // Khuôn hiển thị: đọc một hàng dữ liệu là đủ, vì khuôn đặt cho cả cột. Đây là phép kiểm duy nhất cho biết chỗ chống Sheets tự đổi chuỗi số thành số có thật đang bật trên tệp hay không.
   columnFormatSheets().forEach(function (sheetName) {

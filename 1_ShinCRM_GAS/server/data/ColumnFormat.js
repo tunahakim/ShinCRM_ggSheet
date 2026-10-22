@@ -20,7 +20,7 @@ var COLUMN_FORMAT_BY_PRECISION = { day: 'dd/mm/yyyy', minute: 'dd/mm/yyyy HH:mm'
  *
  * `Category` là văn bản thuần toàn bộ: giá trị danh mục có thứ trông như số (`01`, mã FBM), và một danh mục mất số 0 đầu thì giá trị đã lưu trong bản ghi khách không còn khớp dòng nào trong danh sách chọn nữa.
  *
- * `Config` và `Log` cố ý không có mặt. Cột `Giá trị` của `Config` là ô người dùng tự vặn núm, và khối bộ đếm thì cửa cấp mã đọc ghi bằng số — ép cả sheet thành chữ ở đó là đổi cách hiện của một sheet chủ dự án đọc hằng ngày để đổi lấy một chỗ chưa hỏng. `Log` chỉ có máy ghi vào.
+ * `Log` cố ý không có mặt: chỉ có máy ghi vào.
  */
 var COLUMN_FORMAT_WHOLE_SHEET = { Category: COLUMN_FORMAT_TEXT };
 

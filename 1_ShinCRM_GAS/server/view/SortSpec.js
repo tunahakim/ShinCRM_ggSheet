@@ -1,4 +1,10 @@
 /** Parser và comparator sắp xếp sheet quản trị. */
+
+/** Số cấp sắp xếp tối đa, chung cho ô sắp xếp riêng của sheet quản trị và sắp xếp chung trong Cài đặt. */
+var VIEW_SORT_MAX_LEVELS = 10;
+
+/** Hai chiều hiện ở ô chọn của sheet quản trị; `sortSpecLevel` đọc được cả hai. */
+var SORT_LEVEL_OPTIONS = ['Tăng dần (A → Z)', 'Giảm dần (Z → A)'];
 var SORT_LEVELS = { asc: ['tang', 'tangdan', 'az', 'asc'], desc: ['giam', 'giamdan', 'za', 'desc'] };
 
 function sortSpecLevel(value) {

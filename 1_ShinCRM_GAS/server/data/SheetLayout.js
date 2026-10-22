@@ -2,7 +2,7 @@
  * Bảng khai hình dáng sheet: sheet nào có mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, và cột nào bày ra theo thứ tự nào.
  *
  * Đây là chuyện **chỗ để**, khác với chuyện **trường** mà `DataSchema.gs` khai. Hai sheet kho không liệt kê cột ở đây:
- * cột của chúng suy ra từ `DATA_SCHEMA`, nên mã cột vẫn chỉ có đúng một chỗ. Chỉ `Category`, `Config` và `Log` liệt kê thẳng,
+ * cột của chúng suy ra từ `DATA_SCHEMA`, nên mã cột vẫn chỉ có đúng một chỗ. Chỉ `Category` và `Log` liệt kê thẳng,
  * vì mã của chúng không thuộc thực thể nào nên không có schema nào sở hữu — bảng dưới đây chính là bản gốc duy nhất của chúng.
  *
  * Tám cột thuần đồng bộ cố ý không có ở đây. Chúng thuộc `fbm_sync`, và chính module đó dựng chúng. Lõi không đọc `SYNC_SCHEMA`
@@ -45,33 +45,17 @@ var SHEET_RENAMED_CODES = {
 /** Hậu tố của cột đi kèm cho danh mục đồng bộ. Tài liệu 02 Phần 9. */
 var CATEGORY_FBM_SUFFIX = '_FBM';
 
-/**
- * Bốn khối của sheet `Config`. Mỗi khối là một cặp cột đứng cạnh nhau, dữ liệu mỗi khối
- * chạy dọc độc lập nên các khối dài ngắn khác nhau không sao.
- */
-var CONFIG_COLUMNS = [
-  ['@CFG_THAM_SO', 'Tham số'],
-  ['@CFG_THAM_SO_GIA_TRI', 'Giá trị'],
-  ['@CFG_COT_MA', 'Mã cột người dùng thêm'],
-  ['@CFG_COT_KIEU', 'Kiểu'],
-  ['@CFG_NGAM_DINH_MA_COT', 'Ngầm định — mã cột'],
-  ['@CFG_NGAM_DINH_GIA_TRI', 'Ngầm định — giá trị'],
-  ['@CFG_SORT_COL', 'Sắp xếp — mã cột'],
-  ['@CFG_SORT_LEVEL', 'Sắp xếp — chiều']
-];
-
 /** Chín cột của sheet `Log`, theo tài liệu 10 Phần 2. Không mã `@`, một hàng tiêu đề, dữ liệu từ hàng 2. */
 var LOG_HEADERS = ['Lúc', 'Nguồn', 'Việc', 'Kết quả', 'Thực thể', 'Mã bản ghi', 'Lý do', 'Kỳ', 'Chi tiết kỹ thuật'];
 
 /**
- * Bảng hình dáng của cả năm sheet. `entity` nghĩa là cột suy ra từ `DATA_SCHEMA`; `columns` nghĩa là cột khai thẳng ở tệp này.
+ * Bảng hình dáng của cả bốn sheet. `entity` nghĩa là cột suy ra từ `DATA_SCHEMA`; `columns` nghĩa là cột khai thẳng ở tệp này.
  * Một sheet chỉ được có một trong hai, không được có cả hai.
  */
 var SHEET_LAYOUT = {
   Customer: { entity: 'customer', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#d9e2f3' },
   Activity: { entity: 'activity', headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#d9e2f3' },
   Category: { columns: CATEGORY_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#e2efd9' },
-  Config: { columns: CONFIG_COLUMNS, headerRows: SHEET_HEADER_ROWS, firstDataRow: SHEET_FIRST_DATA_ROW, controlRows: SHEET_CONTROL_ROWS, headerColor: '#fff2cc' },
   Log: { plainHeaders: LOG_HEADERS, headerRows: 1, firstDataRow: 2, controlRows: { header: 1 }, headerColor: '#fce4d6' }
 };
 

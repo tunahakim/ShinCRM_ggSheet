@@ -1,7 +1,5 @@
 /** Tạo và chuẩn bị sheet quản trị; không chứa logic lọc, sắp hay chép dữ liệu từ kho. */
 
-var VIEW_SORT_MAX_LEVELS = 10;
-
 var VIEW_CONTROL_COLUMNS = [
   {
     code: '@VIEW_SORT_COL',

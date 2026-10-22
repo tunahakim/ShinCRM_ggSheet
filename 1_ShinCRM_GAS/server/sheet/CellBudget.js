@@ -8,43 +8,23 @@
  * Vì sao tệp này ra đời ngay bây giờ, khi sheet còn trắng và chưa có gì để đo: hình dạng của **kết quả chặn** là thứ client phải biết bung ngay từ lượt code đầu tiên. Thêm một dạng trả về thứ hai vào sau nghĩa là đường nhận dữ liệu bên client phải học lại một hình dạng nữa, ở đúng lúc nó đã chạy quen. Việc còn lại thật sự thuộc Giai đoạn 3 là **đo khối lượng thật** ngay sau lượt nạp đầu từ FBM, không phải viết phép đo.
  */
 
-/** Trần mặc định khi `Config` chưa khai: năm trăm nghìn ô. Tài liệu 05 Phần 6. */
+/** Trần mặc định khi cài đặt `CELL_BUDGET` để trống: năm trăm nghìn ô. Tài liệu 05 Phần 6. */
 var CELL_BUDGET_DEFAULT = 500000;
 
 /**
- * Tên tham số ở khối tham số hệ thống của sheet `Config`. Trần ở `Config` chứ không ở `SETTINGS` vì đây là quyết định vận hành mà người dùng được phép đổi mà không cần mở code.
+ * Trần đang có hiệu lực, kèm lý do nếu phải rơi về mặc định. Trả về `{ ceiling, source, warning }`; `source` là `'settings'` hoặc `'default'`.
  *
- * Tên viết tiếng Anh hoa, cùng dạng với `LOG_TRACE` — khối tham số chỉ có đúng hai cái tên này, và một cột hai dòng mà mỗi dòng một thứ tiếng thì trông như nhặt được chứ không như đặt ra. Chủ dự án giao quyền chọn cho phiên code 05/09/2026, kèm điều kiện tiếng Việt thì phải có dấu — mà dấu trong một khóa tra khớp chính xác là chỗ hỏng chờ sẵn, vì Sheet tự sửa chữ và người gõ tay hay gõ thiếu dấu. Cột tiêu đề `Tham số` và `Giá trị` vẫn tiếng Việt, và lời giải thích cho người dùng nằm ở màn chặn.
- */
-var CELL_BUDGET_CONFIG_NAME = 'CELL_BUDGET';
-
-/**
- * Trần đang có hiệu lực, kèm lý do nếu phải rơi về mặc định.
- *
- * Trả về `{ ceiling, source, warning }`. `source` là `'config'` hoặc `'default'`.
- *
- * Đọc con số này rất dễ và rất đáng lo, vì người dùng gõ số vào một ô sheet theo cách người Việt vẫn gõ: `500.000`. `parseInt('500.000')` trả về `500`. Nếu tin con số đó thì hệ thống chặn ở 500 ô, tức là **chặn mãi mãi** — và màn chặn chiếm trọn khung sidebar, nên người dùng mất luôn đường vào để sửa lại con số đã gõ sai. Một cổng chặn tự khóa người giữ chìa khóa ở ngoài là cổng chặn hỏng.
- *
- * Nên hàm này bỏ hết dấu chấm, dấu phẩy và khoảng trắng trước khi đọc số, và mọi ca còn lại không ra một số dương thì **rơi về mặc định kèm lời cảnh báo** chứ không ném lỗi và cũng không chặn. Cảnh báo đi theo kết quả nạp để hiện lên cho người dùng thấy mình gõ sai.
+ * Giá trị đã được bộ kiểm kiểu `number` chuẩn hóa lúc lưu (số nguyên dương, đọc được cả `500.000`), nên ở đây chỉ còn hai ca. Đọc kho lỗi thì **rơi về mặc định kèm cảnh báo** chứ không ném: màn chặn chiếm trọn Sidebar, và một cổng chặn vì không đọc được chính trần của nó là cổng khóa người giữ chìa khóa ở ngoài.
  */
 function cellBudgetCeiling() {
-  var raw = '';
+  var value;
   try {
-    raw = configGet(CELL_BUDGET_CONFIG_NAME);
-  } catch (khongDocDuocConfig) {
-    return { ceiling: CELL_BUDGET_DEFAULT, source: 'default', warning: 'Không đọc được sheet Config nên dùng trần mặc định ' + CELL_BUDGET_DEFAULT + ' ô.' };
+    value = settingsValue('core_ops', CELL_BUDGET_SETTING);
+  } catch (khongDocDuocCaiDat) {
+    return { ceiling: CELL_BUDGET_DEFAULT, source: 'default', warning: 'Không đọc được cài đặt trần số ô (' + String(khongDocDuocCaiDat && khongDocDuocCaiDat.message || khongDocDuocCaiDat) + ') nên dùng trần mặc định ' + CELL_BUDGET_DEFAULT + ' ô.' };
   }
-
-  if (!raw) { return { ceiling: CELL_BUDGET_DEFAULT, source: 'default', warning: '' }; }
-
-  var digits = String(raw).replace(/[.,\s]/g, '');
-  var so = /^[0-9]+$/.test(digits) ? Number(digits) : NaN;
-
-  if (!so || !isFinite(so) || so <= 0) {
-    return { ceiling: CELL_BUDGET_DEFAULT, source: 'default', warning: 'Tham số ' + CELL_BUDGET_CONFIG_NAME + ' ở sheet Config gõ là "' + raw + '", không đọc ra một số dương, nên đang dùng trần mặc định ' + CELL_BUDGET_DEFAULT + ' ô.' };
-  }
-
-  return { ceiling: so, source: 'config', warning: '' };
+  if (value === '') { return { ceiling: CELL_BUDGET_DEFAULT, source: 'default', warning: '' }; }
+  return { ceiling: value, source: 'settings', warning: '' };
 }
 
 /**
@@ -77,7 +57,7 @@ function cellBudgetMeasure(book) {
 
 /** Bảng thủ phạm thành các dòng chữ đọc được, dùng cho log và cho phép nghiệm thu. Màn cảnh báo bên client tự vẽ bảng từ dữ liệu, không dùng mấy dòng này. */
 function cellBudgetLines(measure) {
-  var lines = ['Ngân sách ô: ' + measure.total + ' / trần ' + measure.ceiling + ' (' + (measure.ceilingSource === 'config' ? 'lấy từ Config' : 'mặc định') + ')' + (measure.exceeded ? ' — VƯỢT TRẦN' : ' — trong ngưỡng')];
+  var lines = ['Ngân sách ô: ' + measure.total + ' / trần ' + measure.ceiling + ' (' + (measure.ceilingSource === 'settings' ? 'lấy từ Cài đặt' : 'mặc định') + ')' + (measure.exceeded ? ' — VƯỢT TRẦN' : ' — trong ngưỡng')];
 
   if (measure.warning) { lines.push('Cảnh báo: ' + measure.warning); }
 

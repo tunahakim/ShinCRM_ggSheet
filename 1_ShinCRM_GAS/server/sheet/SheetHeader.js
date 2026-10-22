@@ -1,5 +1,5 @@
 /**
- * Cửa duy nhất đặt hàng tiêu đề cho sheet dữ liệu: dựng sheet mới, chạy lại `setupSheets`, Config và module đồng bộ thêm cột riêng đều đi qua đây, để luật "đối chiếu theo mã, không theo vị trí" chỉ có một chỗ.
+ * Cửa duy nhất đặt hàng tiêu đề cho sheet dữ liệu: dựng sheet mới, chạy lại `setupSheets` và module đồng bộ thêm cột riêng đều đi qua đây, để luật "đối chiếu theo mã, không theo vị trí" chỉ có một chỗ.
  */
 
 /**

@@ -69,8 +69,8 @@ function shinDefaultCodeMap(sheet, entity) {
   var valid = {};
   if (DATA_SCHEMA[entity]) {
     Object.keys(DATA_SCHEMA[entity]).forEach(function (name) { valid[DATA_SCHEMA[entity][name].code] = true; });
-  } else if (entity === 'category' || entity === 'config') {
-    sheetCoreColumns(entity === 'category' ? 'Category' : 'Config').forEach(function (pair) { valid[pair[0]] = true; });
+  } else if (entity === 'category') {
+    sheetCoreColumns('Category').forEach(function (pair) { valid[pair[0]] = true; });
   } else {
     return null;
   }
@@ -152,10 +152,10 @@ function shinOnEdit(event) {
     if (shinSchemaEditNeedsReload(sheet, range, event)) {
       return shinReloadDecision({ source: 'edit', surface: 'schema', schema: true });
     }
-    if (name === 'Config' || name === 'Category') {
+    if (name === 'Category') {
       if (range.row < SHEET_FIRST_DATA_ROW) { return; }
-      if (!shinDefaultCodeIsValid(sheet, name.toLowerCase(), range.column, range.lastColumn)) { return; }
-      return shinReloadDecision({ source: 'edit', surface: name.toLowerCase(), entity: name.toLowerCase() });
+      if (!shinDefaultCodeIsValid(sheet, 'category', range.column, range.lastColumn)) { return; }
+      return shinReloadDecision({ source: 'edit', surface: 'category', entity: 'category' });
     }
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (!entity || range.row < SHEET_FIRST_DATA_ROW) { return; }
@@ -200,7 +200,7 @@ function shinOnChange(event) {
     var entity = name === ENTITY_SHEETS.customer ? 'customer' : name === ENTITY_SHEETS.activity ? 'activity' : '';
     if (type === 'OTHER') {
       if (entity) { return shinReloadDecision({ source: 'change', surface: 'entity', entities: [entity] }); }
-      if (name === 'Category' || name === 'Config') { return shinReloadDecision({ source: 'change', surface: name.toLowerCase(), entity: name.toLowerCase() }); }
+      if (name === 'Category') { return shinReloadDecision({ source: 'change', surface: 'category', entity: 'category' }); }
       // Đổi tên sheet cũng báo `OTHER`: tên `!` mới chưa có trong sổ vẽ thì chuẩn bị sheet đó; tên cũ (kể cả khi đổi thành tên thường) bỏ khỏi sổ.
       if (name.charAt(0) === '!' && viewLedgerEntry(name)) { return null; }
       shinViewLedgerPrune(book);
@@ -215,8 +215,6 @@ function shinOnChange(event) {
         structural = shinReloadDecision({ source: 'change', surface: 'structure', structure: true, allCore: true });
       } else if (name === 'Category') {
         structural = shinReloadDecision({ source: 'change', surface: 'category', entity: 'category' });
-      } else if (name === 'Config') {
-        structural = shinReloadDecision({ source: 'change', surface: 'config', entity: 'config' });
       } else if (name && name.charAt(0) === '!') {
         structural = shinReloadDecision({ source: 'change', surface: 'view-control', sheetName: name });
       } else {
