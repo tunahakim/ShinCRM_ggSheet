@@ -8,7 +8,7 @@
 | pattern (mẫu) | Hình dạng nội dung của một term, ví dụ chứa, bằng đúng, khoảng; tập pattern khả dụng do `type` của cột quyết định. |
 | `normalizeText` | Hàm chuẩn hóa chuỗi dùng chung cho bộ lọc và `searchIndex`: bỏ khoảng trắng thừa, chuyển thường, bỏ dấu tiếng Việt. |
 | Luật cắt độ chi tiết (precision truncation) | So sánh DATE bằng cách cắt cả hai vế về độ dài chuỗi mà người dùng gõ. |
-| Chuỗi ba nấc (sort spec chain) | Trình tự tìm cấu hình sắp xếp: hai cột `VIEW_` của sheet, rồi hai cột `CFG_` trong `Config`, rồi luật cứng trong code. |
+| Chuỗi ba nấc (sort spec chain) | Trình tự tìm cấu hình sắp xếp: hai cột `VIEW_` của sheet, rồi cài đặt sắp xếp chung (`sort` của phần `core_data`), rồi luật cứng trong code. |
 | Cặp sắp xếp (sort pair) | Một hàng gồm `@VIEW_SORT_COL` và `@VIEW_SORT_LEVEL` cùng có giá trị; thiếu một vế thì cặp bị bỏ qua. |
 | Tie-break cuối cùng | `@CUS_MA_KH` giảm dần, nối tự động vào cuối mọi cấu hình sắp xếp ở cả ba nấc. |
 | `prepareViewSheet` | Lệnh menu do người dùng bấm, đặt Data Validation và cell note lên sheet quản trị; idempotent, không bao giờ ghi giá trị. |
@@ -29,7 +29,7 @@ Không giữ danh sách riêng ở đây. **`[NEO → lộ trình và checklist]
 
 ## 5. Phụ thuộc
 
-**Phiên này tiêu thụ:** bốn kiểu dữ liệu và hiến pháp đọc cột; ba hàng tiêu đề; năm tiền tố; danh sách cột hai sheet kho; chuỗi thời gian chuẩn `YYYY-MM-DD` và `YYYY-MM-DD HH:mm` theo giờ Việt Nam; thuộc tính `type` và `precision` trong `DATA_SCHEMA`; quy ước số đầu tên mục trong `Category`; hai giá trị `active` và `deleted` của `recordStatus`; `renderViewSheet` và ba đường kích hoạt việc vẽ ở Tài liệu 7; `searchIndex` và luật bỏ dấu chuyển thường ở Tài liệu 5; bốn khối hiện có của `Config`.
+**Phiên này tiêu thụ:** bốn kiểu dữ liệu và hiến pháp đọc cột; ba hàng tiêu đề; bốn tiền tố; danh sách cột hai sheet kho; chuỗi thời gian chuẩn `YYYY-MM-DD` và `YYYY-MM-DD HH:mm` theo giờ Việt Nam; thuộc tính `type` và `precision` trong `DATA_SCHEMA`; quy ước số đầu tên mục trong `Category`; hai giá trị `active` và `deleted` của `recordStatus`; `renderViewSheet` và ba đường kích hoạt việc vẽ ở Tài liệu 7; `searchIndex` và luật bỏ dấu chuyển thường ở Tài liệu 5; phần cài đặt `core_data` (trường `sort`).
 
 **Phiên này cung cấp cho tài liệu 10:** nội dung hai phần của thông báo lỗi và ràng buộc kênh; bảng tra nhanh để đưa vào tài liệu hướng dẫn người dùng; danh sách tệp mới phía server. Kênh đi của phần A và phần B đã chốt ở tài liệu 10 Phần 9.
 

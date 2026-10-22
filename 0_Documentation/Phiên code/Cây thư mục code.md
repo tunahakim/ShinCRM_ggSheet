@@ -45,16 +45,20 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │
 ├── server\                       Code chạy phía Google, không có DOM, không thấy trang web.
 │   ├── config\
-│   │   ├── Settings.js           Hằng số phía code (SETTINGS) và khối tham số hệ thống của sheet Config. Nơi duy nhất biết LOG_TRACE đang bật cho nguồn nào.
-│   │   ├── ConfigParams.js       Danh mục núm vặn: có những tham số nào, mỗi tham số gõ giá trị gì là hợp lệ. Settings.js biết một tham số đang là bao nhiêu, tệp này biết có những tham số nào.
-│   │   └── ConfigSheetSetup.js   Migration bộ đếm Config cũ, dựng hướng dẫn và validation, gieo tham số và khôi phục Config mặc định mà không chạm Customer/Activity.
+│   │   └── Settings.js           Hằng số phía code (SETTINGS). Nơi duy nhất biết LOG_TRACE (đọc từ cài đặt core_ops) đang bật cho nguồn nào.
+│   ├── settings\                 Cổng cài đặt người dùng chỉnh được, lưu ở DocumentProperties khóa SETTINGS:<phần>. Không biết có những phần nào; mỗi module tự khai.
+│   │   ├── SettingsKinds.js      Bộ kiểu trường cố định (select, number, text, columnTypes, sortLevels, fieldDefaults): giá trị rỗng, chuẩn hóa và kiểm thuần của từng kiểu.
+│   │   ├── SettingsGate.js       Công cụ đọc, kiểm, ghi, tra một phần cài đặt. Tệp duy nhất chạm khóa SETTINGS:. Chưa có khóa thì mặc định, JSON hỏng thì ném.
+│   │   ├── SettingsService.js    Người điều phối: settingsSave (khóa, đọc, phủ, kiểm, ghi, tín hiệu nạp lại), kiểm ngầm định theo kênh nhập (settings_stale), gói config cho Sidebar, đường chữa cháy shinSettingsShow/shinLogTraceOff.
+│   │   └── SettingsMigrate.js    Công cụ một lần: chuyển sheet Config đời cũ sang cổng cài đặt, đọc lại khớp mới xóa sheet. Xóa cùng server/dev/ trước production.
 │   ├── diagnostic\
-│   │   └── CorePreflight.js       Checker nền tảng dùng chung cho Config/Category; trả hợp đồng lỗi chuẩn cho các module, không biết nghiệp vụ FBM.
+│   │   └── CorePreflight.js       Checker nền tảng dùng chung cho cài đặt/Category; trả hợp đồng lỗi chuẩn cho các module, không biết nghiệp vụ FBM.
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   ├── ColumnFormat.js       Khuôn hiển thị của từng cột, khai một chỗ cho cả SetupSheets và WriteGate dùng chung. Chống mất chữ số đầu của mã số thuế: `@` nghĩa là chữ, không phải số.
+│   │   ├── SettingsSections.js   Bảng khai phần cài đặt của lõi (core_ops, core_data, defaults_sidebar) và danh sách gom phần của mọi module.
 │   │   ├── NoticeTopics.js       Bảng khai loại thông báo: mỗi loại quyết mức độ và cách hết (tự hết khi việc chạy lại thành công, hoặc bấm ✕).
-│   │   └── SheetLayout.js        Khai khung năm sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
+│   │   └── SheetLayout.js        Khai khung bốn sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
 │   ├── sheet\                    Mọi tệp chạm SpreadsheetApp. Ranh giới quan trọng nhất của cây này: tệp trong đây phải nghiệm thu trên Google, tệp ngoài đây kiểm được offline.
 │   │   ├── Book.js               Mở đúng tệp Sheet, không chứa mã Sheet viết cứng. Lời gọi từ ngoài mở theo cặp mã Sheet và mã script ghi lúc mở Sidebar.
 │   │   ├── SheetHeader.js        Cửa duy nhất đặt hàng tiêu đề: đối chiếu theo mã, mã thiếu nối vào cuối, không đổi chỗ cột đã có (FBM-056).
@@ -66,13 +70,12 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SheetRegions.js       Tầng 2 lập kế hoạch vùng: gom số hàng/cột thành dải liền nhau, gom dòng đọc theo ngưỡng cách dòng.
 │   │   ├── SheetLocate.js        Tầng 2 định vị: đổi cột mã đã đọc ra bảng mã → số dòng, ném lỗi khi trùng mã.
 │   │   ├── SheetGrid.js          Tầng 1 sự thật về lưới: đếm hàng dữ liệu, đọc một khối ô, nới hàng và cột, kích thước lưới, tọa độ vùng có sẵn. Ra đời từ lỗi thật làm sheet Log co xuống 7 hàng rồi tắt log trong im lặng.
-│   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần ở Config. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
+│   │   ├── CellBudget.js         Đo tổng số ô cả tệp và so với trần CELL_BUDGET ở Cài đặt › Vận hành. Vượt trần thì chặn hẳn lượt nạp, kèm bảng chỉ mặt sheet nào phình to.
 │   │   ├── EntityRead.js         Tầng 3 đọc bản ghi Customer và Activity ra dạng { fields, rows } truyền được sang client; định vị bản ghi theo mã (`placement`) và đọc lại theo vị trí. Bỏ hàng không có mã và đếm số hàng đã bỏ.
 │   │   ├── EntityWrite.js        Tầng 3 ghi bản ghi theo tên trường: định vị cột, dấu nháy và khuôn chữ cho cột chữ, gom vùng, gọi công cụ ghi ô. Không kiểm, không cầm khóa.
 │   │   ├── CategoryRead.js       Tầng 3 đọc sheet Category: các cột danh mục theo mã `@` qua tờ nháp, và bảng "mã danh mục → danh sách giá trị". Biết loại cột đi kèm _FBM mà không loại nhầm @CAT_CHO_PHEP_FBM.
-│   │   ├── ConfigRead.js         Đọc các khối bảng của Config và trả hợp đồng counters riêng dù bộ đếm đã lưu chung trong khối tham số.
 │   │   ├── SyncColumnSetup.js    Dựng các cột metadata đồng bộ qua cửa ghi chung; module fbm_sync chỉ khai báo schema.
-│   │   └── SetupSheets.js        Dựng và kiểm khung năm sheet từ hai tệp khai ở data\, rồi gọi lớp chuẩn bị Config. Chạy được nhiều lần, không phá dữ liệu đang có.
+│   │   └── SetupSheets.js        Dựng và kiểm khung bốn sheet từ hai tệp khai ở data\. Chạy được nhiều lần, không phá dữ liệu đang có.
 │   ├── util\
 │   │   ├── DateText.js           Biên giới duy nhất giữa Date và hai dạng chuỗi thời gian của dự án. google.script.run không mang Date qua được, nên mọi mốc thời gian đi đường chuỗi.
 │   │   └── TextNormalize.js      Chuẩn hóa văn bản trước khi so sánh. Có một bản sinh đôi ở client\util\ — hai bản phải giống nhau từng dòng.
@@ -85,7 +88,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
 │   ├── gate\                     Các cửa ghi có kỷ luật, cùng họ với LogGate: tập trung điểm vào theo từng bề mặt, kiểm rồi mới ghi, hậu xử lý reload dùng chung.
 │   │   ├── FieldLogic.js         Ba bảng chuẩn hóa - kiểm tra - bắt buộc của tài liệu 03 Phần 6, phía máy chủ. Cắt trắng và trần 50.000 ký tự là mặc định của bộ máy, không khai trong schema.
-│   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở Config, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
+│   │   ├── IdGate.js             Cấp mã bản ghi từ bộ đếm ở DocumentProperties, chỉ chạy bên trong khóa của cửa ghi. Bộ đếm lạc hậu thì nhảy lên max+1 kèm dòng cảnh báo chứ không cấp mã đã có.
 │   │   ├── WriteCommit.js        Hậu xử lý chung sau ghi thành công: phát signal trong lock, render sau khi nhả lock; fail-fast nếu thiếu module reload, không ghi dữ liệu nguồn.
 │   │   ├── RecordGate.js         Cửa bản ghi: mọi thay đổi dòng Customer/Activity đi qua đây. Bên gọi đưa hàm quyết; cửa giữ khóa, đọc mới, quyết, ghi qua WriteGate/DeleteGate rồi cập nhật sổ bận.
 │   │   ├── WriteGate.js          Cửa ghi nghiệp vụ duy nhất của Customer và Activity: khóa, cấp mã, kiểm tra, ghi đúng cột đã khai, flush rồi nhả khóa.
@@ -107,7 +110,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── view\                     Dựng sheet quản lý: đọc bộ lọc, sắp xếp và vẽ lại vùng dữ liệu.
 │   │   ├── FilterMessages.js      Thông báo lỗi và trạng thái cho bộ lọc sheet quản lý.
 │   │   ├── FilterParser.js        Phân tích điều kiện lọc từ sheet quản lý.
-│   │   ├── SortSpec.js            Chuẩn hóa cấu hình sắp xếp của sheet quản lý.
+│   │   ├── SortSpec.js            Chuẩn hóa cấu hình sắp xếp của sheet quản lý; giữ trần VIEW_SORT_MAX_LEVELS dùng chung với cài đặt sắp xếp chung.
 │   │   ├── ViewSheetRenderer.js   Vẽ lại vùng dữ liệu sheet quản lý theo bộ lọc và sắp xếp.
 │   │   ├── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
 │   │   ├── ViewLedger.js          Sổ trạng thái mỗi sheet quản trị: lượt thử gần nhất (dữ liệu, ô điều khiển, kết quả); quyết sheet cũ và có cần thử lại.
@@ -119,7 +122,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── ReloadMatrixProbe.js  Probe DEV tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.
 │       ├── ReloadRefactorProbe.js Probe DEV thử công thức mảng cho bộ đọc Extension và đo chi phí trigger, lời dò, tô màu tab.
 │       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
-│       ├── ConfigReadProbe.js   Probe DEV đếm số lần đọc sheet `Config` và thời gian từng đoạn trong một lượt `loadCore` và `reloadConfig`.
 │       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, ghi nhận thay đổi) để tìm chỗ tốn thời gian.
 │       ├── ViewRenderProbe.js   Probe DEV tách lượt vẽ sheet quản trị và "Làm mới tất cả" (tạm thêm hai sheet `!` thử, xóa và dọn sổ vẽ trong lượt).
 │       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet; so `loadCore` và một lần sửa ô khi tắt và bật bản đọc.
@@ -136,7 +138,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
 │       ├── TransportProbe.js     Đo trần đường truyền gói lớn của việc quét bằng gói đệm (đường Sidebar và đường relay nền), ghi cỡ và thời gian vào Log; không chạm FBM. Cặp với client/dev/transportProbe.html; EntryPoints.js chỉ gọi nếu hàm còn tồn tại.
-│       ├── LogTraceSwitch.js     Bật/tắt tham số LOG_TRACE ở sheet Config: devLogTraceOn ghi "all", devLogTraceOff xóa trắng. Tra cột theo mã hàng 1 nên không gõ sai khối.
+│       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
 │
 ├── client\                       Code chạy trong sidebar. Tệp .html bọc thẻ <script>, hoặc bọc thẻ <style> nếu là tệp chỉ có CSS.
@@ -247,8 +249,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
-    ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties, migration Config một lần.
-    ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity; migration Config một lần.
+    ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
+    ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity.
+    ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
@@ -296,7 +299,7 @@ tests\
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
     ├── sourceEncoding.js         Mã GAS và Sidebar không chứa chữ mojibake (UTF-8 bị đọc nhầm bảng mã).
-    ├── settings.js               SETTINGS và khối tham số Config, kể cả ca sheet chưa có dòng nào.
+    ├── settings.js               Cổng cài đặt: bảng khai, đọc khi kho rỗng hay hỏng, settingsSave chuẩn hóa và phát tín hiệu, các kiểu trường, ngầm định lệch thì bỏ và có thông báo, LOG_TRACE.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
     ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
     ├── entryPoint.js             Cửa vào Sidebar tự gọi ghi Log theo chuyển trạng thái lỗi.
@@ -307,11 +310,11 @@ tests\
     ├── cellBudget.js             Cái bẫy gõ "500.000" thành 500, và bảng thủ phạm phải sắp giảm dần.
     ├── setupSheets.js            Chạy lại lần thứ hai có phá gì không: giá trị người dùng đã vặn phải còn nguyên, và tên mới nối dưới dòng cuối của chính cột tham số.
     ├── columnFormat.js           Khuôn chống mất chữ số đầu của mã số thuế: bảng khuôn khớp kiểu cột, cửa ghi đặt lại khuôn trước khi ghi, dựng và kiểm sheet áp khuôn đúng ô.
-    ├── creatorField.js           Cột Người tạo trên FBM ở cửa ghi: người dùng tạo mới lấy USER_NAME của Config, không gõ đè được; nguồn pull ghi thẳng người tạo FBM.
+    ├── creatorField.js           Cột Người tạo trên FBM ở cửa ghi: người dùng tạo mới lấy USER_NAME của Cài đặt, không gõ đè được; nguồn pull ghi thẳng người tạo FBM.
     ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
-    ├── configRead.js             Khóa trùng thì chặn, còn khối sắp xếp thì thứ tự hàng là nghĩa.
-    ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: di chuyển một lần từ Config, khóa đã có thì thắng, giá trị hỏng thì dừng chứ không về 0.
+    ├── settingsMigrate.js        Chuyển sheet Config cũ: đạt thì đủ khóa và xóa sheet; có vấn đề hay kho hỏng thì không ghi khóa nào, sheet còn nguyên.
+    ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: chưa có khóa thì cấp từ 1, khóa đã có thì cấp tiếp, giá trị hỏng thì dừng chứ không về 0.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
     ├── sheetReadCopy.js          Bản đọc Sheet chung: chỉ nhớ trong một lần gọi, bỏ khi cầm khóa, cửa ghi và cửa xóa bỏ để lần đọc sau thấy số dòng mới.
     ├── documentStore.js          Cửa kho dùng chung: một lần ghi khách mới đọc kho thật tối đa 3 lần, tín hiệu reload vào kho trước khi nhả khóa, không tệp nào gọi thẳng kho hay khóa.
@@ -401,7 +404,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ui/tokens.html` | `client/style/tokens.html` |
 | `client/ui/frame.html` | `client/style/frame.html` |
 
-Chín tệp máy chủ không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ConfigParams.js`, `UserPrefs.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng — với `UserPrefs.js` là tài liệu 07 Phần 6, chỗ ra luật "mọi núm chọn nhớ ở `UserProperties`" mà không đặt tên tệp — còn việc gom mỗi luật vào một tệp là quyết định của phiên code, nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
+Bảy tệp máy chủ không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `DateText.js`, `EntryPoint.js`, `UserPrefs.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng — với `UserPrefs.js` là tài liệu 07 Phần 6, chỗ ra luật "mọi núm chọn nhớ ở `UserProperties`" mà không đặt tên tệp — còn việc gom mỗi luật vào một tệp là quyết định của phiên code, nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
 
 Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 

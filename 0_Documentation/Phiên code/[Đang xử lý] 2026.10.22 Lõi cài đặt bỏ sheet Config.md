@@ -15,26 +15,26 @@ Branch `feature/config-core`. Tách từ mục 2 của `2026.10.17 Todo.md`.
 - [x] Đo `measureConfigReads` trước khi sửa (2026-10-22: lượt lạnh `configParams` 1487 ms gồm mở Sheet lần đầu; lượt ấm `configReadAll` 8–10 ms, `reloadConfig` 9–10 ms; đọc thật 1 lần mỗi lượt, còn lại dùng bản nhớ)
 - [ ] Thử bản sao tệp Sheet DEV có mang DocumentProperties không (cần chủ dự án tạo bản sao, sau khi có hàm xem cài đặt)
 - [x] Trình phương án ba phần. Chủ dự án duyệt 2026-10-22 (xem mục Thiết kế đã chốt)
-- [ ] Đọc toàn bộ tài liệu 01; đọc code mở form trống phía Sidebar và `FieldLogic` hai phía
-- [ ] Cổng cài đặt `server/settings/`: đọc, kiểm (thuần, nhận ngữ cảnh), ghi; bộ kiểu trường cố định
-- [ ] Bảng khai phần cài đặt của lõi: tham số vận hành; dữ liệu (cột tự thêm, ngầm định khi nhập trên Sidebar, sắp xếp chung)
-- [ ] Phần cài đặt của FBM trong `fbm_sync`: ngầm định khi kéo từ FBM (giá trị Xác thực)
-- [ ] Người điều phối `settingsSave` (khóa, đọc ngữ cảnh, kiểm, ghi, tín hiệu nạp lại) và `settingsReadAll` trả hợp đồng `config` cũ
-- [ ] Công cụ ngầm định dùng chung: kiểm giá trị bằng bộ kiểm của trường, bỏ giá trị lệch, phát/gỡ thông báo
-- [ ] `LOG_TRACE` đọc từ kho; cảnh báo đang bật thành thông báo
-- [ ] Thay mọi chỗ gọi `configGet`, `configParams`, `configReadAll`; bỏ `SETTINGS_CONFIG_CACHE`
-- [ ] Sidebar điền ngầm định đã kiểm vào form trống
-- [ ] Đường chữa cháy: `shinSettingsShow`, `shinLogTraceOff`
-- [ ] Hàm chạy tay `settingsMigrateFromConfig`: đọc, kiểm, ghi, đọc lại so, đủ mới xóa sheet; lỗi thì thông báo, không xóa
-- [ ] Gỡ code sheet Config: tệp `server/config/ConfigSheetSetup.js`, `ConfigParams.js`, `server/sheet/ConfigRead.js`, menu Khôi phục Config, phần Config ở dựng sheet, khung sheet, chính sách sheet, trigger, chọn ô, chẩn đoán, đường lùi `configGet` của FBM và `IdGate`
-- [ ] Hàm dò DEV: `LogTraceSwitch`, `ReloadMatrixProbe`, `ConfigReadProbe`, `FbmSyncFixture`
-- [ ] Test offline: cổng cài đặt, ngầm định (lệch thì không điền, có thông báo), di chuyển, quét mã không còn Config
-- [ ] Tài liệu chính thức: 00, 01, 02, 02A, 03, 05, 05A, 06, 07, 07A, 08, 08A, 10
-- [ ] Cập nhật `Cây thư mục code.md`
-- [ ] `node tests/run.js` xanh
-- [ ] GAS DEV: chạy di chuyển trên Sheet DEV, hàm dò cổng cài đặt `--push`
+- [x] Đọc toàn bộ tài liệu 01; đọc code mở form trống phía Sidebar và `FieldLogic` hai phía
+- [x] Cổng cài đặt `server/settings/`: đọc, kiểm (thuần, nhận ngữ cảnh), ghi; bộ kiểu trường cố định
+- [x] Bảng khai phần cài đặt của lõi: tham số vận hành; dữ liệu (cột tự thêm, ngầm định khi nhập trên Sidebar, sắp xếp chung)
+- [x] Phần cài đặt của FBM trong `fbm_sync`: ngầm định khi kéo từ FBM (giá trị Xác thực)
+- [x] Người điều phối `settingsSave` (khóa, đọc ngữ cảnh, kiểm, ghi, tín hiệu nạp lại) và `settingsReadAll` trả hợp đồng `config` cũ
+- [x] Công cụ ngầm định dùng chung: kiểm giá trị bằng bộ kiểm của trường, bỏ giá trị lệch, phát/gỡ thông báo
+- [x] `LOG_TRACE` đọc từ kho; cảnh báo đang bật thành thông báo
+- [x] Thay mọi chỗ gọi `configGet`, `configParams`, `configReadAll`; bỏ `SETTINGS_CONFIG_CACHE`
+- [x] Sidebar điền ngầm định đã kiểm vào form trống
+- [x] Đường chữa cháy: `shinSettingsShow`, `shinLogTraceOff`
+- [x] Hàm chạy tay `settingsMigrateFromConfig`: đọc, kiểm, ghi, đọc lại so, đủ mới xóa sheet; lỗi thì thông báo, không xóa
+- [x] Gỡ code sheet Config: tệp `server/config/ConfigSheetSetup.js`, `ConfigParams.js`, `server/sheet/ConfigRead.js`, menu Khôi phục Config, phần Config ở dựng sheet, khung sheet, chính sách sheet, trigger, chọn ô, chẩn đoán, đường lùi `configGet` của FBM và `IdGate`
+- [x] Hàm dò DEV: `LogTraceSwitch`, `ReloadMatrixProbe`, `ConfigReadProbe`, `FbmSyncFixture`
+- [x] Test offline: cổng cài đặt, ngầm định (lệch thì không điền, có thông báo), di chuyển, quét mã không còn Config
+- [x] Tài liệu chính thức: 00, 01, 02, 02A, 03, 05, 05A, 06, 07, 07A, 08, 08A, 10
+- [x] Cập nhật `Cây thư mục code.md`
+- [x] `node tests/run.js` xanh
+- [x] GAS DEV: chạy di chuyển trên Sheet DEV, hàm dò cổng cài đặt `--push`
 - [ ] Nhờ chủ dự án thử bản sao tệp mang DocumentProperties không
-- [ ] Ghi phần cần nghiệm thu trên Sidebar vào mục 4 Todo
+- [x] Ghi phần cần nghiệm thu trên Sidebar vào mục 4 Todo
 - [ ] Commit, hỏi chủ dự án trước khi gộp vào `main`
 
 ## Thiết kế đã chốt (2026-10-22)
