@@ -751,14 +751,14 @@ async function chayView(so) {
     [fbm.FBM_SYNC_CLIENT.running, (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length, /sheetLinkSyncFinished|refreshDeferredBySync|SHEET_LINK_RELOAD_TIMER|forceImmediate|syncRunning/.test(sidebarSources)],
     [false, 1, false]);
 
-  // Lỗi nền GAS đã xóa khỏi kho khi trả về, nên Sidebar phải hiện ngay ở lời trả đó.
+  // Lời hỏi chọn ô mang danh sách thông báo thì Sidebar thay trọn phần thông báo máy chủ ngay ở lời trả đó.
   const cho = dungHopPoll();
   const daHien = [];
-  cho.bootTellPendingMessages = (messages) => { daHien.push(messages); return null; };
-  cho.callServer = () => syncValue({ ok: true, selection: null, customerId: '', reload: { revision: 0 }, pendingMessages: ['lỗi nền'] });
+  cho.noticeServerApply = (list) => { daHien.push(list); };
+  cho.callServer = () => syncValue({ ok: true, selection: null, customerId: '', reload: { revision: 0 }, notices: [{ key: 'entry_failure:shinOnEdit', title: 'lỗi nền' }] });
   batDau(cho);
   await cho.sheetLinkProbeSelectionAndReload('wake');
-  check(so, 'lời hỏi chọn ô và nạp lại mang câu chờ thì Sidebar hiện bằng hộp báo lỗi sẵn có', daHien, [['lỗi nền']]);
+  check(so, 'lời hỏi chọn ô và nạp lại mang thông báo thì Sidebar đưa vào cửa noticeServerApply', daHien, [[{ key: 'entry_failure:shinOnEdit', title: 'lỗi nền' }]]);
 }
 
 module.exports = { chay: async (so) => { await chay(so); await chayView(so); } };

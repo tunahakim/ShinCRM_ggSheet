@@ -44,13 +44,14 @@ async function chay(so) {
     ScriptApp: { getService: () => ({ getUrl: () => relayContextUrl }), getScriptId: () => 'script-relay-test' },
     shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) },
-    ERROR_CHANNEL_PENDING: 'pending', LOG_ERROR: 'error', errorMessage: (err) => String(err && err.message || err)
+    LOG_ERROR: 'error', errorMessage: (err) => String(err && err.message || err)
   });
   // Bộ ghi Log giả: đếm dòng đệm và số lần xả để chốt cổng nhịp nền đi qua đúng vỏ runEntryPoint (FBM-034).
   const relayLog = { lines: [], flushes: 0, reports: [] };
   relay.logEvent = (entry) => { relayLog.lines.push(entry); };
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
-  relay.reportError = (err, channel) => { relayLog.reports.push([String(err && err.message || err), channel]); };
+  relay.noticeRaise = (notice) => { relayLog.reports.push([notice.title, notice.topic]); return true; };
+  relay.noticeResolve = () => null;
   napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
   const relayConfigError = () => { try { relay.fbmSyncRelayConfig(); return ''; } catch (err) { return String(err.message); } };
   check(so, 'Chưa có địa chỉ Web App đã ghi: không cấp cấu hình relay, báo rõ phải mở link Web App một lần', /Chưa có địa chỉ Web App/.test(relayConfigError()), true);
@@ -81,7 +82,7 @@ async function chay(so) {
   const relayBoom = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
   const boomLine = relayLog.lines.filter((line) => line.action === 'fbmRelay')[0] || {};
   check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension',
-    [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'pending']]]);
+    [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'entry_failure']]]);
   const mismatch = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-khac', kind: 'heartbeat_request' });
   check(so, 'FBM-034: Extension gửi nhịp nền cho bảng tính khác thì có dòng Log lỗi và tin chờ, không xử lý nhịp', [mismatch.ok, relayLog.lines.length, relayLog.reports.length, relayLog.lines[1] && relayLog.lines[1].reason.indexOf('bảng tính khác') >= 0], [false, 2, 2, true]);
   const intruder = relayPost({ key: 'sai-khoa', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });

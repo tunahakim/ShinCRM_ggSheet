@@ -53,6 +53,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── data\
 │   │   ├── DataSchema.js         Khai 33 cột dữ liệu người dùng: mã cột, nhãn, kiểu, ràng buộc. Nguồn sự thật của hàng 1.
 │   │   ├── ColumnFormat.js       Khuôn hiển thị của từng cột, khai một chỗ cho cả SetupSheets và WriteGate dùng chung. Chống mất chữ số đầu của mã số thuế: `@` nghĩa là chữ, không phải số.
+│   │   ├── NoticeTopics.js       Bảng khai loại thông báo: mỗi loại quyết mức độ và cách hết (tự hết khi việc chạy lại thành công, hoặc bấm ✕).
 │   │   └── SheetLayout.js        Khai khung năm sheet: mấy hàng tiêu đề, dữ liệu bắt đầu từ hàng nào, màu tiêu đề, tiêu đề sheet Log.
 │   ├── sheet\                    Mọi tệp chạm SpreadsheetApp. Ranh giới quan trọng nhất của cây này: tệp trong đây phải nghiệm thu trên Google, tệp ngoài đây kiểm được offline.
 │   │   ├── Book.js               Mở đúng tệp Sheet, không chứa mã Sheet viết cứng. Lời gọi từ ngoài mở theo cặp mã Sheet và mã script ghi lúc mở Sidebar.
@@ -78,7 +79,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── state\
 │   │   ├── ReloadDecision.js    Hàm thuần nhận thay đổi, ReloadState, chính sách và localDraft tùy chọn rồi trả quyết định signal, reload RAM và render view.
 │   │   ├── DocumentStore.js      Cửa duy nhất vào DocumentProperties và khóa: bản đọc theo một lần gọi, lõi ghi thẳng, đồng bộ FBM ghi gộp trong khóa điều phối; lấy khóa xong thì đọc lại kho; công cụ duy nhất đọc JSON từ kho (hỏng thì ném lỗi có mã).
-│   │   ├── DocumentMemo.js       Đọc bộ nhớ phụ dựng lại được trong kho: hỏng thì ghi Log, báo người dùng qua kho câu chờ, xóa khóa rồi làm như chưa có.
+│   │   ├── DocumentMemo.js       Đọc bộ nhớ phụ dựng lại được trong kho: hỏng thì ghi Log, báo người dùng qua cổng thông báo, xóa khóa rồi làm như chưa có.
 │   │   ├── RecordHolds.js        Sổ bận: bản ghi nào đang bị tiến trình nào giữ, vì sao. Chỉ Cửa bản ghi gọi và chỉ trong khóa; phiên ngắn không ghi kho, sổ hỏng thì ném lỗi.
 │   │   ├── DirtyState.js         Cờ "sheet đã lệch so với RAM", giữ ở DocumentProperties. Đọc không bao giờ ném lỗi, vì nó đi kèm mọi lượt trả về.
 │   │   └── UserPrefs.js          Ba núm chọn của sidebar, giữ ở UserProperties. Chiều đọc không bao giờ ném vì nó nằm trên đường nạp lõi; chiều ghi ném ngay vì giá trị lạ ở đó là code gọi sai.
@@ -93,13 +94,15 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
 │   │   ├── SelectionService.js   Cổng một request khi không có Extension: probeSelectionAndReload trả selection, mã khách khi vị trí đổi và quyết định reload trong cùng response. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
-│   │   └── FbmSyncService.js     Entry points ổn định cho Sidebar đồng bộ FBM.
+│   │   ├── FbmSyncService.js     Entry points ổn định cho Sidebar đồng bộ FBM.
+│   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
-│   ├── entry\                    Cửa vào hệ thống, và nửa đưa lỗi tới mắt người.
-│   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: ghi log kèm vết, báo cho người dùng, ném lại lỗi, và luôn xả bộ đệm log ở finally.
-│   │   ├── ErrorReport.js        Đưa lỗi tới mắt người theo bốn kênh. Lỗi ở onOpen thì để dành, hiện ở lần mở sidebar sau.
+│   ├── notice\
+│   │   └── NoticeGate.js         Cổng thông báo duy nhất: phát, gỡ, bỏ, liệt kê. Mỗi thông báo một khóa NOTICE:<key> trong DocumentProperties; lõi không biết kênh, Sidebar là một adapter.
+│   ├── entry\                    Cửa vào hệ thống.
+│   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: lỗi thì phát thông báo theo cửa vào, ghi log và ném lại; thành công thì gỡ thông báo đó; luôn xả bộ đệm log ở finally.
 │   │   └── Menu.js               onOpen dựng menu; trigger cài đặt mở Sidebar, còn lệnh menu tự cài lại trigger này khi cần.
 │   ├── view\                     Dựng sheet quản lý: đọc bộ lọc, sắp xếp và vẽ lại vùng dữ liệu.
 │   │   ├── FilterMessages.js      Thông báo lỗi và trạng thái cho bộ lọc sheet quản lý.
@@ -124,7 +127,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
-│       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger vào kho câu chờ và hiện ở Sidebar đang mở.
+│       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger thành thông báo và hiện ở Sidebar đang mở.
+│       ├── NoticeGateProbe.js    Nghiệm thu cổng thông báo trên DocumentProperties thật và đo phí một lần getProperties lạnh.
 │       ├── BookBindingProbe.js       Hàm dò cặp mã Sheet và mã script đã ghi, để nghiệm thu chuyển Sheet.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
 │       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Sidebar/Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService.
@@ -296,6 +300,7 @@ tests\
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
     ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
     ├── entryPoint.js             Cửa vào Sidebar tự gọi ghi Log theo chuyển trạng thái lỗi.
+    ├── noticeGate.js             Cổng thông báo: ghi đè cùng khóa, tự hết, bấm ✕, kho hỏng, trần, che bí mật; quét mã không còn đường báo cũ.
     ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
     ├── sheetGrid.js              Lưới là hữu hạn, setValues không tự nới, và ca rỗng là ca thường xuyên chứ không phải ngoại lệ.
     ├── book.js                   Bản sao mang kho của script gốc: lời gọi từ ngoài không được mở Sheet gốc.
@@ -396,7 +401,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `client/ui/tokens.html` | `client/style/tokens.html` |
 | `client/ui/frame.html` | `client/style/frame.html` |
 
-Mười tệp máy chủ không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ErrorReport.js`, `ConfigParams.js`, `UserPrefs.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng — với `UserPrefs.js` là tài liệu 07 Phần 6, chỗ ra luật "mọi núm chọn nhớ ở `UserProperties`" mà không đặt tên tệp — còn việc gom mỗi luật vào một tệp là quyết định của phiên code, nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
+Chín tệp máy chủ không có trong bảng này vì tài liệu thiết kế không đặt tên cho chúng: `SheetGrid.js`, `CellBudget.js`, `EntityRead.js`, `CategoryRead.js`, `ConfigRead.js`, `DateText.js`, `EntryPoint.js`, `ConfigParams.js`, `UserPrefs.js`. Tài liệu nói *phải làm gì* ở các phần tương ứng — với `UserPrefs.js` là tài liệu 07 Phần 6, chỗ ra luật "mọi núm chọn nhớ ở `UserProperties`" mà không đặt tên tệp — còn việc gom mỗi luật vào một tệp là quyết định của phiên code, nên chỗ tra chúng là cây thư mục ở trên, không phải bảng này.
 
 Bốn dòng `client/...js` lệch vì một lý do khác hẳn các dòng trên, đã ghi ở tài liệu làm việc `Mục tiêu chặng 1.1 và 1.2.md`: **mọi** tệp client trên Apps Script buộc phải là `.html`, không phải `.js` như tài liệu 04 Phần 10 và 05 Phần 13 viết.
 

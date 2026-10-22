@@ -107,7 +107,7 @@ function chay(so) {
   // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
   const escData = {}, escLogs = [];
   const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
-  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', configGet: () => '', runEntryPoint: (name, source, channel, fn) => fn() });
+  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', configGet: () => '', runEntryPoint: (name, source, fn) => fn() });
   napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
@@ -132,7 +132,7 @@ function chay(so) {
   // Lưu cài đặt chung gộp công tắc tổng: một lời gọi Sidebar, đổi công tắc trước, công tắc lỗi thì không lưu cài đặt, luôn trả status mới.
   const saveOrder = [];
   let masterReply = { ok: true };
-  const saveHop = taoHopCat({ runEntryPoint: (name, source, channel, fn) => fn(), FbmSync: {
+  const saveHop = taoHopCat({ runEntryPoint: (name, source, fn) => fn(), FbmSync: {
     transportValue: (value) => value,
     controlDispatchLocked: (action, args) => { saveOrder.push([action, args.enabled]); return masterReply; },
     syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return { ok: true, settings }; },
@@ -150,7 +150,7 @@ function chay(so) {
   // Gói mở màn: bốn phần đọc qua đúng hàm đọc của từng cửa, một lời gọi; một phần ném lỗi thì cả gói ném để Sidebar báo.
   const bundleReads = [];
   let identityFails = false;
-  const bundleHop = taoHopCat({ runEntryPoint: (name, source, channel, fn) => fn(), FbmSync: {
+  const bundleHop = taoHopCat({ runEntryPoint: (name, source, fn) => fn(), FbmSync: {
     transportValue: (value) => value,
     stateRead: () => ({ phase: 'idle' }),
     controlDispatch: (action) => { bundleReads.push(action); return { phase: 'idle', masterEnabled: true }; },

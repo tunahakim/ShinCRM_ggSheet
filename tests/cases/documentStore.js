@@ -126,34 +126,13 @@ function chay(so) {
 
   jh.logResetBuffers();
   json.stubs._props.viewLedger = '{hỏng';
-  json.stubs._props.entryFailures = '[]';
   const soVe = jh.viewLedgerRead();
-  const nhoLoi = jh.entryFailuresRead();
   const dongLog = jh.LOG_BUFFER.filter((line) => line.reason === 'DOCUMENT_PROPERTY_CORRUPT').length;
-  const cauCho = JSON.parse(json.stubs._props.LOG_PENDING || '[]');
-  check(so, 'bộ nhớ phụ hỏng thì báo rồi tự lành: trả rỗng, mỗi khóa một dòng Log lỗi và một câu chờ cho người dùng, khóa hỏng bị xóa',
-    [soVe, nhoLoi, dongLog, cauCho.length, cauCho.every((cau) => cau.indexOf('bị hỏng') >= 0), 'viewLedger' in json.stubs._props, 'entryFailures' in json.stubs._props],
-    [{}, {}, 2, 2, true, false, false]);
-
-  jh.logResetBuffers();
-  json.stubs._props.LOG_PENDING = '{hỏng';
-  const layHong = jh.takePendingMessages();
-  check(so, 'kho câu chờ hỏng: mở Sidebar vẫn nhận câu báo các câu cũ đã mất, có dòng Log lỗi, kho được dọn',
-    [layHong, jh.LOG_BUFFER.some((line) => line.reason === 'DOCUMENT_PROPERTY_CORRUPT'), 'LOG_PENDING' in json.stubs._props],
-    [[jh.ERROR_PENDING_LOST_MESSAGE], true, false]);
-  json.stubs._props.LOG_PENDING = '"không phải mảng"';
-  jh.errorPendingPush('Lỗi mới.');
-  const khoMoi = JSON.parse(json.stubs._props.LOG_PENDING);
-  check(so, 'kho câu chờ hỏng lúc thêm câu: bắt đầu danh sách mới, câu đầu nói các câu cũ đã mất, câu mới vẫn được giữ',
-    [khoMoi.length, khoMoi[0].indexOf(jh.ERROR_PENDING_LOST_MESSAGE) >= 0, /Lỗi mới\.$/.test(khoMoi[1])], [2, true, true]);
-  jh.errorPendingPush('Lỗi mới.');
-  jh.errorPendingPush('Lỗi khác.');
-  check(so, 'kho câu chờ: câu đã có trong kho không thêm lần nữa, câu khác vẫn vào',
-    JSON.parse(json.stubs._props.LOG_PENDING).length, 3);
-  // Trigger không có người nhìn: lỗi phải vào kho chờ để Sidebar hiện, không chỉ nằm ở Log.
-  const nguonTrigger = fs.readFileSync(path.join(GAS, 'server/Triggers.js'), 'utf8');
-  check(so, 'trigger sửa ô và thêm/xóa sheet báo lỗi qua kho chờ',
-    ['shinOnEdit', 'shinOnChange'].map((ten) => new RegExp("runEntryPoint\\('" + ten + "', 'core', ERROR_CHANNEL_PENDING").test(nguonTrigger)), [true, true]);
+  const thongBao = JSON.parse(json.stubs._props['NOTICE:memo_corrupt:viewLedger'] || '{}');
+  check(so, 'bộ nhớ phụ hỏng thì báo rồi tự lành: trả rỗng, một dòng Log lỗi, một thông báo memo_corrupt cho người dùng, khóa hỏng bị xóa',
+    [soVe, dongLog, thongBao.level, thongBao.clear, 'viewLedger' in json.stubs._props],
+    [{}, 1, 'warning', 'dismiss', false]);
+  delete json.stubs._props['NOTICE:memo_corrupt:viewLedger'];
 
   // Quét chống tái phạm: JSON trong kho chỉ đọc qua công cụ chung, nên không còn đường "hỏng thì coi là rỗng" tự viết.
   // Ngoại lệ: chính công cụ; EntryPoints.js (địa chỉ Web App, JSON thân request) và Book.js (cặp mã Sheet) đọc ScriptProperties, không phải DocumentProperties.

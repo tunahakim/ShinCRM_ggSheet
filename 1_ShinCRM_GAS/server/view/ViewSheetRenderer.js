@@ -379,7 +379,7 @@ function viewProbeRenderCurrent() {
 
 /** Sidebar gọi khi lời hỏi chung quyết vẽ sheet đang xem: thử vẽ khi sổ nói cần thử (chưa có mục, cờ ô điều khiển, dữ liệu đổi, lượt hỏng đến hạn thử lại). Ngoài đó chỉ trả kết quả lượt thử gần nhất, kể cả các khối lỗi, mà không chạm Sheet. */
 function renderViewIfDirty(sheetName) {
-  return runEntryPoint('renderViewIfDirty', 'sidebar', 'throw', function () { return viewRenderIfStale(sheetName); });
+  return runEntryPoint('renderViewIfDirty', 'sidebar', function () { return viewRenderIfStale(sheetName); });
 }
 
 /** Phần ruột không bọc cửa vào, cho đường nội bộ và probe DEV. */

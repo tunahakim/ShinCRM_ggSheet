@@ -16,7 +16,7 @@
 var LOAD_SOURCE = 'sidebar';
 
 function getReloadState() {
-  return runEntryPoint('getReloadState', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('getReloadState', LOAD_SOURCE, function () {
     var started = Date.now();
     return { ok: true, reload: reloadStateRead(), ms: Date.now() - started };
   });
@@ -97,7 +97,7 @@ function reloadRecords(recordIds, options) {
       ms: Date.now() - started
     };
   };
-  return options && options.internal === true ? execute() : runEntryPoint('reloadRecords', LOAD_SOURCE, 'throw', execute);
+  return options && options.internal === true ? execute() : runEntryPoint('reloadRecords', LOAD_SOURCE, execute);
 }
 
 /** Nạp riêng Category. */
@@ -114,7 +114,7 @@ function reloadCategory(options) {
       ms: Date.now() - started
     };
   };
-  return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, 'throw', execute);
+  return options && options.internal === true ? execute() : runEntryPoint('reloadCategory', LOAD_SOURCE, execute);
 }
 
 /** Nạp riêng toàn bộ Config. */
@@ -132,7 +132,7 @@ function reloadConfig(options) {
       ms: Date.now() - started
     };
   };
-  return options && options.internal === true ? execute() : runEntryPoint('reloadConfig', LOAD_SOURCE, 'throw', execute);
+  return options && options.internal === true ? execute() : runEntryPoint('reloadConfig', LOAD_SOURCE, execute);
 }
 
 /** Nạp trọn một sheet dữ liệu theo yêu cầu thủ công; không suy diễn từ trạng thái màn hình của Sidebar. */
@@ -177,20 +177,20 @@ function reloadByPlan(plan) {
 }
 
 function reloadCustomer() {
-  return runEntryPoint('reloadCustomer', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('reloadCustomer', LOAD_SOURCE, function () {
     return reloadEntityAll('customer');
   });
 }
 
 function reloadActivity() {
-  return runEntryPoint('reloadActivity', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('reloadActivity', LOAD_SOURCE, function () {
     return reloadEntityAll('activity');
   });
 }
 
 /** Xác định sheet hiện tại ở GAS rồi chọn đúng API; client không được tự đoán theo màn đang mở. */
 function reloadCurrentSheet() {
-  return runEntryPoint('reloadCurrentSheet', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('reloadCurrentSheet', LOAD_SOURCE, function () {
     var sheet = shinOpenBook().getActiveSheet();
     var name = sheet && typeof sheet.getName === 'function' ? sheet.getName() : '';
     var result;
@@ -225,7 +225,7 @@ function reloadCurrentSheet() {
 /**
  * Nạp phần lõi. Đây là lời gọi đầu tiên của mỗi lượt mở sidebar.
  *
- * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, reload, warnings, pendingMessages, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
+ * Trả về `{ ok: true, blocked: false, settings, schema, config, categories, customer, activity, prefs, budget, reload, warnings, notices, ms }` ở đường bình thường, hoặc gói rút gọn vẫn có `pendingMessages` khi vượt trần ngân sách ô.
  *
  * **Đo ngân sách ô là việc đầu tiên, trước khi đọc một ô dữ liệu nào.** Vượt trần thì dừng ngay tại đó. Phép đo không đọc ô nào nên nó gần như miễn phí, còn đọc dữ liệu trong một tệp đã quá ì là cách chắc nhất để lượt chạy chết ở giữa đường — và chết ở giữa đường thì người dùng thấy sidebar treo, không thấy nguyên nhân.
  *
@@ -249,7 +249,7 @@ function loadCore(options) {
         detail: { total: budget.total, ceiling: budget.ceiling, sheets: budget.sheets }
       });
 
-      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), pendingMessages: takePendingMessages(), ms: Date.now() - batDau };
+      return { ok: true, blocked: 'cellBudget', budget: budget, reload: reloadStateRead(), notices: noticeList(), ms: Date.now() - batDau };
     }
 
     // Revision đọc trước mọi ô dữ liệu: thay đổi ghi trong lúc đọc mang revision lớn hơn nên lời hỏi sau của Sidebar tự thấy.
@@ -302,13 +302,13 @@ function loadCore(options) {
       budget: budget,
       reload: reloadStateRead(),
       warnings: warnings,
-      pendingMessages: takePendingMessages(),
+      notices: noticeList(),
       // Dòng thời gian mở Sidebar là dòng vết: tắt vết thì `logClientTiming` không ghi gì, nên Sidebar không gọi.
       timingTrace: logTraceCoversSource(LOAD_SOURCE),
       ms: ms
     };
   };
-  return opts.internal === true ? execute() : runEntryPoint('loadCore', LOAD_SOURCE, 'throw', execute);
+  return opts.internal === true ? execute() : runEntryPoint('loadCore', LOAD_SOURCE, execute);
 }
 
 /**
@@ -334,7 +334,7 @@ function loadChunkRows(requested) {
  * Gói cuối cùng — gói chạm tới hàng bốn — là chỗ ghi dòng log kết thúc. Ghi mỗi gói một dòng thì một tệp năm mươi gói để lại năm mươi dòng log cho một việc, làm loãng sheet `Log` tới mức không tìm ra thứ đáng xem; còn không ghi gì thì không ai biết lượt nạp nền đã xong hay đã chết giữa đường.
  */
 function loadActivityChunk(cursor, chunkRows) {
-  return runEntryPoint('loadActivityChunk', LOAD_SOURCE, 'throw', function () {
+  return runEntryPoint('loadActivityChunk', LOAD_SOURCE, function () {
     var batDau = Date.now();
     var context = entityReadContext('activity');
     var firstDataRow = SHEET_FIRST_DATA_ROW;

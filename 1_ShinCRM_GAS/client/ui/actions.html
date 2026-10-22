@@ -133,6 +133,13 @@ ACTIONS.toggleNotices = function () {
   return noticeScreenOpen();
 };
 
+/** Bấm ✕ trên một thông báo của GAS: GAS bỏ khỏi kho chung rồi trả danh sách mới để vẽ lại ngay. `value` là khóa thông báo. */
+ACTIONS.noticeDismiss = function (payload) {
+  return callServer('shinNoticeDismiss', [payload.value]).then(function (result) {
+    return noticeServerApply(result && result.notices);
+  });
+};
+
 /** Nạp lại từ đầu. Đóng hết form trước khi gọi, vì `sidebarBoot` dọn sạch `Store` và một form đang mở sẽ trỏ vào bản ghi vừa bị bỏ. */
 ACTIONS.reloadAll = function () {
   screenStateGoView();

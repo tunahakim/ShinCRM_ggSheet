@@ -447,7 +447,7 @@ FbmSync.removeLegacyTriggers = function () {
 };
 function fbmLegacyTriggerEntry(name) {
   var run = function () { return FbmSync.removeLegacyTriggers(); };
-  return typeof runEntryPoint === 'function' ? runEntryPoint(name, 'fbm_sync', 'throw', run) : run();
+  return typeof runEntryPoint === 'function' ? runEntryPoint(name, 'fbm_sync', run) : run();
 }
 function fbmHeartbeatTrigger() { return fbmLegacyTriggerEntry('fbmHeartbeatTrigger'); }
 function fbmCustomerScanTrigger() { return fbmLegacyTriggerEntry('fbmCustomerScanTrigger'); }

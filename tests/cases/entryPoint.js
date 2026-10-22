@@ -19,7 +19,7 @@ function chay(so) {
   let nen;
   try { nen = dungHop({ sheets: ['Config', 'Log'] }); } catch (err) { return ghiLoiNap(so, 'nạp EntryPoint', err); }
   const hop = nen.hop;
-  const goi = (name, fn) => hop.runEntryPoint(name, 'sidebar', 'throw', fn);
+  const goi = (name, fn) => hop.runEntryPoint(name, 'sidebar', fn);
   const hong = (message) => () => { throw new Error(message); };
   const dem = (text) => docLog(nen).filter((row) => row.indexOf(text) >= 0).length;
 

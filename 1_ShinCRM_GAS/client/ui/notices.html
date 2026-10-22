@@ -2,6 +2,7 @@
 /*
  * Thông báo của Sidebar: nơi duy nhất giữ các việc người dùng cần biết đang còn (nạp lại bị hoãn vì form đang mở, lỗi sheet quản trị đang đứng, Extension không chạy, sheet quản trị chưa cập nhật), dòng báo ở đáy và màn thông báo dùng chung.
  * Nguồn nào cũng chỉ gọi `noticeSet(key, notice)`; thứ tự, chữ ở dòng đáy và lúc thân Sidebar chuyển sang màn thông báo đều quyết ở đây. Dòng đáy nhường chỗ cho dải hoàn tác trong lúc đếm ngược và ẩn khi màn đồng bộ FBM giữ khung.
+ * Thông báo của GAS (cổng thông báo, Tài liệu 10 Phần 8) đổ vào đây qua `noticeServerApply` dưới khóa `server:<key>`: Sidebar là một adapter đọc danh sách đó, màu theo `level`, nút ✕ gọi `shinNoticeDismiss`.
  * `notice`: `{ line, blocks, button, takeover }` — `line` là chữ ở dòng đáy; `blocks` là các khối của màn thông báo (xem `client/schema/status/notices.html`); `button` (`{ label, action }`) là nút ở dòng đáy; `takeover` là việc thay hẳn thân Sidebar ngay khi xuất hiện.
  */
 
@@ -14,15 +15,24 @@ var NOTICE_SCREEN_ROOT_ID = 'shin-notice-screen';
 /** Số nhỏ đứng trước ở dòng đáy và trên màn thông báo. Khóa ngoài bảng này là lỗi lập trình. Hoãn nạp đứng đầu vì nó chỉ có khi form đang mở và nói về chính chữ người dùng đang gõ. */
 var NOTICE_PRIORITY = { recordDeferred: 1, viewProblems: 2, extension: 3, viewStale: 4 };
 
+/** Thứ tự của thông báo GAS theo `level`, xen giữa các việc của Sidebar. */
+var NOTICE_SERVER_PRIORITY = { error: 2.5, warning: 3.5, info: 4.5 };
+var NOTICE_SERVER_PREFIX = 'server:';
+
 var NOTICES = {};
 
+function noticePriority(key) {
+  if (key.indexOf(NOTICE_SERVER_PREFIX) === 0) { return NOTICE_SERVER_PRIORITY[NOTICES[key].level] || NOTICE_SERVER_PRIORITY.error; }
+  return NOTICE_PRIORITY[key];
+}
+
 function noticeList() {
-  return Object.keys(NOTICES).sort(function (a, b) { return NOTICE_PRIORITY[a] - NOTICE_PRIORITY[b]; }).map(function (key) { return NOTICES[key]; });
+  return Object.keys(NOTICES).sort(function (a, b) { return noticePriority(a) - noticePriority(b); }).map(function (key) { return NOTICES[key]; });
 }
 
 /** Đặt hoặc bỏ (`null`) một việc. Màn thông báo đang hiện thì vẽ lại theo danh sách mới; việc thay thân vừa hết thì trả lại màn xem khách. */
 function noticeSet(key, notice) {
-  if (!NOTICE_PRIORITY[key]) { throw new Error('Loại thông báo "' + key + '" không có trong NOTICE_PRIORITY.'); }
+  if (!NOTICE_PRIORITY[key] && key.indexOf(NOTICE_SERVER_PREFIX) !== 0) { throw new Error('Loại thông báo "' + key + '" không có trong NOTICE_PRIORITY.'); }
   var previous = NOTICES[key] || null;
   if (!previous && !notice) { return null; }
   if (notice) { NOTICES[key] = notice; } else { delete NOTICES[key]; }
@@ -58,6 +68,28 @@ function noticePaint() {
     button.textContent = top.button.label;
     button.setAttribute('data-action', top.button.action);
   }
+}
+
+/**
+ * Đổ danh sách thông báo GAS gửi kèm lời trả: thay trọn phần `server:` (thông báo đã hết ở GAS thì mất ở đây). `undefined` là lời trả không mang danh sách, giữ nguyên.
+ * `info` vẽ bằng khung thường vì khung trạng thái chỉ có ba vai.
+ */
+function noticeServerApply(list) {
+  if (!Array.isArray(list)) { return null; }
+  var keep = {};
+  list.forEach(function (item) {
+    var key = NOTICE_SERVER_PREFIX + item.key;
+    keep[key] = true;
+    var block = { variant: item.level === 'info' ? 'normal' : item.level, title: item.title, lines: item.lines || [], hint: item.hint || '', button: { label: 'Đóng ✕', action: 'noticeDismiss', value: item.key } };
+    var next = { level: item.level, line: item.title, blocks: [block] };
+    var previous = NOTICES[key];
+    if (previous && JSON.stringify(previous) === JSON.stringify(next)) { return; }
+    noticeSet(key, next);
+  });
+  Object.keys(NOTICES).forEach(function (key) {
+    if (key.indexOf(NOTICE_SERVER_PREFIX) === 0 && !keep[key]) { noticeSet(key, null); }
+  });
+  return null;
 }
 
 function noticeScreenShowing() {

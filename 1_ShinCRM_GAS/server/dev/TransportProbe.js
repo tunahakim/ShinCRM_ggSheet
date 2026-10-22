@@ -9,14 +9,14 @@ var TRANSPORT_PROBE_SIZES_MB = [1, 5, 10, 20];
 
 /** Kế hoạch đo do GAS cấp để Sidebar không giữ bản sao con số: các cỡ gói và hạn chờ một lần gửi (bằng hạn chờ GAS của lượt đồng bộ). */
 function fbmTransportProbePlan() {
-  return runEntryPoint('fbmTransportProbePlan', 'sidebar', 'throw', function () {
+  return runEntryPoint('fbmTransportProbePlan', 'sidebar', function () {
     return { ok: true, sizesBytes: TRANSPORT_PROBE_SIZES_MB.map(function (mb) { return mb * 1024 * 1024; }), timeoutMs: FbmSync.budgetGasReplyMs() };
   });
 }
 
 /** Đường lượt chạy tay: Sidebar gửi gói Extension vừa trả về. */
 function fbmTransportProbe(input) {
-  return runEntryPoint('fbmTransportProbe', 'sidebar', 'throw', function () { return fbmTransportProbeReceive('sidebar', input || {}); });
+  return runEntryPoint('fbmTransportProbe', 'sidebar', function () { return fbmTransportProbeReceive('sidebar', input || {}); });
 }
 
 /** Đường lượt nền: `doPost` đã kiểm khóa relay rồi mới chuyển vào đây. */
@@ -30,7 +30,7 @@ function fbmTransportProbeReceive(route, input) {
 
 /** Một dòng Log tổng kết mỗi đường; lỗi phía trình duyệt (GAS không nhận được gì) chỉ có ở đây. */
 function fbmTransportProbeReport(results) {
-  return runEntryPoint('fbmTransportProbeReport', 'sidebar', 'throw', function () {
+  return runEntryPoint('fbmTransportProbeReport', 'sidebar', function () {
     var rows = Array.isArray(results) ? results : [], lines = [];
     ['sidebar', 'relay'].forEach(function (route) {
       var own = rows.filter(function (item) { return item && item.route === route; });

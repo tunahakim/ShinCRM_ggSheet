@@ -44,7 +44,7 @@ function chay(so) {
   const rendered = [];
   const realMarkControls = hop.viewLedgerMarkControls;
   hop.viewLedgerMarkControls = (names) => { rendered.push(names.join(',')); return realMarkControls(names); };
-  hop.runEntryPoint = (name, source, channel, fn) => trongLanChay(hop, fn);
+  hop.runEntryPoint = (name, source, fn) => trongLanChay(hop, fn);
   hop.userPrefsRead = () => { throw new Error('Trigger không được đọc núm người dùng'); };
   // Xóa cả mốc cũ của view để `viewsStaleRevision > 0` nghĩa là signal sau lần xóa đã làm view cũ.
   const clearState = () => { hop.documentProps().deleteProperty('reloadJournal'); hop.documentProps().deleteProperty('viewsStaleRevision'); };

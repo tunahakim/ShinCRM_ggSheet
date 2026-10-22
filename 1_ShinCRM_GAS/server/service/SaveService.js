@@ -26,7 +26,7 @@ var SAVE_HOLDER = 'user';
  * Lưu đi qua Cửa bản ghi (tài liệu 06 Phần 1): hỏi sổ bận và ghi trong cùng một lần cầm khóa, không hở khoảng giữa lúc hỏi và lúc ghi. Bản ghi đang bị tiến trình khác giữ (thường là đồng bộ đang đẩy nó) thì trả `{ ok: false, entity, busy: { id, by, reason } }` và không ghi gì; Sidebar mở popup "Thử lại" / "Quay lại form". Bản ghi đang "xung đột chờ quyết" vẫn lưu được: màn xung đột tự thấy phía ShinCRM đã đổi.
  */
 function saveRecord(entity, record, old) {
-  return runEntryPoint('saveRecord', SAVE_SOURCE, 'throw', function () {
+  return runEntryPoint('saveRecord', SAVE_SOURCE, function () {
     var batDau = Date.now();
     var id = String(record && record.id || '').trim();
     var run = recordGateRun({ by: SAVE_HOLDER, decide: function (gate) {
@@ -52,7 +52,7 @@ function saveRecord(entity, record, old) {
  * Đây là đường ghi duy nhất mà mảng đi tới tầng này, và nó khác `saveRecord` ở chỗ mảng mã có nguồn thật: dải hoàn tác đếm ngược một lần cho nhiều lần bấm.
  */
 function deleteRecords(entity, ids) {
-  return runEntryPoint('deleteRecords', SAVE_SOURCE, 'throw', function () {
+  return runEntryPoint('deleteRecords', SAVE_SOURCE, function () {
     var batDau = Date.now();
     var run = recordGateRun({ by: SAVE_HOLDER, decide: function (gate) {
       var held = Array.isArray(ids) ? gate.busy(entity, ids) : {}, busy = {};

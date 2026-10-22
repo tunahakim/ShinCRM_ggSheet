@@ -51,7 +51,7 @@ function workflowGas(options) {
     LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
     logEvent: () => {},
     logTrace: () => {},
-    runEntryPoint: (name, source, channel, fn) => fn(),
+    runEntryPoint: (name, source, fn) => fn(),
     // Chỉ lấy hằng số `SETTINGS` thật, không nạp cả Settings.js vì nó kéo theo đường đọc sheet Config.
     SETTINGS: settingsThat()
   }, opt));
