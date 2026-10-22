@@ -1,7 +1,7 @@
 <script>
 /*
  * Màn thông báo dùng chung: mỗi việc cần người dùng biết là một khối có tiêu đề và phần chi tiết, nhiều việc cùng lúc thì xếp nhiều khối theo thứ tự bên gọi đưa vào.
- * Khối chỉ mang dữ liệu: `title`, `lines`, `hint`, mức `variant` (`error`, `warning`), và tùy chọn `table` (bảng sheet của ngân sách ô) hoặc `button` (`{ label, action, busy }`).
+ * Khối chỉ mang dữ liệu: `title`, `lines`, `hint`, mức `variant` (`error`, `warning`), và tùy chọn `table` (bảng sheet của ngân sách ô) hoặc `button` (`{ label, action, busy, value }`; `value` thành `data-value` cho hành động đọc).
  */
 STATUS_SCHEMA.notices = function (model) {
   var screen = statusSchemaRoot(model.infoText, (model.blocks || []).map(statusSchemaNoticeBlock), NOTICE_SCREEN_ROOT_ID);
@@ -15,7 +15,10 @@ function statusSchemaNoticeBlock(block) {
   if (block.table) { elements.push(statusSchemaTable(block.table)); }
   if (block.hint) { elements.push(statusSchemaText(block.hint)); }
   if (block.button) {
-    elements.push(Row({ elements: [Button({ label: block.button.label, action: block.button.action, data: block.button.busy ? { busy: block.button.busy } : undefined })] }));
+    var data = block.button.busy || block.button.value ? {} : undefined;
+    if (block.button.busy) { data.busy = block.button.busy; }
+    if (block.button.value) { data.value = block.button.value; }
+    elements.push(Row({ elements: [Button({ label: block.button.label, action: block.button.action, data: data })] }));
   }
   return statusSchemaBox(elements, block.variant || 'error');
 }

@@ -66,7 +66,7 @@ async function sidebarBoot(options) {
 
     statusInfoLine('Đang đo ngân sách ô và nạp lõi…');
     var core = await callServer('loadCore');
-    bootTellPendingMessages(core.pendingMessages);
+    noticeServerApply(core.notices);
 
     if (core.blocked) {
       statusBudgetBlocked(core.budget);
@@ -133,17 +133,6 @@ async function sidebarBoot(options) {
 var BOOT_LAST_SUMMARY = null;
 var BOOT_WARNING_TIMER = null;
 var BOOT_WARNING_FINISH = null;
-
-/** Hiện rồi bỏ các lỗi mà cửa chạy nền đã gửi vào kho chờ; gói `loadCore` đã lấy và xóa chúng ở phía máy chủ. */
-function bootTellPendingMessages(messages) {
-  var list = Array.isArray(messages) ? messages.filter(function (message) { return String(message || '').trim(); }) : [];
-  if (!list.length) { return null; }
-
-  var text = 'ShinCRM ghi nhận ' + list.length + ' lỗi từ các lượt chạy nền trước đó:\n\n• ' + list.join('\n• ');
-  if (typeof dispatchError === 'function') { dispatchError(new Error(text)); }
-  else { alert(text); }
-  return text;
-}
 
 /** Vẽ lại màn tóm tắt của lượt nạp gần nhất. Không phải một trong mười lăm hành động, nên nó không có nút nào — đường vào là console lúc nghiệm thu, và nút Nạp lại đưa màn hình về lại màn xem. */
 function bootShowSummary() {

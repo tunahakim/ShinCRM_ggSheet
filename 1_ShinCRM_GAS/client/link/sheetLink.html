@@ -459,8 +459,8 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     silent: !sheetLinkShowProbeProgress()
   });
   var settled = request.then(function (result) {
-    // Lỗi nền (trigger, đồng bộ FBM) GAS đã xóa khỏi kho khi trả về, nên phải hiện ở mọi lời trả, kể cả lời trả của ngữ cảnh cũ.
-    if (result && typeof bootTellPendingMessages === 'function') { bootTellPendingMessages(result.pendingMessages); }
+    // Thông báo GAS (lỗi trigger, đồng bộ FBM...) đi kèm mọi lời trả, kể cả lời trả của ngữ cảnh cũ: danh sách luôn là trạng thái mới nhất của kho.
+    if (result && typeof noticeServerApply === 'function') { noticeServerApply(result.notices); }
     var extensionOwnsContext = sheetLinkExtensionOwnsContext();
     var contextIsCurrent = contextGeneration === SHEET_LINK_CONTEXT_GENERATION;
     if (result && result.selection && contextIsCurrent && !extensionOwnsContext) {
