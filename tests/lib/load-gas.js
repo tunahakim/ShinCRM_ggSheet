@@ -73,22 +73,21 @@ function capBangChoPhepDongBo(hopCat) {
   if (hopCat.FBM_SYNC_PERMISSION_OPTIONS) { return; }
   const rieng = taoHopCat({});
   vm.runInContext(docTep('server/data/DataSchema.js'), rieng, { filename: 'server/data/DataSchema.js' });
-  vm.runInContext(docTep('server/config/ConfigParams.js'), rieng, { filename: 'server/config/ConfigParams.js' });
   hopCat.FBM_SYNC_PERMISSION_OPTIONS = rieng.FBM_SYNC_PERMISSION_OPTIONS;
   hopCat.fbmSyncPermissionValues = rieng.fbmSyncPermissionValues;
-  capOXacThucMacDinh(hopCat, rieng.FBM_VERIFY_STATUS_CONFIG_NAME);
 }
 
-/** Giá trị ô Config "Xác thực mặc định cho khách kéo từ FBM" của tệp thử; test cần giá trị khác thì tự gán `configGet`. */
+/** Giá trị Xác thực của khách mới kéo từ FBM trong tệp thử; test cần nhánh khác thì tự gán `FbmSync.pullDefaults` hoặc nạp `fbm_sync/state/PullDefaults.js` thật. */
 const XAC_THUC_MAC_DINH_THU = 'Chưa xác thực';
 
 /**
- * Tệp thật luôn có ô Config này (preflight chặn khi trống), nên hộp cát chỉ nạp vài tệp đồng bộ cũng được cấp sẵn tên ô và một `configGet` chỉ trả giá trị cho đúng ô đó.
- * Hộp cát đã có `configGet` riêng thì giữ nguyên.
+ * Tệp thật luôn có ngầm định kéo từ FBM (preflight chặn khi thiếu), nên hộp cát chỉ nạp vài tệp đồng bộ được cấp sẵn `FbmSync.pullDefaults` trả Xác thực thử và một `categoryReadAll` rỗng cho chỗ gọi nó. Hộp đã có hàm thật hoặc tự gán thì giữ nguyên; nạp `PullDefaults.js` sau thì bản thật thay vào.
  */
-function capOXacThucMacDinh(hopCat, ten) {
-  if (!hopCat.FBM_VERIFY_STATUS_CONFIG_NAME) { hopCat.FBM_VERIFY_STATUS_CONFIG_NAME = ten; }
-  if (typeof hopCat.configGet !== 'function') { hopCat.configGet = (name, fallback) => name === ten ? XAC_THUC_MAC_DINH_THU : (fallback === undefined ? '' : fallback); }
+function capNgamDinhKeoThu(hopCat) {
+  const F = hopCat.FbmSync;
+  if (!F) { return; }
+  if (typeof F.pullDefaults !== 'function') { F.pullDefaults = (entity) => (entity === 'customer' ? { verifyStatus: XAC_THUC_MAC_DINH_THU } : {}); }
+  if (typeof hopCat.categoryReadAll !== 'function') { hopCat.categoryReadAll = () => ({}); }
 }
 
 /** Mã người dùng FBM thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
@@ -208,6 +207,7 @@ function napServer(hopCat, ...duongDans) {
       vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
     }
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
+    if (duongDan.indexOf('fbm_sync/') === 0) { capNgamDinhKeoThu(hopCat); }
     if (duongDan === 'fbm_sync/transport/TransportCore.js' || duongDan === 'fbm_sync/read/GridRead.js') { capPhienThu(hopCat); }
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });

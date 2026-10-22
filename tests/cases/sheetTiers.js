@@ -21,7 +21,7 @@ function chay(so) {
 
   let nen;
   try {
-    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+    nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
     ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
     ghiO(nen, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
     nen.hop.shinViewSheetNames = () => [];
@@ -131,7 +131,7 @@ function chay(so) {
   section('Cửa ghi: kiểm xung đột bằng giá trị cũ và xác nhận sau ghi');
   let xd;
   try {
-    xd = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+    xd = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
     ghiO(xd, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
     ghiO(xd, 'Customer', 4, '@CUS_SDT', '0901000001');
     ghiO(xd, 'Customer', 4, '@CUS_NGAY_DONG_THAU', new Date(2026, 9, 17));

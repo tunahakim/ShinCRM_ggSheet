@@ -1,6 +1,6 @@
 /**
  * Test quét mã của tầng 1 đọc/ghi Sheet (tài liệu 06 Phần 2): mọi lệnh Google đọc hoặc ghi ô, cấu trúc, kích thước lưới chỉ được nằm trong bốn tệp tầng 1. Nơi khác phải gọi công cụ tầng 1, để chính sách theo loại sheet (khóa tài liệu, sheet tự do) và tờ nháp của lần gọi không ai phải nhớ.
- * Ngoại lệ có tên: `server/dev/` (chỉ DEV) và tệp dựng sheet `Config` (hết hạn ở phiên chuyển Config vào Sidebar).
+ * Ngoại lệ có tên: `server/dev/` (chỉ DEV).
  */
 
 const fs = require('fs');
@@ -10,7 +10,7 @@ const { section, check } = require('../lib/assert');
 const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 
 const LAYER1_FILES = ['server/sheet/SheetCellWrite.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetReadCopy.js', 'server/sheet/SheetStructure.js'];
-const NAMED_EXCEPTIONS = ['server/config/ConfigSheetSetup.js'];
+const NAMED_EXCEPTIONS = [];
 const isExempt = (file) => file.startsWith('server/dev/') || LAYER1_FILES.indexOf(file) >= 0 || NAMED_EXCEPTIONS.indexOf(file) >= 0;
 
 /** Lệnh đọc ô, cấu trúc và kích thước lưới. `getSheets`, `getSheetByName`, `getName` không ở đây: chúng chỉ hỏi tệp có những sheet nào. */
@@ -127,7 +127,7 @@ function chay(so) {
       files.filter((file) => file !== 'server/state/RecordHolds.js' && /SHIN_RECORD_HOLDS_V1|\bRECORD_HOLDS_KEY\b/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))))],
     [[], []]);
 
-  const requiredCommit = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
+  const requiredCommit = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/settings/SettingsService.js', 'server/sheet/SyncColumnSetup.js'];
   requiredCommit.forEach((file) => {
     const source = fs.readFileSync(path.join(GAS_DIR, file), 'utf8');
     check(so, file + ' gọi hậu xử lý WriteCommit', source.indexOf('writeCommitAfterSuccess') >= 0, true);
@@ -140,7 +140,7 @@ function chay(so) {
     return fs.readFileSync(path.join(GAS_DIR, file), 'utf8').indexOf('sheetWriteColumns') >= 0;
   }), []);
 
-  const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/config/ConfigSheetSetup.js', 'server/sheet/SyncColumnSetup.js'];
+  const noDirectReload = ['server/gate/WriteGate.js', 'server/gate/DeleteGate.js', 'server/settings/SettingsService.js', 'server/sheet/SyncColumnSetup.js'];
   noDirectReload.forEach((file) => {
     const source = stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'));
     check(so, file + ' không tự gọi ReloadDecision/DirtyState và không vẽ sheet quản trị', [
@@ -149,6 +149,10 @@ function chay(so) {
       /render(?:AllManagedViews|ViewSheet|ViewIfDirty)\s*\(/.test(source)
     ], [false, false, false]);
   });
+
+  // Cổng cài đặt: chỉ `SettingsGate.js` chạm khóa kho `SETTINGS:`, và không còn đường đọc sheet Config cũ ngoài hàm chuyển một lần.
+  check(so, 'chỉ cổng cài đặt chạm khóa kho SETTINGS:', files.filter((file) => file !== 'server/settings/SettingsGate.js' && /['"]SETTINGS:/.test(stripNonCode(read(file)))), []);
+  check(so, 'không còn đường đọc tham số sheet Config cũ', files.filter((file) => !file.startsWith('server/dev/') && /(?:configGet|configParams|configReadAll|resetSettingsCache)\s*\(/.test(stripNonCode(read(file)))), []);
 
   const pullSource = stripNonCode(fs.readFileSync(path.join(GAS_DIR, 'fbm_sync/reconcile/Pull.js'), 'utf8'));
   check(so, 'Pull không tự đánh dấu dirty sau khi WriteGate đã commit', /dirtyStateMark(?:Records|Decision|Signal)\s*\(/.test(pullSource), false);

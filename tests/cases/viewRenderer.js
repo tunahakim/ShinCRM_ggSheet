@@ -12,7 +12,7 @@ const TEP_VIEW = TEP_NEN.concat([
 
 function taoNen(headers) {
   const nen = dungHop({
-    sheets: ['Customer', 'Activity', 'Config', 'Category', 'Log'],
+    sheets: ['Customer', 'Activity', 'Category', 'Log'],
     tep: TEP_VIEW
   });
   const view = nen.book.insertSheet('!Lead');
@@ -74,8 +74,8 @@ function chay(so) {
   const docTruoc = Object.assign({}, base.nen.dem.doc);
   base.nen.hop.renderViewSheet('!Lead');
   const doc = base.nen.dem.doc;
-  check(so, 'mỗi sheet một yêu cầu đọc: lượt vẽ tốn 4 lệnh đọc giá trị (vài hàng đầu sheet `!`, cả khối Config, Customer, Activity), 1 getLastRow của sheet `!`, không getLastColumn nào',
-    [doc.getValues - docTruoc.getValues, doc.getLastRow - docTruoc.getLastRow, doc.getLastColumn - docTruoc.getLastColumn], [4, 1, 0]);
+  check(so, 'mỗi sheet một yêu cầu đọc: lượt vẽ tốn 3 lệnh đọc giá trị (vài hàng đầu sheet `!`, Customer, Activity; cài đặt đọc từ kho), 1 getLastRow của sheet `!`, không getLastColumn nào',
+    [doc.getValues - docTruoc.getValues, doc.getLastRow - docTruoc.getLastRow, doc.getLastColumn - docTruoc.getLastColumn], [3, 1, 0]);
 
   // Vẽ đè: lọc thu hẹp còn một dòng, dòng thừa được ghi rỗng trong cùng lệnh ghi, không có lệnh xóa riêng.
   base.view.getRange(3, 2).setValue('Hai');
@@ -200,10 +200,7 @@ function chay(so) {
   custom.nen.Customer.sheet.getRange(1, customCol).setValue('@CUS_DOANH_THU');
   custom.nen.Customer.sheet.getRange(4, customCol).setValue('20');
   custom.nen.Customer.sheet.getRange(5, customCol).setValue('3');
-  ghiO(custom.nen, 'Config', 4, '@CFG_COT_MA', '@CUS_DOANH_THU');
-  ghiO(custom.nen, 'Config', 4, '@CFG_COT_KIEU', 'NUMBER');
-  ghiO(custom.nen, 'Config', 4, '@CFG_SORT_COL', '@CUS_DOANH_THU');
-  ghiO(custom.nen, 'Config', 4, '@CFG_SORT_LEVEL', 'Tăng dần (A → Z)');
+  custom.nen.props['SETTINGS:core_data'] = JSON.stringify({ columnTypes: { '@CUS_DOANH_THU': 'NUMBER' }, sort: [{ col: '@CUS_DOANH_THU', level: 'asc' }] });
   custom.nen.hop.renderViewSheet('!Lead');
   check(so, 'cột người dùng ngoài DATA_SCHEMA được chép và sắp theo kiểu Sheet Schema',
     custom.view.getRange(4, 1, 2, 2).getValues(), [['KH0002', 3], ['KH0001', 20]]);
@@ -213,13 +210,12 @@ function chay(so) {
   const sort = taoNen(['@CUS_MA_KH', '@CUS_TEN_CTY', '@VIEW_SORT_COL', '@VIEW_SORT_LEVEL']);
   gieoHaiKhach(sort.nen);
   gieoHaiGiaoDich(sort.nen);
-  ghiO(sort.nen, 'Config', 4, '@CFG_SORT_COL', '@CUS_TEN_CTY');
-  ghiO(sort.nen, 'Config', 4, '@CFG_SORT_LEVEL', 'Tăng dần (A → Z)');
+  sort.nen.props['SETTINGS:core_data'] = JSON.stringify({ columnTypes: {}, sort: [{ col: '@CUS_TEN_CTY', level: 'asc' }] });
   sort.nen.hop.renderViewSheet('!Lead');
-  check(so, 'sort chung từ Config được dùng khi sheet không có cặp riêng', sort.view.getRange(4, 1).getValue(), 'KH0002');
+  check(so, 'sắp xếp chung trong Cài đặt được dùng khi sheet không có cặp riêng', sort.view.getRange(4, 1).getValue(), 'KH0002');
   sort.view.getRange(4, 3, 1, 2).setValues([['@ACT_NGAY_LAM_VIEC', 'Tăng dần (A → Z)']]);
   sort.nen.hop.renderViewSheet('!Lead');
-  check(so, 'sort riêng đè Config và dùng được cột kho không hiển thị', sort.view.getRange(4, 1).getValue(), 'KH0001');
+  check(so, 'sort riêng đè sắp xếp chung và dùng được cột kho không hiển thị', sort.view.getRange(4, 1).getValue(), 'KH0001');
   sort.view.getRange(5, 3).setValue('@CUS_TEN_CTY');
   check(so, 'hàng sắp xếp thiếu một vế mà vế còn lại hợp lệ thì không phải lỗi', sort.nen.hop.renderViewSheet('!Lead').ok, true);
   sort.view.getRange(5, 3).setValue('@CUS_KHONG_CO');
@@ -237,14 +233,11 @@ function chay(so) {
 
   const missingSort = taoNen(['@CUS_MA_KH']);
   gieoHaiKhach(missingSort.nen);
-  ghiO(missingSort.nen, 'Config', 4, '@CFG_COT_MA', '@CUS_KHONG_CO');
-  ghiO(missingSort.nen, 'Config', 4, '@CFG_COT_KIEU', 'TEXT');
-  ghiO(missingSort.nen, 'Config', 4, '@CFG_SORT_COL', '@CUS_KHONG_CO');
-  ghiO(missingSort.nen, 'Config', 4, '@CFG_SORT_LEVEL', 'Tăng dần (A → Z)');
+  missingSort.nen.props['SETTINGS:core_data'] = JSON.stringify({ columnTypes: { '@CUS_KHONG_CO': 'TEXT' }, sort: [{ col: '@CUS_KHONG_CO', level: 'asc' }] });
   missingSort.view.getRange(4, 1).setValue('cũ');
   const missingSortResult = missingSort.nen.hop.renderViewSheet('!Lead');
-  check(so, 'Sheet Schema không làm mã sort chung vắng trong kho thành hợp lệ; lỗi xảy ra trước khi ghi',
-    [tieuDe(missingSortResult), missingSort.view.getRange(4, 1).getValue()], [['Sắp xếp chung trong Config sai'], 'cũ']);
+  check(so, 'kiểu cột tự thêm không làm mã sort chung vắng trong kho thành hợp lệ; lỗi xảy ra trước khi ghi',
+    [tieuDe(missingSortResult), missingSort.view.getRange(4, 1).getValue()], [['Sắp xếp chung trong Cài đặt sai'], 'cũ']);
 
   const duplicate = taoNen(['@CUS_MA_KH', '@CUS_MA_KH']);
   duplicate.view.getRange(4, 1, 1, 2).setValues([['cũ 1', 'cũ 2']]);
@@ -252,7 +245,7 @@ function chay(so) {
   check(so, 'mã @ trùng ở hàng 1 bị chặn trước khi vẽ và không xóa dữ liệu đang có',
     [duplicateResult.problems[0].lines[0].indexOf('xuất hiện hai lần') >= 0, duplicate.view.getRange(4, 1, 1, 2).getValues()], [true, [['cũ 1', 'cũ 2']]]);
 
-  const created = dungHop({ sheets: ['Customer', 'Activity', 'Config', 'Category', 'Log'], tep: TEP_VIEW });
+  const created = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'], tep: TEP_VIEW });
   const newView = created.hop.createViewSheet('Tổng quan');
   const newHeaders = created.book.getSheetByName('!Tổng quan').getRange(1, 1, 1, 13).getValues()[0];
   check(so, 'tạo view tự thêm dấu ! và dùng trường từ DATA_SCHEMA, gồm ghi chú khách, vẽ ngay và có mục trong sổ',

@@ -9,7 +9,7 @@ const GAS = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 const NGOAI_LE = ['server/state/DocumentStore.js', 'server/dev/FbmPerfProbe.js'];
 
 function taoHop() {
-  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   nen.hop.shinViewSheetNames = () => ['!Lead'];
   return nen;
@@ -55,7 +55,7 @@ function chay(so) {
 
   section('Người giữ khóa tài liệu — một chỗ cầm, gọi lồng không tự khóa, trả khóa luôn qua flush rồi gửi kho');
 
-  const giu = dungHop({ sheets: ['Config', 'Log'] });
+  const giu = dungHop({ sheets: ['Log'] });
   const thuTu = [];
   const flushGoc = giu.hop.SpreadsheetApp.flush;
   giu.hop.SpreadsheetApp.flush = () => { thuTu.push('flush'); return flushGoc(); };
@@ -79,20 +79,20 @@ function chay(so) {
   check(so, 'người giữ khóa: trong khóa, ghi kho chờ (kho thật chưa có) nhưng đọc lại trong lần chạy thấy ngay', trongKhoKhiDangGiu, [undefined, '2']);
   check(so, 'người giữ khóa: trước khi nhả thì flush Sheet rồi gửi mọi khóa đã ghi bằng đúng một lệnh kho', [thuTu, dem.ghi - ghiTruoc], [['flush', 'nha:12'], 1]);
 
-  const loiGiu = dungHop({ sheets: ['Config', 'Log'] });
+  const loiGiu = dungHop({ sheets: ['Log'] });
   let loiRa = null;
   try { loiGiu.hop.documentLockRun(() => { loiGiu.hop.documentProps().setProperty('khoaA', 'truoc-loi'); throw new Error('lỗi giữa chừng'); }); } catch (e) { loiRa = e.message; }
   check(so, 'người giữ khóa: việc ném lỗi thì phần đã ghi trước lỗi vẫn được gửi, khóa vẫn nhả, lỗi gốc ném ra',
     [loiRa, loiGiu.stubs._props.khoaA, loiGiu.stubs._khoa.dangGiu], ['lỗi giữa chừng', 'truoc-loi', false]);
 
-  const ban = dungHop({ sheets: ['Config', 'Log'] });
+  const ban = dungHop({ sheets: ['Log'] });
   ban.stubs._khoa.chanKhoa = true;
   let daChay = false;
   let banRa = null;
   try { ban.hop.documentLockRun(() => { daChay = true; }, 'Bận riêng.'); } catch (e) { banRa = e.message; }
   check(so, 'người giữ khóa: hết giờ chờ thì ném câu bận của bên gọi và không chạy việc', [banRa, daChay], ['Bận riêng.', false]);
 
-  const lop = dungHop({ sheets: ['Config', 'Log'] });
+  const lop = dungHop({ sheets: ['Log'] });
   lop.hop.withDocumentStoreDeferred(() => {
     lop.hop.documentPropsDeferred().setProperty('dongBo', 'x');
     lop.hop.documentLockRun(() => { lop.hop.documentProps().setProperty('loi', 'y'); });
@@ -103,7 +103,7 @@ function chay(so) {
 
   section('Đọc JSON từ kho — hỏng không bao giờ thành rỗng im lặng');
 
-  const json = dungHop({ sheets: ['Config', 'Log'] });
+  const json = dungHop({ sheets: ['Log'] });
   const jh = json.hop;
   const maLoi = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code || error.message; } };
   const khoDoc = (data) => ({ getProperty: (key) => (key in data ? data[key] : null) });

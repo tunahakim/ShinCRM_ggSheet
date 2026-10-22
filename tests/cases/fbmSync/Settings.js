@@ -3,25 +3,24 @@ const { section, check } = require('../../lib/assert');
 
 function chay(so) {
   section('FBM sync - tham số DocumentProperties');
-  const data = {}, legacy = { FBM_MA_KH_PREFIX: 'KH-', FBM_MA_KH_LENGTH: '8', FBM_ACTIVITY_SINCE: '2026-01-01', FBM_SYNC_APPROVAL_THRESHOLD: '12' };
+  const data = {};
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const settingsLog = [];
-  const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, configGet: (name, fallback) => legacy[name] === undefined ? fallback : legacy[name], logEvent: (event) => { settingsLog.push(event); } });
+  const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent: (event) => { settingsLog.push(event); } });
   napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
   const first = hop.FbmSync.accountSettingsRead();
+  first.customerPrefix = 'SỬA-BẢN-SAO';
   const syncFirst = hop.FbmSync.syncSettingsRead();
-  const writesAfterMigration = Object.keys(data).length;
-  legacy.FBM_MA_KH_PREFIX = 'CHANGED-'; legacy.FBM_SYNC_APPROVAL_THRESHOLD = '99';
-  const second = hop.FbmSync.accountSettingsRead();
-  const syncSecond = hop.FbmSync.syncSettingsRead();
-  check(so, 'migration tach cau hinh tai khoan FBM khoi tham so phien', [Object.keys(first).sort(), first.customerPrefix, first.customerCodeLength, first.activitySince, writesAfterMigration, Object.keys(second).sort(), second.customerPrefix, Object.keys(syncFirst).sort(), syncSecond.approvalThreshold], [['customerCodeLength', 'customerPrefix'], 'KH-', '8', undefined, 2, ['customerCodeLength', 'customerPrefix'], 'KH-', ['approvalThreshold', 'requestGapMaxSeconds', 'requestGapMinSeconds', 'scopeCodes', 'scopeLimited'], 12]);
+  check(so, 'kho chưa có cài đặt FBM thì đọc ra bản sao mặc định, không ghi gì và sửa bản sao không đổi mặc định',
+    [Object.keys(data).length, hop.FbmSync.accountSettingsRead(), syncFirst, syncFirst === hop.FbmSync.SYNC_SETTINGS_DEFAULT],
+    [0, { customerPrefix: '', customerCodeLength: '' }, { approvalThreshold: 10, scopeLimited: true, scopeCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 }, false]);
   check(so, 'luu cau hinh tai khoan FBM hop le', [hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' }).ok, hop.FbmSync.accountSettingsRead()], [true, { customerPrefix: 'ALT', customerCodeLength: '8' }]);
   const invalidAccount = hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '' });
   check(so, 'cau hinh tai khoan FBM chan cap thieu', [invalidAccount.ok, invalidAccount.code], [false, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE']);
   data.FBM_ACCOUNT_SETTINGS_V1 = JSON.stringify({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
   check(so, 'Kho cũ còn mốc ngày Activity: lần đọc trả cấu hình không có mốc và ghi lại kho không còn khóa đó', [hop.FbmSync.accountSettingsRead(), data.FBM_ACCOUNT_SETTINGS_V1.indexOf('activitySince') < 0], [{ customerPrefix: 'ALT', customerCodeLength: '8' }, true]);
   const invalid = hop.FbmSync.syncSettingsSave({ approvalThreshold: -1 });
-  check(so, 'nguong phe duyet am bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1.indexOf('CHANGED-') >= 0], [false, 'FBM_APPROVAL_THRESHOLD_INVALID', false]);
+  check(so, 'nguong phe duyet am bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1], [false, 'FBM_APPROVAL_THRESHOLD_INVALID', undefined]);
   const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
   check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
   const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
@@ -74,8 +73,7 @@ function chay(so) {
     FbmSync: {},
     PropertiesService: { getDocumentProperties: () => quotaProps },
     logEvent: (event) => quotaLogs.push(event),
-    LOG_ERROR: 'error',
-    configGet: () => ''
+    LOG_ERROR: 'error'
   });
   napServer(quotaHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { customerErrors: { total: 1, recent: [{ customer: 'CUS-000001', reason: 'x'.repeat(200) }] } } });
@@ -91,7 +89,7 @@ function chay(so) {
 
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
-  const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps }, configGet: () => 'LEGACY-' });
+  const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps } });
   napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
   check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
@@ -107,7 +105,7 @@ function chay(so) {
   // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
   const escData = {}, escLogs = [];
   const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
-  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', configGet: () => '', runEntryPoint: (name, source, fn) => fn() });
+  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', runEntryPoint: (name, source, fn) => fn() });
   napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });

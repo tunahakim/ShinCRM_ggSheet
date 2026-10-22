@@ -25,7 +25,7 @@ function trongLanGoi(hop, fn) {
 }
 
 function taoHop() {
-  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] });
+  const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
   ghiO(nen, 'Customer', 4, '@CUS_MA_KH', 'KH000001');
   ghiO(nen, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
   nen.hop.shinViewSheetNames = () => [];

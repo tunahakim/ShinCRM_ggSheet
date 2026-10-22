@@ -15,7 +15,7 @@ const TEP = TEP_NEN.concat(['server/sheet/SetupSheets.js']);
 
 /** Hộp cát có đủ năm sheet, vì `verifySheets` đọc cả năm. */
 function dungDay() {
-  return dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'], tep: TEP });
+  return dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'], tep: TEP });
 }
 
 /** Số cột của một sheet giả, tra theo mã ở hàng 1. */
@@ -43,11 +43,10 @@ function chay(so) {
 
   const hop = nen.hop;
 
-  check(so, 'ba sheet có đặt khuôn, và Config với Log cố ý không có mặt',
+  check(so, 'ba sheet có đặt khuôn, Log cố ý không có mặt',
     hop.columnFormatSheets(), ['Customer', 'Activity', 'Category']);
 
-  check(so, 'Config trả về null chứ không phải bảng rỗng — ô Giá trị là ô người dùng tự vặn núm',
-    [hop.columnFormatMap('Config'), hop.columnFormatMap('Log')], [null, null]);
+  check(so, 'Log trả về null chứ không phải bảng rỗng', hop.columnFormatMap('Log'), null);
 
   const cusMap = hop.columnFormatMap('Customer');
   check(so, 'cột chữ và cột chọn đều ở khuôn văn bản thuần, đó là chỗ giữ số 0 đầu',
@@ -127,7 +126,7 @@ function chay(so) {
 
   section('columnFormat — setupSheets đặt khuôn, verifySheets bắt được cột hở');
 
-  const dungKhung = dungHop({ sheets: ['Config'], tep: TEP });
+  const dungKhung = dungHop({ sheets: ['Log'], tep: TEP });
   dungKhung.hop.setupSheets();
 
   const khuonSauDung = ['Customer', 'Activity', 'Category'].map((ten) => {

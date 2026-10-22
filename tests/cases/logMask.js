@@ -17,7 +17,7 @@ function chay(so) {
 
   let hop;
   try {
-    hop = dungHop({ sheets: ['Config'] }).hop;
+    hop = dungHop({ sheets: ['Log'] }).hop;
   } catch (err) {
     return ghiLoiNap(so, 'nạp được server/log/LogGate.js', err);
   }
@@ -71,7 +71,7 @@ function chay(so) {
 
   // Chế độ vết ghi nguyên văn — đó là thiết kế, không phải lỗi (tài liệu 10 Phần 7). Kiểm nó ở đây để cái giá của việc
   // bật `LOG_TRACE` là một điều đã chứng minh chứ không phải một điều người ta đoán: bật là tệp Sheet không được chia sẻ.
-  const batVet = dungHop({ sheets: ['Config'], thamSo: [['LOG_TRACE', 'core']] }).hop;
+  const batVet = dungHop({ sheets: ['Log'], caiDat: { core_ops: { LOG_TRACE: 'core' } } }).hop;
   check(so, 'chế độ vết: đúng nguồn được bật thì chi tiết ra NGUYÊN VĂN',
     batVet.logDetailToText({ cookie: BI_MAT }, 'core').indexOf('abc123def456') !== -1, true);
   check(so, 'chế độ vết: nguồn không được bật thì vẫn che',

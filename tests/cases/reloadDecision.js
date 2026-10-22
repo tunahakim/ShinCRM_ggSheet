@@ -6,7 +6,7 @@ function chay(so) {
 
   let hop;
   try {
-    hop = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'] }).hop;
+    hop = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] }).hop;
   } catch (err) {
     return ghiLoiNap(so, 'nạp ReloadDecision.js', err);
   }

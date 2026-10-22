@@ -1,7 +1,7 @@
 /**
  * Ca kiểm cho `server/service/LoadService.js`: hai đường nạp `loadCore` và `loadActivityChunk`.
  *
- * Tệp này không kiểm phép đọc ô — việc đó thuộc `entityRead.js`, `categoryRead.js`, `configRead.js`. Nó kiểm ba thứ mà chỉ tầng gom lượt nạp mới có:
+ * Tệp này không kiểm phép đọc ô hay cài đặt — việc đó thuộc `entityRead.js`, `categoryRead.js`, `settings.js`. Nó kiểm ba thứ mà chỉ tầng gom lượt nạp mới có:
  *
  * **Hình dạng gói trả về.** Client dựng cả tầng dữ liệu theo hình dạng này, nên thiếu một khóa là mọi chỗ nhận phản hồi phải sửa lại một lượt — đúng loại việc mà sót một chỗ thì không có gì báo.
  *
@@ -13,18 +13,18 @@
 const fs = require('fs');
 const path = require('path');
 const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
-const { dungHop, ghiO } = require('../lib/dung-hop');
+const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
 const { trongLanChay } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
-const NAM_SHEET = ['Customer', 'Activity', 'Category', 'Config', 'Log'];
+const NAM_SHEET = ['Customer', 'Activity', 'Category', 'Log'];
 
 /** Hộp cát có cả năm sheet, kèm khóa dọn log đặt sẵn cho hôm nay để phép quét tuổi log không chen vào. */
-function dungNap(thamSo, dirtyProps) {
+function dungNap(vanHanh, dirtyProps) {
   return dungHop({
     sheets: NAM_SHEET,
-    thamSo: thamSo,
+    caiDat: vanHanh ? { core_ops: vanHanh } : {},
     props: Object.assign({ LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }, dirtyProps || {})
   });
 }
@@ -71,7 +71,7 @@ function chay(so) {
   check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
   check(so, 'gói lõi mang read plan tọa độ do GAS tính',
     rong.selectionHints && Object.keys(rong.selectionHints.readPlan).sort(),
-    ['!', 'Activity', 'Category', 'Config', 'Customer']);
+    ['!', 'Activity', 'Category', 'Customer']);
   check(so, 'ms là số, không phải chuỗi', typeof rong.ms, 'number');
 
   const coThongBao = dungNap(null, { 'NOTICE:entry_failure:shinOnEdit': JSON.stringify({ key: 'entry_failure:shinOnEdit', topic: 'entry_failure', scope: 'shinOnEdit', level: 'error', clear: 'on_success', source: 'core', title: 'lỗi nền', lines: [], hint: '', actions: [], at: '2026-09-08 09:00:00' }) });
@@ -79,12 +79,11 @@ function chay(so) {
     [coThongBao.hop.loadCore().notices.map((item) => item.title), coThongBao.hop.loadCore().notices.length],
     [['lỗi nền'], 1]);
 
-  const batVet = dungNap([['LOG_TRACE', 'sidebar']]).hop.loadCore();
-  check(so, 'LOG_TRACE đang bật được cảnh báo qua gói nạp thay cho toast nhỏ',
-    batVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), true);
-  const tatVet = dungNap([['LOG_TRACE', 'off']]).hop.loadCore();
-  check(so, 'LOG_TRACE off không hiện cảnh báo bật log',
-    tatVet.warnings.some((warning) => warning.indexOf('LOG_TRACE đang bật') >= 0), false);
+  const batVet = dungNap({ LOG_TRACE: 'sidebar' }).hop.loadCore();
+  check(so, 'LOG_TRACE đang bật được báo qua thông báo log_trace_on trong gói nạp',
+    batVet.notices.some((item) => item.topic === 'log_trace_on'), true);
+  const tatVet = dungNap({ LOG_TRACE: 'off' }).hop.loadCore();
+  check(so, 'LOG_TRACE off không có thông báo bật log', tatVet.notices.some((item) => item.topic === 'log_trace_on'), false);
   check(so, 'gói nạp báo vết nguồn sidebar có bật không, để Sidebar bỏ lời gọi ghi thời gian khi tắt', [batVet.timingTrace, tatVet.timingTrace], [true, false]);
   const nguonBoot = fs.readFileSync(path.join(GAS_DIR, 'client', 'ram', 'bootstrap.html'), 'utf8');
   check(so, 'Sidebar chỉ gọi logClientTiming khi vết bật và không chờ lời gọi đó trước khi nhả màn khóa',
@@ -125,7 +124,7 @@ function chay(so) {
     coNgay.customer.rows.some((row) => row.some((o) => hop.dateTextIsDate(o))), false);
 
   // Đường chặn. Trần đặt thấp hơn kích thước lưới thật của tệp giả nên phép đo phải chặn.
-  const chan = dungNap([['CELL_BUDGET', '10']]);
+  const chan = dungNap({ CELL_BUDGET: 10 });
   const bao = chan.hop.loadCore();
   check(so, 'vượt trần thì blocked mang TÊN LÝ DO chứ không phải true', bao.blocked, 'cellBudget');
   check(so, 'gói bị chặn chỉ có các khóa điều khiển, và KHÔNG có customer — bằng chứng là chưa đọc ô dữ liệu nào',
@@ -163,7 +162,7 @@ function chay(so) {
     [categoryReload.reloadMode, categoryReload.categories[category.Category.codes[0]], typeof categoryReload.reload.revision],
     ['category', ['Giá trị thử'], 'number']);
   const configReload = category.hop.reloadConfig();
-  check(so, 'reloadConfig trả payload Config riêng và ReloadState',
+  check(so, 'reloadConfig trả gói cài đặt riêng và ReloadState',
     [configReload.reloadMode, !!configReload.config, configReload.config && !!configReload.config.params, !!configReload.reload],
     ['config', true, true, true]);
   const truocNap = category.hop._props.reloadJournal;
@@ -277,43 +276,6 @@ function chayGoi(so, nen, hop, hangDau) {
   return so;
 }
 
-const TEP_RENDER = [
-  'server/sheet/Book.js',
-  'server/data/DataSchema.js',
-  'server/data/SheetLayout.js',
-  'server/data/ColumnFormat.js',
-  'server/sheet/SheetIo.js',
-  'server/sheet/SheetGrid.js',
-  'server/config/Settings.js',
-  'server/log/LogGate.js',
-  'server/util/DateText.js',
-  'server/util/TextNormalize.js',
-  'server/sheet/CellBudget.js',
-  'server/config/ConfigParams.js',
-  'server/config/ConfigSheetSetup.js',
-  'server/sheet/EntityRead.js',
-  'server/sheet/CategoryRead.js',
-  'server/sheet/ConfigRead.js',
-  'server/state/ReloadDecision.js',
-  'server/state/DirtyState.js',
-  'server/state/UserPrefs.js',
-  'server/gate/FieldLogic.js',
-  'server/gate/IdGate.js',
-  'server/gate/WriteCommit.js',
-  'server/view/ViewLedger.js',
-  'server/view/ViewTabTint.js',
-  'server/gate/WriteGate.js',
-  'server/gate/DeleteGate.js',
-  'server/service/SelectionService.js',
-  'server/service/LoadService.js',
-  'server/data/NoticeTopics.js',
-  'server/notice/NoticeGate.js',
-  'server/entry/EntryPoint.js',
-  'server/view/FilterMessages.js',
-  'server/view/FilterParser.js',
-  'server/view/SortSpec.js',
-  'server/view/ViewSheetSetup.js',
-  'server/view/ViewSheetRenderer.js'
-];
+const TEP_RENDER = TEP_NEN.concat(['server/view/FilterMessages.js', 'server/view/FilterParser.js', 'server/view/ViewSheetSetup.js', 'server/view/ViewSheetRenderer.js']);
 
 module.exports = { chay };

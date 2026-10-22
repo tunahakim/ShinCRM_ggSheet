@@ -4,12 +4,14 @@ const { taoHopCat, napServer } = require("../../lib/load-gas");
 
 async function chay(so) {
   section("FBM sync — preflight");
-  const coreXacThuc = { params: { FBM_VERIFY_STATUS_DEFAULT: 'Chưa xác thực' }, category: { categories: { '@CAT_XAC_THUC': ['Chưa xác thực', 'Đã xác thực'] } } };
+  // Ngầm định kéo từ FBM đọc qua cổng cài đặt; bộ kiểm thật của cổng được kiểm ở `tests/cases/settings.js`, ở đây chỉ cấp giá trị đang lưu và kết quả kiểm theo Category để kiểm cách preflight phân biệt thiếu và lệch.
+  const coreXacThuc = { stored: 'Chưa xác thực', category: { categories: { '@CAT_XAC_THUC': ['Chưa xác thực', 'Đã xác thực'] } } };
   const hop = taoHopCat({ FbmSync: {}, DATA_SCHEMA: { customer: { verifyStatus: { source: '@CAT_XAC_THUC' } } }, shinCorePreflight: () => ({
-    params: coreXacThuc.params,
     category: coreXacThuc.category,
     issues: []
-  }) });
+  }),
+  settingsValue: (section, field) => (section === 'defaults_fbm_pull' && field === 'values' ? { customer: { verifyStatus: coreXacThuc.stored } } : undefined),
+  settingsDefaultsChecked: (section, category) => (category.categories['@CAT_XAC_THUC'].indexOf(coreXacThuc.stored) >= 0 ? { customer: { verifyStatus: coreXacThuc.stored } } : {}) });
   napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/State.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/write/PushCandidates.js');
   // Định sẵn các dòng có việc nhưng giữ phép xét chờ sửa thật (`pushHold`): preflight phải báo đúng dòng mà chặng đẩy sẽ đánh dấu.
   const pushCandidatesAllGoc = hop.FbmSync.pushCandidatesAll;
@@ -20,18 +22,17 @@ async function chay(so) {
   hop.FbmSync.scope = () => null;
   hop.FbmSync.readCategoryGate = () => ({ valid: {} });
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-a';
-  hop.FbmSync.configValue = () => '';
   hop.FbmSync.bindingRead = () => ({});
   hop.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-NOPERM', customerId: 'CUS-1', fbmId: '174813', fbmHash: 'old', fbmSyncPermission: 'Chỉ lấy từ FBM', syncStatus: 'chờ đối soát', taskType: 'Gọi điện chăm sóc', content: 'Nội dung mới' }] : [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmSyncPermission: 'Cho phép' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmSyncPermission: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }, { id: 'CUS-3', fbmId: 'FBM-3', fbmSyncPermission: 'Cho phép', syncStatus: hop.FbmSync.SYNC_STATUS.conflict }];
   ungVien((entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-1', record: { id: 'ACT-1', syncStatus: hop.FbmSync.SYNC_STATUS.pending, taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }] : []);
 
   const xacThucIssue = (mode) => hop.FbmSync.runPreflight({ mode: mode }).issues.filter((item) => /^FBM_VERIFY_STATUS_DEFAULT/.test(item.code)).map((item) => [item.code, item.blocking]);
-  check(so, 'ô Xác thực mặc định hợp lệ thì preflight không chặn', [xacThucIssue('read'), xacThucIssue('write')], [[], []]);
-  coreXacThuc.params.FBM_VERIFY_STATUS_DEFAULT = '';
-  check(so, 'ô Xác thực mặc định trống thì preflight chặn chiều lấy và hai chiều, chiều đẩy không cần', [xacThucIssue('read'), xacThucIssue('write'), xacThucIssue('push')], [[['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], [['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], []]);
-  coreXacThuc.params.FBM_VERIFY_STATUS_DEFAULT = 'Tên cũ đã đổi';
-  check(so, 'giá trị Xác thực mặc định không còn trong Category thì preflight chặn trước khi ghi', xacThucIssue('read'), [['FBM_VERIFY_STATUS_DEFAULT_INVALID', true]]);
-  coreXacThuc.params.FBM_VERIFY_STATUS_DEFAULT = 'Chưa xác thực';
+  check(so, 'ngầm định Xác thực kéo từ FBM hợp lệ thì preflight không chặn', [xacThucIssue('read'), xacThucIssue('write')], [[], []]);
+  coreXacThuc.stored = '';
+  check(so, 'chưa chọn ngầm định Xác thực kéo từ FBM thì preflight chặn chiều lấy và hai chiều, chiều đẩy không cần', [xacThucIssue('read'), xacThucIssue('write'), xacThucIssue('push')], [[['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], [['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], []]);
+  coreXacThuc.stored = 'Tên cũ đã đổi';
+  check(so, 'ngầm định Xác thực kéo từ FBM không còn trong Category thì preflight chặn trước khi ghi', xacThucIssue('read'), [['FBM_VERIFY_STATUS_DEFAULT_INVALID', true]]);
+  coreXacThuc.stored = 'Chưa xác thực';
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight write khong dung Config ten tai khoan cu lam cong chan', write.issues.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING'), false);
   const perRecordCodes = ['FBM_RECORD_CONFLICT_PENDING', 'FBM_PREVIOUS_PUSH_FAILURE', 'FBM_CATEGORY_MAPPING_MISSING', 'FBM_ACTIVITY_OWNER_MISMATCH'];

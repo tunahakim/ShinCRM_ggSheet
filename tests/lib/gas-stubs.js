@@ -18,7 +18,7 @@ function dem2(n) {
  *
  * Ba khuôn: `yyyy-MM-dd` và `yyyy-MM-dd HH:mm` là hai dạng chuỗi thời gian chốt ở tài liệu 05 Phần 3, còn `yyyy-MM-dd HH:mm:ss` là dạng cột `Lúc` của sheet `Log`. Khuôn của `Log` có giây vì đó là dấu vết pháp y, còn dữ liệu nghiệp vụ thì không có giây.
  *
- * Bỏ qua múi giờ là giới hạn phải biết: phép kiểm ở đây không chứng minh được cột `Lúc` ghi đúng giờ Việt Nam. Việc đó chỉ chứng minh được trên Google, và `dumpSettings`, `probeLogGate`, `probeDateText` là chỗ nhìn thấy nó.
+ * Bỏ qua múi giờ là giới hạn phải biết: phép kiểm ở đây không chứng minh được cột `Lúc` ghi đúng giờ Việt Nam. Việc đó chỉ chứng minh được trên Google, và `probeLogGate`, `probeDateText` là chỗ nhìn thấy nó.
  */
 function formatDateGia(date, timezone, format) {
   const d = date instanceof Date ? date : new Date(date);

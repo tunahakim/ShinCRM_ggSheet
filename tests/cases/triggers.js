@@ -29,7 +29,7 @@ function chay(so) {
   let nen;
   try {
     nen = dungHop({
-      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+      sheets: ['Customer', 'Activity', 'Category', 'Log'],
       tep: TEP_RENDER
     });
   } catch (err) {
@@ -64,7 +64,7 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 2, 1) });
   check(so, 'hàng lọc dưới mã @, cột sắp xếp và ô dữ liệu dưới cột ShinCRM vẽ (thêm công thức, xóa giá trị) gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường và hàng nhãn thì không gắn cờ', rendered, ['!Lead', '!Lead', '!Lead']);
 
-  const defaultSheets = ['Customer', 'Activity', 'Category', 'Config'];
+  const defaultSheets = ['Customer', 'Activity', 'Category'];
   const schemaResults = defaultSheets.map((name) => {
     clearState();
     hop.shinOnEdit({ range: eventRange(nen.sheet(name), 1, 1) });
@@ -189,32 +189,12 @@ function chay(so) {
     [dirty.customer, dirty.viewsStaleRevision === dirty.revision, rendered],
     [['KH000001'], true, []]);
 
-  const config = nen.sheet('Config');
-  const configCodes = config.getRange(1, 1, 1, config.getLastColumn()).getValues()[0];
-  const configParamColumn = configCodes.indexOf('@CFG_THAM_SO') + 1;
-  const configSortColumn = configCodes.indexOf('@CFG_SORT_COL') + 1;
-  const configLevelColumn = configCodes.indexOf('@CFG_SORT_LEVEL') + 1;
-  clearState();
-  rendered.length = 0;
-  hop.shinOnEdit({ range: eventRange(config, 4, configParamColumn) });
-  check(so, 'sửa tham số Config đánh dấu nạp lại cấu hình và làm mọi view cũ, không vẽ',
-    [trangThai().config, trangThai().customer, trangThai().viewsStaleRevision > 0, rendered],
-    [true, [], true, []]);
-
-  [configSortColumn, configLevelColumn].forEach((column) => {
-    clearState();
-    hop.shinOnEdit({ range: eventRange(config, 4, column) });
-  });
-  check(so, 'sửa @CFG_SORT_COL hoặc @CFG_SORT_LEVEL trong Config chỉ làm mọi view cũ như tham số Config, không vẽ sheet nào',
-    [configSortColumn > 0, configLevelColumn > 0, rendered, trangThai().config, trangThai().viewsStaleRevision > 0],
-    [true, true, [], true, true]);
-
   clearState();
   rendered.length = 0;
   hop.shinOnEdit({ range: eventRange(nen.sheet('Category'), 4, 2) });
-  check(so, 'sửa Category đánh dấu nạp lại danh mục và làm mọi view cũ, không vẽ',
+  check(so, 'sửa Category đánh dấu nạp lại danh mục kèm cài đặt (ngầm định kiểm theo Category) và làm mọi view cũ, không vẽ',
     [trangThai().category, trangThai().config, trangThai().customer, trangThai().viewsStaleRevision > 0, rendered],
-    [true, false, [], true, []]);
+    [true, true, [], true, []]);
 
   const realRun = hop.runEntryPoint;
   const realOpen = hop.shinOpenBook;
@@ -240,10 +220,10 @@ function chay(so) {
     return [sheetName, changeType, st.entities, st.core, st.category, st.config, st.viewsStaleRevision > 0];
   };
   check(so, 'onChange OTHER (sắp xếp) và thêm/xóa hàng trên sheet kho nạp riêng sheet đó, không allCore; thêm cột trên Customer vẫn full core',
-    [doiCauTruc('Customer', 'OTHER'), doiCauTruc('Activity', 'OTHER'), doiCauTruc('Category', 'OTHER'), doiCauTruc('Config', 'OTHER'),
+    [doiCauTruc('Customer', 'OTHER'), doiCauTruc('Activity', 'OTHER'), doiCauTruc('Category', 'OTHER'),
       doiCauTruc('Customer', 'INSERT_ROW'), doiCauTruc('Activity', 'REMOVE_ROW'), doiCauTruc('Customer', 'INSERT_COLUMN'), doiCauTruc('Log', 'OTHER')],
     [['Customer', 'OTHER', ['customer'], false, false, false, true], ['Activity', 'OTHER', ['activity'], false, false, false, true],
-      ['Category', 'OTHER', [], false, true, false, true], ['Config', 'OTHER', [], false, false, true, true],
+      ['Category', 'OTHER', [], false, true, true, true],
       ['Customer', 'INSERT_ROW', ['customer'], false, false, false, true], ['Activity', 'REMOVE_ROW', ['activity'], false, false, false, true],
       ['Customer', 'INSERT_COLUMN', [], true, false, false, true], ['Log', 'OTHER', [], false, false, false, false]]);
   clearState();
@@ -285,7 +265,7 @@ function chay(so) {
   let renderNen;
   try {
     renderNen = dungHop({
-      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+      sheets: ['Customer', 'Activity', 'Category', 'Log'],
       tep: TEP_RENDER
     });
   } catch (err) { return ghiLoiNap(so, 'nạp trigger cùng renderer', err); }
@@ -304,7 +284,7 @@ function chay(so) {
   let controlNen;
   try {
     controlNen = dungHop({
-      sheets: ['Customer', 'Activity', 'Category', 'Config', 'Log'],
+      sheets: ['Customer', 'Activity', 'Category', 'Log'],
       userProps: { prefAutoRenderView: 'false' },
       tep: TEP_RENDER
     });

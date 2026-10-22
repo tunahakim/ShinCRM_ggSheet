@@ -28,7 +28,7 @@ function docLog(nen) {
 function chay(so) {
   section('Cổng thông báo — mỗi việc một thông báo, hết theo loại, không ném lỗi');
   let nen;
-  try { nen = dungHop({ sheets: ['Config', 'Log'] }); } catch (err) { return ghiLoiNap(so, 'nạp cổng thông báo', err); }
+  try { nen = dungHop({ sheets: ['Log'] }); } catch (err) { return ghiLoiNap(so, 'nạp cổng thông báo', err); }
   const hop = nen.hop;
   const khoa = (k) => nen.props['NOTICE:' + k];
   const loi = { topic: 'entry_failure', scope: 'shinOnEdit', source: 'core', title: 'Lỗi A', lines: ['Việc gây ra: shinOnEdit'] };
