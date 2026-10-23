@@ -214,8 +214,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── unsavedChanges.html   Cổng dirty dùng chung: giữ action chờ, modal ba lựa chọn, highlight trường thay đổi và cảnh báo mặc định khi đóng tab.
 │   │   ├── menu.html             Lớp menu nổi dựng từ dấu data-menu của engine. Dấu tích và chấm tròn đọc ở Prefs. Mục con vẫn mang data-action, nên menu không mở thêm đường gọi hàm nào.
 │   │   ├── collapse.html         Đo xem khối có tràn trần chiều cao hay không rồi mới quyết có nút Xem thêm — phép đo mà bản khai không nói được vì nó phụ thuộc nội dung thật.
-│   │   ├── search.html           Hộp tìm khách: ô nhập nằm ngoài bốn vùng engine vẽ nên con trỏ không nhảy sau mỗi chữ. Dòng gợi ý bấm hay Enter đều đi qua đúng một bộ phát click.
-│   │   ├── combo.html            Hành vi của ô gõ-để-lọc: con trỏ vào ô là tự bung danh sách nên không cần mũi tên ăn 24 pixel bề ngang, lọc không dấu, và đo chỗ hở lúc chạy để bung lên khi dưới hẹp.
+│   │   ├── listPicker.html       Hành vi chung của danh sách gợi ý nổi (bung khi vào ô, bôi đen chữ cũ, phím mũi tên/Enter/Tab/Esc, ẩn khi rời ô hoặc ngay trong cú chọn); hộp tìm khách và ô gõ-để-lọc chỉ khai nguồn dòng và việc chọn.
+│   │   ├── search.html           Hộp tìm khách: ô nhập nằm ngoài bốn vùng engine vẽ nên con trỏ không nhảy sau mỗi chữ. Đóng hộp giữ chữ cũ; dòng gợi ý bấm hay Enter đều đi qua đúng một bộ phát click.
+│   │   ├── combo.html            Nguồn dòng và việc chọn của ô gõ-để-lọc: con trỏ vào ô là tự bung danh sách nên không cần mũi tên ăn 24 pixel bề ngang, lọc không dấu, và đo chỗ hở lúc chạy để bung lên khi dưới hẹp.
 │   │   ├── choiceMenu.html       Control menu chọn ít mục: trigger là button, popup dùng chung và không chọn/bôi đen chữ như combo nhập liệu.
 │   │   └── inputs.html           Hai nếp gõ chung của mọi form: Enter nhảy sang ô kế tiếp và dừng ở nút Lưu, và dán một khối nhiều dòng thành nhiều ô rồi nhuộm vàng chỗ máy tự điền.
 │   ├── screen\                   Một tệp một màn người dùng nhìn thấy. Màn được mang theo style riêng, vì style đó chết cùng màn đó.
@@ -413,7 +414,7 @@ Ba dòng cuối lệch vì thư mục: tài liệu 04 gom cả CSS vào `client/
 Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client\ui\` (uiBuilder, renderEngine, actions, slots), bảng khai form là `client\schema\screens\` (mỗi màn một tệp, `uiSchema` chỉ là registry), và điều phối vòng đời form là `client\screen\formScreen.html`.
 ## Shared popup UI
 
-The client UI uses `client/ui/popupList.html` as the shared popup primitive. `search.html`, `combo.html`, and `customerPicker.html` remain separate controllers so search, dropdown, and customer-picker behavior do not get coupled.
+The client UI uses `client/ui/popupList.html` as the shared popup primitive. `client/ui/listPicker.html` is the single behavior controller for suggestion lists (open on focus, select-on-open, arrows/Enter/Tab/Esc, hide on blur or on pick); `search.html` and `combo.html` only declare their row source and pick action, and `customerPicker.html` supplies the customer rows.
 
 `Checklist tái cấu trúc cầu nối GAS-FBM.md` ghi tiến độ chuyển toàn bộ quyết định FBM về GAS và giữ Extension ở vai trò transport bridge.
 
