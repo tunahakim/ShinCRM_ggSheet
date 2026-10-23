@@ -184,3 +184,31 @@ Ký hiệu cho bảng (c): **R1** lỗi không có đường xảy ra; **R2** m�
 4. P3.
 5. P4.
 6. P9, rồi phần hợp đồng của P7, rồi P8.
+
+## Kế hoạch đợt refactor (chờ chủ dự án duyệt)
+
+Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `client/sync/`, Extension phía FBM (`2_ShinCRM_Extension/`). Đích: ba quy tắc cứng (một việc một công cụ; người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu; tiến trình lớn ghép từ tiến trình nhỏ) đúng cho mọi hàm, có test tĩnh giữ, không còn tàn dư.
+
+### Giai đoạn A — rà soát và thiết kế đích (3a, không sửa code)
+- [ ] A1. Script kiểm kê (trong scratchpad): liệt kê mọi hàm kèm tệp, số dòng và các lệnh đáng chú ý (`stateRead`/`stateWrite`, ghi DocumentProperties, đọc/ghi Sheet, `logEvent`, `nextEnvelope`, `statusView`, `catch` rỗng, nhánh `typeof ... === 'function'`); gắn cờ hàm dài hoặc gọi nhiều loại lệnh.
+- [ ] A2. Agent Sonnet đọc các hàm bị gắn cờ theo nhóm tệp, trả theo mẫu cố định (hàm làm những việc gì, gợi ý tách); đọc trọn các tệp chưa đọc (màn vẽ Sidebar, `FbmSyncService.js`).
+- [ ] A3. Dựng giấy nháp đích trong tệp này: cây tiến trình (mẹ, con, hàm điều phối, state sở hữu), danh mục công cụ theo loại (đầu vào, đầu ra, ai được gọi), bảng ánh xạ mỗi hàm cũ → đích (giữ / tách / gộp / xóa). Hàm không ánh xạ được là sót hoặc code chết. Tự đọc lại các kết luận nặng của agent.
+- [ ] A4. Ghi P11 (tách hàm ôm nhiều việc) và P12 (test tĩnh chặn tái phạm), cập nhật P1–P10 theo giấy nháp; trình chủ dự án duyệt.
+
+### Giai đoạn B — sửa (3b), mỗi bước: test offline, `node tests/gas.js ... --push` trên DEV, commit riêng
+- [ ] B0. Viết test tĩnh trước, chạy ở chế độ "danh sách ngoại lệ chỉ được giảm": vi phạm hiện có ghi thành danh sách ngoại lệ, mỗi bước sau xóa bớt; thêm vi phạm mới là đỏ.
+- [ ] B1. Lỗi thật nhỏ, độc lập: P10 (dừng nền ngay, Sidebar chờ theo `running`), mất `identityBlocks`, `approvalThreshold`, P6 (chờ chấp thuận có hạn và thông báo), P5 (lỗi im lặng, Extension một cổng gọi GAS).
+- [ ] B2. P1: một cửa cho mọi lượt, tiến trình đăng nhập `loginRun`, Sidebar một vòng.
+- [ ] B3. P2: tách cổng request, bảng chặng, một hàm nối chuỗi nền, lõi V24.
+- [ ] B4. P3 + P11: state truyền qua công cụ, tách các hàm ôm nhiều việc.
+- [ ] B5. P4: cài đặt FBM về cổng cài đặt chung, một cửa cho mỗi công tắc.
+- [ ] B6. P9: một công cụ cho mỗi phép tính trùng.
+- [ ] B7. P7 phần hợp đồng dữ liệu Sidebar (phần vẽ làm ở mục 4).
+- [ ] B8. P8: Extension không làm nghiệp vụ.
+
+### Giai đoạn C — dọn tàn dư (bắt buộc trước khi gộp `main`)
+- [ ] C1. Xóa mọi hàm có đích "xóa" trong bảng ánh xạ; tìm tên trong toàn repo (GAS, Sidebar, Extension, tests, `server/dev/`, `DEV_RUNNER_ALLOWED`) phải ra 0.
+- [ ] C2. Xóa nhánh tương thích đời cũ (state cũ, khóa cũ, trigger cũ, lệnh Extension cũ) sau khi hàm chuyển một lần đã chạy trên DEV; xóa khóa DocumentProperties cũ bằng hàm dọn một lần rồi xóa luôn hàm dọn.
+- [ ] C3. Test tĩnh "hàm không ai gọi" cho `fbm_sync/`, `client/sync/`, Extension; danh sách ngoại lệ của B0 phải rỗng.
+- [ ] C4. Sửa tài liệu 09 và `Quy tắc theo loại phiên/Đồng bộ FBM.md` cho khớp (chỉ ghi luật và vị trí, không chép bước), cập nhật `Cây thư mục code.md`, xóa giấy nháp đích khỏi tệp phiên.
+- [ ] C5. Chạy bộ test đầy đủ, nghiệm thu trên DEV, hỏi chủ dự án trước khi gộp `main`.
