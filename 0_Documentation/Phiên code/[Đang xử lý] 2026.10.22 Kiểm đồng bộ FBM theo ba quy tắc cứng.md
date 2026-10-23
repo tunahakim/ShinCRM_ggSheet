@@ -118,6 +118,11 @@ Mức: **Nặng** = có thể sai dữ liệu, ghi đè âm thầm, ghi FBM sai 
 - Ngày Việt Nam chuẩn hóa ba chỗ với hai nguồn múi giờ (`Fingerprint.js:32` cứng `Asia/Ho_Chi_Minh`, `GridRead.js:167` theo múi giờ script).
 - `threeWay` hai chế độ, tự hash baseline thì bỏ `categoryGate`.
 
+### N11. "Dừng đồng bộ nền" phụ thuộc response kế tiếp, Sidebar chờ sai điều kiện — Nặng (gặp thật 2026-10-23)
+- `stopBackground` (`transport/PullFlow.js:14`) chỉ đặt `manualPending`; lượt nền chỉ dừng khi response kế tiếp về (`continueStep`). Chuỗi nền đã đứt (Extension nộp kết quả hỏng, hộp đen `gas_reply_failed`) thì không response nào về, lượt chỉ được thu hồi khi quá hạn 3–5 phút (`SYNC_STALE_RUN`).
+- `fbmSyncWaitForBackgroundIdle` (`client/sync/fbmSync.html`) chờ `phase === 'idle' && !runId` trong 120 giây; lượt bị thu hồi có phase `error`, nên dù nền đã nhả Sidebar vẫn không chạy lệnh gốc và báo "Đồng bộ nền chưa xong trong thời gian chờ".
+- Log DEV 2026-10-23: chuỗi nền đứt ở 08:42, 09:17, 09:22, 09:36 với hộp đen `gas_reply_failed` (Extension không nộp được kết quả cho Web App relay), hai lần bấm tay lúc 09:22:37 và 09:36:48 đều báo lỗi trên.
+
 ## Phương án đề xuất (chờ chủ dự án chốt)
 
 Ký hiệu cho bảng (c): **R1** lỗi không có đường xảy ra; **R2** một việc một công cụ; **R3** người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu; **R4** tiến trình lớn ghép từ tiến trình nhỏ.
@@ -167,8 +172,13 @@ Ký hiệu cho bảng (c): **R1** lỗi không có đường xảy ra; **R2** m�
 - (b) Dùng lại: một hàm hash trên một hình dạng (record đã đổi tên; mọi chỗ đổi dòng thô sang record trước); một vị từ "cần đẩy" cho cả preflight và chặng đẩy; gate danh mục theo bản chụp của lời gọi như `readLocal`, bỏ cache `defineProperty`; một hàm ngày theo hằng múi giờ dự án; `threeWay` chỉ nhận hash.
 - (c) R1: bịt đường "preflight đếm khác tập đẩy" và "hash lệch hình dạng". R2: đúng định nghĩa. R3, R4: không đổi.
 
+### P10. Dừng lượt nền có hiệu lực ngay, Sidebar chờ theo kết luận của GAS (N11)
+- (a) Gốc: lệnh dừng giao việc dừng cho một response có thể không bao giờ về; "nền đã nhả" là quyết định nghiệp vụ nhưng do Sidebar tự định nghĩa bằng phase.
+- (b) Dùng lại: `requestAnswered` đã từ chối response cũ (`STALE_RESPONSE`), và hash chờ xác nhận đẩy (`pendingPush*`) đã ghi trước khi gửi lệnh ghi FBM, lượt sau tự kiểm lại. Nên `stop_background` đóng lượt nền ngay trong cùng lần cầm khóa (phase `paused`, mã dừng do người dùng) bằng công cụ đặt kết thúc chung, response đến muộn bị bỏ theo đường sẵn có. `statusView` trả `running` (từ `runInProgress`), Sidebar chờ theo trường này; khi lệnh dừng đóng ngay thì Sidebar gọi lệnh gốc luôn, không cần vòng chờ 3 giây.
+- (c) R1: bịt đường "chờ một response không bao giờ về" và "Sidebar hiểu sai nền đã nhả". Còn phép kiểm: lệnh ghi FBM đang bay khi dừng có kết quả chưa biết, dựa vào kiểm hash chờ xác nhận ở lượt sau (đã có). R2: một định nghĩa "đang chạy" ở GAS. R3: Sidebar chỉ đọc kết luận. R4: không đổi.
+
 ### Thứ tự chặng 3b đề xuất
-1. Bịt lỗi thật, nhỏ và độc lập: mất `identityBlocks`; `approvalThreshold`; P6; P5.
+1. Bịt lỗi thật, nhỏ và độc lập: P10; mất `identityBlocks`; `approvalThreshold`; P6; P5.
 2. P1.
 3. P2.
 4. P3.
