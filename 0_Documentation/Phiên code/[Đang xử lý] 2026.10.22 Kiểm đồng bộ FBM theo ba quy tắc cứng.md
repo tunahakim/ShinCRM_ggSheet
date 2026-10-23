@@ -185,6 +185,163 @@ Ký hiệu cho bảng (c): **R1** lỗi không có đường xảy ra; **R2** m�
 5. P4.
 6. P9, rồi phần hợp đồng của P7, rồi P8.
 
+## Kiến trúc đích (chờ chủ dự án duyệt)
+
+Bản thiết kế đích của đồng bộ FBM sau refactor, ở mức nơi chạy, nơi giữ state, cửa vào, cây tiến trình và tín hiệu. Nó thay cho phần mô tả rời về vòng đời lượt, nhịp chạy, chấp thuận, mất đường truyền và mật khẩu ở P1, P5, P6, P8, P10. Danh mục công cụ chi tiết và bảng ánh xạ hàm cũ → đích làm ở A3 sau khi kiểm kê hàm. Sau 3b, phần này thành luật trong tài liệu 09 (C4) và bị xóa khỏi tệp phiên.
+
+Đã chốt (2026-10-23): giữ một ô state, mỗi lúc một lượt. Còn lại chờ duyệt.
+
+### K1. Ba nơi chạy và việc của mỗi nơi
+
+| Nơi | Được làm | Không được làm |
+|---|---|---|
+| GAS | Giữ mọi state nghiệp vụ và quyết mọi việc: có chạy không, chạy gì, request nào, response nghĩa là gì, khi nào Extension hỏi lại, Sidebar hiện gì | — |
+| Extension | (1) Đồng hồ: một alarm `gas_poll`, khoảng cách lấy từ câu trả lời gần nhất của GAS. (2) Đường ống: nhận envelope, chuẩn bị tab FBM theo lệnh trong envelope, fetch trong tab, nộp response thô qua một cổng gọi GAS. (3) Giữ khóa giải mã mật khẩu và làm phép "giải mã, băm, điền vào chỗ trống của request" khi envelope yêu cầu. (4) Hộp đen, gửi kèm mỗi lần hỏi | Tự quyết tải lại tab, rẽ nhánh theo loại việc, chạy chuỗi đăng nhập, tự thử lại, giữ bản mã mật khẩu, giữ response qua hai lần gọi |
+| Sidebar | Gửi lệnh của người dùng tới GAS (chạy tay, chấp thuận, kiểm lại, dừng nền, lưu cài đặt), chuyển request của lượt tay sang Extension, hiển thị `statusView` và thông báo do GAS dựng | Suy trạng thái từ phase hay cursor, quyết xung đột, tự nối "đăng nhập rồi chạy", tự nhận biết dữ liệu đổi, nghe Extension để biết lỗi |
+
+Hai đường truyền, chung một cửa GAS:
+- Lượt nền: Extension ↔ Web App relay (`doPost`).
+- Lượt tay: Sidebar ↔ GAS bằng `google.script.run`; Sidebar ↔ Extension bằng `postMessage`. Đường này không đi qua Web App, nên vẫn chạy được khi relay trả 404.
+
+### K2. Nơi sở hữu state
+
+Mỗi state có một chủ và một cổng.
+
+| State | Chủ | Cổng | Ghi chú |
+|---|---|---|---|
+| Ô lượt `FBM_SYNC_STATE_V1`: runId, loại lượt, phase, cursor, request đang chờ và hạn, kết luận | Người điều phối lát `runSlice` | Đọc một lần đầu lát, ghi một lần cuối lát, trong khóa | Một lượt tại một thời điểm. Không còn công cụ nào tự `stateRead`/`stateWrite` |
+| Sổ hẹn: giờ chạy xong, lần thử lại của từng tiến trình nền | Lịch nền | `scheduleMarkDone`/`scheduleMarkFailed` | Thêm kiểu kết thúc "không phải lỗi" (mất đường truyền, bị dừng tay): không dời giờ thử lại |
+| Sổ chờ chấp thuận (khóa mới): dấu của tập ứng viên, số bản ghi, revision sổ nạp lại lúc tính, lúc tạo, dấu đã duyệt | Chặng đẩy | Cổng chấp thuận | Nằm ngoài ô lượt nên không chiếm ô |
+| Sổ nạp lại (`reloadJournal`) | Lõi | `fbm_sync` chỉ đọc qua hàm đọc của lõi | Không thêm khóa mới. Giữ luật phụ thuộc một chiều: lõi không biết `fbm_sync`. Đã có tiền lệ: dấu lần đẩy sạch đang so số thay đổi của sổ này |
+| Máy chạy nền (V24): mã máy, tên, lúc giao, lần hỏi cuối | GAS | Cổng máy nền | Thiết kế đã thống nhất hướng ở mục bối cảnh |
+| Cài đặt FBM | Cổng cài đặt chung | `settingsSave`/`settingsValue` | P4 |
+| Bản mã mật khẩu | GAS (DocumentProperties) | Cổng credential | GAS không có khóa |
+| Khóa giải mã | Extension (`chrome.storage.local`) | Chỉ Extension | Extension không có bản mã lưu lâu |
+| Hộp đen | Extension | Gửi kèm `heartbeat_request` (đã có) | Thêm ô "lỗi nộp gần nhất" không bị bước sau đè |
+| Màn Sidebar | Sidebar | — | Chỉ là bản hiển thị của `statusView` mới nhất, không phải state nghiệp vụ |
+
+### K3. Một cửa duy nhất
+
+Mọi thay đổi state FBM đi qua `controlDispatch(lệnh, dữ liệu)` cầm khóa. Sidebar và relay là hai adapter: chỉ đổi thao tác thành lệnh, không có đường gọi thẳng vào công cụ.
+
+| Nhóm | Lệnh |
+|---|---|
+| Lượt | `start` (loại lượt: đồng bộ tay, đăng nhập thử, đăng nhập ép, kiểm liên kết, dò liên kết), `continue` (nộp response), `cancel`, `stop_background` |
+| Nền | `heartbeat` (Extension hỏi, kèm hộp đen và mã máy) |
+| Chấp thuận | `approve_push` (kèm dấu tập Sidebar đang hiện), `recheck_push` |
+| Xung đột | `confirm_conflict` (Sidebar gửi lựa chọn từng trường, GAS quyết) |
+| Cài đặt | `save_settings` (một lệnh cho mọi phần), `set_master`, `set_background`, `save_identity_binding`, `save_credential`, `assign_background_machine` |
+| Đọc | `status` |
+
+Luật chiếm ô:
+- Ô bận khi và chỉ khi lượt ở phase đang chạy **và** có request đang chờ chưa quá hạn hoặc đang trong một lát.
+- Mọi trạng thái cuối (xong, lỗi, tạm dừng, xung đột, chờ chấp thuận) là ô rảnh. Danh sách phase "đang chạy" khai một chỗ trong GAS; `statusView` trả sẵn `running` để Sidebar không tự suy.
+- `start` từ Sidebar gặp lượt nền đang chạy: GAS trả `SYNC_BACKGROUND_RUNNING`, Sidebar hỏi người dùng. Chọn dừng thì `stop_background` đóng lượt nền ngay trong khóa, không chờ response kế tiếp. Response đến muộn bị cổng `requestAnswered` loại như nay.
+
+### K4. Cây tiến trình
+
+```
+Chuỗi nền (lệnh heartbeat)        Lượt tay (start)              Đăng nhập thử / ép (start)
+  └─ chọn tiến trình đến hạn         │                                │
+      └──────────── Lượt ◄───────────┘                                │
+                     ├─ Cổng phiên ── hết phiên ──► Tiến trình đăng nhập ◄┘
+                     ├─ Chặng quét khách
+                     ├─ Chặng lớp giao dịch
+                     ├─ Chặng kéo về
+                     ├─ Chặng đối soát
+                     ├─ Chặng đẩy ──► Cổng chấp thuận
+                     └─ Bước đếm khách ── lệch ──► Quét nhanh
+```
+
+- Mỗi hộp là một người điều phối. Người điều phối gọi công cụ (đọc, kiểm, tính, ghi) và người điều phối con.
+- Lượt tay, lượt nền và Giữ phiên là **cùng một** người điều phối Lượt, chỉ khác tham số.
+- Đăng nhập thử gọi đúng Tiến trình đăng nhập mà Cổng phiên dùng. Việc "làm gì sau khi đăng nhập xong" (kết thúc, nối lại cursor đang chờ, chạy lượt) được truyền vào lúc khởi chạy; các bước đăng nhập không rẽ theo cờ `testOnly`/`purpose`/`manual`.
+
+Một lát (một lời gọi GAS):
+1. `runSlice` cầm khóa và đọc ô lượt một lần.
+2. Gọi công cụ kiểm thuần (công tắc, ngân sách, cờ dừng); kết quả là một quyết định.
+3. Tra bảng `cursor.kind` → người điều phối chặng. Chặng trả `{ thay đổi state, request kế hoặc kết thúc }`.
+4. Cổng phát request dựng envelope, cấp id, ghi hạn.
+5. `runSlice` ghi ô một lần và trả kết quả.
+
+### K5. Nhịp hỏi và tín hiệu
+
+Giới hạn không đổi được: GAS không gọi được Extension. Extension chỉ hỏi theo alarm, và Chrome cho alarm tối thiểu 1 phút. Vì vậy GAS quyết luôn nhịp hỏi:
+- Mỗi câu trả lời `heartbeat` mang `nextAskMinutes`:
+  - Còn việc chờ (sổ chờ chấp thuận, lượt vừa mất đường truyền, lượt nền vừa bị dừng mà còn việc đến hạn): 1 phút.
+  - Không có việc chờ: nhịp người dùng đặt, mặc định 5 phút.
+  - Extension chỉ đặt lại alarm theo số đó.
+- Mỗi envelope mang `askOnFailMinutes` (GAS đặt, bằng 1). Khi nộp kết quả hỏng, Extension biết lần hỏi tới là lúc nào mà không phải tự quyết.
+- Giữ phiên đổi từ "mọi lần hỏi" sang chu kỳ thời gian bằng nhịp người dùng đặt, có dung sai để không hụt một nhịp. Nếu không đổi, nhịp 1 phút sẽ thành mỗi phút một request Giữ phiên lên FBM.
+
+Mỗi lần Extension hỏi, GAS xét theo thứ tự:
+
+| # | Tín hiệu | Ai phát hiện, nằm ở đâu | GAS quyết |
+|---|---|---|---|
+| 0 | Máy hỏi không phải máy được giao chạy nền | Mã máy trong `heartbeat` | Trả lệnh dừng nhịp (V24) |
+| 1 | Hộp đen báo nộp kết quả hỏng đúng request đang chờ (`gas_reply_failed`) | Extension ghi, gửi kèm `heartbeat` (đã có) | Đóng lượt với mã `TRANSPORT_LOST`. Đây không phải lỗi của tiến trình nên không dời giờ thử lại; mở lại ngay tiến trình đó trong lần hỏi này. Request ghi đã gửi mà mất response (`push_wait`) vẫn theo luật `SYNC_STALE_WRITE`, không gửi lại |
+| 2 | Lượt dở có request quá hạn mà không có hộp đen (Extension chết, tắt Chrome) | GAS so hạn (`recoverStaleRun`) | Đóng `SYNC_ABANDONED_RUN` như nay |
+| 3 | Sổ chờ chấp thuận đã có dấu duyệt | Lệnh `approve_push` | Chạy lượt có đẩy ngay |
+| 4 | Sổ chờ chấp thuận còn, và sổ nạp lại có dòng mới chạm Customer/Activity sau revision đã ghi | GAS so revision | Chạy lại chặng đẩy: đọc hai Sheet, dựng lại ứng viên. Dưới ngưỡng thì đẩy, xóa sổ chờ, tắt thông báo. Vẫn vượt thì cập nhật sổ chờ và số trên thông báo |
+| 5 | Tiến trình đến hạn theo sổ hẹn | Sổ hẹn | Như nay |
+| 6 | Không có gì | — | `request: null` kèm nhịp thường |
+
+Hiển thị: Sidebar đọc `statusView` do GAS dựng. GAS biết và trả: có lượt chờ duyệt (số bản ghi, lúc); lượt nền mất đường truyền hoặc request quá hạn (lúc, lần hỏi kế tiếp). Sidebar không nghe Extension để biết lỗi.
+
+Hai nút trên thông báo chờ duyệt:
+- "Chấp thuận" gửi `approve_push`.
+- "Kiểm lại ngay" chạy lượt tay qua đường Sidebar: không phải chờ nhịp, và chạy được cả khi relay 404.
+
+### K6. Chấp thuận
+
+- Kiểm ngưỡng chuyển từ đầu lượt sang **đầu chặng đẩy**. Lúc đó tập ứng viên đúng là tập sẽ đẩy, sau kéo về và đối soát. Các chặng trước chạy đủ vì không ghi gì lên FBM. Luật "chấp thuận đứng trước mọi request ghi" giữ nguyên.
+- Vượt ngưỡng thì chặng đẩy không phát request ghi nào. Nó ghi sổ chờ (dấu tập ứng viên, số, revision sổ nạp lại sau lần ghi Sheet cuối của lượt, lúc) và phát thông báo qua `noticeRaise`. Lượt chạy nốt bước đếm rồi kết thúc bình thường, ghi giờ chạy xong như mọi lượt.
+- Khi sổ chờ còn, mọi lượt bỏ chặng đẩy, trừ khi có tín hiệu 3 hoặc 4. Không đẩy lẻ một phần nào của tập.
+- Duyệt: `approve_push` mang dấu của tập Sidebar đang hiện. Chặng đẩy dựng lại tập và so dấu: khớp thì đẩy; khác thì không đẩy, cập nhật sổ chờ và hỏi lại. Đường "duyệt bộ này mà đẩy bộ khác" bị bịt bằng kiến trúc.
+- Thông báo tự tắt khi sổ chờ bị xóa.
+- Bỏ phase `awaiting_approval` và bỏ ý tưởng hạn chờ.
+
+### K7. Mất đường truyền
+
+- Extension không giữ response (có thể vài MB). Nó chỉ ghi dấu vào hộp đen. Lượt mở lại đọc lại từ FBM; đọc lặp là an toàn.
+- Extension có một cổng gọi GAS cho cả hỏi lẫn nộp (P5). Mọi lỗi đi một đường: ghi hộp đen kèm mã thật và `httpStatus`.
+- Cổng phát hiện treo theo hạn (2 phút) giữ lại, chỉ còn cho ca Extension chết hẳn.
+
+### K8. Mật khẩu và đăng nhập
+
+- Hiện tại: Extension giữ cả khóa lẫn bản mã trong `chrome.storage.local`, GAS cũng giữ bản mã. Mất riêng Extension là đủ để giải ra mật khẩu.
+- Đích:
+  - GAS giữ bản mã (như nay). Extension chỉ giữ khóa; bỏ bản sao bản mã trong Extension.
+  - Không phải nhập lại mật khẩu, vì bản mã GAS giữ là bản do chính khóa đó tạo. Điểm này sẽ kiểm lại ở A2 khi đọc đường lưu credential.
+- Tiến trình đăng nhập do GAS điều phối, mỗi bước là một request thường:
+  1. Lấy trang Login; GAS trích salt.
+  2. Lấy danh sách database và đơn vị; GAS chọn.
+  3. Gửi Login.
+  4. GAS xét kết quả: vào được, bị phiên cũ chặn, hay sai mật khẩu.
+  5. Đọc trang tài khoản.
+  6. Ghi khóa trang.
+- Hai bước cần mật khẩu (Login và khóa trang): GAS gửi envelope có "chỗ trống băm" kèm bản mã và salt. Extension giải mã trong bộ nhớ, tính băm, điền vào chỗ trống, fetch, rồi bỏ đi. Extension không biết đó là bước nghiệp vụ nào.
+- Mật khẩu và bản băm chỉ đi ra khỏi Extension trong request gửi FBM; response nộp GAS không chứa chúng. Có test chốt luật này.
+- Mất riêng GAS: chỉ có bản mã. Mất riêng Extension: chỉ có khóa.
+
+### K9. Đối chiếu quy tắc cứng
+
+| Quy tắc | Cách kiến trúc đáp ứng |
+|---|---|
+| Lỗi không có đường xảy ra | Bịt bằng kiến trúc: hai lượt ghi đè nhau (một cửa, một khóa, luật chiếm ô); bước sau đọc nhầm lượt (cursor mang runId); duyệt bộ này mà đẩy bộ khác (so dấu tập); lượt chờ duyệt chặn nền và Giữ phiên (sổ chờ ngoài ô lượt); dừng nền phải chờ response (đóng trong khóa); lộ mật khẩu khi mất một bên (tách khóa và bản mã); hai bản state đè nhau trong một lời gọi (chỉ `runSlice` đọc ghi). Chỉ còn phép kiểm: Extension chết chỉ biết qua hạn chờ, vì GAS không gọi được Extension; 404 chỉ biết khi Extension nối lại được GAS; sửa Sheet mà trigger không chạy thì sổ nạp lại không tăng, nên lưới an toàn vẫn là Quét nhanh như nay |
+| Một việc một công cụ | Một cửa lệnh; một sổ chờ chấp thuận; dùng lại sổ nạp lại của lõi, không dựng tín hiệu thứ hai; một cổng gọi GAS ở Extension; một tiến trình đăng nhập; một danh sách phase "đang chạy" |
+| Người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu | `runSlice` đọc và ghi ô một lần; chặng trả dữ liệu; Extension làm phép băm trên dữ liệu envelope đưa, không tự đọc state |
+| Tiến trình lớn ghép từ tiến trình nhỏ | Lượt tay, lượt nền và Giữ phiên dùng chung người điều phối Lượt; đăng nhập thử gọi đúng Tiến trình đăng nhập; chuỗi nền gọi Lượt |
+
+### K10. Những chỗ tài liệu 09 phải đổi theo (làm ở C4)
+
+- 09/02 "Chuỗi trong một lần hỏi" mục 4: bỏ "chờ chấp thuận" khỏi định nghĩa "đang chạy".
+- 09/02 mục 6: dừng nền có hiệu lực ngay, không chờ response.
+- 09/02 "Một alarm Extension": GAS ghi nhịp hỏi kế tiếp; Giữ phiên chạy theo chu kỳ thời gian thay cho "chu kỳ 0 = mọi lần hỏi".
+- 09/02 "Thứ tự trong một kỳ" bước 3: hỏi chấp thuận ở đầu chặng đẩy.
+- 09/01 và 09/06: Extension giữ khóa, GAS giữ bản mã; đăng nhập do GAS điều phối.
+- 09/01 "Cổng điều khiển": danh sách lệnh theo K3.
+
 ## Kế hoạch đợt refactor (chờ chủ dự án duyệt)
 
 Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `client/sync/`, Extension phía FBM (`2_ShinCRM_Extension/`). Đích: ba quy tắc cứng (một việc một công cụ; người điều phối gọi công cụ, công cụ trao nhau bằng dữ liệu; tiến trình lớn ghép từ tiến trình nhỏ) đúng cho mọi hàm, có test tĩnh giữ, không còn tàn dư.
