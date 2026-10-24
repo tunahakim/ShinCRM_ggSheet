@@ -30,7 +30,7 @@ Branch `feature/fbm-audit`. Chặng 3a chỉ đọc, lập bản đồ và trìn
 - [x] Đọc trọn phía Sidebar `client/sync/` và Extension phía FBM (`service_worker.js`, chuỗi nền, `postRelay`).
 - [x] Lập bản đồ tiến trình – công cụ – nơi sở hữu state (ghi vào mục "Bản đồ" của tệp này).
 - [x] Liệt kê vi phạm ba quy tắc cứng kèm mức nặng (ghi vào mục "Vi phạm").
-- [ ] Trình phương án ba phần (a) gốc lỗi, (b) công cụ dùng lại, (c) bảng đối chiếu quy tắc cứng cho từng nhóm vi phạm, gồm cả bốn lỗi gặp thật 2026-10-22 và việc chuyển cài đặt FBM về cổng chung.
+- [x] Trình phương án ba phần (a) gốc lỗi, (b) công cụ dùng lại, (c) bảng đối chiếu quy tắc cứng cho từng nhóm vi phạm, gồm cả bốn lỗi gặp thật 2026-10-22 và việc chuyển cài đặt FBM về cổng chung.
 
 ## Bản đồ
 
@@ -123,7 +123,7 @@ Mức: **Nặng** = có thể sai dữ liệu, ghi đè âm thầm, ghi FBM sai 
 - `fbmSyncWaitForBackgroundIdle` (`client/sync/fbmSync.html`) chờ `phase === 'idle' && !runId` trong 120 giây; lượt bị thu hồi có phase `error`, nên dù nền đã nhả Sidebar vẫn không chạy lệnh gốc và báo "Đồng bộ nền chưa xong trong thời gian chờ".
 - Log DEV 2026-10-23: chuỗi nền đứt ở 08:42, 09:17, 09:22, 09:36 với hộp đen `gas_reply_failed` (Extension không nộp được kết quả cho Web App relay), hai lần bấm tay lúc 09:22:37 và 09:36:48 đều báo lỗi trên.
 
-## Phương án đề xuất (A4, chờ chủ dự án duyệt)
+## Phương án đề xuất (A4, chủ dự án duyệt 2026-10-24)
 
 Các phương án dưới đây thực hiện kiến trúc ở mục "Kiến trúc đích" và bảng ở mục "Bảng đích (A3)"; tên công cụ đích lấy theo A3.1–A3.3. "Lỗi n" là lỗi thứ n trong danh sách lỗi mới ở dòng A2 của lộ trình (đã đọc lại ở A3.5). Thứ tự làm là các bước B của lộ trình.
 
@@ -209,7 +209,7 @@ Chủ dự án chốt 2026-10-24: một ô state, mỗi lúc một lượt; Exte
 |---|---|---|
 | FBM | CRM thật của công ty, nguồn dữ liệu; chỉ trả lời request | — |
 | GAS (bộ não) | Quyết mọi việc: có chạy không, chạy gì, request nào, response nghĩa là gì, ghi gì xuống Sheet, có cần chấp thuận không, báo lỗi gì, Sidebar hiện gì. Nơi duy nhất ghi Sheet và `Log`. Chỉ chạy khi Sidebar hoặc Extension gọi, hoặc trigger sửa ô chạy | — |
-| Extension (người đưa thư, kiêm đồng hồ) | Một alarm `gas_poll` theo nhịp người dùng đặt (mặc định 5 phút); nhận envelope, chuẩn bị tab FBM theo lệnh trong envelope, fetch trong tab, nộp response thô qua một cổng gọi GAS; giữ khóa giải mã mật khẩu và làm phép "giải mã, băm, điền vào chỗ trống" khi envelope yêu cầu; hộp đen | Tự quyết tải lại tab, rẽ nhánh theo loại việc, chạy chuỗi đăng nhập, tự thử lại, giữ bản mã mật khẩu, giữ response qua hai lần gọi |
+| Extension (người đưa thư, kiêm đồng hồ) | Một alarm `gas_poll` theo nhịp người dùng đặt (mặc định 5 phút); nhận envelope, chuẩn bị tab FBM theo lệnh trong envelope, fetch trong tab, nộp response thô qua một cổng gọi GAS; giữ khóa giải mã mật khẩu và làm phép "giải mã, băm, điền vào chỗ trống" khi envelope yêu cầu; hộp đen | Tự quyết tải lại tab, rẽ nhánh theo loại việc, chạy chuỗi đăng nhập, tự thử lại, giữ bản mã mật khẩu, giữ response qua hai lần gọi. Ngoại lệ duy nhất (chủ dự án chốt 2026-10-24): cắt gói một response quét danh sách khách lớn hơn trần một lần nộp relay và giữ phần chưa gửi trong RAM tab; tab tải lại làm mất gói thì GAS quét lại từ đầu |
 | Sidebar (bảng điều khiển) | Gửi lệnh của người dùng tới GAS; với lượt tay, đưa thư giữa GAS và Extension; hiển thị `statusView` và thông báo do GAS dựng | Suy trạng thái từ phase hay cursor, quyết xung đột, tự nối "đăng nhập rồi chạy", tự nhận biết dữ liệu đổi |
 | Sheet | Dữ liệu khách, giao dịch, danh mục; sheet `Log` (trần `LOG_MAX_ROWS`) | Chỉ GAS ghi |
 | DocumentProperties | Kho ẩn đi kèm tệp: ô lượt, sổ hẹn, cài đặt, sổ nạp lại, bản mã mật khẩu, kho phụ | Chỉ GAS đọc ghi |
@@ -416,11 +416,11 @@ Không phải kho (A1 bắt nhầm): `FBM_SYNC_EXCEPTION`, `FBM_SYNC_PERMISSION_
 | 10 | Phạm vi "thiếu hàm thì mở" | Đúng: `typeof FbmSync.scope === 'function' ? ... : null` ở `PushCandidates.js:77`, tương tự ở `GridRead` (3 chỗ), `ActivityLayers` (1), `ActivityBatch` (2) |
 | 11 | Cầu nối iframe và executor không kiểm nguồn | Hạ mức: `CRM_FBM_CANCEL` và `CRM_FBM_REQUEST` có kiểm origin, nonce, phiên, chỉ thiếu kiểm cửa sổ nguồn; nonce chỉ Sidebar biết nên nguy cơ thấp. Executor fetch URL từ envelope không kiểm miền; thêm một phép kiểm miền chung ở B10 |
 
-### A3.6 Điểm cần chủ dự án quyết (trình ở A4)
+### A3.6 Điểm chủ dự án đã quyết (2026-10-24: chọn cách a, đã ghi ngoại lệ ở K1)
 
 - Việc quét danh sách khách: một lần trả của FBM lớn hơn trần một lần nộp qua relay, nên Extension cắt thành nhiều gói, giữ phần chưa gửi trong RAM của tab FBM và chọn sẵn cột (`scanJob`, `scanChunks`). K1 cấm Extension giữ response qua hai lần gọi. Có hai cách: (a) ghi ngoại lệ ở K1: Extension được cắt gói một response đang quét, mất gói khi tab tải lại thì GAS quét lại từ đầu (hiện đã có `scanJobRestart`); (b) GAS xin FBM từng trang nhỏ, tốn thêm request FBM mỗi lượt. Đề xuất (a), vì giữ RAM tab ở đây là phép cắt gói kỹ thuật chứ không phải quyết định nghiệp vụ.
 
-## Lộ trình đợt refactor (chờ chủ dự án duyệt)
+## Lộ trình đợt refactor (chủ dự án duyệt 2026-10-24)
 
 Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `client/sync/`, Extension phía FBM (`2_ShinCRM_Extension/`). Đích: kiến trúc ở mục trên, ba quy tắc cứng đúng cho mọi hàm, có test tĩnh giữ, không còn tàn dư. Ba mốc chủ dự án duyệt: cuối A (bảng đích), giữa B (sau mỗi bước có việc cần kiểm trên Sheet), cuối C (trước khi gộp `main`).
 
@@ -429,8 +429,8 @@ Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `clie
 - [x] A1. Script kiểm kê (trong scratchpad): (1) mọi hàm của phạm vi kèm tệp, số dòng, các lệnh đáng chú ý (`stateRead`/`stateWrite`, ghi DocumentProperties, đọc/ghi Sheet, `logEvent`, `nextEnvelope`, `statusView`, `catch` rỗng, nhánh `typeof ... === 'function'`), gắn cờ hàm dài hoặc gọi nhiều loại lệnh; (2) mọi khóa DocumentProperties và `chrome.storage` của FBM kèm hàm đọc, hàm ghi, hàm xóa. Kết quả (2026-10-24): 58 tệp, 1.065 hàm, 66 hàm bị gắn cờ (dài trên 60 dòng, chạm từ ba loại lệnh state/kho/Sheet/envelope/status trở lên, hoặc có `catch` rỗng); 32 khóa DocumentProperties của FBM và 11 khóa `chrome.storage`. Bảng nằm ở scratchpad phiên (`inv_functions.tsv`, `inv_stores.md`), không đưa vào repo.
 - [x] A2. Agent Sonnet đọc các hàm bị gắn cờ và từng kho theo nhóm tệp, trả theo mẫu cố định (hàm làm những việc gì, gợi ý tách; kho dùng làm gì, sống bao lâu, ai dọn); đọc trọn các tệp chưa đọc (màn vẽ Sidebar, `FbmSyncService.js`); kiểm bản mã GAS giữ có cùng khóa với Extension không (để biết có phải nhập lại mật khẩu). Kết quả (2026-10-24): 7 agent đọc trọn khoảng 950 hàm của 7 nhóm tệp, khoảng 510 hàm có vi phạm; bảng từng hàm và kho nằm ở scratchpad phiên (`a2_G1.md`…`a2_G7.md`), không đưa vào repo. Mật khẩu: bản mã GAS giữ ở `FBM_LOGIN_CONFIG_V1` đúng là bản Extension tạo bằng khóa trong `fbmCredentialVault`, nên tách khóa và bản mã (K8) không phải nhập lại mật khẩu. Lỗi thật mới ngoài N1–N11, A3 tự đọc lại trước khi đưa vào phương án: (1) Sidebar chép danh sách phase 5 lần đều thiếu `waiting_session` (`fbmSync.html`, `screens/run.html`), đã kiểm thấy đúng; (2) lệnh `start` ở `ControlPort.js` không truyền `identity`, đã kiểm thấy đúng, còn phải xem lượt kiểm liên kết có đi đường này không; (3) `markPushError` thoát trước khi ghi Log khi cửa ghi trả bận/đổi/vắng nhưng đã cộng sổ lỗi; (4) `Probe.js` xét loại bản ghi theo `customerFbmCode` nên đảo customer/activity, đã kiểm thấy đúng (chỉ ảnh hưởng ca dò); (5) Extension đổi 404 hoặc response không phải JSON thành `{ok:false}` và bỏ kết quả FBM đã lấy (`service_worker.js`, gần N11); (6) `fbmSyncCancel` trả cả state có `authorized` cho Sidebar; (7) lưu cài đặt đổi công tắc tổng trước khi kiểm (`FbmSyncService.js`); (8) `autoLoginMark*` ghi đè cả cấu hình đăng nhập nên có thể khôi phục credential vừa xóa; (9) `customerBaselineWrite` ghi mốc trước khi chặng giao dịch và chặng đẩy chạy; (10) phạm vi "thiếu hàm = mở" ở `GridRead`, `ActivityLayers`, `PushCandidates`, `ActivityBatch`; (11) cầu nối iframe và executor không kiểm nguồn tin và origin.
 - [x] A3. Bảng đích trong tệp này: cây tiến trình chi tiết (người điều phối, công cụ nó gọi, state nó sở hữu); danh mục công cụ theo loại (đầu vào, đầu ra, ai được gọi); ánh xạ mỗi hàm cũ → đích (giữ / tách / gộp / xóa); ánh xạ mỗi kho cũ → đích (giữ / gộp / xóa, luật dọn). Hàm hay kho không ánh xạ được là sót hoặc code chết. Tự đọc lại các kết luận nặng của agent. Kết quả (2026-10-24): mục "Bảng đích (A3)" và tệp `2026.10.24 Ánh xạ hàm đồng bộ FBM (A3).md`. Đọc lại 11 lỗi mới của A2: 9 đúng (lỗi 2 và 6 nặng hơn báo cáo), 2 hạ mức; một điểm chờ chủ dự án quyết (A3.6).
-- [ ] A4. Sửa P1–P10 theo kiến trúc đã chốt (P6 thay bằng cổng chặng đẩy), thêm P11 (tách hàm ôm nhiều việc), P12 (test tĩnh chặn tái phạm), P13 (gộp kho và luật dọn); mỗi mục đủ ba phần (a)(b)(c). **Trình chủ dự án duyệt.** Đã viết (2026-10-24), chờ duyệt.
-- [ ] A5. Viết checklist chi tiết từng bước B vào tệp này (bước con, dữ liệu vào/ra, test, việc chủ dự án cần kiểm trên Sheet).
+- [x] A4. Sửa P1–P10 theo kiến trúc đã chốt (P6 thay bằng cổng chặng đẩy), thêm P11 (tách hàm ôm nhiều việc), P12 (test tĩnh chặn tái phạm), P13 (gộp kho và luật dọn); mỗi mục đủ ba phần (a)(b)(c). **Trình chủ dự án duyệt.** Chủ dự án duyệt 2026-10-24, chọn cách (a) ở A3.6.
+- [x] A5. Viết checklist chi tiết từng bước B vào tệp này (bước con, dữ liệu vào/ra, test, việc chủ dự án cần kiểm trên Sheet). Kết quả: mục "Checklist chi tiết giai đoạn B (A5)" bên dưới.
 
 ### Chuẩn bị trước giai đoạn B (chủ dự án làm)
 - [ ] Tạo một bản sao Sheet DEV làm bản lưu (Tệp › Tạo bản sao), không dùng để chạy.
@@ -450,6 +450,100 @@ Cách chạy thử (b): mỗi lần thử chiều ghi FBM, AI bật giới hạn
 - [ ] B8. Một công cụ cho mỗi phép tính trùng (P9).
 - [ ] B9. Hợp đồng dữ liệu Sidebar (P7; phần vẽ lại màn làm ở Todo mục 4).
 - [ ] B10. Extension: một cổng gọi GAS, bỏ quyết tải lại tab, đăng nhập do GAS điều phối, tách khóa và bản mã, mã máy (P5 phần Extension, P8, K8, V24). Chủ dự án tải lại Extension rồi kiểm: Đăng nhập thử, tự đăng nhập khi hết phiên, lượt nền chạy.
+
+### Checklist chi tiết giai đoạn B (A5)
+
+Luật chung cho mọi bước: đọc trọn tiến trình chứa chỗ sửa trước khi sửa; mỗi bước con xong thì `node tests/run.js` xanh rồi tick; bước có phần GAS thì nghiệm thu `node tests/gas.js <hàm dò> --push` trên DEV; sửa tài liệu 09 liên quan trong cùng bước; mỗi bước một hoặc vài commit theo chủ đề; xóa dòng tương ứng ở tệp ánh xạ hàm A3 khi hàm đã về đích. Ghi DEV thật chỉ trong phạm vi `ALT00010`, tắt nền bằng lệnh trước khi thử ghi và bật lại sau. Gặp vấn đề hoặc phương án tốt hơn kế hoạch thì dừng, trình chủ dự án.
+
+**B0. Khung test tĩnh (P12)**
+- [ ] Tạo `tests/cases/fbmSync/StaticRules.js` theo mẫu `tests/cases/writeGateAudit.js` (quét nguồn, danh sách ngoại lệ có tên). Phạm vi: `fbm_sync/`, `server/service/FbmSyncService.js`, `client/sync/`, `client/schema/sync/`, `2_ShinCRM_Extension/background/service_worker.js`, `content_scripts/fbm_sync/`, `content_scripts/bridge/iframe_bridge.js`.
+- [ ] Luật: (1) `stateRead`/`stateWrite` chỉ trong danh sách người điều phối; (2) không `catch` rỗng, không `.catch` trả `null`/`{}`; (3) không `typeof FbmSync.x === 'function'`; (4) danh sách phase chỉ ở `State.js`; (5) `props().setProperty`/`deleteProperty` chỉ trong cổng kho; (6) không `window.confirm`/`alert`; (7) Extension không so `kind ===`; (8) không hằng phút/ngưỡng nghiệp vụ trong Sidebar (`|| 5`, `|| 30`).
+- [ ] Sinh danh sách ngoại lệ ban đầu bằng script trong scratchpad, dán vào test; mỗi luật một danh sách. Test kiểm hai chiều: vi phạm mới ngoài danh sách là đỏ, mục trong danh sách đã hết vi phạm cũng đỏ (buộc xóa mục, nên danh sách chỉ giảm).
+- [ ] Test của test: chèn tạm một `catch (e) {}` vào bản sao chuỗi nguồn trong ca kiểm, phải đỏ.
+
+**B1. Lỗi thật nhỏ, độc lập**
+- [ ] Lỗi 6: `fbmCancelSync` và mọi điểm vào trả về Sidebar đi qua `fbmPublicResult`; `fbmSyncCancel` trả `{ ok, code, status: statusView() }`, không trả ô lượt. Test: kết quả của mọi hàm `fbm*` trong `FbmSyncService.js` (chạy với ô lượt mẫu có `cookie`, `customerAuthorized`) không chứa các chuỗi đó.
+- [ ] Lỗi 2: lệnh `start` ở `ControlPort.js` truyền nguyên đối tượng tham số (chuẩn hóa ở `startRun`), không chép từng trường. Test: `fbmStartIdentityCheck(bốn ô nháp)` cho `state.identityTarget` bằng bản nháp, không bằng liên kết đã lưu.
+- [ ] Lỗi 3: `markPushError` ghi Log ở mọi nhánh trả của `pushRowChange`, kèm trạng thái bận/đổi/vắng. Test nhánh `busy`.
+- [ ] Lỗi 7: `fbmSaveSyncSettings` kiểm cài đặt trước, chỉ đổi công tắc khi lưu đạt (giải pháp tạm đến B6). Test: cài đặt sai → công tắc giữ nguyên.
+- [ ] P10: `stop_background` đóng lượt nền ngay trong khóa (`phase: paused`, mã dừng của người dùng, dọn `activeRequestId`); response đến muộn bị `requestAnswered` loại. `statusView` thêm `running` từ một danh sách phase đang chạy ở `State.js` (có `waiting_session`, lỗi 1). Sidebar: `fbmSyncAfterBackground` gọi lệnh gốc ngay khi kết quả `running:false`; xóa `fbmSyncWaitForBackgroundIdle` và hằng chờ. Test: dừng khi có request đang chờ → ô rảnh ngay; response cũ nộp sau → `STALE_RESPONSE`, không ghi.
+- [ ] Mất `identityBlocks`: tìm lại hai bản state trong cùng lời gọi, sửa để công cụ trả dữ liệu cho người điều phối ghi. Test tái hiện.
+- [ ] `approvalThreshold` bỏ `catch` rỗng; giá trị sai ném lỗi có mã.
+- [ ] `catch` rỗng và `.catch` trả null ở GAS và Sidebar: sửa thành báo lỗi + ghi Log; xóa mục khỏi danh sách ngoại lệ B0.
+- [ ] Chủ dự án kiểm: bấm Bắt đầu đồng bộ khi nền đang chạy, chọn Dừng nền → lượt tay chạy ngay; bấm Kiểm liên kết với bốn ô vừa sửa → kết quả theo ô đang nhập.
+
+**B2. Một cửa lệnh, Tiến trình đăng nhập, Sidebar một vòng (P1)**
+- [ ] Bảng lệnh K3 ở `ControlPort.js`; xóa 12 lệnh chết; relay chỉ được các lệnh `heartbeat`, `continue`, `transport_failure`, `status`.
+- [ ] Mọi `fbm*` của `FbmSyncService.js` thành adapter một dòng `runEntryPoint` → `controlDispatch`; công cụ `publicResult` theo danh sách trường cho phép; xóa `transportValue` bản trùng ở `RequestBuilders.js`; xóa điểm vào chết (`fbmSyncStart`, `fbmSyncStartActivityBulk`, `fbmSyncPreflight`, `fbmSyncContinue`, `fbmGetLoginConfig`, `fbmGetMasterSwitch`, `fbmGetBackgroundSwitch`, `fbmSetBackgroundSwitch`, `fbmGetSyncSettings`, `fbmLogSyncTrace`, `fbmSetAutoLogin` nếu xác nhận không ai gọi).
+- [ ] `loginRun(state, afterLogin)`: `afterLogin` thuộc `{ end, resumeCursor, startRun(params) }` ghi một lần vào cursor; ba bước đăng nhập bỏ nhánh `testOnly`/`purpose`/`manual`, trả `{ ok, identity, code }`; `start` loại `login_test`/`login_force` đi qua `runSlice`; `loginTestResult` thành `continue` thường.
+- [ ] Sidebar: một vòng `sidebarRun` thay `fbmSyncLoop` và `fbmSyncLoginTestLoop`; `fbmSyncForceLogin` gửi `start(login_force, afterLogin = startRun)`; GAS dựng kết luận lượt, Sidebar bỏ chữ "Đăng nhập thử thành công" cố định.
+- [ ] Test: đăng nhập thử khi lượt khác đang chạy → từ chối; đăng nhập ép rồi chạy; lượt nền gặp hết phiên → `loginRun` → nối lại cursor; relay gửi lệnh ngoài danh sách → từ chối.
+- [ ] Chủ dự án kiểm: Đăng nhập thử, Đăng nhập ép, đồng bộ tay.
+
+**B3. Lát, cổng phát request, Chuỗi nền (P2)**
+- [ ] `sliceGuards` thuần (công tắc, ngân sách, cờ dừng, request quá hạn) + `requestIssue` (endpoint, id, hạn, envelope) tách khỏi `nextEnvelope`; xóa `nextEnvelope`.
+- [ ] Bảng `cursor.kind` → người điều phối chặng thay `continueStep`; mỗi chặng trả `{ patch, next | end }`; Cổng phiên thành người điều phối `sessionGate` (gộp 12 hàm `sessionGate*`); sửa `sessionGateTransportRetry` xóa id trước khi dựng lại.
+- [ ] `heartbeatRun` theo K5 (`machineCheck`, `staleRunCheck`, `pushGateDue`, `processDue`); xóa `recoverStaleRun` và phần ghi trong `fbmSyncStatusRead`; Log `stale_run` một lần.
+- [ ] Kho máy nền (V24): mã máy do Extension gửi trong `heartbeat`, GAS trả lệnh dừng nhịp cho máy không được giao; lệnh `assign_background_machine`. (Màn chọn máy làm ở Todo mục 4; tạm thời máy hỏi đầu tiên được giao.)
+- [ ] Test: mỗi nhánh K5; chặng không gọi được `requestIssue` trực tiếp (test tĩnh luật 1 mở rộng); request quá hạn → `SYNC_ABANDONED_RUN` + Log có hộp đen.
+- [ ] Chủ dự án kiểm: để nền chạy một buổi, xem Log không có dòng lạ.
+
+**B4. State truyền qua công cụ, tách hàm (P3, P11)**
+- [ ] `runSlice` đọc ô một lần, truyền bản sao, ghi một lần; công cụ đọc kho nhận dữ liệu qua tham số (`scriptSettings(state)`, `scope` tính một lần đầu lát, bỏ `typeof` mở cửa ở `GridRead`, `ActivityLayers`, `PushCandidates`, `ActivityBatch`, lỗi 10).
+- [ ] `stateWrite` thành ghi thuần; hiệu ứng phụ lên người điều phối; `runFail` thay bốn chỗ gán `phase='error'`.
+- [ ] `runOpen` thay `stateStart`; `runClose` gọi ở mọi đường kết thúc (xong, lỗi, hủy, bỏ lượt).
+- [ ] Tách các hàm ôm nhiều việc theo tệp ánh xạ A3: `pullWrite` (hash một lần mỗi bản ghi, `parse` không sửa đầu vào), `customerScanMark`, các hàm con `PushFlow.js` (bỏ tự ghi state và dựng envelope; `pushResultApply` một công cụ), `ActivityBatch`/`ActivityScan`/`ActivityLayers` (bỏ đọc lại state, bỏ ghi con trỏ trong công cụ), `statusView` → `statusViewBuild` thuần.
+- [ ] Danh sách ngoại lệ luật 1 của B0 phải rỗng sau bước này.
+- [ ] Test: hai công cụ trong một lát sửa hai trường khác nhau → cả hai còn; lượt lỗi giữa chừng → không còn khóa kho làm việc.
+
+**B5. Chấp thuận qua cổng chặng đẩy (P6)**
+- [ ] Cổng chặng đẩy `FBM_SYNC_PUSH_GATE_V1` (chuyển từ `PUSH_CLEAN_V1`); `pushGateDecide` thuần: sạch / vượt ngưỡng → chờ duyệt / dấu duyệt khớp → đẩy; dấu tập = hash của danh sách `{ entity, id, hash }` đã sắp.
+- [ ] Kiểm ngưỡng ở đầu chặng đẩy; chờ duyệt thì lượt chạy nốt và kết thúc bình thường; `noticeRaise` hai nút "Chấp thuận", "Kiểm lại ngay"; thông báo tự tắt khi cổng về sạch.
+- [ ] `approve_push(dấu tập)`; `heartbeatRun` bước 3 so revision sổ nạp lại; xóa phase `awaiting_approval` ở GAS và 4 chỗ Sidebar.
+- [ ] Test: vượt ngưỡng → không request ghi, ô rảnh; duyệt dấu cũ sau khi tập đổi → hỏi lại; Sheet đổi về như cũ → cổng sạch, thông báo tắt.
+- [ ] Chủ dự án kiểm (phạm vi `ALT00010`, ngưỡng tạm đặt 1): sửa một bản ghi → thông báo chờ duyệt; Ctrl+Z → tự hết; sửa lại → Chấp thuận → đẩy.
+
+**B6. Cài đặt FBM về cổng chung (P4)**
+- [ ] Khai các mục ở `fbmSettingsSections`; thêm kiểu `boolean`, `codeList`, số có khoảng, hàm kiểm cả mục; lưu nhiều mục kiểm hết rồi ghi.
+- [ ] Đọc qua `settingsValue` ở mọi chỗ (xóa `syncSettingsRead`, `accountSettingsRead`, `extensionConfigRead`, `backgroundScheduleRead`, `masterEnabled`); đọc không ghi lại.
+- [ ] Tách `FBM_LOGIN_CONFIG_V1` thành chính sách (cổng cài đặt), `FBM_CREDENTIAL_V1`, `FBM_LOGIN_ATTEMPT_V1`; xóa `FBM_AUTO_LOGIN_LAST_ATTEMPT_V1`.
+- [ ] Hàm chuyển một lần (mẫu `settingsMigrateFromConfig`), chạy trên DEV bằng `tests/gas.js --push`, ghi số khóa đã chuyển vào mục này.
+- [ ] Sidebar gửi nguyên chuỗi ô, GAS kiểm và trả `invalid`; bỏ `|| 5`, `|| 30` và bản sao mặc định ở schema Sidebar.
+- [ ] Test: ô trống → chưa đặt; giá trị ngoài khoảng → `invalid`, không ghi gì; khóa hỏng → lỗi có nút đặt về mặc định.
+- [ ] Chủ dự án kiểm: mở các màn cài đặt, giá trị giữ đúng như trước khi chuyển.
+
+**B7. Gộp kho và luật dọn (P13)**
+- [ ] `documentPropertySet` đo byte thật, bỏ `catch` rỗng; `readWaitWrite`, `traceStore` ghi qua nó.
+- [ ] Sổ tiến trình `FBM_SYNC_PROCESS_BOOK_V1` thay 8 khóa lịch nền, số khách mốc, con trỏ vòng xoay; ghi ở `runClose`.
+- [ ] Kho kết nối `FBM_CONNECTION_V1` thay hai khóa liên kết.
+- [ ] Danh sách tiền tố kho làm việc khai một chỗ; `runClose`/`runOpen` xóa hẳn khóa; bỏ phạm vi `activity` của kho đã thấy; đo cỡ `READ_NEW` + `READ_NEW_DONE` trên DEV để quyết gộp, ghi số đo vào mục này.
+- [ ] `PENDING_PUSHES`: đối soát xóa mục mồ côi; mục quá tuổi báo Log và Sidebar. `PUSH_FAILURES`: trần số mục.
+- [ ] Hàm chuyển một lần trên DEV; ghi kết quả.
+- [ ] Test: mọi đường kết thúc lượt → không còn khóa kho làm việc; sổ tiến trình không ghi khi lượt lỗi.
+
+**B8. Một công cụ cho mỗi phép tính trùng (P9)**
+- [ ] Một `hash` trên record đã đổi tên (gộp 6 chỗ); một `pushEligible` (gộp `pushReview`, `preflightPushPermissions` và bốn hàm rời); gate danh mục theo bản chụp lời gọi, bỏ cache `defineProperty`; một hàm ngày; một phép so chủ bản ghi; `threeWay` chỉ nhận hash.
+- [ ] `Probe.js` sang `server/dev`, dùng công cụ chung (sửa lỗi 4).
+- [ ] Test: preflight đếm bằng đúng tập chặng đẩy dựng; hash cùng bản ghi từ hai đường bằng nhau.
+
+**B9. Hợp đồng dữ liệu Sidebar (P7)**
+- [ ] `statusViewBuild` trả `running`, `tone`, `actions`, `progress`, `pendingApproval`, `warnings`, `issues`, `pipeline` luôn có, `usernameDisplay`/`usernameMismatch`, `identityResult`, `scopeNotice`.
+- [ ] Sidebar đọc các trường đó, xóa mọi chỗ suy trạng thái (G6 mục A), xóa danh sách phase (luật 4 của B0 rỗng phía Sidebar), xóa status giả và vá `lastStatus`, xóa cờ RAM `running`/`cancelRequested`/`backgroundStopping`/`backgroundWait`/`ownRunId`/`backgroundDirection`.
+- [ ] Xung đột: Sidebar gửi lựa chọn từng trường qua `confirm_conflict`, GAS quyết; xóa `fbmSyncConflictDecision`, phần quyết của `fbmSyncResolveConflict`, `fbmSyncConflictSheetChanged`.
+- [ ] Credential: `save_credential(clear)` do GAS quyết, kết quả trả lệnh xóa khóa cho Extension; xóa `fbmSyncApplyLoginStatus` tự sửa tên.
+- [ ] `extensionRpc` thay 5 bảng chờ; `window.confirm` thay bằng `uiDecisionOpen`; xóa code chết G6.
+- [ ] Phần vẽ lại màn để Todo mục 4.
+- [ ] Chủ dự án kiểm: mở từng màn đồng bộ, so với trước; thử một xung đột trên `ALT00010`.
+
+**B10. Extension (P5 phần Extension, P8, K8, V24)**
+- [ ] Một cổng `relayCall` cho hỏi và nộp, ném mọi lỗi kèm `httpStatus` và mã thật (sửa lỗi 5); xóa `RELAY_CHANNELS`, `noteRelayStatus`, `noteHeartbeatStatus`, hai khóa chẩn đoán; hộp đen thêm ô lỗi nộp, GAS trả `trailAck` thì xóa.
+- [ ] Bỏ tự tải lại tab: GAS đặt `meta.reloadFbmPage` khi lần đầu báo tab chưa sẵn sàng; giữ mã lỗi gốc; điểm dừng lô do GAS cắt trước khi gửi; xóa `callsFbm` và mọi nhánh `kind`.
+- [ ] Đăng nhập do GAS điều phối: GAS trích salt (`loginSaltExtract`), chọn database/đơn vị (`loginUnitPick`), xét kết quả; Extension `credentialFill` giải mã trong worker, băm, điền hai chỗ trống, không gửi bản rõ sang tab; xóa `executeLogin`, `storeLoginPageKey` (thành lệnh ghi khóa trang), `loginValueFromPage`, `loginListValue`, `showFbmHomeAfterLogin`, `readCredentialMetadata`.
+- [ ] Vault chỉ `{ ref, key }`; GAS gửi bản mã trong envelope đăng nhập và `credentialRef` đang dùng kèm câu trả lời heartbeat; Extension xóa ref khác. Hàm chuyển: vault cũ bỏ trường `envelope`.
+- [ ] Đường lượt tay (`FBM_EXECUTE_REQUEST`) dùng chung `prepareFbmTab` + gửi với `relayLoop`; một phép kiểm miền FBM cho mọi URL; cầu nối iframe gom các kiểm vào `bridgeGuard`, có kiểm cửa sổ nguồn.
+- [ ] Cắt gói quét giữ ở Extension theo ngoại lệ K1; mã máy gửi trong `heartbeat`.
+- [ ] Test: nộp gặp 404 → hộp đen có mã và `httpStatus`, GAS ghi Log ở lần hỏi kế; mật khẩu và bản băm chỉ có trong request gửi FBM (test chốt K8); envelope mang URL ngoài miền → từ chối.
+- [ ] Chủ dự án tải lại Extension rồi kiểm: Đăng nhập thử, tự đăng nhập khi hết phiên, lượt nền chạy.
 
 ### Giai đoạn C — dọn tàn dư và nghiệm thu (bắt buộc trước khi gộp `main`)
 - [ ] C1. Xóa mọi hàm và kho có đích "xóa"; tìm tên trong toàn repo (GAS, Sidebar, Extension, tests, `server/dev/`, `DEV_RUNNER_ALLOWED`) phải ra 0.
