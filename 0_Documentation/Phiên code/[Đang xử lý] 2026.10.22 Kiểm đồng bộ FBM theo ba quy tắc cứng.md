@@ -432,8 +432,15 @@ Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `clie
 - [x] A4. Sửa P1–P10 theo kiến trúc đã chốt (P6 thay bằng cổng chặng đẩy), thêm P11 (tách hàm ôm nhiều việc), P12 (test tĩnh chặn tái phạm), P13 (gộp kho và luật dọn); mỗi mục đủ ba phần (a)(b)(c). **Trình chủ dự án duyệt.** Chủ dự án duyệt 2026-10-24, chọn cách (a) ở A3.6.
 - [x] A5. Viết checklist chi tiết từng bước B vào tệp này (bước con, dữ liệu vào/ra, test, việc chủ dự án cần kiểm trên Sheet). Kết quả: mục "Checklist chi tiết giai đoạn B (A5)" bên dưới.
 
+- [ ] A6. Bản thiết kế đích viết cho chủ dự án đọc (chủ dự án yêu cầu 2026-10-29: không đọc code, cần bản kiến trúc nhìn vào là code theo được), tệp riêng `2026.10.29 Thiết kế đích đồng bộ FBM.md`: sơ đồ các cấp điều phối, danh mục toàn bộ công cụ (nhận gì, trả gì, ai gọi), từng tiến trình theo tình huống thật, bảng code hiện tại so với thiết kế. Nguồn: K1–K10, A3 và thẻ công cụ do 5 agent Sonnet đọc code theo nhóm (G1 khung chạy, G2 phiên và đăng nhập, G3 quét khách và giao dịch, G4 kéo, đối soát, đẩy, xung đột, G5 Extension và Sidebar; bản nháp ở scratchpad phiên). Vi phạm ở phần lõi mà đồng bộ gọi (agent G6) ghi tệp riêng `2026.10.29 Vi phạm quy tắc cứng ở lõi liên quan đồng bộ FBM.md`. **Trình chủ dự án duyệt.** Sau khi duyệt, các bước B code theo tài liệu này; chỗ nào A3 và tài liệu này vênh thì tài liệu này thắng.
+  - [x] Nhận thẻ G1–G6, đối chiếu với A3, ghi điểm vênh.
+  - [x] Viết sơ đồ các cấp và danh mục công cụ.
+  - [x] Viết từng tiến trình theo tình huống và bảng hiện tại so với thiết kế.
+  - [x] Viết tệp vi phạm ở lõi.
+  - [ ] Chủ dự án duyệt tài liệu thiết kế và trả lời D1–D10 ở mục 8 của nó.
+
 ### Chuẩn bị trước giai đoạn B (chủ dự án làm)
-- [ ] Tạo một bản sao Sheet DEV làm bản lưu (Tệp › Tạo bản sao), không dùng để chạy.
+- [x] Tạo một bản sao Sheet DEV làm bản lưu (Tệp › Tạo bản sao), không dùng để chạy.
 - [ ] Đồng ý thời điểm bắt đầu; trong lúc B chạy, gặp gì lạ trên Sheet thì báo.
 
 Cách chạy thử (b): mỗi lần thử chiều ghi FBM, AI bật giới hạn phạm vi chỉ `ALT00010` và tắt đồng bộ nền bằng lệnh, thử xong trả lại như cũ và báo. Mỗi bước B đẩy lên Sheet DEV đang dùng thật nên phải chạy trọn vẹn và qua test trước khi đẩy.
