@@ -226,25 +226,3 @@ function shinOnChange(event) {
     return null;
   });
 }
-
-function shinInstallTriggers() {
-  var book = shinOpenBook();
-  ScriptApp.getProjectTriggers().forEach(function (trigger) {
-    var handler = trigger.getHandlerFunction();
-    if (handler === 'shinOnEdit' || handler === 'shinOnChange') { ScriptApp.deleteTrigger(trigger); }
-  });
-  ScriptApp.newTrigger('shinOnEdit').forSpreadsheet(book).onEdit().create();
-  ScriptApp.newTrigger('shinOnChange').forSpreadsheet(book).onChange().create();
-  book.getSheets().forEach(function (sheet) { shinHeaderSnapshotWrite(sheet); });
-  return ['shinOnEdit', 'shinOnChange'];
-}
-
-/** Nghiệm thu DEV: cho biết hai trigger cài đặt có thực sự tồn tại trên tệp đang chạy hay không. */
-function probeTriggerState() {
-  var handlers = ScriptApp.getProjectTriggers().map(function (trigger) { return trigger.getHandlerFunction(); });
-  return [
-    'shinOnEdit: ' + (handlers.indexOf('shinOnEdit') >= 0),
-    'shinOnChange: ' + (handlers.indexOf('shinOnChange') >= 0),
-    'Tất cả handler: ' + handlers.join(', ')
-  ];
-}
