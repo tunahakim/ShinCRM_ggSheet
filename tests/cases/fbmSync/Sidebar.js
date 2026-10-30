@@ -106,14 +106,14 @@ async function testSharedShellLifecycle(so) {
   const openCalls = [];
   hop.callServer = (name) => {
     openCalls.push(name);
-    if (name === 'fbmGetPanelBundle') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: { approvalThreshold: 7 }, login: { configured: false } }); }
+    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: { approvalThreshold: 7 }, login: { configured: false } }); }
     return Promise.resolve({ ok: true });
   };
 
   await hop.syncPanelToggle();
   check(so, 'Mở màn Đồng bộ FBM chỉ gọi GAS một lần và nạp đủ bốn phần của gói',
     [openCalls, hop.FBM_SYNC_CLIENT.statusReady, hop.FBM_SYNC_CLIENT.identityDraft.userId, hop.FBM_SYNC_CLIENT.syncSettings.approvalThreshold, hop.FBM_SYNC_CLIENT.loginStatus.configured, hop.FBM_SYNC_CLIENT.loginPasswordMode],
-    [['fbmGetPanelBundle'], true, 'u-1', 7, false, 'draft']);
+    [['fbmGetSyncStatus'], true, 'u-1', 7, false, 'draft']);
   check(so, 'mo FBM dung chung header body va an info footer cua man truoc',
     [hop.FBM_SYNC_CLIENT.active,
       dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active'),
@@ -556,7 +556,7 @@ async function chay(so) {
   const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
   const scopeLines = [{ code: 'ALT00010', kind: 'fbm', status: 'matched', customerId: 'CUS-020061', fbmCode: 'ALT00010' }, { code: 'ALT00099', kind: 'fbm', status: 'fbm_new', customerId: '', fbmCode: 'ALT00099' }];
   const settingsCalls = [];
-  hop.callServer = (name, args) => { settingsCalls.push([name, args && args[1]]); if (name === 'fbmSaveSyncSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: args && args[0], scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
+  hop.callServer = (name, args) => { settingsCalls.push([name, args && args[0], args && args[2]]); if (name === 'fbmSaveSettings' && args[0] === 'sync') { gapSaves.push(args[1]); } return Promise.resolve({ ok: true, settings: args && args[1], scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
   hop.fbmSyncStatusOnce = () => Promise.reject(new Error('Lưu cài đặt chung không được hỏi lại trạng thái.'));
   const savedNotices = [], noticeSetter = hop.fbmSyncSetSettingsNotice;
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
@@ -565,7 +565,7 @@ async function chay(so) {
   check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
     [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
     [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
-  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS; công tắc tổng không đổi thì gửi null', settingsCalls, [['fbmSaveSyncSettings', null]]);
+  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS; công tắc tổng không đổi thì gửi null', settingsCalls, [['fbmSaveSettings', 'sync', null]]);
   check(so, 'Dòng mã FBM mang cảnh báo độ dài hiện thêm độ dài đã cài sau câu mã chưa có trên Sheet',
     /ALT0010: mã FBM chưa có trên Sheet.*\(8 ký tự\)/.test(hop.fbmSyncSettingsScopeLinesText([{ code: 'ALT0010', kind: 'fbm', status: 'fbm_new', lengthExpected: 8 }])), true);
   check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
@@ -727,7 +727,7 @@ async function chay(so) {
   check(so, 'Dừng nền mà GAS còn báo running:true thì báo lỗi ghi Log và không chạy lệnh gốc', [dungHong.goi.slice(0, 2), dungHong.start], [['fbmStopBackground', 'fbmLogSyncError'], 1]);
 
   const savedCallStatus = hop.callServer, savedPaintStatus = hop.fbmSyncPaint;
-  hop.callServer = () => Promise.resolve({ phase: 'idle', runId: '', updatedAt: Date.now() + 1000 });
+  hop.callServer = () => Promise.resolve({ ok: true, status: { phase: 'idle', runId: '', updatedAt: Date.now() + 1000 } });
   hop.fbmSyncPaint = () => undefined;
   const docThat = await hop.fbmSyncStatusOnce();
   hop.callServer = savedCallStatus; hop.fbmSyncPaint = savedPaintStatus;
@@ -825,7 +825,7 @@ async function chay(so) {
   let resumedIdentityArgs = null, stoppingIdentityCall = true;
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   hop.callServer = (name, args) => {
-    if (name === 'fbmGetIdentityStatus') { return Promise.resolve({ status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } }); }
+    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, identity: { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } } }); }
     if (name === 'fbmStopBackground') { return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: false } }); }
     if (name === 'fbmStartIdentityCheck') {
       resumedIdentityArgs = args;
@@ -978,7 +978,7 @@ async function chay(so) {
   check(so, 'Lỗi mạng và lỗi bridge đều hiện Sidebar và gọi ghi Sheet Log', [errorLogs.length, paints.some((item) => item.phase === 'error' && String(item.message).indexOf('NETWORK_DOWN') >= 0), paints.some((item) => item.phase === 'error' && String(item.message).indexOf('EXTENSION_DOWN') >= 0)], [2, true, true]);
   hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
   check(so, 'Hai lỗi cùng message ở hai thời điểm đều ghi Log, không dedupe vĩnh viễn', errorLogs.length, 3);
-  hop.callServer = (name) => name === 'fbmReportSyncTransportFailure' ? Promise.resolve({ ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: { id: 'retry-once' } }) : Promise.resolve({ ok: true });
+  hop.callServer = (name, args) => name === 'fbmContinueSync' && args[0].error && args[0].error.code === 'FBM_TAB_NOT_FOUND' && args[0].error.requestId === 'request-1' ? Promise.resolve({ ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: { id: 'retry-once' } }) : Promise.resolve({ ok: true });
   const transportRetry = await hop.fbmSyncReportTransportFailure({ id: 'request-1' }, new Error('Không thấy tab FBM'), 'FBM_TAB_NOT_FOUND');
   check(so, 'Sidebar nhận request retry no-tab do GAS cấp thay vì tự quyết policy', [transportRetry.code, transportRetry.request.id], ['FBM_TAB_RETRY_REQUEST_READY', 'retry-once']);
   hop.callServer = () => Promise.reject(new Error('NETWORK_DOWN'));

@@ -3,6 +3,9 @@ const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer, giuBanGhiDongBo, TRANG_FBM_THU } = require("../../lib/load-gas");
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
+/** Nộp response của lượt nền như `continue` qua lát chung, bỏ phần khóa của cửa lệnh (khóa kiểm ở Control). */
+function noiNen(hop, response) { return hop.FbmSync.runSlice(() => hop.FbmSync.continue(response)); }
+
 async function chay(so) {
   section("FBM sync — orchestration");
   const bindingData = {};
@@ -28,19 +31,20 @@ async function chay(so) {
   bindingData[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-binding-test', userId: '2037', username: 'anhlt', accountName: 'Le Tuan Anh' });
   identity.FbmSync.stateRead = () => ({ runId: 'running-binding-test', phase: 'pull_customer', activeRequestId: 'request-binding-test' });
   const blockedBindingClear = identity.FbmSync.bindingWrite({});
-  check(so, 'không hủy liên kết khi request FBM đang bay', [blockedBindingClear.ok, blockedBindingClear.code, Boolean(bindingData[identity.FbmSync.BINDING_KEY])], [false, 'SYNC_ALREADY_RUNNING', true]);
+  check(so, 'không hủy liên kết khi request FBM đang bay', [blockedBindingClear.ok, blockedBindingClear.code, Boolean(bindingData[identity.FbmSync.BINDING_KEY])], [false, 'SYNC_BUSY', true]);
   identity.FbmSync.stateRead = () => ({ runId: 'failed-binding-test', phase: 'error', activeRequestId: '' });
   const clearedFailedBinding = identity.FbmSync.bindingWrite({});
   check(so, 'lỗi cầu nối đã kết thúc vẫn cho phép hủy liên kết', [clearedFailedBinding.ok, clearedFailedBinding.code, bindingData[identity.FbmSync.BINDING_KEY]], [true, 'IDENTITY_BINDING_CLEARED', undefined]);
 
-  // ScriptProperties giả có thật kho; `relayContextUrl` là địa chỉ ScriptApp trả trong ngữ cảnh đang chạy.
-  const relayScriptStore = { FBM_SYNC_KEY: 'relay-test-key' };
+  // ScriptProperties giả có thật kho; `relayContextUrl` là địa chỉ ScriptApp trả trong ngữ cảnh đang chạy. Khóa relay ở DocumentProperties.
+  const relayScriptStore = {};
   const relayScriptWrites = [];
   const relayScriptProps = { getProperty: (name) => relayScriptStore[name] === undefined ? null : relayScriptStore[name], setProperty: (name, value) => { relayScriptWrites.push(name); relayScriptStore[name] = value; } };
+  const relayDocStore = { FBM_RELAY_KEY_V1: 'relay-test-key' };
   let relayContextUrl = 'https://script.google.com/macros/s/relay-dep/exec';
   const relay = taoHopCat({
     FbmSync: {},
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => 'relay-test-key' }), getScriptProperties: () => relayScriptProps },
+    PropertiesService: { getDocumentProperties: () => ({ getProperty: (name) => relayDocStore[name] === undefined ? null : relayDocStore[name], setProperty: (name, value) => { relayDocStore[name] = String(value); } }), getScriptProperties: () => relayScriptProps },
     ScriptApp: { getService: () => ({ getUrl: () => relayContextUrl }), getScriptId: () => 'script-relay-test' },
     shinOpenBook: () => ({ getId: () => 'sheet-relay-test' }),
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: (text) => ({ text: text, setMimeType() { return this; } }) },
@@ -52,18 +56,23 @@ async function chay(so) {
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
   relay.noticeRaise = (notice) => { relayLog.reports.push([notice.title, notice.topic]); return true; };
   relay.noticeResolve = () => null;
-  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
-  const relayConfigError = () => { try { relay.fbmSyncRelayConfig(); return ''; } catch (err) { return String(err.message); } };
+  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
+  // Cửa lệnh giả: phần này chỉ kiểm cổng HTTP (khóa, Sheet, mã giao thức, danh sách lệnh relay, Log); cửa lệnh thật kiểm ở Control.
+  const relayDispatched = [];
+  relay.FbmSync.controlDispatch = (command, input) => { relayDispatched.push([command, input.source]); return { ok: true, code: 'RELAY_TEST_DONE', request: null, status: {} }; };
+  Object.assign(relay.FbmSync, { currentSpreadsheetId: () => 'sheet-relay-test', extensionConfigPublic: () => ({}), masterEnabled: () => true, backgroundEnabled: () => true });
+  const contract = relay.FbmSync.protocol.contract;
+  const relayConfigError = () => { try { relay.FbmSync.relayConfig(); return ''; } catch (err) { return String(err.message); } };
   check(so, 'Chưa có địa chỉ Web App đã ghi: không cấp cấu hình relay, báo rõ phải mở link Web App một lần', /Chưa có địa chỉ Web App/.test(relayConfigError()), true);
   relayScriptStore[relay.FbmSync.RELAY_URL_KEY] = JSON.stringify({ url: 'https://script.google.com/macros/s/cua-script-goc/exec', scriptId: 'script-goc' });
   check(so, 'Địa chỉ Web App mang theo từ script gốc (bản sao Sheet) bị bỏ qua: vẫn không cấp cấu hình', /Chưa có địa chỉ Web App/.test(relayConfigError()), true);
   delete relayScriptStore[relay.FbmSync.RELAY_URL_KEY];
-  relay.doPost({ postData: { contents: JSON.stringify({ key: 'sai-khoa', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } });
+  relay.doPost({ postData: { contents: JSON.stringify({ key: 'sai-khoa', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} }) } });
   check(so, 'Lời gọi Web App sai khóa không ghi địa chỉ', relayScriptWrites.length, 0);
-  const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' }) } }).text);
-  check(so, 'Web App từ chối probe ngoài nhịp nền', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request], [false, 'RELAY_KIND_UNSUPPORTED', null]);
-  const configAfterPost = relay.fbmSyncRelayConfig();
-  check(so, 'Lời gọi Web App qua khóa ghi đúng địa chỉ Web App đang chạy; Sidebar cấp đúng địa chỉ đó cho Extension', [configAfterPost.url, relayScriptWrites], ['https://script.google.com/macros/s/relay-dep/exec', [relay.FbmSync.RELAY_URL_KEY]]);
+  const rejectedProbe = JSON.parse(relay.doPost({ postData: { contents: JSON.stringify({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'probe', payload: {} }) } }).text);
+  check(so, 'Web App từ chối lệnh ngoài danh sách relay (probe) và không gọi cửa lệnh', [rejectedProbe.ok, rejectedProbe.code, rejectedProbe.request || null, relayDispatched.length], [false, 'RELAY_COMMAND_REJECTED', null, 0]);
+  const configAfterPost = relay.FbmSync.relayConfig();
+  check(so, 'Lời gọi Web App qua khóa ghi đúng địa chỉ Web App đang chạy; Sidebar cấp đúng địa chỉ đó và khóa relay cho Extension', [configAfterPost.url, configAfterPost.key, relayScriptWrites], ['https://script.google.com/macros/s/relay-dep/exec', 'relay-test-key', [relay.FbmSync.RELAY_URL_KEY]]);
   relayContextUrl = 'https://script.google.com/macros/s/head-only/dev';
   check(so, 'Ngữ cảnh không phải Web App /exec (Sidebar, @HEAD) không ghi được địa chỉ', (() => { try { relay.FbmSync.relayUrlRecord(relayScriptProps); return 'ghi'; } catch (err) { return /\/exec/.test(err.message); } })(), true);
   relayContextUrl = 'https://script.google.com/macros/s/relay-dep/exec';
@@ -76,31 +85,20 @@ async function chay(so) {
   const relayPost = (body) => JSON.parse(relay.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).text);
   // Địa chỉ đã ghi từ trên nên các lời gọi dưới không thêm dòng Log; đếm lại từ đầu.
   relayLog.lines = []; relayLog.flushes = 0; relayLog.reports = [];
-  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'probe' });
-  check(so, 'FBM-034: nhịp nền thành công vẫn xả bộ đệm Log đúng một lần', relayLog.flushes, 1);
-  relay.fbmSyncHeartbeatRequest = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
-  const relayBoom = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
+  const relayOk = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { trigger: 'alarm' } });
+  check(so, 'FBM-034: nhịp nền thành công đi đúng một lệnh relay vào cửa lệnh với nguồn relay và xả bộ đệm Log đúng một lần', [relayOk.code, relayDispatched, relayLog.flushes], ['RELAY_TEST_DONE', [['heartbeat', 'relay']], 1]);
+  relay.FbmSync.controlDispatch = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
+  const relayBoom = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} });
   const boomLine = relayLog.lines.filter((line) => line.action === 'fbmRelay')[0] || {};
   check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension',
     [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'entry_failure']]]);
-  const mismatch = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-khac', kind: 'heartbeat_request' });
-  check(so, 'FBM-034: Extension gửi nhịp nền cho bảng tính khác thì có dòng Log lỗi và tin chờ, không xử lý nhịp', [mismatch.ok, relayLog.lines.length, relayLog.reports.length, relayLog.lines[1] && relayLog.lines[1].reason.indexOf('bảng tính khác') >= 0], [false, 2, 2, true]);
-  const intruder = relayPost({ key: 'sai-khoa', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
+  const mismatch = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-khac', command: 'heartbeat', payload: {} });
+  check(so, 'FBM-034: Extension gửi nhịp nền cho bảng tính khác thì có dòng Log lỗi và tin chờ, không xử lý nhịp', [mismatch.ok, mismatch.code, relayLog.lines.length, relayLog.reports.length, relayLog.lines[1] && relayLog.lines[1].reason.indexOf('bảng tính khác') >= 0], [false, 'RELAY_SPREADSHEET_MISMATCH', 2, 2, true]);
+  const oldExtension = relayPost({ key: 'relay-test-key', contract: 'ban-cu', spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} });
+  check(so, 'Extension khác bản giao thức gọi nhịp nền thì từ chối với EXTENSION_PROTOCOL_MISMATCH, có dòng Log lỗi và lời nhắc tải lại Extension', [oldExtension.ok, oldExtension.code, relayLog.lines.length, /tải lại Extension/.test(oldExtension.error)], [false, 'EXTENSION_PROTOCOL_MISMATCH', 3, true]);
+  const intruder = relayPost({ key: 'sai-khoa', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} });
   const badJson = relayPost('{"key":"relay-test-key", hỏng');
-  check(so, 'FBM-034: khóa sai hoặc JSON hỏng bị từ chối mà không ghi Log (người lạ không đẩy trôi được Log thật) và câu trả về không trích nội dung gửi lên', [intruder.error, badJson.error, JSON.stringify(badJson).indexOf('relay-test-key') < 0, relayLog.lines.length, relayLog.flushes], ['unauthorized', 'invalid_json', true, 2, 3]);
-
-  // GAS bận lúc Extension mang kết quả FBM về thì kết quả mất; phải có dòng Log nói thẳng. Bận lúc cấp request mới thì chưa mất gì, không ghi.
-  const busyReply = () => ({ ok: false, code: 'BUSY', request: null, message: 'GAS đang bận', status: {} });
-  relay.fbmSyncHeartbeatRequest = busyReply;
-  relay.fbmSyncHeartbeat = busyReply;
-  relay.FbmSync = Object.assign(relay.FbmSync || {}, { controlDispatchLocked: busyReply });
-  const linesBeforeBusy = relayLog.lines.length;
-  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat_request' });
-  const busyAsk = relayLog.lines.slice(linesBeforeBusy).filter((line) => line.action === 'relay_busy_dropped').length;
-  const busyHeartbeat = relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', kind: 'heartbeat', response: {}, hop: 2 });
-  relayPost({ key: 'relay-test-key', spreadsheetId: 'sheet-relay-test', command: 'continue', payload: {}, hop: 6 });
-  const dropped = relayLog.lines.slice(linesBeforeBusy).filter((line) => line.action === 'relay_busy_dropped');
-  check(so, 'GAS bận bỏ kết quả FBM Extension gửi về (Giữ phiên hay chuỗi nền) thì có dòng Log lỗi nêu GAS bận và lượt sẽ chờ tới hạn; bận lúc cấp request mới thì không ghi', [busyAsk, busyHeartbeat.code, dropped.length, dropped.map((line) => line.outcome).join(','), dropped[0] && dropped[0].reason.indexOf('GAS đang bận') >= 0, dropped.map((line) => line.detail.kind + '@' + line.detail.hop).join(',')], [0, 'BUSY', 2, 'error,error', true, 'heartbeat@2,continue@6']);
+  check(so, 'FBM-034: khóa sai hoặc JSON hỏng bị từ chối mà không ghi Log (người lạ không đẩy trôi được Log thật) và câu trả về không trích nội dung gửi lên', [intruder.error, badJson.error, JSON.stringify(badJson).indexOf('relay-test-key') < 0, relayLog.lines.length, relayLog.flushes], ['unauthorized', 'invalid_json', true, 3, 4]);
 
   const props = { data: {} };
   let propertyWrites = 0;
@@ -282,7 +280,7 @@ async function chay(so) {
 
   const schedulerData = {};
   const schedulerPropertyApi = { getProperty: (key) => schedulerData[key] || null, setProperty: (key, value) => { schedulerData[key] = String(value); } };
-  const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) } });
+  const scheduler = taoHopCat({ FbmSync: {}, SETTINGS: { LOCK_WAIT_MS: 1 }, PropertiesService: { getDocumentProperties: () => schedulerPropertyApi }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, runEntryPoint: (name, source, fn) => fn() });
   napServer(scheduler, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/state/Scheduler.js');
   const schedule = scheduler.FbmSync.backgroundScheduleRead();
   check(so, 'Lấy toàn bộ giao dịch chạy nền mặc định chu kỳ 8 giờ; chưa từng chạy xong thì đến hạn ngay', [schedule.activityFull.minutes, scheduler.FbmSync.scheduleDueAt('activityFull')], [480, 0]);
@@ -307,7 +305,7 @@ async function chay(so) {
   // Các phép dưới kiểm xử lý request và response đếm của Giữ phiên nên phiên đã xác minh; phiên chưa xác minh thì Giữ phiên mở bằng probe (AutoLogin.js).
   heartbeat.FbmSync.statePatch({ session: { cookie: '', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session', userId: '2037' } });
   heartbeat.FbmSync.identityPreflight = () => ({ blocking: true, status: { status: 'UNBOUND' }, message: 'Chưa có liên kết tài khoản FBM.' });
-  const unboundHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const unboundHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat không cấp envelope FBM khi chưa liên kết tài khoản', [unboundHeartbeat.ok, unboundHeartbeat.code, unboundHeartbeat.request], [true, 'FBM_IDENTITY_UNBOUND', null]);
   heartbeat.FbmSync.statePatch({ runId: 'master-off-run', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, activeRequestId: '' });
   const masterOff = heartbeat.FbmSync.setMasterEnabled(false);
@@ -318,9 +316,9 @@ async function chay(so) {
   // Các tiến trình khác vừa chạy xong nên chưa đến hạn: lần hỏi nào đến hạn chỉ là Giữ phiên.
   ['CUSTOMER_FULL_SCAN', 'ACTIVITY_FULL_SCAN', 'DETAIL_SCAN'].forEach((key) => { heartbeatData['FBM_SYNC_DONE_' + key] = String(Date.now()); });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const heartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const heartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'Giữ phiên cấp request đếm khách (cùng hàm dựng request lấy danh sách khách, count 1) để capture generic khi chưa biết cookie', [heartbeatRequest.ok, heartbeatRequest.code, heartbeatRequest.request.meta.kind, heartbeatRequest.request.body.type, heartbeatRequest.request.body.count, heartbeatRequest.request.body.sortExpression, heartbeatRequest.request.bodyText.indexOf('{{FBM_PAYLOAD_COOKIE}}') >= 0], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat', 0, 1, heartbeat.FbmSync.customerListRequest({}).body.sortExpression, true]);
-  const overlappingHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const overlappingHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat không cấp request chồng khi reservation còn hiệu lực', [overlappingHeartbeat.ok, overlappingHeartbeat.code, overlappingHeartbeat.request], [false, 'REQUEST_IN_FLIGHT', null]);
   const transportFailure = heartbeat.FbmSync.heartbeatTransportFailure({ requestId: heartbeatRequest.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'GAS thu hồi reservation và kết thúc phiên khi Extension không có tab FBM', [transportFailure.ok, transportFailure.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().phase], [false, 'FBM_TAB_NOT_FOUND', '', 'error']);
@@ -329,29 +327,29 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   heartbeatData.FBM_SYNC_CUSTOMER_BASELINE_V1 = JSON.stringify({ total: 2 });
-  const firstHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const firstHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: firstHeartbeatRequest.request.id }] } });
+  const firstHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const firstHeartbeat = noiNen(heartbeat, { d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: firstHeartbeatRequest.request.id }] } });
   check(so, 'Giữ phiên đếm khách khớp số khách mốc thì chỉ lưu lần sống, không cấp request nào', [heartbeat.FbmSync.stateRead().session.lastHeartbeatAt > 0, firstHeartbeat.request], [true, null]);
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
-   const blockedHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+   const blockedHeartbeatRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
    check(so, 'GAS khong tu dang nhap khi khong co tien trinh den han', heartbeat.FbmSync.stateRead().phase, 'idle');
    check(so, 'GAS tra request:null khi khong co tien trinh den han', [blockedHeartbeatRequest.ok, blockedHeartbeatRequest.code, blockedHeartbeatRequest.request], [true, 'NO_PROCESS_DUE', null]);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', session: { cookie: '', expired: false, lastHeartbeatAt: 0, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session', userId: '2037' } });
    heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-   const missingCookieRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+   const missingCookieRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'cookie chua capture khong bi coi la logout', [missingCookieRequest.ok, missingCookieRequest.code, missingCookieRequest.request.meta.kind], [true, 'HEARTBEAT_REQUEST_READY', 'heartbeat']);
    heartbeat.FbmSync.statePatch({ session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, phase: 'idle', runId: '', cursor: {}, activeRequestId: '', deadlineAt: 0 });
-  const scheduledHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const scheduledHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'Quet nhanh den han: lan hoi nen mo thang luot Customer bang request dau cua luot (probe User), khong gui request dem khach truoc', [scheduledHeartbeat.ok, scheduledHeartbeat.request.meta.kind, scheduledHeartbeat.status.phase], [true, 'session_probe', 'checking_session']);
-   const continuedProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
+   const continuedProbe = noiNen(heartbeat, { ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }), transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: scheduledHeartbeat.request.id }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'probe User cua phien nen moi cap authorize Customer', [continuedProbe && continuedProbe.ok, continuedProbe && continuedProbe.request && continuedProbe.request.meta.kind, continuedProbe && continuedProbe.request && continuedProbe.request.meta.entity], [true, 'authorize', 'customer']);
-   const continuedBackground = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
+   const continuedBackground = noiNen(heartbeat, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'auth-customer' } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: continuedProbe && continuedProbe.request && continuedProbe.request.id || '' }], payloadCookie: 'userFHN_CRM_App' } });
    check(so, 'response authorize cua phien nen di qua continuation chung', [continuedBackground && continuedBackground.ok, continuedBackground && continuedBackground.request && continuedBackground.request.meta.kind, continuedBackground && continuedBackground.request && continuedBackground.request.meta.entity, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'authorize', 'activity', 'authorize_activity']);
   // Mỗi lần hỏi nền là một lượt mới (09/02 Phần 3): lượt dở không còn request chờ trong hạn thì kết thúc có Log, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở.
   const abandonLogs = [];
   heartbeat.logEvent = (entry) => abandonLogs.push(entry);
   heartbeat.FbmSync.statePatch({ runId: 'abandoned-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['d', 't', 'x'], count: 2000 }, activeRequestId: 'lost-request', deadlineAt: Date.now() - 1000, scheduledScan: 'customerFull', chain: { current: 'customerFull', ran: [], direction: 'read' }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, metadata: { sessionGate: {} } });
-  const afterAbandon = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm', extensionTrail: { stage: 'fbm_tab_sent', requestId: 'lost-request', hop: 3, at: Date.now() - 5 * 60000, workerStartedAt: 100, currentWorkerStartedAt: 200, cookie: 'bi-mat-khong-duoc-chep' } });
+  const afterAbandon = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm', trail: { stage: 'fbm_tab_sent', requestId: 'lost-request', hop: 3, at: Date.now() - 5 * 60000, workerStartedAt: 100, currentWorkerStartedAt: 200, cookie: 'bi-mat-khong-duoc-chep' } });
   const abandonState = heartbeat.FbmSync.stateRead();
   check(so, 'Lần hỏi nền gặp lượt dở không còn request chờ: lượt cũ kết thúc SYNC_ABANDONED_RUN có dòng Log lỗi, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở', [
     abandonLogs.some((entry) => JSON.stringify(entry).indexOf('SYNC_ABANDONED_RUN') >= 0), afterAbandon.ok, afterAbandon.request && afterAbandon.request.meta.kind, abandonState.runId !== 'abandoned-run'
@@ -368,14 +366,14 @@ async function chay(so) {
   const unanswered = () => watchLogs.filter((entry) => entry.action === 'request_unanswered');
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'done', cursor: { kind: 'heartbeat' }, activeRequestId: 'hb-lost', deadlineAt: Date.now() - 4 * 60000, scheduledScan: '', chain: null });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const afterLostHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm', extensionTrail: { stage: 'gas_request_received', requestId: 'hb-lost', hop: 0, at: Date.now() - 6 * 60000 } });
+  const afterLostHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm', trail: { stage: 'gas_request_received', requestId: 'hb-lost', hop: 0, at: Date.now() - 6 * 60000 } });
   const lostHeartbeat = unanswered()[0] || {};
   check(so, 'Giữ phiên hết hạn không có trả lời (không thuộc lượt nào): lần hỏi nền kế tiếp có dòng Log lỗi nêu request, bước, số phút quá hạn và hộp đen Extension, rồi vẫn cấp request mới', [
     unanswered().length, lostHeartbeat.outcome, String(lostHeartbeat.reason).indexOf('Request FBM hb-lost (bước heartbeat) không nhận được trả lời từ Extension, đã quá hạn chờ 4 phút; GAS bỏ request này. Hộp đen Extension: bước cuối (cách đây 6 phút) là đã nhận request từ GAS, chưa gửi sang tab FBM, request hb-lost.') === 0, !!(afterLostHeartbeat.request && afterLostHeartbeat.request.id)
   ], [1, 'error', true, true]);
   watchLogs.length = 0;
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'done', cursor: { kind: 'heartbeat' }, activeRequestId: 'hb-late', deadlineAt: Date.now() - 60000, scheduledScan: '', chain: null });
-  heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'hb-late' }] } });
+  noiNen(heartbeat, { d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'hb-late' }] } });
   heartbeat.FbmSync.statePatch({ activeRequestId: 'in-time', deadlineAt: Date.now() + 60000 });
   heartbeat.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   check(so, 'Không báo nhầm: trả lời đến muộn vẫn là có trả lời; GAS tự bỏ request còn trong hạn (dừng, cổng phiên chặn) không phải request mất', unanswered().length, 0);
@@ -422,7 +420,7 @@ async function chay(so) {
   ], [true, 'pull_customer', false, 'RUN_LEFT_OPEN', 'error', 'RUN_LEFT_OPEN', 1]);
   heartbeat.FbmSync.statePatch({ runId: 'write-lost-run', origin: 'background', phase: 'push', cursor: { kind: 'push_wait', entity: 'customer' }, activeRequestId: 'write-request', deadlineAt: Date.now() - 1000, scheduledScan: '', chain: null });
   giuBanGhiDongBo(heartbeat, 'customer', '1');
-  heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   const lostWrite = heartbeat.FbmSync.stateRead();
   // Lượt hỏng thì phiên chưa xác minh, nên Giữ phiên của chính lần hỏi này mở bằng probe (phase kiểm tra phiên); probe xong phase quay về `error` của lượt vừa đóng.
   check(so, 'Lần hỏi nền gặp lệnh ghi mất response: kết thúc SYNC_STALE_WRITE, giữ khóa bản ghi, không gửi lại lệnh ghi', [lostWrite.lastFailureCode, heartbeat.recordHoldsPeekOwner('fbm'), lostWrite.phase, lostWrite.cursor.kind, (lostWrite.metadata.sessionGate || {}).resumePhase], ['SYNC_STALE_WRITE', true, 'checking_session', 'session_probe', 'error']);
@@ -430,24 +428,24 @@ async function chay(so) {
   const activeState = heartbeat.FbmSync.stateRead();
   activeState.phase = 'pull_customer'; activeState.runId = 'heartbeat-run'; activeState.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }; activeState.activeRequestId = 'in-flight-request'; activeState.deadlineAt = Date.now() + 60000;
   heartbeat.FbmSync.stateWrite(activeState);
-  const overlapDuringSync = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const overlapDuringSync = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat khong ghi de cursor phien Customer dang chay', [overlapDuringSync.ok, overlapDuringSync.code, overlapDuringSync.request], [false, 'REQUEST_IN_FLIGHT', null]);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }, scheduledScan: '' });
    heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-   const changedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+   const changedRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat thay doi tong Customer co reservation moi', [changedRequest.ok, changedRequest.request.meta.kind], [true, 'heartbeat']);
-  const changedHeartbeat = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 3 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: changedRequest.request.id }] } });
+  const changedHeartbeat = noiNen(heartbeat, { d: { TotalRowCount: 3 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: changedRequest.request.id }] } });
    check(so, 'heartbeat tong Customer thay doi kich full Customer va probe lai', [changedHeartbeat.request.meta.kind, changedHeartbeat.status.phase], ['session_probe', 'checking_session']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session', userId: '2037' }, scheduledScan: '' });
    heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-   const failedRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const failedHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: failedRequest.request.id }] } });
+   const failedRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const failedHeartbeat = noiNen(heartbeat, { ok: false, status: 500, body: '{"Message":"There was an error processing the request."}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: failedRequest.request.id }] } });
   check(so, 'heartbeat HTTP 500 dung phien va tra loi ro rang', [failedHeartbeat.ok, failedHeartbeat.code, heartbeat.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', 'TRANSPORT_ERROR']);
    heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { cookie: 'userFHN_CRM_App', expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session', userId: '2037' } });
    heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-   const emptyRequest = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+   const emptyRequest = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat shape rong co reservation truoc khi phan loai', [emptyRequest.ok, emptyRequest.request.meta.kind], [true, 'heartbeat']);
-  const emptyHeartbeat = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: emptyRequest.request.id }] } });
+  const emptyHeartbeat = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: emptyRequest.request.id }] } });
   check(so, 'heartbeat khong co shape Customer khong duoc suy ra het phien tu heartbeat', [emptyHeartbeat.ok, emptyHeartbeat.code, heartbeat.FbmSync.stateRead().session.expired], [false, 'HEARTBEAT_RESPONSE_INVALID', false]);
   const backgroundState = heartbeat.FbmSync.stateRead();
   backgroundState.runId = 'background-run'; backgroundState.origin = 'background'; backgroundState.phase = 'pull_customer'; backgroundState.entity = 'customer'; backgroundState.activeRequestId = 'background-request'; backgroundState.cursor = { kind: 'customer_grid', type: 0, pageIndex: 0, pageValue: null, count: 2000 }; backgroundState.metadata.manualPending = null;
@@ -482,7 +480,7 @@ async function chay(so) {
   check(so, 'dung phien khi request dang bay giu reservation', [pendingCancel.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().metadata.cancelPending], ['SYNC_CANCEL_PENDING', 'cancel-request', true]);
   const stoppedAfterResponse = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'cancel-request' }] } });
   check(so, 'response hien tai duoc dong nhung khong cap request tiep', [stoppedAfterResponse.ok, stoppedAfterResponse.request, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [true, null, 'paused', '']);
-  const cancelWithoutFlight = heartbeat.fbmSyncCancel();
+  const cancelWithoutFlight = heartbeat.fbmSyncCancel().status;
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);
 
   // Bộ đệm DocumentProperties: lượt khác ghi trong lúc chờ khóa phải được thấy; lỗi giữa chừng vẫn lưu phần đã ghi và giữ lỗi gốc.

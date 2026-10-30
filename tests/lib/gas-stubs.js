@@ -46,6 +46,7 @@ function taoStubsGas(options) {
   const daLog = [];
   const daConsole = [];
   const khoa = { dem: 0, demNha: 0, dangGiu: false, chanKhoa: chon.chanKhoa === true, msCuoi: 0 };
+  const khoaScript = { dangGiu: false };
   const khoDem = { doc: 0, ghi: 0, userDoc: 0 };
 
   return {
@@ -113,6 +114,12 @@ function taoStubsGas(options) {
         },
         releaseLock: () => { khoa.dangGiu = false; khoa.demNha += 1; },
         hasLock: () => khoa.dangGiu
+      }),
+      // Khóa script là khóa riêng của Google, không dùng chung với khóa tài liệu; đồng bộ FBM điều phối bằng khóa này.
+      getScriptLock: () => ({
+        tryLock: () => { if (khoaScript.dangGiu) { return false; } khoaScript.dangGiu = true; return true; },
+        releaseLock: () => { khoaScript.dangGiu = false; },
+        hasLock: () => khoaScript.dangGiu
       })
     },
 
@@ -148,7 +155,8 @@ function taoStubsGas(options) {
     _props: props,
     _khoDem: khoDem,
     _userProps: userProps,
-    _khoa: khoa
+    _khoa: khoa,
+    _khoaScript: khoaScript
   };
 }
 

@@ -67,7 +67,7 @@ async function chay(so) {
   let daChen = false;
   const chenLan = await chen.hoi(60, 1000, { beforeSend: (request) => {
     chen.clock.now += 1000;
-    if (!daChen && request.meta.kind === 'scan_job') { daChen = true; chen.F.controlDispatchLocked('stop_background', {}); }
+    if (!daChen && request.meta.kind === 'scan_job') { daChen = true; chen.F.controlDispatch('stop_background', {}); }
   } });
   const mocSauChen = chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN');
   chen.F.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, metadata: {} });

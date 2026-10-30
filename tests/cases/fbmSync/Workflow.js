@@ -41,8 +41,10 @@ function workflowGas(options) {
   const opt = options || {};
   const documentProperties = opt.documentProperties || properties();
   const scriptProperties = opt.scriptProperties || properties();
+  const scriptLock = { held: false, tryLock() { if (this.held) { return false; } this.held = true; return true; }, releaseLock() { this.held = false; } };
   const hop = taoHopCat(Object.assign({
-    FbmSync: {},
+    // Bộ dựng chung không nạp sổ bước (Trace.js) vì các ca khác không xét Log theo bước; ca cần thì nạp qua `extraFiles`, bản thật đè hàm giả này.
+    FbmSync: { traceImport() {} },
     DATA_SCHEMA: {},
     SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => scriptProperties },
@@ -52,6 +54,8 @@ function workflowGas(options) {
     logEvent: () => {},
     logTrace: () => {},
     runEntryPoint: (name, source, fn) => fn(),
+    // Khóa script giả của hộp cát; `scriptLock.held` cho ca kiểm giữ khóa sẵn để thử nhánh bận.
+    LockService: { getScriptLock: () => scriptLock },
     // Chỉ lấy hằng số `SETTINGS` thật, không nạp cả Settings.js vì nó kéo theo đường đọc sheet Config.
     SETTINGS: settingsThat()
   }, opt));
@@ -82,7 +86,7 @@ function workflowGas(options) {
   hop.FbmSync.configValue = () => '';
   // `readLocal: 'sheet'` giữ readLocal thật (đi qua bản chụp Sheet) để đếm số lần đọc Sheet.
   if (opt.readLocal !== 'sheet') { hop.FbmSync.readLocal = opt.readLocal || (() => []); }
-  return { hop, documentProperties, scriptProperties };
+  return { hop, documentProperties, scriptProperties, scriptLock };
 }
 
 function gridResponse(fields, rows, total) {
@@ -249,6 +253,9 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
   return { context, relayCalls, storage, metrics: () => ({ fbmTabQueries, fbmTabCreates, fbmMessages }) };
 }
 
+/** Kết quả từng bước Đăng nhập thử nộp về như mọi response: lệnh `continue` của cửa lệnh. */
+function noiDangNhap(hop, response) { return hop.FbmSync.controlDispatch('continue', { response }); }
+
 async function chay(so) {
   section('FBM sync — workflow theo tài liệu');
   const ids = WORKFLOWS.map((item) => item.id);
@@ -345,14 +352,14 @@ async function chay(so) {
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
   const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
-  const afterLogin = loginFlow.hop.FbmSync.loginTestResult({
+  const afterLogin = noiDangNhap(loginFlow.hop, {
     ok: true, status: 200, body: JSON.stringify({ d: true }),
     transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
   });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
-  const afterAuthorize = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginAuthorize.reply, afterLogin.request.id));
+  const afterAuthorize = noiDangNhap(loginFlow.hop, executorRaw(loginAuthorize.reply, afterLogin.request.id));
   const loginUser = await sendThroughExecutor(afterAuthorize.request, userResponse);
-  const loginDone = loginFlow.hop.FbmSync.loginTestResult(executorRaw(loginUser.reply, afterAuthorize.request.id));
+  const loginDone = noiDangNhap(loginFlow.hop, executorRaw(loginUser.reply, afterAuthorize.request.id));
   check(so, 'dang nhap thu: Login thanh cong phai qua authorize va User grid khop binding moi duoc bao thanh cong', [
     loginStarted.request.meta.kind, afterLogin.request.meta.kind, afterAuthorize.request.meta.kind,
     loginDone.ok, loginDone.code, loginDone.status.phase, loginDone.status.message
@@ -361,9 +368,9 @@ async function chay(so) {
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest('workflow-credential-ref');
-  const wrongAfterLogin = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
-  const wrongAuthorize = wrongLogin.hop.FbmSync.loginTestResult({ ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
-  const wrongDone = wrongLogin.hop.FbmSync.loginTestResult({
+  const wrongAfterLogin = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
+  const wrongAuthorize = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
+  const wrongDone = noiDangNhap(wrongLogin.hop, {
     ok: true, status: 200,
     body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2038, 'OTHER', 'Tai khoan khac']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } }),
     transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAuthorize.request.id }] }
@@ -383,7 +390,7 @@ async function chay(so) {
   activeBindingState.runId = 'binding-request'; activeBindingState.phase = 'checking_session'; activeBindingState.activeRequestId = 'request-binding';
   binding.hop.FbmSync.stateWrite(activeBindingState);
   const rejectedClear = binding.hop.FbmSync.bindingWrite({});
-  check(so, 'xoa lien ket bi chan khi request FBM dang bay', [rejectedClear.ok, rejectedClear.code, Boolean(binding.documentProperties.getProperty('FBM_SYNC_BINDING_V1'))], [false, 'SYNC_ALREADY_RUNNING', true]);
+  check(so, 'xoa lien ket bi chan khi request FBM dang bay', [rejectedClear.ok, rejectedClear.code, Boolean(binding.documentProperties.getProperty('FBM_SYNC_BINDING_V1'))], [false, 'SYNC_BUSY', true]);
 
   const gates = workflowGas().hop.FbmSync;
   check(so, 'phan quyen ghi theo mode: check khong ghi, read chi ghi Sheet, push chi ghi FBM', [
@@ -669,9 +676,9 @@ async function chay(so) {
   const probe = compactLookupFlow.hop.fbmSyncStateProbe();
   check(so, 'probe state chỉ trả kích thước từng nhánh, không trả payload', [
     probe.ok, probe.state.parseOk, probe.state.cursorKind, 'metadataCategoryGateBytes' in probe.state,
-    probe.state.metadataCategoryBlocksBytes > 0, probe.state.branchBytes.metadata > 0, probe.state.sessionLookupsBytes, Array.isArray(probe.extensionResponses), probe.largestProperties[0].key,
+    probe.state.metadataCategoryBlocksBytes > 0, probe.state.branchBytes.metadata > 0, probe.state.sessionLookupsBytes, Array.isArray(probe.extensionResponses), probe.largestProperties.some((item) => item.key === 'FBM_SYNC_STATE_V1'),
     JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
-  ], [true, true, 'push_wait', false, true, true, 2, true, 'FBM_SYNC_STATE_V1', true]);
+  ], [true, true, 'push_wait', false, true, true, 2, true, true, true]);
   const orderFlow = workflowGas();
   const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
   orderState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
@@ -761,7 +768,7 @@ async function chay(so) {
   check(so, 'scheduler GAS lap lai cung nhat khong tao reservation thu hai', [duplicateReservation.ok, duplicateReservation.kind, duplicateReservation.existing], [true, 'customerFull', true]);
   scheduleFlow.hop.FbmSync.statePatch({ runId: 'running-a', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '' });
   const blockedOverlap = scheduleFlow.hop.FbmSync.schedulerPickDue(now + 1);
-  check(so, 'scheduler GAS khong cap tien trinh song song khi A dang chay', [blockedOverlap.ok, blockedOverlap.code], [false, 'SYNC_ALREADY_RUNNING']);
+  check(so, 'scheduler GAS khong cap tien trinh song song khi A dang chay', [blockedOverlap.ok, blockedOverlap.code], [false, 'SYNC_BUSY']);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', scheduledScan: '' });
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', String(now));
@@ -879,7 +886,7 @@ async function chay(so) {
   const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
   quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {} });
   quotaFull = true;
-  const quotaResult = quotaFlow.hop.FbmSync.controlDispatchLocked('cancel', {});
+  const quotaResult = quotaFlow.hop.FbmSync.controlDispatch('cancel', {});
   const quotaLog = quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED').slice(-1)[0] || quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA').slice(-1)[0] || {};
   const quotaUi = taoBoTest();
   quotaUi.hop.fbmSyncPaint(quotaResult.status);
@@ -893,20 +900,20 @@ async function chay(so) {
   const noopWorker = workerHarness([{ ok: true, code: 'HEARTBEAT_NOOP', request: null }], []);
   const noopResult = await noopWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm noop: Extension hoi GAS mot lan, khong tim tab va khong fetch FBM', [
-    noopResult.code, noopWorker.relayCalls.map((item) => item.body.kind), noopWorker.metrics().fbmTabQueries, noopWorker.metrics().fbmMessages
-  ], ['HEARTBEAT_NOOP', ['heartbeat_request'], 0, 0]);
+    noopResult.code, noopWorker.relayCalls.map((item) => item.body.command), noopWorker.metrics().fbmTabQueries, noopWorker.metrics().fbmMessages
+  ], ['HEARTBEAT_NOOP', ['heartbeat'], 0, 0]);
 
   const noTabWorker = workerHarness([
-    { ok: true, request: { id: 'reserved-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000 } } },
+    { ok: true, request: { id: 'reserved-heartbeat', contract: MA_HOP_DONG, url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000 } } },
     { ok: true, code: 'TRANSPORT_RECORDED', request: null }
   ], []);
   const noTabResult = await noTabWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm khong co tab: Extension nop transport failure dung reservation va khong tu fetch FBM', [
-    noTabResult.code, noTabWorker.relayCalls.map((item) => [item.body.kind, item.body.requestId || '', item.body.code || '']), noTabWorker.metrics().fbmMessages
-  ], ['FBM_TAB_NOT_FOUND', [['heartbeat_request', '', ''], ['heartbeat_transport_failure', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
+    noTabResult.code, noTabWorker.relayCalls.map((item) => [item.body.command, (item.body.payload.error || {}).requestId || '', (item.body.payload.error || {}).code || '']), noTabWorker.metrics().fbmMessages
+  ], ['FBM_TAB_NOT_FOUND', [['heartbeat', '', ''], ['continue', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
 
   const autoOpenWorker = workerHarness([
-    { ok: true, request: { id: 'open-heartbeat', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000, openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
+    { ok: true, request: { id: 'open-heartbeat', contract: MA_HOP_DONG, url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000, openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
     if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
@@ -918,7 +925,7 @@ async function chay(so) {
 
   const rawHeartbeat = '{"d":{"TotalRowCount":12,"Rows":[]}}';
   const completeWorker = workerHarness([
-    { ok: true, request: { id: 'heartbeat-envelope', url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}', meta: { timeoutMs: 30000, gasReplyMs: 390000 } } },
+    { ok: true, request: { id: 'heartbeat-envelope', contract: MA_HOP_DONG, url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}', meta: { timeoutMs: 30000, gasReplyMs: 390000 } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
     if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
@@ -929,10 +936,10 @@ async function chay(so) {
   });
   const completeResult = await completeWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm co tab: GAS cap envelope truoc, Extension chuyen response tho kem ma hop dong cua no ve GAS va dung khi request null', [
-    completeResult.ok, completeWorker.relayCalls.map((item) => item.body.kind), completeWorker.relayCalls[1].body.response.body,
-    completeWorker.relayCalls[1].body.response.transport.contract,
+    completeResult.ok, completeWorker.relayCalls.map((item) => item.body.command), completeWorker.relayCalls[1].body.payload.response.body,
+    completeWorker.relayCalls[1].body.payload.response.transport.contract,
     completeWorker.metrics().fbmTabQueries, completeWorker.metrics().fbmMessages
-  ], [true, ['heartbeat_request', 'heartbeat'], rawHeartbeat, MA_HOP_DONG, 1, 2]);
+  ], [true, ['heartbeat', 'continue'], rawHeartbeat, MA_HOP_DONG, 1, 2]);
 
   // Chạy cả pipeline Customer + Activity. `withTrace` nạp thêm Trace.js như GAS thật (có sổ bước nghiệp vụ thay cho dòng Log tóm tắt mỗi lát), dùng cho phép đếm lần gọi kho.
   async function fullPipeline(withTrace, mode, options) {
@@ -997,7 +1004,7 @@ async function chay(so) {
       if (kind === 'batch' && request.meta.entity === 'category') { fullLookupFields.push(request.items.map((item) => item.body.controller)); }
       if (activityBatch) { fullBatches.push(request); }
       if (activityBatch && round === 0 && options && options.loseTab) {
-        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('transport_failure', { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' });
+        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { error: { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' } });
         fullStatuses.push(fullStep.status);
         continue;
       }
@@ -1044,7 +1051,7 @@ async function chay(so) {
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
-        fullStep = fullFlow.hop.FbmSync.controlDispatchLocked('continue', { response: raw });
+        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw });
         if (withTrace) { fullFlow.hop.FbmSync.traceEvent('engine_after', { operation: 'fbmContinueSync' }); }
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
@@ -1210,12 +1217,12 @@ async function chay(so) {
   };
   const oldExtension = await contractRun(undefined), sameContract = await contractRun(MA_HOP_DONG);
   const mismatchLog = oldExtension.logs.find((event) => event.action === 'extension_contract_mismatch') || {};
-  check(so, 'Extension lệch mã hợp đồng: GAS dừng phiên, không ghi Sheet, Sidebar nhận lỗi và Log ghi "Extension trên máy này đang dùng bản cũ, hãy tải lại Extension"', [
+  check(so, 'Extension lệch mã hợp đồng: GAS dừng phiên, không ghi Sheet, Sidebar nhận lỗi và Log ghi lời nhắc tải lại Extension"', [
     oldExtension.last.ok, oldExtension.last.code, oldExtension.last.request, oldExtension.sheetWrites,
-    oldExtension.last.status.phase, String(oldExtension.last.status.lastError || '').indexOf('Extension trên máy này đang dùng bản cũ, hãy tải lại Extension') >= 0,
+    oldExtension.last.status.phase, String(oldExtension.last.status.lastError || '').indexOf('hãy tải lại Extension') >= 0,
     mismatchLog.reason, mismatchLog.detail && mismatchLog.detail.received, oldExtension.state.activeRequestId,
     sameContract.last.ok
-  ], [false, 'FBM_EXTENSION_CONTRACT_MISMATCH', null, 0, 'error', true, 'Extension trên máy này đang dùng bản cũ, hãy tải lại Extension.', '(Extension không gửi mã)', '', true]);
+  ], [false, 'EXTENSION_PROTOCOL_MISMATCH', null, 0, 'error', true, 'Extension trên máy này đang dùng bản giao thức khác GAS, hãy tải lại Extension (chrome://extensions → ShinCRM → Tải lại).', '(Extension không gửi mã)', '', true]);
   check(so, 'Danh sách toàn bộ khách chỉ đánh dấu: lượt chỉ qua trang danh sách khách thì không ghi Sheet lần nào, request kế là lô cửa ghi đọc chi tiết khách vừa đánh dấu', [
     sameContract.sheetWrites, sameContract.last.request && sameContract.last.request.meta.kind, sameContract.last.request && sameContract.last.request.items.length
   ], [0, 'batch', 2]);
@@ -1315,7 +1322,7 @@ async function chay(so) {
     cancelPending.code, cancelState.activeRequestId === cancellingStarted.request.id, cancelState.cursor.kind, cancelState.metadata.cancelPending
   ], ['SYNC_CANCEL_PENDING', true, 'identity_user_grid', true]);
 
-  const reloaded = workflowGas();
+  const reloaded = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
   const orphan = reloaded.hop.FbmSync.stateRead();
   orphan.runId = 'cancelled-orphan'; orphan.phase = 'checking_session'; orphan.cursor = { kind: 'identity_user_grid' };
   orphan.activeRequestId = 'orphan-request'; orphan.metadata.cancelPending = true;
@@ -1324,25 +1331,30 @@ async function chay(so) {
   reloaded.hop.FbmSync.stateWrite(orphan);
   reloaded.documentProperties.setProperty(reloaded.hop.FbmSync.STATE_KEY, JSON.stringify(orphan));
   const reloadedStatus = reloaded.hop.fbmGetSyncStatus();
-  check(so, 'reload sau khi callback dừng bị mất thu hồi phiên treo và không còn nút Dừng đồng bộ', [
-    reloadedStatus.phase, reloadedStatus.lastFailureCode, reloadedStatus.runId, reloaded.hop.FbmSync.stateRead().activeRequestId
-  ], ['error', 'SYNC_STALE_RUN', 'cancelled-orphan', 'orphan-request']);
+  // Đọc trạng thái chỉ đọc: lượt kẹt quá hạn chỉ được đóng ở cửa mở lượt, không đóng khi Sidebar mở lại.
+  check(so, 'reload sau khi callback dừng bị mất: đọc trạng thái không ghi, phiên treo vẫn nguyên chờ cửa mở lượt thu hồi', [
+    reloadedStatus.ok, reloadedStatus.status.phase, reloadedStatus.status.runId, reloaded.hop.FbmSync.stateRead().phase, reloaded.hop.FbmSync.stateRead().activeRequestId
+  ], [true, 'checking_session', 'cancelled-orphan', 'checking_session', 'orphan-request']);
 
   // State do bản cũ ghi (chưa có schemaVersion) mà đang giữa lượt: dù request còn trong hạn, lượt phải dừng và báo chạy lại, dấu chờ đẩy ở khóa riêng còn nguyên.
   for (const [phase, cursorKind] of [['pull_activity', 'activity_grid'], ['awaiting_approval', 'push_plan'], ['push', 'push_wait']]) {
     const nhatKy = [];
-    const cu = workflowGas({ logEvent: (row) => nhatKy.push(row) });
+    const cu = workflowGas({ logEvent: (row) => nhatKy.push(row), extraFiles: ['fbm_sync/state/SyncSettings.js'] });
     const legacy = cu.hop.FbmSync.stateDefault();
     delete legacy.schemaVersion; legacy.version = 1;
     Object.assign(legacy, { runId: 'legacy-run', phase, cursor: { kind: cursorKind }, activeRequestId: 'req-dang-bay', deadlineAt: Date.now() + 60000, updatedAt: Date.now(), startedAt: Date.now() });
     cu.documentProperties.setProperty(cu.hop.FbmSync.STATE_KEY, JSON.stringify(legacy));
     cu.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }));
-    const trangThai = cu.hop.fbmGetSyncStatus();
+    const truocDoc = cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY);
+    const trangThai = cu.hop.fbmGetSyncStatus().status;
+    const docXong = cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY);
+    // Đọc trạng thái không ghi; cửa mở lượt mới thu hồi lượt dở của bản cũ trước khi mở lượt.
+    const thuHoi = cu.hop.FbmSync.recoverStaleRun(cu.hop.FbmSync.stateRead());
     const luu = JSON.parse(cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY));
-    check(so, 'Lượt dở do bản cũ ghi (' + phase + ') bị dừng, báo chạy lại ở Sidebar và Log, giữ dấu chờ đẩy, state ghi lại theo phiên bản mới', [
-      trangThai.phase, trangThai.lastFailureCode, /chạy lại lượt/.test(String(trangThai.lastError || '')), luu.schemaVersion, luu.version, cu.documentProperties.getProperty('FBM_SYNC_PENDING_PUSHES_V1'),
+    check(so, 'Lượt dở do bản cũ ghi (' + phase + '): đọc trạng thái không ghi; cửa mở lượt dừng nó, báo chạy lại ở Log, giữ dấu chờ đẩy, state ghi lại theo phiên bản mới', [
+      trangThai.phase, docXong === truocDoc, thuHoi.recovered, luu.phase, luu.lastFailureCode, /chạy lại lượt/.test(String(luu.lastError || '')), luu.schemaVersion, luu.version, cu.documentProperties.getProperty('FBM_SYNC_PENDING_PUSHES_V1'),
       nhatKy.some((row) => /chạy lại lượt/.test(JSON.stringify(row)))
-    ], ['error', 'SYNC_STATE_MIGRATED', true, cu.hop.FbmSync.STATE_SCHEMA_VERSION, undefined, JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }), true]);
+    ], [phase, true, true, 'error', 'SYNC_STATE_MIGRATED', true, cu.hop.FbmSync.STATE_SCHEMA_VERSION, undefined, JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }), true]);
   }
   // Sổ bước trong Log phải theo đúng thứ tự xảy ra: bước đã xong đóng ngay khi luồng chuyển chặng, vấn đề theo bản ghi đứng trước dòng đóng bước và dòng đóng phiên.
   const soBuoc = (mode) => {

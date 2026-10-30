@@ -39,6 +39,7 @@ function chay(so) {
     const kho = {}, dong = [];
     const nen = taoHopCat({
       FbmSync: {}, LOG_OK: 'ok', LOG_WARN: 'warn', LOG_ERROR: 'error',
+      LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
@@ -102,7 +103,7 @@ function chay(so) {
   const runIdVo = vo.st.runId, truocVo = vo.dong.length;
   vo.nen.FbmSync.continue = () => { throw new Error('Cannot read properties of undefined'); };
   let nemLai = '';
-  try { vo.nen.FbmSync.controlDispatchLocked('continue', { response: {} }); } catch (err) { nemLai = err.message; }
+  try { vo.nen.FbmSync.controlDispatch('continue', { response: {} }); } catch (err) { nemLai = err.message; }
   const sauVo = vo.nen.FbmSync.stateRead();
   check(so, 'exception giữa lát: lỗi gốc được ném lại, phiên chuyển sang error ngay, giữ cursor',
     [nemLai, sauVo.phase, sauVo.lastError, sauVo.runId],
@@ -118,11 +119,13 @@ function chay(so) {
     ['error', true, 0]);
 
   const nenHb = dungState();
-  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/state/Scheduler.js');
+  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/PullFlow.js');
   nenHb.nen.fbmSyncHeartbeatLocked = () => { throw new Error('Lỗi lát nền'); };
+  nenHb.nen.FbmSync.masterEnabled = () => true;
+  nenHb.nen.FbmSync.statePatch({ cursor: { kind: 'heartbeat' } });
   let nemNen = '';
-  try { nenHb.nen.fbmSyncHeartbeat({}, {}); } catch (err) { nemNen = err.message; }
-  check(so, 'exception ở đường nền (heartbeat tự giữ khóa): lỗi gốc ném lại và phiên chuyển sang error',
+  try { nenHb.nen.FbmSync.controlDispatch('continue', { source: 'relay', response: {} }); } catch (err) { nemNen = err.message; }
+  check(so, 'exception ở đường nền (relay nộp kết quả nhịp Giữ phiên): lỗi gốc ném lại và phiên chuyển sang error',
     [nemNen, nenHb.nen.FbmSync.stateRead().phase], ['Lỗi lát nền', 'error']);
 
   const client = dungState();
@@ -155,7 +158,7 @@ function chay(so) {
     throw new Error('Hỏng giữa lát');
   };
   const truocGom = gom.dong.length;
-  try { gom.nen.FbmSync.controlDispatchLocked('continue', { response: {} }); } catch (ignore) { /* lỗi gốc đã kiểm ở ca exception giữa lát */ }
+  try { gom.nen.FbmSync.controlDispatch('continue', { response: {} }); } catch (ignore) { /* lỗi gốc đã kiểm ở ca exception giữa lát */ }
   const issueGom = gom.dong.slice(truocGom).filter((e) => e.action === 'pull_record_issue');
   check(so, 'lát bị exception vẫn xả lỗi theo bản ghi: mỗi loại đúng một dòng cùng runId, giữ tối đa 20 mã và đếm phần còn lại',
     [issueGom.length, issueGom.map((e) => e.outcome + '|' + e.entity + '|' + e.detail.count + '|' + e.detail.ids.length + '|' + (e.cycleId === runIdGom)), /và 5 bản ghi khác$/.test(issueGom[0] && issueGom[0].reason), issueGom[1] && issueGom[1].recordId],
@@ -191,7 +194,7 @@ function chay(so) {
   ghi.nen.FbmSync.continue = () => { ghi.nen.FbmSync.pullRecords('customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;
   let nemGhi = '';
-  try { ghi.nen.FbmSync.controlDispatchLocked('continue', { response: {} }); } catch (err) { nemGhi = err.code; }
+  try { ghi.nen.FbmSync.controlDispatch('continue', { response: {} }); } catch (err) { nemGhi = err.code; }
   const sauGhi = ghi.nen.FbmSync.stateRead(), viewGhi = ghi.nen.FbmSync.statusView ? ghi.nen.FbmSync.statusView() : sauGhi;
   check(so, 'ghi Sheet bị chặn khi pull: phiên chuyển error có lý do đọc được, cursor đứng nguyên, không cộng số thành công',
     [nemGhi, sauGhi.phase, sauGhi.lastFailureCode, /Không ghi được 2 bản ghi customer vào Sheet.*Mã KH FBM của CUS-3/.test(sauGhi.lastError), JSON.stringify(sauGhi.cursor || {}) === cursorGhi, Number(sauGhi.counts.succeeded || 0), viewGhi.phase],

@@ -3,12 +3,15 @@ const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer, TRANG_FBM_THU } = require('../../lib/load-gas');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
+/** Nộp response của lượt nền như `continue` qua lát chung, bỏ phần khóa của cửa lệnh (khóa kiểm ở Control). */
+function noiNen(hop, response) { return hop.FbmSync.runSlice(() => hop.FbmSync.continue(response)); }
+
 async function chay(so) {
   section('FBM sync - auto-login');
   const data = {};
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent() {}, LOG_OK: 'ok', LOG_ERROR: 'error' });
-  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'auto-login mặc định bật nhưng chưa cấu hình', [hop.FbmSync.loginConfigPublic().enabled, hop.FbmSync.loginConfigPublic().configured], [true, false]);
   const invalid = hop.FbmSync.loginConfigSave({ credentialRef: 'cred-invalid', envelope: { iv: 'short', ciphertext: 'short' } });
   check(so, 'envelope thiếu độ dài bị từ chối', invalid.code, 'LOGIN_ENVELOPE_INVALID');
@@ -52,15 +55,15 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   // Dấu hết hạn còn từ lượt trước không đủ để đăng nhập (09/06), và phiên chưa xác minh thì Giữ phiên không được dựng request đếm khách (mã người dùng lấy từ phiên đã xác minh): mở bằng probe, probe báo chưa xác thực mới đi cổng đăng nhập.
-  const staleCount = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const staleProbe = heartbeat.fbmSyncHeartbeat({ ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleCount.request.id }] } });
-  const autoLoginRequest = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleProbe.request.id }] } });
+  const staleCount = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const staleProbe = noiNen(heartbeat, { ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleCount.request.id }] } });
+  const autoLoginRequest = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: staleProbe.request.id }] } });
   check(so, 'heartbeat phien chua xac minh: mo bang probe, FBM tra 401 thi probe lai mot lan roi cap login request', [staleCount.request.meta.kind, staleProbe.request && staleProbe.request.meta.kind, autoLoginRequest.ok, autoLoginRequest.request && autoLoginRequest.request.meta.kind, autoLoginRequest.request && autoLoginRequest.request.meta.testOnly], ['session_probe', 'session_probe', true, 'login', false]);
-  const loginResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: autoLoginRequest.request.id }] } });
+  const loginResponse = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: autoLoginRequest.request.id }] } });
   check(so, 'login adapter thanh cong van phai authorize truoc', [loginResponse.ok, loginResponse.request.meta.kind, loginResponse.request.meta.entity], [true, 'authorize', 'customer']);
-  const authorizeResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: loginResponse.request.id }] } });
+  const authorizeResponse = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: loginResponse.request.id }] } });
   check(so, 'sau authorize GAS cap User grid de xac minh identity', [authorizeResponse.ok, authorizeResponse.request.meta.kind, authorizeResponse.request.body.controller], [true, 'identity_user_grid', 'User']);
-  const userResponse = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: authorizeResponse.request.id }] } });
+  const userResponse = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: authorizeResponse.request.id }] } });
   check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
   check(so, 'Giữ phiên đi qua probe rồi cần đăng nhập không bị tính là lượt bấm tay: lần đăng nhập vẫn chịu chu kỳ chờ của chạy nền', autoLoginRequest.request && heartbeat.FbmSync.autoLoginAttemptOptions(Object.assign({}, heartbeat.FbmSync.stateRead(), { origin: 'manual', metadata: { sessionGate: { resumeCursor: { kind: 'heartbeat' } } } }), { kind: 'session_probe' }).manual, false);
   // Gặp thật 2026-10-16 20:33: đăng nhập xong giữa Giữ phiên, response đếm khách về thì GAS trả "hết việc" mà lượt vẫn mở ở checking_session; Quét đầy đủ đến hạn không chạy, lần hỏi sau mới phát hiện lượt bỏ dở.
@@ -68,7 +71,7 @@ async function chay(so) {
   heartbeat.FbmSync.customerBaselineWrite(1);
   const resumedLogs = [], savedResumedLog = heartbeat.logEvent;
   heartbeat.logEvent = (event) => resumedLogs.push(event);
-  const resumedCount = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[1]],"ViewPage":{"Fields":[{"AliasName":"id"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: userResponse.request.id }] } });
+  const resumedCount = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[1]],"ViewPage":{"Fields":[{"AliasName":"id"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: userResponse.request.id }] } });
   heartbeat.logEvent = savedResumedLog;
   const resumedState = heartbeat.FbmSync.stateRead();
   check(so, 'Đăng nhập xong giữa Giữ phiên: response đếm khách về thì chuỗi chạy tiếp Quét đầy đủ đến hạn, không trả hết việc khi lượt còn mở', [
@@ -89,9 +92,9 @@ async function chay(so) {
   againConfig.lastAttemptAt = 0; againConfig.nextRetryAt = 0;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(againConfig);
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const againCount = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const againCount = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   // Quét đầy đủ vừa mở đã xóa phiên nên Giữ phiên mở bằng probe; probe nhận Authorized:false là phiên chết, đi thẳng cổng đăng nhập.
-  const againProbe = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againCount.request.id }] } });
+  const againProbe = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: againCount.request.id }] } });
   check(so, 'Lượt trước đã tự đăng nhập thành công, lần hỏi nền sau phiên lại chết: probe nhận Authorized:false thì cấp lệnh đăng nhập mới, không dừng SESSION_PROBE_FAILED_AFTER_LOGIN', [
     loginLeftover, againCount.request.meta.kind, againProbe.code || '', againProbe.request && againProbe.request.meta.kind
   ], [true, 'session_probe', '', 'login']);
@@ -164,25 +167,25 @@ async function chay(so) {
 
   /** Phiên đã chết: request đầu (probe, vì phiên chưa xác minh) nhận 401, probe lại xác nhận FBM báo chưa xác thực. */
   const phienChet = (sent) => {
-    const probe = heartbeat.fbmSyncHeartbeat({ ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: sent.request.id }] } });
-    return probe.request && probe.request.meta.kind === 'session_probe' ? heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: probe.request.id }] } }) : probe;
+    const probe = noiNen(heartbeat, { ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: sent.request.id }] } });
+    return probe.request && probe.request.meta.kind === 'session_probe' ? noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: probe.request.id }] } }) : probe;
   };
   const savedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const failedLoginProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const failedLoginProbe = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   const failedLoginRequest = phienChet(failedLoginProbe);
-  const failedLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
+  const failedLogin = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
   check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'login_failure')], [false, 'AUTO_LOGIN_FAILED', null, 'paused', true]);
   // Trong chu kỳ chờ, lần hỏi sau gửi request việc thật (người dùng có thể đã tự đăng nhập); phiên vẫn chết thì không đăng nhập lại.
-  const throttledProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const throttledProbe = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   const throttledAfterFailure = phienChet(throttledProbe);
   check(so, 'login that bai khong tu chay khi chua den lich', [throttledProbe.request && throttledProbe.request.meta.kind, throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
-  const throttledDueProbe = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const throttledDueProbe = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   const throttledDue = phienChet(throttledDueProbe);
   check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDueProbe.request && throttledDueProbe.request.meta.kind, throttledDue.ok, throttledDue.code, throttledDue.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
 
@@ -238,7 +241,7 @@ async function chay(so) {
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const testRequest = heartbeat.FbmSync.loginTestRequest();
   check(so, 'login test khong truyen ref van dung credential da luu', [testRequest.request.meta.credentialRef, testRequest.request.meta.testOnly], ['cred-heartbeat-123', true]);
-  const testFailure = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: testRequest.request.id }] } });
+  const testFailure = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: testRequest.request.id }] } });
   const afterTestFailure = heartbeat.FbmSync.loginConfigRead();
   check(so, 'dang nhap thu that bai khong thay doi throttle hay loi auto-login', [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError], ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, beforeTestConfig.lastError]);
 
@@ -246,24 +249,24 @@ async function chay(so) {
   // được mã phiên thì vẫn đi tiếp bước xác minh; request xác minh được cấp mã rỗng làm dự phòng thay vì token bắt buộc khiến Extension chặn FBM_TRANSPORT_CAPTURE_MISSING.
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const noCookieTest = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123');
-  const noCookieLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, captures: {}, trace: [{ requestId: noCookieTest.request.id }] } });
+  const noCookieLogin = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, captures: {}, trace: [{ requestId: noCookieTest.request.id }] } });
   const noCookieReplacement = (noCookieLogin.request && noCookieLogin.request.meta && noCookieLogin.request.meta.transport && noCookieLogin.request.meta.transport.replacements || [])[0] || {};
   check(so, 'đăng nhập thử thành công mà không bắt được mã phiên vẫn đi tiếp xác minh, mã phiên là tùy chọn có dự phòng rỗng (FBM-037)',
     [noCookieLogin.ok, noCookieLogin.request && noCookieLogin.request.meta.kind, noCookieReplacement.required, noCookieReplacement.fallback],
     [true, 'authorize', false, '']);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const mismatchTest = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123');
-  const mismatchLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: mismatchTest.request.id }] } });
-  const mismatchAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: mismatchLogin.request.id }] } });
-  const mismatchIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: mismatchAuthorize.request.id }] } });
+  const mismatchLogin = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: mismatchTest.request.id }] } });
+  const mismatchAuthorize = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: mismatchLogin.request.id }] } });
+  const mismatchIdentity = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: mismatchAuthorize.request.id }] } });
   check(so, 'dang nhap thu sai identity fail-closed nhung khong tu tat auto-login', [mismatchIdentity.code, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.stateRead().session.identityVerified], ['LOGIN_IDENTITY_MISMATCH', true, false]);
 
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const draftB = { spreadsheetId: 'sheet-test', userId: '2040', username: 'USERB', accountName: 'Tai khoan B' };
   const draftLogin = heartbeat.FbmSync.loginTestRequest('cred-heartbeat-123', draftB);
-  const draftLoginAdapter = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: draftLogin.request.id }] } });
-  const draftLoginAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: draftLoginAdapter.request.id }] } });
-  const draftLoginIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2040,"USERB","Tai khoan B"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2040', pageAccountName: 'Tai khoan B' }, trace: [{ requestId: draftLoginAuthorize.request.id }] } });
+  const draftLoginAdapter = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: draftLogin.request.id }] } });
+  const draftLoginAuthorize = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: draftLoginAdapter.request.id }] } });
+  const draftLoginIdentity = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2040,"USERB","Tai khoan B"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2040', pageAccountName: 'Tai khoan B' }, trace: [{ requestId: draftLoginAuthorize.request.id }] } });
   check(so, 'login test doi chieu theo identity ban nhap B, khong ep theo binding A', [draftLoginIdentity.code, heartbeat.FbmSync.stateRead().session.accountUsername], ['LOGIN_OK', 'USERB']);
 
   // Gặp thật 2026-10-07: FBM trả {"d":null} khi đăng nhập hỏng, code cũ coi là thành công rồi báo sai "FBM không trả mã xác thực" ở bước sau.
@@ -285,21 +288,21 @@ async function chay(so) {
   const textText = heartbeat.FbmSync.stateRead().message;
   check(so, 'Login trả d:false thì báo sai tên hoặc mật khẩu và không mở nút hủy phiên cũ; d là chuỗi thì báo còn giữ phiên cũ và mở nút', [falseText.indexOf('sai tên đăng nhập hoặc mật khẩu') > 0, falseText.indexOf('màn Tài khoản') > 0, falseOffered, textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, true, false, true, true, true]);
   const serviceSource = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8');
-  check(so, 'đăng nhập thử, hủy phiên cũ và các bước đăng nhập đi qua vỏ runEntryPoint để Log được ghi ra sheet', ['fbmStartLoginTest', 'fbmStartForceLogin', 'fbmLoginTestResult'].map((name) => serviceSource.indexOf('function ' + name + '(') >= 0 && serviceSource.indexOf("runEntryPoint('" + name + "'") >= 0), [true, true, true]);
+  check(so, 'đăng nhập thử, hủy phiên cũ và các bước đăng nhập đi qua vỏ runEntryPoint để Log được ghi ra sheet', ['fbmStartLoginTest', 'fbmStartForceLogin', 'fbmContinueSync'].map((name) => serviceSource.indexOf('function ' + name + '(') >= 0 && serviceSource.indexOf("fbmCommandRun('" + name + "'") >= 0).concat(/function fbmCommandRun\([^)]*\) \{ return runEntryPoint\(name, 'fbm_sync'/.test(serviceSource)), [true, true, true, true]);
   // FBM-057: nút hủy phiên cũ. GAS chỉ mở sau khi FBM trả lời từ chối; đăng nhập tự động luôn là login mềm.
   check(so, 'FBM từ chối đăng nhập thì status mở nút hủy phiên cũ; request đăng nhập tự động không mang cờ hủy phiên', [heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginRequest('cred-heartbeat-123', false).meta.force], [true, false]);
   const forceLogsBefore = gateLogs.length;
   const forceStart = heartbeat.FbmSync.loginForceRequest();
   check(so, 'bấm hủy phiên cũ gửi đăng nhập có cờ hủy phiên bằng thông tin đã lưu, đóng nút lại và ghi Log', [forceStart.ok, forceStart.request.meta.force, forceStart.request.meta.credentialRef, heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginForceRequest().code, gateLogs.slice(forceLogsBefore).some((event) => event.action === 'login_force_requested')], [true, true, 'cred-heartbeat-123', false, 'LOGIN_FORCE_NOT_OFFERED', true]);
-  heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":null}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceStart.request.id }] } });
+  heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":null}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceStart.request.id }] } });
   check(so, 'đã hủy phiên cũ mà FBM vẫn từ chối thì báo khả năng sai mật khẩu và không mở lại nút hủy phiên', [heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ nhưng FBM vẫn từ chối') === 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, false]);
   const throttleText = heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', { retryAt: new Date(2026, 9, 7, 16, 48).getTime() });
   check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay', [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM còn giữ phiên đăng nhập cũ') > 0, throttleText.indexOf('Đăng nhập thử') > 0], [true, true, true]);
   heartbeat.FbmSync.statePatch({ phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
   const forceAgain = heartbeat.FbmSync.loginForceRequest();
-  const forceLogin = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: forceAgain.request.id }] } });
-  const forceAuthorize = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceLogin.request.id }] } });
-  const forceIdentity = heartbeat.FbmSync.loginTestResult({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: forceAuthorize.request.id }] } });
+  const forceLogin = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: forceAgain.request.id }] } });
+  const forceAuthorize = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceLogin.request.id }] } });
+  const forceIdentity = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: forceAuthorize.request.id }] } });
   check(so, 'hủy phiên cũ và đăng nhập đúng tài khoản đã liên kết thì báo thành công, mở lại quyền tự đăng nhập ngay và ghi Log', [forceIdentity.code, heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ và đăng nhập') === 0, heartbeat.FbmSync.autoLoginCanAttempt().ok, gateLogs.some((event) => event.action === 'login_force_ok')], ['LOGIN_OK', true, true, true]);
   heartbeat.FbmSync.statePatch({ runId: 'authorize-false-run', phase: 'checking_session', cursor: { kind: 'login_identity_authorize', purpose: 'auto', testOnly: false }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
   const logsBeforeAuthorize = gateLogs.length;
@@ -317,22 +320,22 @@ async function chay(so) {
   justTried.lastAttemptAt = Date.now();
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(justTried);
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const withinCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const withinCycleEnd = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycle.request.id }] } });
+  const withinCycle = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const withinCycleEnd = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycle.request.id }] } });
   check(so, 'Chưa hết chu kỳ thử lại: lượt nền mới thấy phiên chết thì kết thúc AUTO_LOGIN_THROTTLED, không gửi lệnh đăng nhập', [withinCycle.request.meta.kind, withinCycleEnd.code, withinCycleEnd.request, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['session_probe', 'AUTO_LOGIN_THROTTLED', null, false]);
   const blockedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
   blockedConfig.lastAttemptAt = Date.now() - 61 * 1000;
   blockedConfig.nextRetryAt = 0;
   heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(blockedConfig);
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const afterCycle = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const afterCycleIdentity = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: afterCycle.request.id }] } });
-  const afterCycleLive = heartbeat.fbmSyncHeartbeat({ d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleIdentity.request && afterCycleIdentity.request.id }] } });
+  const afterCycle = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const afterCycleIdentity = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: afterCycle.request.id }] } });
+  const afterCycleLive = noiNen(heartbeat, { d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleIdentity.request && afterCycleIdentity.request.id }] } });
   check(so, 'Hết chu kỳ thử lại mà người dùng đã tự đăng nhập: probe xác minh xong thì đếm khách, số khách lệch mốc thì mở Quét nhanh bằng probe User, không gửi lệnh đăng nhập', [afterCycle.request.meta.kind, afterCycleIdentity.request && afterCycleIdentity.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind], ['session_probe', 'heartbeat', true, 'session_probe']);
   heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, scheduledScan: '', chain: null });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  const afterCycleDead = heartbeat.fbmSyncHeartbeatRequest({ source: 'alarm' });
-  const afterCycleLogin = heartbeat.fbmSyncHeartbeat({ ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
+  const afterCycleDead = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+  const afterCycleLogin = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
   check(so, 'Hết chu kỳ thử lại mà phiên vẫn chết: lượt mới probe xác nhận rồi cấp lệnh đăng nhập', [afterCycleDead.request && afterCycleDead.request.meta.kind, afterCycleLogin.ok, afterCycleLogin.request && afterCycleLogin.request.meta.kind], ['session_probe', true, 'login']);
   // Sau đăng nhập, liên kết (ở đây là bản nháp của đăng nhập thử) cũng phải khớp cả trang FBM vừa mở.
   const loginUserBody = '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}';
@@ -364,7 +367,7 @@ async function chay(so) {
     deleteProperty: (key) => { delete connectionData[key]; }
   };
   const connection = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => connectionProps }, shinOpenBook: () => ({ getId: () => 'sheet-connection' }) });
-  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   connection.FbmSync.configValue = () => '';
   connection.FbmSync.readLocal = () => [];
   const incompleteBinding = connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-a', username: '' }, credential: { mode: 'preserve' } });
@@ -444,9 +447,9 @@ async function chay(so) {
   afterWipe.FbmSync.statePatch({ session: Object.assign(afterWipe.FbmSync.stateRead().session, { cookie: '461099999855cFHN_CRM_App' }) });
   afterWipeData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const wipedSession = afterWipe.FbmSync.stateRead().session;
-  const afterWipeHeartbeat = afterWipe.fbmSyncHeartbeatRequest({ source: 'alarm' });
+  const afterWipeHeartbeat = afterWipe.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   const wipeProbeBody = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[7777, 'WIPE', 'Tai khoan wipe']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
-  const afterWipeCount = afterWipe.fbmSyncHeartbeat({ ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '7777', pageAccountName: 'Tai khoan wipe' }, trace: [{ requestId: afterWipeHeartbeat.request.id }] } });
+  const afterWipeCount = noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '7777', pageAccountName: 'Tai khoan wipe' }, trace: [{ requestId: afterWipeHeartbeat.request.id }] } });
   const wipedKeys = JSON.stringify(afterWipeCount.request && afterWipeCount.request.body && afterWipeCount.request.body.externalKey || []);
   check(so, 'Giữ phiên sau lượt bị xóa phiên: request đầu là probe User, sau probe mới dựng request đếm khách, lọc quyền theo mã đọc từ grid User (không theo mã đoán từ cookie)', [
     wipedSession.userId, afterWipeHeartbeat.ok, afterWipeHeartbeat.request && afterWipeHeartbeat.request.meta.kind, afterWipeCount.ok, afterWipeCount.request && afterWipeCount.request.meta.kind, wipedKeys.indexOf("GetCustomerValidate('7777')") >= 0, wipedKeys.indexOf("GetCustomerValidate('9999')") >= 0
@@ -456,8 +459,8 @@ async function chay(so) {
   const pageRound = (captures) => {
     afterWipe.FbmSync.stateStart('', 'error', 0);
     afterWipeData.FBM_SYNC_DONE_HEARTBEAT = '1';
-    const opened = afterWipe.fbmSyncHeartbeatRequest({ source: 'alarm' });
-    return { opened, reply: afterWipe.fbmSyncHeartbeat({ ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures, trace: [{ requestId: opened.request.id }] } }) };
+    const opened = afterWipe.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
+    return { opened, reply: noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures, trace: [{ requestId: opened.request.id }] } }) };
   };
   const pageMismatch = pageRound({ pageUserId: '9999', pageAccountName: 'Tai khoan wipe' }).reply;
   const nameMismatch = pageRound({ pageUserId: '7777', pageAccountName: 'Nguoi khac' }).reply;
@@ -465,12 +468,12 @@ async function chay(so) {
     pageMismatch.ok, pageMismatch.code, pageMismatch.request, nameMismatch.code, nameMismatch.request, afterWipe.FbmSync.sessionIdentityIsVerified(afterWipe.FbmSync.stateRead())
   ], [false, 'SESSION_IDENTITY_MISMATCH', null, 'SESSION_IDENTITY_MISMATCH', null, false]);
   const pageEmpty = pageRound({});
-  const pageStillEmpty = afterWipe.fbmSyncHeartbeat({ ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: pageEmpty.reply.request.id }] } });
+  const pageStillEmpty = noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: pageEmpty.reply.request.id }] } });
   check(so, 'Trang FBM thiếu mã và tên: GAS phát lại probe kèm lệnh tải tab về trang khách hàng; tải lại vẫn thiếu thì dừng FBM_PAGE_IDENTITY_MISSING, không tải lại mãi', [
     pageEmpty.reply.ok, pageEmpty.reply.request.meta.kind, pageEmpty.reply.request.meta.reloadFbmPage, pageStillEmpty.ok, pageStillEmpty.code, pageStillEmpty.request
   ], [true, 'session_probe', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', false, 'FBM_PAGE_IDENTITY_MISSING', null]);
   const pageAfterReload = pageRound({});
-  const pageReloadedOk = afterWipe.fbmSyncHeartbeat({ ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '7777', pageAccountName: 'Tai khoan wipe' }, trace: [{ requestId: pageAfterReload.reply.request.id }] } });
+  const pageReloadedOk = noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '7777', pageAccountName: 'Tai khoan wipe' }, trace: [{ requestId: pageAfterReload.reply.request.id }] } });
   check(so, 'Tải lại trang xong có đủ mã và tên khớp liên kết: phiên được xác minh, Giữ phiên dựng request đếm khách, request không còn lệnh tải lại', [
     pageReloadedOk.ok, pageReloadedOk.request && pageReloadedOk.request.meta.kind, pageReloadedOk.request && pageReloadedOk.request.meta.reloadFbmPage
   ], [true, 'heartbeat', undefined]);

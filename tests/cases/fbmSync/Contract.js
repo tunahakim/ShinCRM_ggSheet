@@ -36,7 +36,7 @@ async function chay(so) {
     hop.FbmSync.protocol.contractMismatch({ status: 200, body: '{}' }).code,
     hop.FbmSync.protocol.contractMismatch({ status: 200, body: '{}', transport: { contract: 'ma-khac' } }).received,
     hop.FbmSync.protocol.contractMismatch({ status: 200, body: '{}', transport: { contract: hop.FbmSync.protocol.contract } })
-  ], ['FBM_EXTENSION_CONTRACT_MISMATCH', 'ma-khac', null]);
+  ], ['EXTENSION_PROTOCOL_MISMATCH', 'ma-khac', null]);
 }
 
 module.exports = { chay };

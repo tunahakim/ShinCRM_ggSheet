@@ -43,9 +43,9 @@ function chay(so) {
   check(so, 'các phần cài đặt của lõi có mặt, mỗi khóa kho mang tiền tố SETTINGS:',
     hop.settingsSectionList().map((s) => hop.settingsKey(s)), ['SETTINGS:core_ops', 'SETTINGS:core_data', 'SETTINGS:defaults_sidebar']);
   checkThrows(so, 'tên phần lạ là lỗi lập trình, ném ngay', () => hop.settingsSection('khong_co'), 'khong_co');
-  hop.fbmSettingsSections = () => [{ name: 'core_ops', owner: 'fbm_sync', label: 'x', fields: {} }];
+  hop.SETTINGS_SECTION_PROVIDERS.thu = () => [{ name: 'core_ops', owner: 'thu', label: 'x', fields: {} }];
   checkThrows(so, 'hai module khai trùng tên phần thì ném, không để hai bên tranh một khóa kho', () => hop.settingsSectionList(), 'core_ops');
-  delete hop.fbmSettingsSections;
+  delete hop.SETTINGS_SECTION_PROVIDERS.thu;
 
   check(so, 'chưa lưu gì thì đọc ra giá trị rỗng của từng kiểu',
     [hop.settingsRead(hop.settingsSection('core_ops')), hop.settingsRead(hop.settingsSection('core_data'))],

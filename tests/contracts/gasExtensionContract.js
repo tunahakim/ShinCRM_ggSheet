@@ -35,17 +35,19 @@ const CONTRACT = {
     // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
     codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT']
   },
-  // Extension → Web App GAS (nhịp nền).
+  // Extension → Web App GAS (nhịp nền). Thân: `{ key, contract, spreadsheetId, command, payload }`. `heartbeat` hỏi việc (payload `trigger`, `trail`); `continue` nộp `response` hoặc `error` (`requestId`, `code`, `message`).
   relay: {
-    kinds: ['heartbeat_request', 'heartbeat', 'heartbeat_transport_failure', 'background_sync', 'transport_probe'],
-    commands: ['continue', 'transport_failure'],
+    body: ['key', 'contract', 'spreadsheetId', 'command', 'payload'],
+    commands: ['heartbeat', 'continue'],
+    // Mã giao thức lệch giữa GAS và Extension: bên nhận dừng, Sidebar báo tải lại Extension.
+    mismatchCode: 'EXTENSION_PROTOCOL_MISMATCH',
     // Extension đã chuyển sang Sheet khác giữa chuỗi: báo một lần cho GAS cũ rồi dừng.
     failureCodes: ['RELAY_CONFIG_SWITCHED']
   },
   // Sidebar ↔ Extension qua postMessage.
   bridge: {
-    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_REQUEST', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL', 'CRM_FBM_TRANSPORT_PROBE'],
-    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_TRANSPORT_PROBE_RESULT'],
+    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_REQUEST', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL'],
+    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_RESPONSE', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT'],
     // Cấu hình relay: `switchFrom` là Spreadsheet Extension đang giữ, chỉ gửi sau khi người dùng xác nhận chuyển Sheet ở Sidebar.
     config: ['url', 'key', 'spreadsheetId', 'extension', 'switchFrom'],
     configAck: ['ok', 'code', 'error', 'currentSpreadsheetId'],

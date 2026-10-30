@@ -1,60 +1,62 @@
-/** Kiểm tra cổng lệnh trung lập với Sidebar/relay/bot và DTO thông báo. */
-const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer } = require("../../lib/load-gas");
+/** Kiểm cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng, relay chỉ gọi được lệnh của relay, mã giao thức lệch bị chặn, khóa bận không lọt, `status` chỉ đọc. */
+const { section, check } = require('../../lib/assert');
+const { workflowGas } = require('./Workflow');
+
+function loi(fn) {
+  try { fn(); return null; } catch (error) { return String(error && error.code || ''); }
+}
 
 async function chay(so) {
-  section("FBM sync — control port");
-  const calls = [];
-  const hop = taoHopCat({
-    FbmSync: {
-      start: (input) => { calls.push(['start', input]); return { ok: true, request: null }; },
-      continue: (response) => { calls.push(['continue', response]); return { ok: true }; },
-      statusView: () => ({ phase: 'idle', counts: {} }),
-      masterEnabled: () => true,
-      setMasterEnabled: (enabled) => { calls.push(['master', enabled]); return { ok: true, enabled }; },
-      backgroundEnabled: () => true,
-      setBackgroundEnabled: (enabled) => { calls.push(['background', enabled]); return { ok: true, enabled }; },
-      resolveConflict: (...args) => { calls.push(['resolve', args]); return { ok: true }; },
-      confirmConflict: (...args) => { calls.push(['confirm', args]); return { ok: true }; },
-      heartbeatTransportFailure: (input) => { calls.push(['transport_failure', input]); return { ok: false, code: input.code }; },
-      withOrchestrationLock: (callback) => { calls.push(['lock']); return callback(); },
-      logTransportError: (message) => ({ phase: 'error', message })
-    },
-    fbmSyncApprovePush: () => { calls.push(['approve']); return { ok: true }; },
-    fbmSyncCancel: () => { calls.push(['cancel']); return { ok: true }; },
-    fbmSyncRetryPushFailures: () => { calls.push(['retry']); return { ok: true }; }
-  });
-  napServer(hop, 'fbm_sync/control/ControlPort.js');
+  section('FBM sync — cửa lệnh');
+  const { hop, documentProperties, scriptLock } = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
+  const FbmSync = hop.FbmSync;
+  FbmSync.setMasterEnabled(true);
 
-  hop.FbmSync.controlDispatch('start', { mode: 'read', origin: 'background' });
-  hop.FbmSync.controlDispatch('continue', { response: { status: 200 } });
-  check(so, 'adapter chuyen command thanh payload nghiep vu chuan', calls.slice(0, 2), [
-    ['start', { mode: 'read', scan: undefined, origin: 'background', manual: true }],
-    ['continue', { status: 200 }]
-  ]);
-  hop.FbmSync.controlDispatch('start', { mode: 'write', pack: 'deep' });
-  check(so, 'Lệnh chạy từ Sidebar mang Mức quét đã chọn tới GAS', calls[2] && calls[2][1] && calls[2][1].pack, 'deep');
-  calls.splice(2, 1);
-  hop.FbmSync.controlDispatch('set_master_switch', { enabled: false });
-  hop.FbmSync.controlDispatch('set_background_switch', { enabled: false });
-  check(so, 'control port chuyển đúng công tắc tổng và lịch nền', calls.slice(2), [['master', false], ['background', false]]);
+  check(so, 'lệnh không có trong bảng thì từ chối với COMMAND_UNKNOWN, không có nhánh mặc định', [loi(() => FbmSync.controlDispatch('get_master_switch', {})), loi(() => FbmSync.controlDispatch('transport_failure', {})), loi(() => FbmSync.controlDispatch('', {}))], ['COMMAND_UNKNOWN', 'COMMAND_UNKNOWN', 'COMMAND_UNKNOWN']);
+  check(so, 'relay chỉ được gọi heartbeat và continue', Object.keys(FbmSync.COMMANDS).filter((name) => FbmSync.relayCommandAllowed(name)).sort(), ['continue', 'heartbeat']);
+  check(so, 'loại lượt lạ của lệnh start thì từ chối', loi(() => FbmSync.controlDispatch('start', { kind: 'bulk' })), 'SYNC_START_KIND_UNKNOWN');
+  check(so, 'mục cài đặt lạ thì từ chối', loi(() => FbmSync.controlDispatch('save_settings', { section: 'all', value: {} })), 'SETTINGS_SECTION_UNKNOWN');
 
-  const beforeTransport = calls.length;
-  const transportFailure = hop.FbmSync.controlDispatchLocked('transport_failure', { requestId: 'req-1', code: 'FBM_TRANSPORT_UNAVAILABLE' });
-  check(so, 'transport failure không bị bọc lock lần hai', calls.slice(beforeTransport), [['transport_failure', { requestId: 'req-1', code: 'FBM_TRANSPORT_UNAVAILABLE' }]]);
-  check(so, 'transport failure giữ nguyên mã lỗi từ handler tự khóa', transportFailure.code, 'FBM_TRANSPORT_UNAVAILABLE');
+  // Cổng relay: khóa đúng nhưng lệnh ngoài danh sách, mã giao thức lệch hoặc Sheet khác thì ném lỗi có mã trước khi chạm state.
+  const contract = FbmSync.protocol.contract;
+  const before = JSON.stringify(documentProperties.data);
+  check(so, 'relay gửi lệnh ngoài danh sách thì từ chối và không đổi state', [loi(() => FbmSync.relayHandle({ spreadsheetId: 'sheet-workflow', contract, command: 'start', payload: { kind: 'sync', mode: 'write' } })), JSON.stringify(documentProperties.data) === before], ['RELAY_COMMAND_REJECTED', true]);
+  check(so, 'relay của Extension khác bản giao thức thì từ chối với EXTENSION_PROTOCOL_MISMATCH', [loi(() => FbmSync.relayHandle({ spreadsheetId: 'sheet-workflow', contract: 'cu', command: 'heartbeat', payload: {} })), loi(() => FbmSync.relayHandle({ spreadsheetId: 'sheet-workflow', command: 'heartbeat', payload: {} }))], ['EXTENSION_PROTOCOL_MISMATCH', 'EXTENSION_PROTOCOL_MISMATCH']);
+  check(so, 'relay gửi nhầm Sheet thì từ chối', loi(() => FbmSync.relayHandle({ spreadsheetId: 'sheet-khac', contract, command: 'heartbeat', payload: {} })), 'RELAY_SPREADSHEET_MISMATCH');
+  check(so, 'phong bì GAS gửi Extension mang mã giao thức', FbmSync.protocol.request('r1', 'https://fbm.test/x', {}, {}).contract, contract);
 
-  const warning = hop.FbmSync.controlNotification({
-    runId: 'r1', phase: 'awaiting_approval', message: 'old',
-    counts: { total: 20 }, metadata: { approvalRequired: true, approvalCount: 20 }
-  });
-  check(so, 'DTO approval co action id khong phu thuoc giao dien', [warning.type, warning.severity, warning.text, warning.actions.map((item) => item.id)], [
-    'sync_approval_required', 'warning', 'Cảnh báo: có 20 bản ghi cần người dùng chấp thuận trước khi ghi.', ['approve_push', 'cancel_sync']
-  ]);
-  check(so, 'notification binh thuong khong tu tao action', hop.FbmSync.controlNotification({ phase: 'done', message: 'x', counts: {} }).actions, []);
-  let unknown = false;
-  try { hop.FbmSync.controlDispatch('unknown', {}); } catch (error) { unknown = /SYNC_COMMAND_UNKNOWN/.test(String(error.message)); }
-  check(so, 'lenh la khong hop le thi fail closed', unknown, true);
+  // Lượt khác đang chạy: Đăng nhập thử bị từ chối với SYNC_BUSY và không đổi ô lượt.
+  const running = FbmSync.stateStart('', 'pull_customer', 1);
+  running.phase = 'pull_customer'; running.cursor = { kind: 'customer_grid' };
+  FbmSync.stateWrite(running);
+  FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
+  const busyState = JSON.stringify(FbmSync.stateRead());
+  const loginBusy = FbmSync.controlDispatch('start', { kind: 'login_test' });
+  check(so, 'Đăng nhập thử khi lượt khác đang chạy thì trả SYNC_BUSY, không cấp request và không đổi ô lượt', [loginBusy.code, loginBusy.request || null, JSON.stringify(FbmSync.stateRead()) === busyState], ['SYNC_BUSY', null, true]);
+
+  // Khóa đang bị lượt khác giữ: lệnh ghi không chạy, lệnh nộp kết quả bị bỏ thì phải ghi Log.
+  const logs = [];
+  hop.logEvent = (line) => { logs.push(line); };
+  scriptLock.held = true;
+  const locked = FbmSync.controlDispatch('continue', { response: { ok: true, status: 200, body: '{}' } });
+  scriptLock.held = false;
+  check(so, 'khóa bận thì lệnh continue không chạy và bỏ kết quả có dòng Log', [locked.code, logs.some((line) => line.action === 'busy_reply_dropped')], ['BUSY', true]);
+
+  // `status` chỉ đọc: không ghi DocumentProperties, kể cả khi lượt đang chạy đã quá hạn.
+  const stale = FbmSync.stateRead();
+  stale.updatedAt = 1; stale.lastProgressAt = 1; FbmSync.stateWrite(stale);
+  const snapshot = JSON.stringify(documentProperties.data);
+  let writes = 0;
+  const realSet = documentProperties.setProperty, realDelete = documentProperties.deleteProperty;
+  documentProperties.setProperty = function (key, value) { writes += 1; return realSet.call(this, key, value); };
+  documentProperties.deleteProperty = function (key) { writes += 1; return realDelete.call(this, key); };
+  const status = FbmSync.controlDispatch('status', {});
+  documentProperties.setProperty = realSet; documentProperties.deleteProperty = realDelete;
+  check(so, 'status trả đủ gói một lần đọc và không ghi DocumentProperties', [status.ok, !!status.status, !!status.identity, !!status.settings, !!status.login, writes, JSON.stringify(documentProperties.data) === snapshot], [true, true, true, true, true, 0, true]);
+
+  // Kết quả ra ngoài chỉ gồm trường đã khai: thêm trường lạ là lỗi to, không lọt khóa phiên FBM.
+  check(so, 'kết quả có trường ngoài danh sách thì ném PUBLIC_RESULT_FIELD_UNKNOWN', loi(() => FbmSync.publicResult({ ok: true, session: {} })), 'PUBLIC_RESULT_FIELD_UNKNOWN');
+  check(so, 'kết quả gỡ khóa phiên FBM theo hình dạng ô phiên', FbmSync.publicResult({ ok: true, status: { session: { customerAuthorized: 'x', activityAuthorized: 'y', cookie: 'c', userId: 'u1' } } }).status.session, { userId: 'u1' });
 }
 
 module.exports = { chay };

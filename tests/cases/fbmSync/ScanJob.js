@@ -131,13 +131,12 @@ function scanHarness(options) {
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const sent = await deliver(step.request, h);
       if (sent.fail) {
-        step = F.controlDispatchLocked('transport_failure', { requestId: step.request.id, code: sent.fail, message: sent.message });
+        step = F.controlDispatch('continue', { error: { requestId: step.request.id, code: sent.fail, message: sent.message } });
         trace.statuses.push(step.status);
         continue;
       }
-      const before = F.statusView();
       try {
-        step = F.controlDispatchLocked('continue', { response: sent.raw });
+        step = F.controlDispatch('continue', { response: sent.raw });
       } catch (error) {
         trace.errors.push(String(error && error.message || error));
         if (!h.afterError) { throw error; }
@@ -145,18 +144,17 @@ function scanHarness(options) {
         continue;
       }
       trace.statuses.push(step.status);
-      if (step.status && F.shouldLogStatus(before, step.status)) { F.logStatus(step.status, 'slice'); }
     }
     return step;
   }
-  /** Một lần Extension hỏi GAS theo alarm `gas_poll`: request đầu nộp qua cổng heartbeat, các request sau qua cổng continue tới khi GAS trả `request: null` như relay thật; trần 200 vòng chỉ để test không treo. */
+  /** Một lần Extension hỏi GAS theo alarm `gas_poll` như relay thật: lệnh `heartbeat` hỏi việc, mọi kết quả nộp qua lệnh `continue` tới khi GAS trả `request: null`; trần 200 vòng chỉ để test không treo. */
   async function poll(hooks) {
-    const h = hooks || {}, hop = flow.hop;
-    let step = hop.fbmSyncHeartbeatRequest({ source: h.source || 'alarm', hop: 0 });
+    const h = hooks || {};
+    let step = F.controlDispatch('heartbeat', { source: 'relay', trigger: h.source || 'alarm' });
     for (let used = 0; step && step.request && used < 200; used += 1) {
       const request = step.request, sent = await deliver(request, h);
-      if (sent.fail) { step = F.controlDispatchLocked('transport_failure', { requestId: request.id, code: sent.fail, message: sent.message, hop: used + 1 }); continue; }
-      step = used === 0 ? hop.fbmSyncHeartbeat(sent.raw, { hop: 1 }) : F.controlDispatchLocked('continue', { response: sent.raw, hop: used + 1 });
+      if (sent.fail) { step = F.controlDispatch('continue', { source: 'relay', error: { requestId: request.id, code: sent.fail, message: sent.message }, hop: used + 1 }); continue; }
+      step = F.controlDispatch('continue', { source: 'relay', response: sent.raw, hop: used + 1 });
     }
     return step;
   }
