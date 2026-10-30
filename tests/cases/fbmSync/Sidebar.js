@@ -157,6 +157,15 @@ async function testSharedShellLifecycle(so) {
   const openFailed = await hop.syncPanelToggle();
   hop.fbmSyncPaintError = openErrorPaint; hop.callServer = openCallServer;
   check(so, 'Gói mở màn lỗi thì báo lỗi một lần trên màn đồng bộ, không nuốt lỗi', [openFailed, openErrors], [null, [['GAS hỏng', 'sidebar_open']]]);
+
+  // Lượt tay mở rồi mà Sidebar đóng trước khi đánh thức Extension: mở lại màn thấy lượt còn chờ nhận thì đánh thức lại.
+  const wakes = [], wakeRpc = hop.fbmSyncExtensionRpc, wakeCallServer = hop.callServer;
+  hop.fbmSyncExtensionRpc = (action, fields) => { wakes.push([action, fields]); return Promise.resolve({ ok: true, accepted: true }); };
+  hop.callServer = (name) => Promise.resolve(name === 'fbmGetSyncStatus' ? { ok: true, status: { phase: 'session', running: true, runId: 'L9', awaitingPickup: true, masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: {}, login: { configured: false } } : { ok: true });
+  hop.FBM_SYNC_CLIENT.active = false;
+  await hop.syncPanelToggle();
+  hop.fbmSyncExtensionRpc = wakeRpc; hop.callServer = wakeCallServer;
+  check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS', wakes, [['CRM_FBM_RUN_NOW', { retryMs: [] }]]);
 }
 
 async function testOwnRunId(so) {

@@ -73,9 +73,9 @@ function phongBi(ctx, id, extra) {
   return Object.assign(base, extra || {}, { meta: Object.assign({}, base.meta, extra && extra.meta || {}) });
 }
 
-/** Mở lượt tay như Sidebar gửi `CRM_FBM_RUN_NOW`, chờ vòng chạy hết. */
-async function chayLuot(ctx, runId, retryMs) {
-  const accepted = await ctx.fbmRunNow(runId, retryMs || []);
+/** Đánh thức như Sidebar gửi `CRM_FBM_RUN_NOW` sau khi mở lượt tay, chờ vòng chạy hết. */
+async function chayLuot(ctx, retryMs) {
+  const accepted = await ctx.fbmRunNow(retryMs || []);
   const flight = ctx.relayLoopFlight;
   const ketQua = flight ? await flight : null;
   await nghi(5);
@@ -92,22 +92,22 @@ async function vongLuotTay(so) {
     }
   });
   ctxRef = tron.ctx;
-  const { accepted, ketQua } = await chayLuot(tron.ctx, 'L1', [5, 10]);
+  const { accepted, ketQua } = await chayLuot(tron.ctx, [5, 10]);
   const [nhan, nop] = tron.st.bodies;
-  check(so, 'Lượt tay: Sidebar gửi runId, Extension nhận lượt bằng continue{runId} kèm mã máy, chạy đúng một request rồi nộp response về GAS cùng mã máy và Sheet', [
-    accepted, nhan.command, nhan.payload.runId, typeof nhan.payload.machineId, nhan.payload.machineId.length > 4, nhan.spreadsheetId, nhan.key, nhan.contract === tron.ctx.FBM_CONTRACT_VERSION,
+  check(so, 'Lượt tay: Sidebar đánh thức, Extension chỉ hỏi GAS (heartbeat, trigger run_now, không mang mã lượt) kèm mã máy, chạy đúng request GAS trả rồi nộp response về GAS cùng mã máy và Sheet', [
+    accepted, nhan.command, nhan.payload.trigger, Object.prototype.hasOwnProperty.call(nhan.payload, 'runId'), typeof nhan.payload.machineId, nhan.payload.machineId.length > 4, nhan.spreadsheetId, nhan.key, nhan.contract === tron.ctx.FBM_CONTRACT_VERSION,
     tron.st.executes.map((item) => item.id), nop.command, nop.payload.hop, nop.payload.response.status, nop.payload.machineId === nhan.payload.machineId, Object.prototype.hasOwnProperty.call(nop.payload, 'runId'), tron.st.bodies.length, ketQua.ok
-  ], [{ ok: true, accepted: true }, 'continue', 'L1', 'string', true, SHEET, 'relay-key', true, ['r1'], 'continue', 1, 200, true, false, 2, true]);
+  ], [{ ok: true, accepted: true }, 'heartbeat', 'run_now', false, 'string', true, SHEET, 'relay-key', true, ['r1'], 'continue', 1, 200, true, false, 2, true]);
   check(so, 'Mỗi lần GAS trả lời thì chuyển status sang tab Sheets kèm Sheet; chỉ lần GAS không cấp request mới mang done', tron.st.statuses.map((item) => [item.spreadsheetId, item.status.phase, item.done, item.ok]), [[SHEET, 'running', false, true], [SHEET, 'done', true, true]]);
   check(so, 'Mã máy cất trong kho Extension, lần sau dùng lại đúng mã đó', tron.st.storage.fbmMachineId, nhan.payload.machineId);
   check(so, 'Hộp đen ghi đủ chuỗi bước của lượt tay', tron.st.trails, ['gas_request_received', 'fbm_tab_preparing:complete', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'chain_finished']);
 
-  // Máy khác: GAS từ chối ngay lần nhận lượt.
-  const lech = workerNap({ gas() { return { ok: false, code: 'RUN_DRIVER_MISMATCH', error: 'Lượt đang do máy khác chở.', request: null, status: { runId: 'L2', phase: 'running' } }; } });
-  const ketQuaLech = (await chayLuot(lech.ctx, 'L2')).ketQua;
-  check(so, 'GAS từ chối RUN_DRIVER_MISMATCH: Extension dừng ngay, không tìm và không chạm tab FBM, Sidebar nhận done kèm đúng mã và chữ GAS', [
+  // Không có lượt chờ máy này (lượt đang chờ máy khác, hoặc đã được nhận): GAS không cấp request.
+  const lech = workerNap({ gas() { return { ok: true, code: 'NO_RUN_AWAITING', request: null, status: { runId: 'L2', phase: 'running' } }; } });
+  const ketQuaLech = (await chayLuot(lech.ctx)).ketQua;
+  check(so, 'GAS trả NO_RUN_AWAITING: Extension dừng ngay, không tìm và không chạm tab FBM, Sidebar nhận done kèm đúng mã', [
     ketQuaLech.code, lech.st.bodies.length, lech.st.fbmQueries, lech.st.executes.length, lech.st.statuses.map((item) => [item.done, item.ok, item.code, item.error])
-  ], ['RUN_DRIVER_MISMATCH', 1, 0, 0, [[true, false, 'RUN_DRIVER_MISMATCH', 'Lượt đang do máy khác chở.']]]);
+  ], ['NO_RUN_AWAITING', 1, 0, 0, [[true, true, 'NO_RUN_AWAITING', '']]]);
 
   // Response đến sau khi lượt đã đóng (người dùng bấm Dừng, lượt khác đã thay): GAS trả lỗi, Extension không nộp lại, không thử lại.
   let ctxMuon = null;
@@ -118,7 +118,7 @@ async function vongLuotTay(so) {
     }
   });
   ctxMuon = muon.ctx;
-  const ketQuaMuon = (await chayLuot(muon.ctx, 'L3', [5, 10])).ketQua;
+  const ketQuaMuon = (await chayLuot(muon.ctx, [5, 10])).ketQua;
   check(so, 'Response nộp sau khi lượt đóng bị GAS từ chối: GAS đã trả lời nên không thử lại, không ghi ô lỗi hộp đen; Sidebar nhận done kèm mã GAS; hộp đen ghi bước cuối bị từ chối', [
     ketQuaMuon.code, muon.st.bodies.length, muon.st.storage.fbmExtensionFailure, muon.st.statuses.map((item) => [item.done, item.code]), muon.st.trails[muon.st.trails.length - 1]
   ], ['RUN_NOT_ACTIVE', 2, undefined, [[false, ''], [true, 'RUN_NOT_ACTIVE']], 'gas_reply_failed:RUN_NOT_ACTIVE']);
@@ -131,17 +131,17 @@ async function vongLuotTay(so) {
     gas(body, lan) { return lan === 1 ? { ok: true, request: phongBi(ctxLa, 'r-la') } : { ok: true, request: null }; }
   });
   ctxLa = laNap.ctx;
-  await chayLuot(laNap.ctx, 'L4');
+  await chayLuot(laNap.ctx);
   const nopLa = laNap.st.bodies[1].payload.response;
   check(so, 'Response hình dạng lạ đi nguyên về GAS: thân, trường lạ, header và vết giữ nguyên, chỉ thêm mã hợp đồng', [
     nopLa.body, nopLa.weird, nopLa.headers, nopLa.status, nopLa.transport.trace, nopLa.transport.contract === laNap.ctx.FBM_CONTRACT_VERSION
   ], [la.body, la.weird, la.headers, 200, la.transport.trace, true]);
 
-  // Không có runId: không mở vòng, không gọi GAS.
-  const khongMa = workerNap({ gas() { throw new Error('không được gọi'); } });
-  const tuChoi = await khongMa.ctx.fbmRunNow('', []);
-  await nghi(5);
-  check(so, 'Sidebar gửi chạy mà không có runId: Extension trả RUN_ID_REQUIRED, không gọi GAS', [tuChoi.code, khongMa.st.bodies.length], ['RUN_ID_REQUIRED', 0]);
+  // Đánh thức không kèm lịch thử lại (mở lại Sidebar): giữ lịch đã học, không xóa thành rỗng (rỗng thì lần gọi hỏng không được thử lại lần nào).
+  const khongLich = workerNap({ gas() { return { ok: true, code: 'NO_RUN_AWAITING', request: null }; } });
+  await chayLuot(khongLich.ctx, [5, 10]);
+  await chayLuot(khongLich.ctx, []);
+  check(so, 'Đánh thức với lịch thử lại rỗng giữ lịch đã học', [Array.from(khongLich.ctx.relayRetrySchedule), khongLich.st.bodies.length], [[5, 10], 2]);
 }
 
 async function tabVaMien(so) {
@@ -154,25 +154,25 @@ async function tabVaMien(so) {
 
   const treo = voiPhongBi({ ping: false, reloadCompletes: true });
   const batDau = Date.now();
-  await chayLuot(treo.ctx, 'T1');
+  await chayLuot(treo.ctx);
   const loiTreo = treo.st.bodies[1].payload.error;
   check(so, 'Tab FBM chưa sẵn sàng (không trả lời ping kể cả sau khi tải lại): tải lại đúng một lần, không gửi request, nộp lỗi FBM_TAB_NOT_READY kèm requestId về GAS trong hạn envelope', [
     loiTreo.code, loiTreo.requestId, treo.st.reloads, treo.st.executes.length, treo.st.bodies[1].command, Date.now() - batDau < 2000, treo.ctx.workerKeepAliveTimer, treo.st.listeners.length
   ], ['FBM_TAB_NOT_READY', 'r', 1, 0, 'continue', true, null, 0]);
 
   const chan = voiPhongBi({ ping: false, pingRefused: true, inject: () => Promise.reject(new Error('Cannot access contents of url "https://fbo.com.vn:8888/Main/". Extension manifest must request permission to access this host.')) });
-  await chayLuot(chan.ctx, 'T2');
+  await chayLuot(chan.ctx);
   const loiChan = chan.st.bodies[1].payload.error;
   check(so, 'Chrome chặn quyền site FBM: báo FBM_SITE_ACCESS_BLOCKED giữ chữ gốc của Chrome, không tải lại tab, không gửi request', [
     loiChan.code, /must request permission/.test(loiChan.message), chan.st.reloads, chan.st.injects, chan.st.executes.length
   ], ['FBM_SITE_ACCESS_BLOCKED', true, 0, 1, 0]);
 
   const khongTab = workerNap({ noFbmTab: true, gas(body, lan) { return lan === 1 ? { ok: true, request: phongBi(khongTab.ctx, 'r') } : { ok: true, request: null }; } });
-  await chayLuot(khongTab.ctx, 'T3');
+  await chayLuot(khongTab.ctx);
   check(so, 'Không có tab FBM và GAS không cho mở: nộp FBM_TAB_NOT_FOUND, không gửi request', [khongTab.st.bodies[1].payload.error.code, khongTab.st.executes.length], ['FBM_TAB_NOT_FOUND', 0]);
 
   const ngoai = voiPhongBi({}, { url: 'https://example.com/steal' });
-  await chayLuot(ngoai.ctx, 'T4');
+  await chayLuot(ngoai.ctx);
   check(so, 'Phong bì có URL ngoài miền FBM: từ chối FBM_URL_OUTSIDE_SITE trước khi tìm tab, không gửi request', [ngoai.st.bodies[1].payload.error.code, ngoai.st.fbmQueries, ngoai.st.executes.length], ['FBM_URL_OUTSIDE_SITE', 0, 0]);
 
   const sai = workerNap({ gas() { return { ok: true, request: null }; } }).ctx;
@@ -184,7 +184,7 @@ async function tabVaMien(so) {
   ], ['', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', '']);
 
   const lechBan = voiPhongBi({}, { contract: 'ban-cu' });
-  await chayLuot(lechBan.ctx, 'T5');
+  await chayLuot(lechBan.ctx);
   check(so, 'Phong bì mang mã hợp đồng khác: nộp EXTENSION_PROTOCOL_MISMATCH, không tìm tab', [lechBan.st.bodies[1].payload.error.code, lechBan.st.fbmQueries], ['EXTENSION_PROTOCOL_MISMATCH', 0]);
 }
 
@@ -192,17 +192,17 @@ async function cuaGoiGas(so) {
   // Mạng hỏng: thử lại theo lịch GAS gửi, hết lượt thì ghi ô lỗi hộp đen và báo Sidebar.
   let lan = 0;
   const hong = workerNap({ gas() { lan += 1; throw new Error('NETWORK_DOWN'); } });
-  const ketQuaHong = (await chayLuot(hong.ctx, 'G1', [5, 10])).ketQua;
+  const ketQuaHong = (await chayLuot(hong.ctx, [5, 10])).ketQua;
   const loiSidebar = hong.st.statuses.filter((item) => item.failure).map((item) => item.failure.code);
   check(so, 'Gọi GAS hỏng mạng: thử lại đúng theo lịch retryMs Sidebar chuyển (2 lần), hết lượt thì ghi ô lỗi hộp đen kèm số lần, báo Sidebar và kết thúc hữu hạn', [
     lan, ketQuaHong.code, hong.st.storage.fbmExtensionFailure && [hong.st.storage.fbmExtensionFailure.command, hong.st.storage.fbmExtensionFailure.code, hong.st.storage.fbmExtensionFailure.attempts], loiSidebar, hong.st.trails[hong.st.trails.length - 1]
-  ], [3, 'RELAY_FETCH_FAILED', ['relay_continue', 'RELAY_FETCH_FAILED', 3], ['RELAY_FETCH_FAILED'], 'gas_reply_failed:RELAY_FETCH_FAILED']);
+  ], [3, 'RELAY_FETCH_FAILED', ['relay_ask', 'RELAY_FETCH_FAILED', 3], ['RELAY_FETCH_FAILED'], 'gas_reply_failed:RELAY_FETCH_FAILED']);
 
   let lan2 = 0;
   const hoi = workerNap({ gas() { lan2 += 1; if (lan2 === 1) { throw new Error('NETWORK_BLIP'); } return { ok: true, request: null, status: { runId: 'G2', phase: 'done' } }; } });
-  const ketQuaHoi = (await chayLuot(hoi.ctx, 'G2', [5, 10])).ketQua;
+  const ketQuaHoi = (await chayLuot(hoi.ctx, [5, 10])).ketQua;
   const oHoi = hoi.st.storage.fbmExtensionFailure;
-  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, Sidebar nhận done, lần hỏng vẫn nằm trong ô lỗi để lần hỏi nền sau đưa vào Log (lần hỏng có thể đã tới GAS)', [lan2, hoi.st.bodies[0].payload.runId === hoi.st.bodies[1].payload.runId, oHoi && [oHoi.command, oHoi.code, oHoi.attempts], ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)], [2, true, ['relay_continue', 'RELAY_FETCH_FAILED', 1], true, [true]]);
+  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, Sidebar nhận done, lần hỏng vẫn nằm trong ô lỗi để lần hỏi nền sau đưa vào Log (lần hỏng có thể đã tới GAS)', [lan2, JSON.stringify(hoi.st.bodies[0]) === JSON.stringify(hoi.st.bodies[1]), oHoi && [oHoi.command, oHoi.code, oHoi.attempts], ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)], [2, true, ['relay_ask', 'RELAY_FETCH_FAILED', 1], true, [true]]);
 
   const tabs = [
     { id: 1, url: 'https://docs.google.com/spreadsheets/d/' + SHEET + '/edit#gid=0' },
@@ -238,8 +238,8 @@ async function cuaGoiGas(so) {
 
   const thieu = workerNap({ storage: { fbmWebAppUrl: undefined }, gas() { throw new Error('không được gọi'); } });
   delete thieu.st.storage.fbmWebAppUrl;
-  const thieuKetQua = await thieu.ctx.fbmRunNow('G9', []);
-  check(so, 'Thiếu cấu hình relay: không nhận lượt, trả RELAY_CONFIG_MISSING, không gọi GAS', [thieuKetQua.code, thieu.st.bodies.length], ['RELAY_CONFIG_MISSING', 0]);
+  const thieuKetQua = await thieu.ctx.fbmRunNow([]);
+  check(so, 'Thiếu cấu hình relay: không hỏi GAS, trả RELAY_CONFIG_MISSING, không gọi GAS', [thieuKetQua.code, thieu.st.bodies.length], ['RELAY_CONFIG_MISSING', 0]);
 }
 
 /** Cầu nối iframe với Chrome giả: `posts` là tin gửi Sidebar, `toWorker` là tin gửi worker. */
@@ -269,9 +269,9 @@ async function cauNoi(so) {
   b.hop.workerReply = (message) => (message.type === 'FBM_RUN_NOW' ? { ok: true, accepted: true } : { ok: false, code: 'RUN_ID_REQUIRED', error: 'thiếu' });
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q1', nonce: 'n-1', sessionId: session, runId: 'L1', retryMs: [5, 10], password: 'khong-chep' });
   const traLoi = b.posts[b.posts.length - 1].data;
-  check(so, 'Lệnh CRM_FBM_RUN_NOW qua bảng lệnh: worker chỉ nhận đúng trường khai báo; trả lời một dạng kèm nonce và phiên', [
+  check(so, 'Lệnh CRM_FBM_RUN_NOW qua bảng lệnh: worker chỉ nhận lịch thử lại (mã lượt, mật khẩu Sidebar gửi kèm bị bỏ); trả lời một dạng kèm nonce và phiên', [
     b.toWorker[0], [traLoi.action, traLoi.id, traLoi.ok, traLoi.result, traLoi.code, traLoi.nonce, traLoi.sessionId === session], b.posts[b.posts.length - 1].origin
-  ], [{ type: 'FBM_RUN_NOW', runId: 'L1', retryMs: [5, 10] }, ['CRM_FBM_RUN_NOW_RESULT', 'q1', true, { ok: true, accepted: true }, '', 'n-1', true], b.origin]);
+  ], [{ type: 'FBM_RUN_NOW', retryMs: [5, 10] }, ['CRM_FBM_RUN_NOW_RESULT', 'q1', true, { ok: true, accepted: true }, '', 'n-1', true], b.origin]);
   const truoc = b.toWorker.length;
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q2', nonce: 'sai', sessionId: session, runId: 'L1' });
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q3', nonce: 'n-1', sessionId: 'phien-cu', runId: 'L1' });

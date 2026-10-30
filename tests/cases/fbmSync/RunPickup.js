@@ -1,4 +1,4 @@
-/** Kiểm đường mở lượt tay mới: Sidebar chỉ nhận `runId`, Extension của đúng máy đến nhận lượt qua relay; máy khác, lần nhận thứ hai và response đến sau khi lượt đóng không chạm ô lượt. */
+/** Kiểm đường mở lượt tay: Sidebar chỉ nhận `runId`, lần hỏi (`heartbeat`) của Extension đúng máy nhận lượt qua relay; máy khác, lần hỏi thứ hai, chỗ giữ quá hạn và response đến sau khi lượt đóng không chạm nhầm ô lượt. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('./Workflow');
 
@@ -7,13 +7,15 @@ function loi(fn) {
 }
 
 async function chay(so) {
-  section('FBM sync — mở lượt bằng runId, Extension nhận lượt');
+  section('FBM sync — mở lượt bằng runId, lần hỏi của Extension nhận lượt');
   const { hop, documentProperties } = workflowGas();
   const FbmSync = hop.FbmSync;
   const logs = [];
   hop.logEvent = (line) => { logs.push(line); };
   FbmSync.setMasterEnabled(true);
   const anh = () => JSON.stringify(documentProperties.data);
+  // Extension chỉ hỏi: Sidebar đánh thức (`run_now`) hoặc chuông (`alarm`); GAS tự quyết lần hỏi nhận lượt nào.
+  const hoi = (machineId, trigger) => FbmSync.controlDispatch('heartbeat', { trigger: trigger || 'run_now', machineId }, 'relay');
 
   const before = anh();
   const noMachine = FbmSync.controlDispatch('start', { kind: 'identity_probe' });
@@ -24,22 +26,25 @@ async function chay(so) {
   check(so, 'start trên kênh Sidebar trả runId và giãn cách thử lại, không trả phong bì; ô lượt giữ chỗ nhận cho đúng máy', [
     started.ok, typeof started.runId, started.runId === held.runId, Object.prototype.hasOwnProperty.call(started, 'request'), started.relayRetryMs, held.activeRequestId, held.driverMachineId, held.deadlineAt > Date.now()
   ], [true, 'string', true, false, FbmSync.BUDGET.relayRetryMs, 'pickup:' + held.runId, 'may-A', true]);
+  check(so, 'chỗ giữ đủ một nhịp chuông của Extension, để tin đánh thức mất thì lần hỏi theo chuông vẫn nhận lượt; status báo lượt đang chờ nhận', [held.deadlineAt - Date.now() >= FbmSync.extensionConfigRead().pollMinutes * 60000, FbmSync.statusView().awaitingPickup], [true, true]);
 
   const beforeForeign = anh();
-  const foreign = FbmSync.controlDispatch('continue', { runId: started.runId, machineId: 'may-B' }, 'relay');
-  check(so, 'continue từ máy khác bị từ chối RUN_DRIVER_MISMATCH và không ghi gì', [foreign.code, foreign.request || null, anh() === beforeForeign], ['RUN_DRIVER_MISMATCH', null, true]);
+  const foreign = hoi('may-B');
+  check(so, 'máy khác được đánh thức thì không nhận lượt của máy A, không mở việc nền, không ghi gì', [foreign.code, foreign.request || null, anh() === beforeForeign], ['NO_RUN_AWAITING', null, true]);
+  const foreignAlarm = hoi('may-B', 'alarm');
+  check(so, 'chuông máy khác gặp chỗ giữ còn hạn thì không cướp lượt, không ghi gì', [foreignAlarm.request || null, anh() === beforeForeign], [null, true]);
   const foreignReply = FbmSync.controlDispatch('continue', { machineId: 'may-B', response: { ok: true, status: 200, body: '{}' } }, 'relay');
   check(so, 'máy khác nộp response cũng bị từ chối trước khi chạm ô lượt', [foreignReply.code, anh() === beforeForeign], ['RUN_DRIVER_MISMATCH', true]);
-  const wrongRun = FbmSync.controlDispatch('continue', { runId: 'luot-khac', machineId: 'may-A' }, 'relay');
-  check(so, 'nhận lượt sai runId bị từ chối, không ghi', [wrongRun.code, anh() === beforeForeign], ['RUN_PICKUP_REJECTED', true]);
+  const empty = FbmSync.controlDispatch('continue', { runId: started.runId, machineId: 'may-A' }, 'relay');
+  check(so, 'continue không mang kết quả hay lỗi (đường nhận lượt cũ) bị từ chối CONTINUE_EMPTY, không ghi', [empty.code, anh() === beforeForeign], ['CONTINUE_EMPTY', true]);
 
-  const picked = FbmSync.controlDispatch('continue', { runId: started.runId, machineId: 'may-A' }, 'relay');
+  const picked = hoi('may-A');
   const issued = FbmSync.stateRead();
-  check(so, 'đúng máy nhận lượt thì GAS phát phong bì đầu dựng từ cursor, chỗ giữ thành request thật', [picked.ok, picked.request && picked.request.meta.kind, issued.activeRequestId === picked.request.id, issued.driverMachineId], [true, 'identity_user_grid', true, 'may-A']);
+  check(so, 'lần hỏi của đúng máy nhận lượt: GAS phát phong bì đầu dựng từ cursor, chỗ giữ thành request thật, status thôi báo chờ nhận', [picked.ok, picked.request && picked.request.meta.kind, issued.activeRequestId === picked.request.id, issued.driverMachineId, FbmSync.statusView().awaitingPickup], [true, 'identity_user_grid', true, 'may-A', false]);
 
   const beforeTwice = anh();
-  const twice = FbmSync.controlDispatch('continue', { runId: started.runId, machineId: 'may-A' }, 'relay');
-  check(so, 'nhận lượt lần hai bị từ chối RUN_PICKUP_REJECTED, không phát phong bì trùng, không ghi', [twice.code, twice.request || null, anh() === beforeTwice], ['RUN_PICKUP_REJECTED', null, true]);
+  const twice = hoi('may-A');
+  check(so, 'đánh thức lần hai khi lượt đã được nhận: không phát phong bì trùng, không ghi', [twice.code, twice.request || null, anh() === beforeTwice], ['NO_RUN_AWAITING', null, true]);
 
   // Lượt đóng (dừng) rồi response của request cũ mới về: GAS bỏ, không cấp request mới.
   FbmSync.stateWrite(FbmSync.runCloseNow(FbmSync.stateRead(), { phase: 'paused', message: 'Dừng để thử response muộn.' }));
@@ -49,7 +54,7 @@ async function chay(so) {
 
   // Chrome chặn quyền site FBM: GAS không thử lại, đóng lượt bằng lỗi, ghi Log và để status mang chữ gốc cho Sidebar.
   const blockedRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
-  const blockedPick = blockedRun.runId ? FbmSync.controlDispatch('continue', { runId: blockedRun.runId, machineId: 'may-A' }, 'relay') : blockedRun;
+  const blockedPick = blockedRun.runId ? hoi('may-A') : blockedRun;
   logs.length = 0;
   const blocked = blockedPick.request ? FbmSync.controlDispatch('continue', { machineId: 'may-A', error: { requestId: blockedPick.request.id, code: 'FBM_SITE_ACCESS_BLOCKED', message: 'Chrome đang chặn Extension truy cập site FBM: Cannot access contents of url.' } }, 'relay') : blockedPick;
   const blockedState = FbmSync.stateRead();
@@ -61,13 +66,32 @@ async function chay(so) {
   const policy = FbmSync.sessionGatePolicy;
   FbmSync.sessionGatePolicy = () => Object.assign(policy(), { autoOpenTab: true });
   const tabRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
-  const tabPick = FbmSync.controlDispatch('continue', { runId: tabRun.runId, machineId: 'may-A' }, 'relay').request;
+  const tabPick = tabRun.runId ? hoi('may-A').request : null;
   const noTab = (id) => FbmSync.controlDispatch('continue', { machineId: 'may-A', error: { requestId: id, code: 'FBM_TAB_NOT_FOUND', message: 'Không thấy tab FBM.' } }, 'relay');
   const retry = noTab(tabPick.id);
   check(so, 'tự mở tab bật, Extension không thấy tab: GAS trả request thử lại cùng bước kèm lệnh mở tab, qua được cửa ra của GAS', [retry.ok, retry.code, retry.request && retry.request.meta.kind, !!(retry.request && retry.request.meta.openFbmContext)], [true, 'FBM_TAB_RETRY_REQUEST_READY', tabPick.meta.kind, true]);
   const twiceNoTab = noTab(retry.request.id);
   check(so, 'thử lại vẫn không thấy tab: không thử lần nữa, lượt về lỗi FBM_TAB_NOT_FOUND', [twiceNoTab.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_FOUND']);
   FbmSync.sessionGatePolicy = policy;
+
+  // Tin đánh thức mất và Extension máy được giao không hỏi lần nào: chỗ giữ quá hạn đóng ở lần hỏi của máy bất kỳ, kể cả khi nền tắt, Log nói rõ Extension không đến nhận.
+  const lostRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
+  const lost = FbmSync.stateRead();
+  FbmSync.stateWrite(Object.assign(lost, { deadlineAt: Date.now() - 1000 }));
+  const background = FbmSync.backgroundEnabled;
+  FbmSync.backgroundEnabled = () => false;
+  logs.length = 0;
+  const lateAsk = hoi('may-B', 'alarm');
+  FbmSync.backgroundEnabled = background;
+  const lostState = FbmSync.stateRead(), lostLog = logs.find((line) => line.action === 'stale_run');
+  check(so, 'chỗ giữ quá hạn: chuông máy khác (nền tắt) đóng lượt RUN_PICKUP_EXPIRED, không phát request, Log nói Extension máy được giao không hỏi GAS', [lateAsk.request || null, lostState.runId === lostRun.runId, lostState.phase, lostState.lastFailureCode, !!lostLog && /không hỏi GAS lần nào/.test(lostLog.reason)], [null, true, 'error', 'RUN_PICKUP_EXPIRED', true]);
+  const lateOwner = hoi('may-A');
+  check(so, 'máy được giao đánh thức muộn sau khi lượt đã đóng thì không nhận gì', [lateOwner.code, lateOwner.request || null], ['NO_RUN_AWAITING', null]);
+
+  // Dừng khi lượt còn giữ chỗ: chưa có request nào sang FBM nên đóng ngay, không chờ response.
+  FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
+  const stopped = hop.fbmSyncCancel();
+  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay (không SYNC_CANCEL_PENDING), lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['', 'paused', '', 'NO_RUN_AWAITING']);
 
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
   check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);
@@ -95,7 +119,7 @@ async function chay(so) {
   FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
   documentProperties.deleteProperty(FbmSync.STATE_KEY);
   const login = FbmSync.controlDispatch('start', { kind: 'login_test', machineId: 'may-A' });
-  const loginPicked = FbmSync.controlDispatch('continue', { runId: login.runId, machineId: 'may-A' }, 'relay');
+  const loginPicked = hoi('may-A');
   check(so, 'Đăng nhập thử trên Sheet chưa từng chạy lượt vẫn có runId; nhận lượt ra request login thử', [typeof login.runId, !!login.runId, loginPicked.request && loginPicked.request.meta.kind, loginPicked.request && loginPicked.request.meta.testOnly], ['string', true, 'login', true]);
 }
 

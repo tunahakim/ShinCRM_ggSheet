@@ -27,7 +27,8 @@ async function chay(so) {
   const nop = (fields) => FbmSync.controlDispatch('continue', Object.assign({ machineId: 'may-A' }, fields), 'relay');
 
   const started = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A' });
-  const r1 = nop({ runId: started.runId }).request;
+  const hoi = () => FbmSync.controlDispatch('heartbeat', { trigger: 'run_now', machineId: 'may-A' }, 'relay');
+  const r1 = hoi().request;
   const r2 = nop({ response: traLoi(r1.id) }).request;
   const sau = FbmSync.stateRead();
   check(so, 'lần nộp đầu được xử lý: GAS cấp request kế, ô lượt nhớ request vừa trả lời và request cấp ngay sau nó', [!!r2, sau.activeRequestId === r2.id, sau.resubmit], [true, true, { answered: r1.id, issued: r2.id }]);
@@ -48,7 +49,7 @@ async function chay(so) {
 
   // Lượt đã đóng sau lần nộp đầu: nộp lặp nhận status, không ghi thêm Log lỗi.
   const again = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
-  const r9 = nop({ runId: again.runId }).request;
+  const r9 = again.runId ? hoi().request : null;
   const blocked = { requestId: r9.id, code: 'FBM_SITE_ACCESS_BLOCKED', message: 'Chrome đang chặn Extension truy cập site FBM.' };
   nop({ error: blocked });
   const logTruoc = logs.filter((line) => JSON.stringify(line).indexOf('FBM_SITE_ACCESS_BLOCKED') >= 0).length;
