@@ -224,3 +224,31 @@ function fbmDevOpenBackgroundRun() {
   var status = FbmSync.statusView();
   return { ok: opened && opened.ok !== false, code: opened && opened.code || '', running: status.running, origin: status.origin, phase: status.phase, message: status.message };
 }
+
+/** Nghiệm thu dừng nền bằng đúng các hàm Sidebar gọi: mở lượt nền, lệnh tay bị chặn bằng `SYNC_BACKGROUND_RUNNING`, dừng nền thì kênh rảnh ngay, lệnh tay gọi lại mở được lượt tay; cuối cùng hủy lượt tay để DEV về rảnh. Chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
+function fbmDevProbeStopBackground() {
+  var view = function (status) { var s = status || {}; return { running: s.running, origin: s.origin, phase: s.phase }; };
+  var opened = fbmDevOpenBackgroundRun();
+  var blocked = fbmStartSync('read');
+  var stopped = fbmStopBackground();
+  var restarted = fbmStartSync('read');
+  var cancelled = fbmCancelSync();
+  var released = fbmDevReleaseUnsentRequest();
+  return {
+    opened: opened,
+    blocked: { ok: blocked.ok, code: blocked.code || '', status: view(blocked.status) },
+    stopped: { ok: stopped.ok, code: stopped.code || '', status: view(stopped.status) },
+    restarted: { ok: restarted.ok, code: restarted.code || '', status: view(restarted.status), firstRequest: restarted.request && restarted.request.meta && restarted.request.meta.kind || '' },
+    cancelled: { ok: cancelled.ok, code: cancelled.code || '', status: view(cancelled.status || cancelled) },
+    released: released
+  };
+}
+
+/** Request do hàm dò dòng lệnh cấp không có Extension nào gửi đi; báo lỗi truyền tải qua đúng cửa Sidebar dùng để lượt đang chờ đóng lại thay vì treo. Chỉ DEV. */
+function fbmDevReleaseUnsentRequest() {
+  var requestId = String(FbmSync.stateRead().activeRequestId || '');
+  if (!requestId) { return { released: false, status: FbmSync.statusView().phase }; }
+  var result = fbmReportSyncTransportFailure(requestId, 'DEV_PROBE_NOT_SENT', 'Hàm dò DEV cấp request nhưng không gửi qua Extension.');
+  var status = result && (result.status || result) || {};
+  return { released: true, code: result && result.code || '', running: status.running, phase: status.phase };
+}
