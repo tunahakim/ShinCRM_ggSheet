@@ -369,6 +369,7 @@ tests\
     │   ├── Gate.js                 Kiểm cửa ghi chiều lấy về: danh sách đọc của lượt, tra mã khách không lọc quyền, khách vắng và giao dịch đổi khách cha, xét lại hai trạng thái đóng băng.
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
+    │   ├── RelayResubmit.js        Kiểm nộp lặp qua relay: GAS phát lại request đang chờ, không chạy lại nghiệp vụ; dựng lại lệch bước thì báo lỗi; lượt đã đóng thì trả status
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
