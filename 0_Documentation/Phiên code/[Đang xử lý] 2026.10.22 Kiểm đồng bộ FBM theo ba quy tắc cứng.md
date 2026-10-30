@@ -437,7 +437,7 @@ Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `clie
   - [x] Viết sơ đồ các cấp và danh mục công cụ.
   - [x] Viết từng tiến trình theo tình huống và bảng hiện tại so với thiết kế.
   - [x] Viết tệp vi phạm ở lõi.
-  - [ ] Chủ dự án duyệt tài liệu thiết kế và trả lời D1–D10 ở mục 8 của nó.
+  - [ ] Chủ dự án duyệt tài liệu thiết kế và trả lời D1–D11 ở mục 8 của nó. Đã chốt 2026-10-30: D12, (a), (b), (c), thêm vào B10; còn (d).
 
 ### Chuẩn bị trước giai đoạn B (chủ dự án làm)
 - [x] Tạo một bản sao Sheet DEV làm bản lưu (Tệp › Tạo bản sao), không dùng để chạy.
@@ -445,9 +445,11 @@ Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `clie
 
 Cách chạy thử (b): mỗi lần thử chiều ghi FBM, AI bật giới hạn phạm vi chỉ `ALT00010` và tắt đồng bộ nền bằng lệnh, thử xong trả lại như cũ và báo. Mỗi bước B đẩy lên Sheet DEV đang dùng thật nên phải chạy trọn vẹn và qua test trước khi đẩy.
 
+Giao thức GAS – Extension (chủ dự án chốt 2026-10-30, chọn cách nhẹ hơn): không viết lớp tương thích cho Extension cũ. Bước B nào đổi lệnh hoặc hình dạng phong bì giữa GAS và Extension thì sửa Extension trong cùng bước, chủ dự án tải lại Extension ở bước đó. Mỗi lời gọi mang số phiên bản giao thức; lệch thì GAS trả `EXTENSION_PROTOCOL_MISMATCH` và Sidebar báo tải lại Extension, không chạy tiếp với hình dạng đoán.
+
 ### Giai đoạn B — sửa; mỗi bước: test offline, `node tests/gas.js ... --push` trên DEV, sửa tài liệu liên quan, commit riêng, tick checklist
 - [ ] B0. Test tĩnh khung "danh sách ngoại lệ chỉ được giảm": vi phạm hiện có ghi thành ngoại lệ, mỗi bước sau xóa bớt; thêm vi phạm mới là đỏ.
-- [ ] B1. Lỗi thật nhỏ, độc lập: dừng nền ngay và Sidebar chờ theo `running` (P10); `fbmCancelSync` trả cookie và token về Sidebar (lỗi 6); Kiểm liên kết bỏ bốn ô đang nhập (lỗi 2); `markPushError` thiếu Log (lỗi 3); lưu cài đặt đổi công tắc trước khi kiểm (lỗi 7); mất `identityBlocks`; `approvalThreshold` bỏ `catch`; các `catch` rỗng và `.catch` trả null ở GAS và Sidebar. Chủ dự án kiểm: bấm đồng bộ khi nền đang chạy, chọn dừng.
+- [ ] B1. Lỗi thật nhỏ, độc lập: dừng nền ngay và Sidebar chờ theo `running` (P10); `fbmCancelSync` trả cookie và token về Sidebar (lỗi 6); Kiểm liên kết bỏ bốn ô đang nhập (lỗi 2); `markPushError` thiếu Log (lỗi 3); lưu cài đặt đổi công tắc trước khi kiểm (lỗi 7); mất `identityBlocks`; `approvalThreshold` bỏ `catch`; các `catch` rỗng và `.catch` trả null ở GAS và Sidebar; Extension gặp relay 404 hoặc response không phải JSON thì ghi hộp đen kèm mã thật và `httpStatus` để lần hỏi kế GAS ghi Log, và thử lại có giãn cách (chủ dự án chốt 2026-10-30 đưa phần này từ B10 lên). Chủ dự án kiểm: bấm đồng bộ khi nền đang chạy, chọn dừng.
 - [ ] B2. Một cửa lệnh, luật chiếm ô, Tiến trình đăng nhập có người điều phối riêng, Sidebar một vòng (P1). Chủ dự án kiểm: Đăng nhập thử, Đăng nhập ép, đồng bộ tay.
 - [ ] B3. Lát và chặng (P2): công cụ kiểm thuần, cổng phát request, bảng `cursor.kind`, một hàm nối chuỗi nền; phần GAS của máy chạy nền (V24).
 - [ ] B4. State truyền qua công cụ, tách các hàm ôm nhiều việc (P3, P11).
@@ -491,7 +493,7 @@ Luật chung cho mọi bước: đọc trọn tiến trình chứa chỗ sửa t
 - [ ] `sliceGuards` thuần (công tắc, ngân sách, cờ dừng, request quá hạn) + `requestIssue` (endpoint, id, hạn, envelope) tách khỏi `nextEnvelope`; xóa `nextEnvelope`.
 - [ ] Bảng `cursor.kind` → người điều phối chặng thay `continueStep`; mỗi chặng trả `{ patch, next | end }`; Cổng phiên thành người điều phối `sessionGate` (gộp 12 hàm `sessionGate*`); sửa `sessionGateTransportRetry` xóa id trước khi dựng lại.
 - [ ] `heartbeatRun` theo K5 (`machineCheck`, `staleRunCheck`, `pushGateDue`, `processDue`); xóa `recoverStaleRun` và phần ghi trong `fbmSyncStatusRead`; Log `stale_run` một lần.
-- [ ] Kho máy nền (V24): mã máy do Extension gửi trong `heartbeat`, GAS trả lệnh dừng nhịp cho máy không được giao; lệnh `assign_background_machine`. (Màn chọn máy làm ở Todo mục 4; tạm thời máy hỏi đầu tiên được giao.)
+- [ ] Kho máy nền (V24): mã máy do Extension gửi trong `heartbeat`, GAS trả lệnh dừng nhịp cho máy không được giao; lệnh `assign_background_machine` và lệnh gỡ máy. Chưa giao máy nào thì không máy nào chạy nền. Màn cài đặt Sidebar hiện máy đang được giao, nút gỡ, nút "Dùng máy này chạy nền"; mở Sidebar ở máy không được giao thì hiện thông báo qua `noticeSet` kèm liên kết tới màn cài đặt (chủ dự án chốt 2026-10-30; thiết kế đích 5.11). Làm trên màn cài đặt hiện có; Todo mục 4 chỉ vẽ lại.
 - [ ] Test: mỗi nhánh K5; chặng không gọi được `requestIssue` trực tiếp (test tĩnh luật 1 mở rộng); request quá hạn → `SYNC_ABANDONED_RUN` + Log có hộp đen.
 - [ ] Chủ dự án kiểm: để nền chạy một buổi, xem Log không có dòng lạ.
 
@@ -549,6 +551,7 @@ Luật chung cho mọi bước: đọc trọn tiến trình chứa chỗ sửa t
 - [ ] Vault chỉ `{ ref, key }`; GAS gửi bản mã trong envelope đăng nhập và `credentialRef` đang dùng kèm câu trả lời heartbeat; Extension xóa ref khác. Hàm chuyển: vault cũ bỏ trường `envelope`.
 - [ ] Đường lượt tay (`FBM_EXECUTE_REQUEST`) dùng chung `prepareFbmTab` + gửi với `relayLoop`; một phép kiểm miền FBM cho mọi URL; cầu nối iframe gom các kiểm vào `bridgeGuard`, có kiểm cửa sổ nguồn.
 - [ ] Cắt gói quét giữ ở Extension theo ngoại lệ K1; mã máy gửi trong `heartbeat`.
+- [ ] Extension phân biệt Chrome chặn quyền site FBM (`FBM_SITE_ACCESS_BLOCKED`) với tab chưa sẵn sàng và báo GAS; GAS ghi Log và hiện trên Sidebar (chủ dự án chốt 2026-10-30).
 - [ ] Test: nộp gặp 404 → hộp đen có mã và `httpStatus`, GAS ghi Log ở lần hỏi kế; mật khẩu và bản băm chỉ có trong request gửi FBM (test chốt K8); envelope mang URL ngoài miền → từ chối.
 - [ ] Chủ dự án tải lại Extension rồi kiểm: Đăng nhập thử, tự đăng nhập khi hết phiên, lượt nền chạy.
 
