@@ -14,7 +14,7 @@ Chỉ đọc tệp này khi phiên có chạm luồng đồng bộ FBM (code GAS
 
 ## Checklist rà soát đồng bộ FBM
 
-- Đợt sửa lỗi sau audit theo dõi tiến độ duy nhất ở `0_Documentation/Phiên code/2026.10.07 Kế hoạch sửa lỗi FBM sau audit.md` (việc còn mở và bảng lỗi FBM-xxx còn mở); sau khi ngữ cảnh bị nén chỉ đọc tệp này và tiếp tục từ dòng `[ ]` đầu tiên.
+- Đợt refactor đồng bộ FBM theo dõi tiến độ duy nhất ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/1. Checklist tiến độ.md`; sau khi ngữ cảnh bị nén đọc tệp này và tiếp tục từ dòng `[ ]` đầu tiên.
 - Checklist dựng từ tài liệu 09 và `tests/contracts/fbmSyncPipeline.js`, không suy ra từ code. Mục nào tả bằng tên hàm nội bộ thay vì hành vi người dùng thấy được là sai gốc, phải viết lại.
 - Checklist phủ cả nhánh thành công lẫn nhánh thất bại. Lỗi nhóm theo lớp xử lý, không theo nguyên nhân: mọi lỗi mạng (DNS, TLS, timeout, đứt kết nối) quy về một lớp ở cổng request chung và chỉ cần một ca đại diện. Mỗi nguyên nhân đi một đường xử lý riêng là lỗi kiến trúc phải sửa, không phải lý do viết thêm test. Các lớp phải tách riêng vì đường xử lý khác nhau: transport, HTTP/parse, đăng nhập/session, hạn mức và giới hạn nền tảng, conflict, ghi/đối soát.
 - Mỗi bước chỉ mang đúng một nhãn `[Tự động]` hoặc `[Cần kiểm chứng thật]`. Cấm nhãn gộp kiểu `[Kết hợp]`; bước có cả hai phần thì tách thành hai dòng con.
