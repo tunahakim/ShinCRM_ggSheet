@@ -385,6 +385,11 @@ FbmSync.submitResubmitted = function (state, requestId) {
   var mark = state && state.resubmit || {};
   return !!requestId && !!mark.answered && String(requestId) === String(mark.answered) && String(state.activeRequestId || '') === String(mark.issued || '');
 };
+FbmSync.PICKUP_PREFIX = 'pickup:';
+/** Lượt đang giữ chỗ chờ Extension nhận: chưa có request nào sang FBM. */
+FbmSync.pickupHeld = function (state) { return !!state && !!state.runId && String(state.activeRequestId || '') === FbmSync.PICKUP_PREFIX + String(state.runId); };
+/** Lần hỏi của máy này có nhận lượt đang giữ chỗ không: đúng máy được giao và còn hạn. */
+FbmSync.pickupAwaits = function (state, machineId, now) { return FbmSync.pickupHeld(state) && !!String(machineId || '') && String(state.driverMachineId || '') === String(machineId) && Number(now) < Number(state.deadlineAt || 0); };
 /** Hộp đen Extension gửi kèm lần hỏi nền; chỉ lần gọi đến từ Extension mới có, nên dòng Log của lượt Sidebar không nhắc hộp đen. */
 FbmSync.requestWatchTrail = function (trail) { FbmSync.requestWatch.trail = trail || null; };
 FbmSync.requestWatchCheck = function (next, now) {
@@ -393,7 +398,7 @@ FbmSync.requestWatchCheck = function (next, now) {
   FbmSync.requestWatch.answered[open.id] = true;
   if (typeof logEvent !== 'function') { return; }
   var trail = FbmSync.requestWatch.trail, overdue = open.deadlineAt ? Math.max(0, Math.round((at - open.deadlineAt) / 60000)) : 0;
-  logEvent({ source: 'fbm_sync', action: 'request_unanswered', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: open.runId, reason: 'Request FBM ' + open.id + (open.kind ? ' (bước ' + open.kind + ')' : '') + ' không nhận được trả lời từ Extension, đã quá hạn chờ ' + overdue + ' phút; GAS bỏ request này.' + (trail !== undefined ? ' ' + FbmSync.extensionTrailText(trail, at) : ''), detail: { code: 'REQUEST_UNANSWERED', requestId: open.id, kind: open.kind, runId: open.runId, extensionTrail: trail !== undefined ? FbmSync.extensionTrailSafe(trail) : undefined } });
+  logEvent({ source: 'fbm_sync', action: 'request_unanswered', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: open.runId, reason: (open.id.indexOf(FbmSync.PICKUP_PREFIX) === 0 ? 'Lượt ' + open.runId + ' chờ Extension máy được giao đến nhận nhưng Extension không hỏi GAS lần nào, đã quá hạn ' + overdue + ' phút; GAS đóng lượt, chưa có request nào sang FBM.' : 'Request FBM ' + open.id + (open.kind ? ' (bước ' + open.kind + ')' : '') + ' không nhận được trả lời từ Extension, đã quá hạn chờ ' + overdue + ' phút; GAS bỏ request này.') + (trail !== undefined ? ' ' + FbmSync.extensionTrailText(trail, at) : ''), detail: { code: 'REQUEST_UNANSWERED', requestId: open.id, kind: open.kind, runId: open.runId, extensionTrail: trail !== undefined ? FbmSync.extensionTrailSafe(trail) : undefined } });
 };
 FbmSync.STATE_MINIMAL_TEXT_LIMIT = 1000;
 FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái phiên; đã lưu bản rút gọn, xem Log.)';
@@ -474,17 +479,19 @@ FbmSync.recoverStaleRun = function (state, now, options) {
   // Request đang bay còn trong hạn ngân sách (một lô có thể chạy lâu hơn mốc chung) thì chưa phải phiên kẹt.
   var inFlight = !!current.activeRequestId && at < Number(current.deadlineAt || 0);
   if (!legacy && (inFlight || (!abandoned && age <= FbmSync.STALE_RUN_MS))) { return { state: current, recovered: false }; }
-  var cursor = current.cursor || {}, waitingWrite = cursor.kind === 'push_wait';
+  var cursor = current.cursor || {}, waitingWrite = cursor.kind === 'push_wait', unclaimed = !legacy && FbmSync.pickupHeld(current);
   var message = legacy
     ? (waitingWrite ? 'Phiên ghi FBM đang dở được tạo bởi bản cũ; đã dừng và không tự ghi lại để tránh trùng dữ liệu. Hãy chạy lại lượt.' : 'Phiên đồng bộ đang dở được tạo bởi bản cũ; đã dừng, hãy chạy lại lượt.')
     : waitingWrite
     ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; không tự ghi lại để tránh trùng dữ liệu.'
+    : unclaimed
+    ? 'Lượt tay chờ Extension máy được giao đến nhận nhưng Extension máy đó không hỏi GAS lần nào trong hạn (Extension tắt, máy tắt hoặc mất mạng); đã đóng lượt, chưa có request nào sang FBM.'
     : abandoned
     ? 'Lượt đồng bộ trước bị bỏ dở (không còn request nào chờ phản hồi); đã kết thúc, lượt mới chạy lại từ đầu.'
     : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; đã tự dừng, có thể chạy lại.';
   current.phase = 'error';
   current.schemaVersion = FbmSync.STATE_SCHEMA_VERSION;
-  current.lastFailureCode = legacy ? 'SYNC_STATE_MIGRATED' : (waitingWrite ? 'SYNC_STALE_WRITE' : abandoned ? 'SYNC_ABANDONED_RUN' : 'SYNC_STALE_RUN');
+  current.lastFailureCode = legacy ? 'SYNC_STATE_MIGRATED' : (waitingWrite ? 'SYNC_STALE_WRITE' : unclaimed ? 'RUN_PICKUP_EXPIRED' : abandoned ? 'SYNC_ABANDONED_RUN' : 'SYNC_STALE_RUN');
   current.retryable = false;
   current.lastError = message;
   current.message = message;

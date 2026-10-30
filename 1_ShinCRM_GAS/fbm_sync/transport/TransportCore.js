@@ -392,7 +392,6 @@ FbmSync.pauseForRuntimeLimit = function (state) {
  * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay.
  */
 FbmSync.issueContext = null;
-FbmSync.PICKUP_PREFIX = 'pickup:';
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
@@ -507,7 +506,7 @@ FbmSync.nextEnvelope = function (request) {
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
 };
 /**
- * Giữ chỗ nhận lượt cho máy đang mở lượt từ Sidebar. Lúc Extension đến nhận, GAS dựng lại request từ cursor, nên request định phát phải dựng lại được từ cursor: lệch là lỗi lập trình, ném ngay chứ không để Extension nhận nhầm bước.
+ * Giữ chỗ nhận lượt cho máy đang mở lượt từ Sidebar; lần hỏi kế tiếp của Extension máy đó (Sidebar đánh thức hoặc chuông) nhận lượt. Lúc Extension đến nhận, GAS dựng lại request từ cursor, nên request định phát phải dựng lại được từ cursor: lệch là lỗi lập trình, ném ngay chứ không để Extension nhận nhầm bước.
  * Chỗ giữ là một request đang chờ có hạn (`REQUEST_IN_FLIGHT` với nhịp nền máy khác); quá hạn mà không ai nhận thì luật lượt treo đóng lượt như request không được trả lời.
  */
 FbmSync.envelopeHold = function (request) {
@@ -519,7 +518,7 @@ FbmSync.envelopeHold = function (request) {
   }
   state.activeRequestId = FbmSync.PICKUP_PREFIX + state.runId;
   state.activeRequestSig = FbmSync.requestSig(request);
-  state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now());
+  state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now(), FbmSync.extensionConfigRead().pollMinutes);
   state.driverMachineId = machineId;
   FbmSync.stateWrite(state);
   return { pickup: true, runId: String(state.runId) };
@@ -527,7 +526,7 @@ FbmSync.envelopeHold = function (request) {
 /** Dấu của request đang chờ (bước và URL) để lần phát lại từ cursor so được với thứ đã phát; không chứa thân request. */
 FbmSync.requestSig = function (request) { return String(request && request.meta && request.meta.kind || '') + ' ' + String(request && request.url || ''); };
 /**
- * Phát lại request đang chờ bằng cách dựng lại từ cursor, dùng cho hai việc: Extension nhận lượt Sidebar vừa mở (chỗ giữ `pickup:`) và Extension nộp lặp kết quả GAS đã xử lý (`answeredId`).
+ * Phát lại request đang chờ bằng cách dựng lại từ cursor, dùng cho hai việc: lần hỏi của Extension nhận lượt Sidebar vừa mở (chỗ giữ `pickup:`) và Extension nộp lặp kết quả GAS đã xử lý (`answeredId`).
  * Request dựng lại phải trùng dấu request đang chờ; lệch là lỗi lập trình nên ném ngay chứ không để Extension chạy nhầm bước. Nộp lặp giữ `resubmit.answered` để lần nộp lặp sau nữa vẫn được nhận ra.
  */
 FbmSync.envelopeReissue = function (state, answeredId) {

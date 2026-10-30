@@ -20,8 +20,8 @@ function fbmSyncApprovePush() {
 /** Dừng phiên lỗi và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), failed = String(state.phase || '') === 'error';
-  // Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng".
-  if (state.activeRequestId && !failed) {
+  // Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng". Lượt còn giữ chỗ chờ Extension nhận thì chưa có request nào sang FBM nên đóng ngay.
+  if (state.activeRequestId && !failed && !FbmSync.pickupHeld(state)) {
     state.metadata = state.metadata || {};
     state.metadata.cancelPending = true;
     state.message = 'Đang chờ response FBM hiện tại để dừng an toàn; sẽ không cấp request kế tiếp.';

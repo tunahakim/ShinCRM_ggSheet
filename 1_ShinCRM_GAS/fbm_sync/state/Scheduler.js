@@ -283,17 +283,29 @@ function fbmSyncLockResult(code, message) {
   return { ok: false, code: String(code || 'BUSY'), request: null, message: String(message || 'GAS đang xử lý một request khác; chưa cấp request FBM mới.'), status: FbmSync.statusView() };
 }
 
-/** GAS cấp request heartbeat; Extension chỉ chuyển nguyên envelope này tới tab FBM. Chạy trong khóa của cửa lệnh (lệnh `heartbeat`). `trigger` là lý do Extension hỏi (`alarm`, `startup`, `sidebar_open`...), `trail` là vết request gần nhất của Extension. */
+/**
+ * Lần hỏi của Extension: GAS tự quyết việc từ ô lượt. Có lượt tay đang giữ chỗ cho đúng máy hỏi thì phát request đầu của lượt đó; không thì chọn việc nền đến hạn. Extension chỉ chuyển nguyên envelope tới tab FBM. Chạy trong khóa của cửa lệnh (lệnh `heartbeat`).
+ * `trigger` là lý do Extension hỏi (`alarm`, `startup`, `run_now`...); `run_now` là Sidebar đánh thức sau khi mở lượt tay nên không mở việc nền. `trail` là vết request gần nhất của Extension.
+ */
 function fbmSyncHeartbeatRequest(options) {
   var opt = options || {}, source = String(opt.trigger || 'alarm');
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: true, noop: true, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
+  // Đọc ô lượt một lần cho cả lần hỏi: kiểm danh tính và ghi hộp đen ở dưới không đổi ô lượt.
+  var state = FbmSync.stateRead(), now = Date.now();
+  if (FbmSync.pickupAwaits(state, opt.machineId, now)) {
+    FbmSync.requestWatchTrail(opt.trail);
+    return FbmSync.runSlice(function () { return FbmSync.envelopeReissue(state, ''); });
+  }
+  // Chỗ giữ quá hạn đóng ở lần hỏi của bất kỳ máy nào, kể cả khi nền tắt: không thì Sidebar thấy lượt "đang chạy" mãi.
+  if (FbmSync.pickupHeld(state) && now >= Number(state.deadlineAt || 0)) { state = FbmSync.recoverStaleRun(state, now, { abandoned: true }).state; }
+  if (source === 'run_now') { return { ok: true, noop: true, code: 'NO_RUN_AWAITING', request: null, status: FbmSync.statusView() }; }
   if (['alarm', 'sidebar_open'].indexOf(source) >= 0 && !FbmSync.backgroundEnabled()) { return { ok: true, noop: true, code: 'BACKGROUND_DISABLED', request: null, status: FbmSync.statusView() }; }
   if (typeof FbmSync.identityPreflight === 'function') {
     var identity = FbmSync.identityPreflight('background');
     if (identity.blocking) { return { ok: true, noop: true, code: identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', request: null, message: identity.message, status: FbmSync.statusView() }; }
   }
   FbmSync.requestWatchTrail(opt.trail);
-  var state = FbmSync.stateRead(), session = state.session || {}, cursor = state.cursor || {}, now = Date.now();
+  var session = state.session || {}, cursor = state.cursor || {};
   var activePhase = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
   if (state.activeRequestId && now < Number(state.deadlineAt || 0)) {
     return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');

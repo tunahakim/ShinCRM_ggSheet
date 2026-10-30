@@ -181,7 +181,6 @@ FbmSync.commandStart = function (input) {
  */
 FbmSync.commandContinue = function (input, state) {
   FbmSync.traceImport(input.clientTrace);
-  if (!input.response && !input.error) { return FbmSync.envelopeReissue(state, ''); }
   if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return fbmSyncHeartbeatTransportFailure(input.error); }
   if (input.source === 'relay' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
@@ -192,17 +191,14 @@ FbmSync.commandContinue = function (input, state) {
 };
 
 /**
- * Chỉ máy đang chở lượt được nộp hay nhận lượt đó: Extension máy khác (Sheet mở ở hai máy) có runId hoặc response cũ vẫn bị chặn trước khi chạm ô lượt. Không có `continue` mang cả response lẫn lỗi rỗng ngoài lần nhận lượt, nên lần nhận sai lượt hoặc nhận lần hai bị từ chối ở đây.
+ * Chỉ máy đang chở lượt được nộp: Extension máy khác (Sheet mở ở hai máy) có response cũ vẫn bị chặn trước khi chạm ô lượt. Nhận lượt đi qua lần hỏi (`heartbeat`), nên `continue` không mang kết quả hay lỗi là lệnh sai.
  */
 FbmSync.continueGuard = function (input, state) {
   var machineId = String(input.machineId || '');
   if (state.runId && String(state.driverMachineId || '') !== machineId) {
     return { ok: false, code: 'RUN_DRIVER_MISMATCH', message: 'Lượt ' + String(state.runId) + ' đang do máy khác chở; GAS không nhận kết quả từ máy này.', status: FbmSync.statusView() };
   }
-  if (input.response || input.error) { return null; }
-  if (!input.runId || String(input.runId) !== String(state.runId || '') || String(state.activeRequestId || '') !== FbmSync.PICKUP_PREFIX + String(state.runId || '')) {
-    return { ok: false, code: 'RUN_PICKUP_REJECTED', message: 'Lượt ' + String(input.runId || '') + ' không còn chờ Extension nhận (đã được nhận, đã đóng hoặc đã có lượt khác).', status: FbmSync.statusView() };
-  }
+  if (!input.response && !input.error) { return { ok: false, code: 'CONTINUE_EMPTY', message: 'Lệnh nộp không mang kết quả hay lỗi của request nào.', status: FbmSync.statusView() }; }
   return null;
 };
 

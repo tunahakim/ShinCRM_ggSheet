@@ -66,8 +66,8 @@ FbmSync.budgetTimeoutMs = function (request, requestGap) {
 /** Hạn GAS thu hồi request đang bay: Extension hết hạn, cộng đường trong Extension (tab → service worker) và đường relay lên GAS. */
 FbmSync.budgetDeadlineAt = function (issuedAt, timeoutMs) { return Number(issuedAt) + Number(timeoutMs) + FbmSync.BUDGET.bridgeMs + FbmSync.BUDGET.gasTransitMs; };
 
-/** Hạn Extension đến nhận lượt Sidebar vừa mở: Sidebar chuyển runId qua cầu nối rồi Extension gọi relay, không có fetch FBM ở giữa. */
-FbmSync.budgetPickupDeadlineAt = function (heldAt) { return FbmSync.budgetDeadlineAt(heldAt, 0); };
+/** Hạn Extension máy được giao đến nhận lượt Sidebar vừa mở: đủ một nhịp chuông hỏi GAS (`pollMinutes` của Extension), để tin đánh thức từ Sidebar có mất thì lần hỏi theo chuông sau vẫn nhận được lượt. */
+FbmSync.budgetPickupDeadlineAt = function (heldAt, pollMinutes) { return FbmSync.budgetDeadlineAt(heldAt, Number(pollMinutes) * 60000); };
 
 /** Bên gửi response lên GAS (Sidebar, relay nền) chờ bấy nhiêu: GAS không chạy quá trần nền tảng. */
 FbmSync.budgetGasReplyMs = function () { return FbmSync.BUDGET.gasHardMs + FbmSync.BUDGET.gasTransitMs; };
