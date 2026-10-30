@@ -67,11 +67,15 @@ function coreSettingsSections() {
 }
 
 /**
- * Mọi phần cài đặt đang có. Module `fbm_sync` không có trong bản cài thì không có phần của nó. Hai phần trùng tên là lỗi lập trình (hai module tranh một khóa kho), ném ngay.
+ * Module có phần cài đặt riêng tự đăng ký hàm trả danh sách phần ở tệp của mình, khóa là tên module; lõi không biết module nào tồn tại. Module không có trong bản cài thì không đăng ký, nên không có phần của nó.
+ * Khai báo dạng `var ... typeof` vì GAS nạp tệp không theo thứ tự cố định: tệp đăng ký có thể chạy trước tệp này.
  */
+var SETTINGS_SECTION_PROVIDERS = typeof SETTINGS_SECTION_PROVIDERS !== 'undefined' ? SETTINGS_SECTION_PROVIDERS : {};
+
+/** Mọi phần cài đặt đang có. Hai phần trùng tên là lỗi lập trình (hai module tranh một khóa kho), ném ngay. */
 function settingsSectionList() {
   var list = coreSettingsSections();
-  if (typeof fbmSettingsSections === 'function') { list = list.concat(fbmSettingsSections()); }
+  Object.keys(SETTINGS_SECTION_PROVIDERS).forEach(function (owner) { list = list.concat(SETTINGS_SECTION_PROVIDERS[owner]()); });
   var seen = {};
   list.forEach(function (section) {
     if (seen[section.name]) { throw new Error('Hai module cùng khai phần cài đặt "' + section.name + '" (' + seen[section.name] + ', ' + section.owner + ').'); }

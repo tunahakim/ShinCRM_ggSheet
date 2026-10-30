@@ -182,7 +182,7 @@ FbmSync.loginTestRequest = function (credentialRef, expectedIdentity, options) {
   var saved = FbmSync.loginConfigRead(), ref = String(credentialRef || (saved.configured ? saved.credentialRef : '') || '').trim();
   if (!ref) { return { ok: false, code: 'LOGIN_CREDENTIAL_REF_INVALID', message: 'Chưa có thông tin đăng nhập để thử.' }; }
   var state = FbmSync.stateRead(), active = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
-  if (state.activeRequestId || (state.runId && active)) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.' }; }
+  if (state.activeRequestId || (state.runId && active)) { return { ok: false, code: 'SYNC_BUSY', message: 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.' }; }
   state.phase = 'checking_session';
   state.entity = '';
   state.cursor = { kind: 'login', credentialRef: ref, testOnly: true, purpose: force ? 'force' : 'test', expectedIdentity: expectedIdentity && typeof expectedIdentity === 'object' ? FbmSync.identityNormalize(expectedIdentity) : FbmSync.boundIdentity() };
@@ -206,7 +206,6 @@ FbmSync.loginForceRequest = function () {
   return FbmSync.loginTestRequest(saved.credentialRef, null, { force: true });
 };
 
-FbmSync.loginTestResult = function (response) { return FbmSync.continue(response); };
 
 FbmSync.loginCursorNext = function (cursor, kind) {
   var current = cursor || {};

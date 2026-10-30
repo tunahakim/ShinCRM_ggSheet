@@ -55,7 +55,7 @@ function syncPanelToggle() {
   if (typeof callServer !== 'function') { return null; }
   // Một lời gọi trả cả bốn phần; nạp liên kết, cài đặt trước rồi mới vẽ status để màn vẽ một lần với đủ dữ liệu.
   var ticket = fbmSyncStatusTicket();
-  return callServer('fbmGetPanelBundle').then(function (bundle) {
+  return callServer('fbmGetSyncStatus').then(function (bundle) {
     if (!bundle || !bundle.status) { throw new Error('GAS không trả gói mở màn đồng bộ.'); }
     fbmSyncApplyIdentityStatus(bundle.identity);
     fbmSyncApplySettings(bundle.settings);
@@ -68,7 +68,7 @@ function syncPanelToggle() {
 }
 function fbmSyncLoadIdentityStatus() {
   if (typeof callServer !== 'function') { return Promise.resolve(null); }
-  return callServer('fbmGetIdentityStatus').then(fbmSyncApplyIdentityStatus).catch(function (error) {
+  return callServer('fbmGetSyncStatus').then(function (bundle) { return fbmSyncApplyIdentityStatus(bundle.identity); }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái liên kết FBM.');
     return null;
   });
@@ -765,7 +765,7 @@ function fbmSyncExtensionRequest(request) {
 function fbmSyncReportTransportFailure(request, error, code) {
   var requestId = String(request && request.id || request && request.meta && request.meta.trace && request.meta.trace.requestId || '');
   if (!requestId) { return Promise.resolve(null); }
-  return callServer('fbmReportSyncTransportFailure', [requestId, code || 'FBM_TRANSPORT_UNAVAILABLE', String(error && error.message || error || '').slice(0, 240)]).catch(function (reportError) {
+  return callServer('fbmContinueSync', [{ error: { requestId: requestId, code: code || 'FBM_TRANSPORT_UNAVAILABLE', message: String(error && error.message || error || '').slice(0, 240) } }]).catch(function (reportError) {
     return { ok: false, code: 'GAS_REPORT_FAILED', error: String(reportError && reportError.message || reportError || 'Không ghi nhận được lỗi cầu nối lên GAS.') };
   }).then(function (result) {
     // Lỗi dạng chuỗi (không phải object) không gắn cờ được; chỉ object mới mang cờ này.
@@ -805,8 +805,8 @@ function fbmSyncStatusFromResult(result, ticket) {
 /** Đọc trạng thái GAS và vẽ khi còn mới. */
 function fbmSyncStatusOnce(freshOpen) {
   var ticket = fbmSyncStatusTicket();
-  return callServer('fbmGetSyncStatus').then(function (status) {
-    return fbmSyncStatusApply(status, ticket, freshOpen);
+  return callServer('fbmGetSyncStatus').then(function (bundle) {
+    return fbmSyncStatusApply(bundle.status, ticket, freshOpen);
   }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'status_load');
     throw error;
@@ -829,7 +829,7 @@ function fbmSyncOpenConflict() {
     if (opened.empty) { fbmSyncShowConflict(null); return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(opened.status, 'Đang đọc bản ghi FBM của xung đột...'));
     return fbmSyncExtensionRequest(opened.request).then(function (response) {
-      return callServer('fbmConflictOpened', [fbmSyncRelayResponse(response)]);
+      return callServer('fbmContinueSync', [{ response: response }]);
     }).then(function (result) {
       if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không đọc được bản ghi xung đột.'); }
       fbmSyncShowConflict(result.conflict);
@@ -1193,7 +1193,7 @@ function fbmSyncSaveAccountSettings(button) {
     if (button) { button.disabled = false; }
     return Promise.resolve(null);
   }
-  return callServer('fbmSaveAccountSettings', [payload]).then(function (result) {
+  return callServer('fbmSaveSettings', ['account', payload]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cấu hình tài khoản FBM.'); }
     FBM_SYNC_CLIENT.accountSettingsInvalid = {};
     FBM_SYNC_CLIENT.accountSettingsDraft = {};
@@ -1208,7 +1208,7 @@ function fbmSyncSaveAccountSettings(button) {
   }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSetAutoLogin(enabled) {
-  return callServer('fbmSetAutoLogin', [enabled === true]).then(function (result) { FBM_SYNC_CLIENT.loginStatus = result || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaintError(error, status.message, 'auto_login_save'); return null; });
+  return callServer('fbmSaveSettings', ['auto_login', enabled === true]).then(function (result) { FBM_SYNC_CLIENT.loginStatus = result || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaintError(error, status.message, 'auto_login_save'); return null; });
 }
 function fbmSyncSetBackgroundSwitchState(enabled, disabled) {
   return fbmSyncSetToggleState('fbm-sync-background-switch', enabled, disabled);
@@ -1237,7 +1237,7 @@ function fbmSyncControlValue(id) {
 function fbmSyncSaveExtensionSettings(button) {
   if (button) { button.disabled = true; }
   var input = document.getElementById('fbm-extension-poll-minutes');
-  return callServer('fbmSaveExtensionConfig', [{ pollMinutes: Number(input && input.value || 5), runOnStartup: fbmSyncToggleValue('fbm-sync-run-on-startup') }]).then(function (result) {
+  return callServer('fbmSaveSettings', ['extension', { pollMinutes: Number(input && input.value || 5), runOnStartup: fbmSyncToggleValue('fbm-sync-run-on-startup') }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được nhịp hỏi GAS.'); }
     FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.extension = { pollMinutes: result.pollMinutes, runOnStartup: result.runOnStartup };
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('extension'); }
@@ -1260,7 +1260,7 @@ function fbmSyncSaveBackgroundSettings(button, confirmLow) {
   schedule.confirmLow = confirmLow === true;
   fieldInvalidClear(Object.keys(fieldIds).map(function (path) { return fieldIds[path]; }));
   var reenable = true;
-  return callServer('fbmSaveBackgroundSchedule', [schedule]).then(function (result) {
+  return callServer('fbmSaveSettings', ['schedule', schedule]).then(function (result) {
     if (result && result.code === 'SCHEDULE_INVALID') {
       fieldInvalidPaint((result.invalid || []).map(function (item) { return fieldIds[item.field]; }));
       var message = fieldInvalidMessage(result.invalid);
@@ -1293,7 +1293,7 @@ function fbmSyncSaveSyncSettings(button) {
   var draft = fbmSyncConfigState('module').draft || {}, desiredMaster = draft.enabled !== false, currentMaster = fbmSyncConfigMasterEnabled();
   // Một lời gọi: GAS đổi công tắc tổng (chỉ khi người dùng đổi), lưu cài đặt rồi trả status mới.
   var ticket = fbmSyncStatusTicket();
-  return callServer('fbmSaveSyncSettings', [payload, desiredMaster === currentMaster ? null : desiredMaster]).then(function (result) {
+  return callServer('fbmSaveSettings', ['sync', payload, desiredMaster === currentMaster ? null : desiredMaster]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); }
     FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload);
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); }
@@ -1305,7 +1305,7 @@ function fbmSyncSaveSyncSettings(button) {
 function fbmSyncSaveLoginPolicy(button) {
   if (button) { button.disabled = true; }
   var retry = document.getElementById('fbm-sync-login-retry-minutes');
-  return callServer('fbmSaveLoginPolicy', [{ enabled: fbmSyncToggleValue('fbm-sync-policy-auto-login'), autoOpenTab: fbmSyncToggleValue('fbm-sync-policy-auto-open'), retryEnabled: fbmSyncToggleValue('fbm-sync-policy-retry'), retryMinutes: Number(retry && retry.value || 30) }]).then(function (result) {
+  return callServer('fbmSaveSettings', ['login_policy', { enabled: fbmSyncToggleValue('fbm-sync-policy-auto-login'), autoOpenTab: fbmSyncToggleValue('fbm-sync-policy-auto-open'), retryEnabled: fbmSyncToggleValue('fbm-sync-policy-retry'), retryMinutes: Number(retry && retry.value || 30) }]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được chính sách tự đăng nhập.'); }
     FBM_SYNC_CLIENT.loginStatus = result;
     if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('loginPolicy'); }
@@ -1497,7 +1497,7 @@ function fbmSyncLoginTestLoop(result) {
     return Promise.resolve(result);
   }
   return fbmSyncExtensionRequest(result.request).then(function (response) {
-    return callServer('fbmLoginTestResult', [fbmSyncRelayResponse(response)]);
+    return callServer('fbmContinueSync', [{ response: response }]);
   }).then(fbmSyncLoginTestLoop);
 }
 function fbmSyncRotateRelay() {
@@ -1661,8 +1661,6 @@ function fbmSyncWaitingStatus(status, message) {
   var snapshot = status && (status.status || status) || {};
   return Object.assign({}, snapshot, { message: message });
 }
-/** Giảm response form trước callback GAS; giữ đúng dữ liệu cần dựng OldValue và ticket. */
-function fbmSyncRelayResponse(response) { return response; }
 /** Báo rõ callback GAS chậm nhưng không tự phát lại request ghi khi chưa biết FBM đã nhận hay chưa. */
 function fbmSyncContinueServer(status, response) {
   var timer = setTimeout(function () {
@@ -1671,7 +1669,7 @@ function fbmSyncContinueServer(status, response) {
   }, FBM_SYNC_GAS_CONTINUE_WARN_MS);
   fbmSyncClientTrace('client_gas_call_started', status && status.request);
   // Hạn chờ của bước này do race gasReplyMs bên dưới sở hữu; hạn mặc định 30 giây của callServer sẽ cắt trước và hủy phiên đang chạy đúng.
-  var callback = callServer('fbmContinueSync', [response, FBM_SYNC_CLIENT.traceEvents.slice()], { timeoutMs: 0 });
+  var callback = callServer('fbmContinueSync', [{ response: response, clientTrace: FBM_SYNC_CLIENT.traceEvents.slice() }], { timeoutMs: 0 });
   // Race chi dung de hien chan doan; callback goc van duoc giu nguyen va khong bi gui lai (lỗi của nó đi qua nhánh từ chối của Promise.race bên dưới).
   var timeoutId, gasReplyMs = fbmSyncBudgetMs(status && status.request, 'gasReplyMs');
   var timeout = new Promise(function (resolve) {
@@ -1749,7 +1747,7 @@ function fbmSyncLoop(status) {
   return fbmSyncExtensionRequest(status.request).then(function (response) {
     if (!FBM_SYNC_CLIENT.running && !FBM_SYNC_CLIENT.cancelRequested) { return fbmSyncStatusOnce(); }
     fbmSyncPaint(fbmSyncWaitingStatus(status, 'Đã nhận phản hồi FBM; đang chờ GAS xử lý...'));
-    return fbmSyncContinueServer(status, fbmSyncRelayResponse(response));
+    return fbmSyncContinueServer(status, response);
   }).then(fbmSyncLoop);
 }
 /** Mở phiên mới; chặn click trùng khi phiên đang chạy. */

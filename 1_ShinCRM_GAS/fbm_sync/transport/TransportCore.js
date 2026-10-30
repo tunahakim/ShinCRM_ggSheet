@@ -67,19 +67,6 @@ FbmSync.pageIdentityReloadRequest = function (state, cursor) {
   request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH });
   return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
 };
-/** Chỉ trả dữ liệu JSON thuần qua google.script.run; Date phải về dạng .NET của FBM. */
-if (typeof FbmSync.transportValue !== 'function') {
-  FbmSync.transportValue = function (value) {
-    if (value && Object.prototype.toString.call(value) === '[object Date]') { return '/Date(' + value.getTime() + ')/'; }
-    if (Array.isArray(value)) { return value.map(function (item) { return FbmSync.transportValue(item); }); }
-    if (value && typeof value === 'object') {
-      var out = {};
-      Object.keys(value).forEach(function (key) { out[key] = FbmSync.transportValue(value[key]); });
-      return out;
-    }
-    return value;
-  };
-}
 /** Cổng tự giữ dấu hiệu cho request login do chính cổng khởi động. */
 FbmSync.sessionGateToken = function () {
   return 'sg_' + Utilities.getUuid().replace(/[^A-Za-z0-9_-]/g, '');

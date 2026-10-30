@@ -47,7 +47,7 @@ FbmSync.startRun = function (options) {
     if (initialRequest && recent && current.cursor.kind === 'authorize_customer') {
       return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView(), resumed: true };
     }
-    if (!initialRequest) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', status: FbmSync.statusView() }; }
+    if (!initialRequest) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
   var state = FbmSync.stateStart('', 'checking_session', 0, {
@@ -397,9 +397,11 @@ FbmSync.contractGate = function (rawResponse) {
 };
 
 /** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
-/** Giữ phiên giữa chuỗi nền về qua cổng `continue` chung của Extension như mọi response sau request đầu, nên cursor `heartbeat` phải về đúng bộ xử lý heartbeat. */
+/** Mọi response sau request đầu về qua cổng `continue` chung của Extension, nên cursor chọn bộ xử lý: giữ phiên của chuỗi nền, đọc lại xung đột, còn lại là bước của lượt. */
 FbmSync.continue = function (rawResponse) {
-  if (String((FbmSync.stateRead().cursor || {}).kind || '') === 'heartbeat') { return fbmSyncHeartbeatLocked(rawResponse, {}); }
+  var kind = String((FbmSync.stateRead().cursor || {}).kind || '');
+  if (kind === 'heartbeat') { return fbmSyncHeartbeatLocked(rawResponse, {}); }
+  if (kind === 'conflict_refresh') { return FbmSync.conflictOpened(rawResponse); }
   return FbmSync.continueRun(rawResponse);
 };
 FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };

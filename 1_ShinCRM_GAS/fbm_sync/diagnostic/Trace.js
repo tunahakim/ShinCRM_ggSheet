@@ -283,4 +283,3 @@ FbmSync.logContextText = function () {
   return parts.join(' · ');
 };
 
-function fbmSyncTrace() { return FbmSync.traceRead(60); }

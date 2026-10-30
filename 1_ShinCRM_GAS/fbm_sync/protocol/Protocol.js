@@ -3,8 +3,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.protocol = {
   version: 1,
-  // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Extension trả mã của nó trong mỗi response; khác mã thì GAS dừng phiên (09.01).
-  contract: '8d2b578969a1',
+  // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Mọi lời gọi giữa GAS và Extension mang mã này: GAS gửi trong phong bì, Extension gửi trong response và thân lời gọi relay; lệch mã thì bên nhận dừng với `EXTENSION_PROTOCOL_MISMATCH`.
+  contract: '746304ea1225',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -31,10 +31,13 @@ FbmSync.protocol = {
       })
     };
   },
-  /** Mã phiên bản Extension ghi trong response; Extension cũ không ghi thì coi là lệch. */
+  /** So mã phiên bản giao thức Extension gửi kèm (trong response FBM hoặc thân lời gọi relay) với mã của GAS; Extension cũ không gửi mã thì coi là lệch. Trả `null` khi khớp. */
   contractMismatch: function (raw) {
-    var received = String(raw && raw.transport && raw.transport.contract || '');
-    return received === FbmSync.protocol.contract ? null : { code: 'FBM_EXTENSION_CONTRACT_MISMATCH', message: 'Extension trên máy này đang dùng bản cũ, hãy tải lại Extension.', expected: FbmSync.protocol.contract, received: received };
+    return FbmSync.protocol.contractCheck(raw && raw.transport && raw.transport.contract);
+  },
+  contractCheck: function (value) {
+    var received = String(value || '');
+    return received === FbmSync.protocol.contract ? null : { code: 'EXTENSION_PROTOCOL_MISMATCH', message: 'Extension trên máy này đang dùng bản giao thức khác GAS, hãy tải lại Extension (chrome://extensions → ShinCRM → Tải lại).', expected: FbmSync.protocol.contract, received: received };
   },
   /** Serialize đúng wire format FBM; Extension chỉ chuyển nguyên chuỗi này qua fetch. */
   json: function (value) { return JSON.stringify(value === undefined ? null : value).replace(/\//g, '\\/'); },

@@ -1,8 +1,6 @@
 /** Entry point cho Sidebar, DEV runner va Web App relay. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** API bắt đầu phiên cho Sidebar hoặc DEV runner. */
-function fbmSyncStart(mode) { return FbmSync.start({ mode: mode }); }
 /** Người dùng chấp thuận phiên push lớn; chỉ sau đó mới cấp request authorize đầu tiên. */
 function fbmSyncApprovePush() {
   var state = FbmSync.stateRead();
@@ -19,12 +17,6 @@ function fbmSyncApprovePush() {
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 }
-/** Khởi tạo riêng pipeline bulk Activity để nghiệm thu trên DEV mà không phải chờ lịch nền đến hạn. */
-function fbmSyncStartActivityBulk() { return FbmSync.start({ mode: 'read', scan: 'activity_bulk' }); }
-/** Lệnh chẩn đoán chỉ đọc điều kiện local theo mode hiện đang lưu, không mở request FBM. */
-function fbmSyncPreflight() { var state = FbmSync.stateRead(); return typeof FbmSync.runPreflight === 'function' ? FbmSync.runPreflight({ mode: state.mode || 'read', scan: state.scan || 'full' }) : { ok: true, issues: [] }; }
-/** API nhận response Extension và trả request kế tiếp. */
-function fbmSyncContinue(rawResponse) { return FbmSync.continue(rawResponse); }
 /** Dừng phiên lỗi và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận. */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), failed = String(state.phase || '') === 'error';
@@ -39,10 +31,8 @@ function fbmSyncCancel() {
   }
   FbmSync.stateWrite(FbmSync.runCloseNow(state, failed ? null : { phase: 'paused', message: 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.' }));
   // Trả status công khai, không trả ô lượt: ô lượt mang cookie và token phiên FBM.
-  return FbmSync.statusView();
+  return { ok: true, status: FbmSync.statusView() };
 }
-function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
-function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }
 
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
 function fbmSyncRetryPushFailures() {
@@ -97,67 +87,42 @@ FbmSync.relayUrlRequired = function (props) {
   return url;
 };
 
-/** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. */
-function fbmSyncRelayConfig() {
-  var props = PropertiesService.getScriptProperties();
-  var url = FbmSync.relayUrlRequired(props);
-  var spreadsheetId = String(shinOpenBook().getId() || '');
-  var key = String(props.getProperty('FBM_SYNC_KEY') || '');
-  if (!key) {
-    var lock = LockService.getScriptLock();
-    documentStoreWaitLock(lock, 10000);
-    try {
-      key = String(props.getProperty('FBM_SYNC_KEY') || '');
-      if (!key) { key = Utilities.getUuid(); props.setProperty('FBM_SYNC_KEY', key); }
-    } finally { lock.releaseLock(); }
-  }
-  return {
-    url: url,
-    key: key,
-    spreadsheetId: spreadsheetId,
-    extension: typeof FbmSync.extensionConfigPublic === 'function' ? FbmSync.extensionConfigPublic() : { pollMinutes: 5, runOnStartup: true },
-    masterEnabled: typeof FbmSync.masterEnabled !== 'function' || FbmSync.masterEnabled(),
-    backgroundEnabled: typeof FbmSync.backgroundEnabled !== 'function' || FbmSync.backgroundEnabled()
-  };
-}
+/**
+ * Khóa relay là bí mật chung của Sheet này và Extension; nằm trong DocumentStore như mọi state của đồng bộ. Sinh ở đúng một chỗ, chỉ trong khóa điều phối (lệnh `relay_config`, `relay_rotate_key`), nên hai lời gọi cùng lúc không sinh hai khóa khác nhau.
+ */
+FbmSync.RELAY_KEY_KEY = 'FBM_RELAY_KEY_V1';
+FbmSync.relayKeyRead = function () { return String(FbmSync.props().getProperty(FbmSync.RELAY_KEY_KEY) || ''); };
+FbmSync.relayKeyEnsure = function (rotate) {
+  var key = rotate ? '' : FbmSync.relayKeyRead();
+  if (!key) { key = Utilities.getUuid(); FbmSync.props().setProperty(FbmSync.RELAY_KEY_KEY, key); }
+  return key;
+};
+/** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. Đổi khóa (`rotate`) thì Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
+FbmSync.relayConfig = function (rotate) {
+  var url = FbmSync.relayUrlRequired(PropertiesService.getScriptProperties());
+  return { ok: true, url: url, key: FbmSync.relayKeyEnsure(rotate === true), spreadsheetId: FbmSync.currentSpreadsheetId(), extension: FbmSync.extensionConfigPublic(), masterEnabled: FbmSync.masterEnabled(), backgroundEnabled: FbmSync.backgroundEnabled() };
+};
 /** Ghi Log lựa chọn của người dùng khi Extension đang đồng bộ nền cho Sheet khác: chuyển sang Sheet này hay giữ Sheet cũ. */
 FbmSync.relaySwitchDecisionLog = function (decision, fromSpreadsheetId) {
   var switching = decision === 'switch', from = String(fromSpreadsheetId || '').slice(0, 120);
   logEvent({ source: 'fbm_sync', action: switching ? 'relay_spreadsheet_switched' : 'relay_spreadsheet_kept', outcome: LOG_WARN, reason: switching ? 'Người dùng xác nhận chuyển đồng bộ nền của Extension từ Sheet ' + from + ' sang Sheet này.' : 'Người dùng giữ Extension đồng bộ nền cho Sheet ' + from + '; Sheet này chưa nhận đồng bộ nền.', detail: { fromSpreadsheetId: from } });
   return { ok: true };
 };
-/** Đổi khóa relay nguyên tử; Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
-function fbmSyncRotateRelayKey() {
-  var lock = LockService.getScriptLock();
-  documentStoreWaitLock(lock, 10000);
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var url = FbmSync.relayUrlRequired(props);
-    var spreadsheetId = String(shinOpenBook().getId() || '');
-    var key = Utilities.getUuid();
-    props.setProperty('FBM_SYNC_KEY', key);
-    return { url: url, key: key, spreadsheetId: spreadsheetId };
-  } finally { lock.releaseLock(); }
-}
-
-/** DTO gọn cho relay nền; Sidebar vẫn nhận statusView đầy đủ qua google.script.run. */
-function fbmSyncRelayCompactResult(result) {
+/** DTO gọn cho relay nền; Sidebar vẫn nhận statusView đầy đủ qua google.script.run. `httpStatus` là mã HTTP của response FBM (chỉ có ở kết quả lỗi đọc FBM), không phải `status` (status là DTO trạng thái). */
+FbmSync.relayCompact = function (result) {
   var value = result || {}, status = value.status || {};
   return {
     ok: value.ok !== false,
     code: String(value.code || ''),
     error: String(value.error || value.message || ''),
-    httpStatus: Number(value.status || 0),
+    httpStatus: Number(value.httpStatus || 0),
     request: value.request || null,
-    imported: Number(value.imported || 0),
-    missing: value.missing,
     status: {
       runId: String(status.runId || ''),
       mode: String(status.mode || ''),
       phase: String(status.phase || ''),
       direction: String(status.direction || ''),
       entity: String(status.entity || ''),
-      cursor: status.cursor || {},
       counts: status.counts || {},
       current: String(status.current || ''),
       message: String(status.message || ''),
@@ -166,10 +131,10 @@ function fbmSyncRelayCompactResult(result) {
       lastFailureCode: String(status.lastFailureCode || '')
     }
   };
-}
+};
 
 /**
- * Cổng HTTP Extension gọi cho nhịp nền, chạy cả khi Sidebar đóng; bắt buộc khóa trước khi xử lý.
+ * Cổng HTTP Extension gọi cho nhịp nền, chạy cả khi Sidebar đóng. Thân lời gọi: `{ key, contract, spreadsheetId, command, payload }`; chỉ nhận lệnh relay được phép (`heartbeat`, `continue`).
  * Phải đi qua `runEntryPoint` như mọi cửa vào: Log chỉ nằm trong bộ đệm RAM tới khi cửa vào xả, và exception phải có dòng Log cùng tin chờ hiện ở Sidebar lần mở sau (FBM-034).
  * Khóa sai thì không ghi Log: ai biết URL cũng gọi được, ghi Log ở nhánh này là cho người lạ đẩy trôi Log thật.
  */
@@ -178,12 +143,11 @@ function doPost(event) {
   try {
     var body;
     // Thông báo lỗi JSON.parse có thể trích một đoạn nội dung gửi lên (chứa khóa relay), nên thay bằng câu không mang nội dung.
-    try { body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}; } catch (badJson) { return reply({ ok: false, error: 'invalid_json' }); }
-    var props = PropertiesService.getScriptProperties();
-    var expected = String(props.getProperty('FBM_SYNC_KEY') || '');
-    if (!expected || body.key !== expected) { return reply({ ok: false, error: 'unauthorized' }); }
-    return reply(runEntryPoint('fbmRelay', 'fbm_sync', function () { FbmSync.relayUrlRecord(props); return fbmSyncRelayHandle(body); }));
-  } catch (err) { return reply({ ok: false, error: errorMessage(err) }); }
+    try { body = event && event.postData && event.postData.contents ? JSON.parse(event.postData.contents) : {}; } catch (badJson) { return reply({ ok: false, code: 'RELAY_INVALID_JSON', error: 'invalid_json' }); }
+    var expected = FbmSync.relayKeyRead();
+    if (!expected || body.key !== expected) { return reply({ ok: false, code: 'RELAY_UNAUTHORIZED', error: 'unauthorized' }); }
+    return reply(runEntryPoint('fbmRelay', 'fbm_sync', function () { FbmSync.relayUrlRecord(PropertiesService.getScriptProperties()); return FbmSync.relayHandle(body); }));
+  } catch (err) { return reply({ ok: false, code: String(err && err.code || 'RELAY_FAILED'), error: errorMessage(err) }); }
 }
 /**
  * Mở link Web App trên trình duyệt là bước cài đặt duy nhất cho địa chỉ relay: Web App ghi địa chỉ của chính nó. Ai mở link cũng chỉ ghi được đúng địa chỉ thật của script này.
@@ -196,40 +160,13 @@ function doGet(event) {
   var text = result && result.url ? 'ShinCRM đã ghi địa chỉ Web App đồng bộ nền của Sheet này. Mở lại Sidebar để gửi địa chỉ cho Extension.' : 'ShinCRM chưa ghi được địa chỉ Web App; xem Sheet Log.';
   return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);
 }
-/** Phần nghiệp vụ của nhịp nền sau khi đã qua khóa; lỗi ném ra để `runEntryPoint` ghi Log. */
-function fbmSyncRelayHandle(body) {
-  var actualSpreadsheetId = String(shinOpenBook().getId() || '');
-  if (!body.spreadsheetId || String(body.spreadsheetId) !== actualSpreadsheetId) { throw new Error('Extension gửi nhịp nền cho bảng tính khác với bảng tính đang gắn script; kiểm tra lại cấu hình relay.'); }
-  var result;
-  if (body.command) {
-    var commandPayload = body.payload || {};
-    if (body.hop !== undefined && commandPayload.hop === undefined) { commandPayload = Object.assign({}, commandPayload, { hop: Number(body.hop || 0) }); }
-    result = FbmSync.controlDispatchLocked(String(body.command), commandPayload);
-  } else if (body.kind === 'heartbeat_request') {
-    result = fbmSyncHeartbeatRequest({ source: body.source || 'alarm', hop: Number(body.hop || 0), extensionTrail: body.trail });
-  } else if (body.kind === 'heartbeat_transport_failure') {
-    result = fbmSyncHeartbeatTransportFailure({ requestId: body.requestId, code: body.code, message: body.error || body.message });
-  } else if (body.kind === 'heartbeat') {
-    result = fbmSyncHeartbeat(body.response, { hop: Number(body.hop || 0) });
-  } else if (body.kind === 'transport_probe' && typeof fbmTransportProbeRelay === 'function') {
-    // Hàm đo chỉ có khi còn thư mục server/dev; gỡ thư mục thì loại tin này rơi về nhánh từ chối bên dưới.
-    result = fbmTransportProbeRelay(body);
-  } else {
-    result = { ok: false, code: 'RELAY_KIND_UNSUPPORTED', error: 'Relay chỉ nhận các nhịp nền do GAS quy định.', request: null };
-  }
-  fbmSyncRelayNoteDropped(body, result);
-  if (body.kind === 'heartbeat_request' || body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.kind === 'background_sync') { result = fbmSyncRelayCompactResult(result); }
-  return result;
-}
-
-/**
- * Extension mang kết quả FBM (hoặc lỗi cầu nối) về mà GAS bận không giữ được khóa thì kết quả đó mất: Extension không gửi lại, lượt nằm chờ tới hạn rồi mới bị đóng.
- * Phải có dòng Log ngay lúc bỏ, không thì Log về sau chỉ thấy "lượt bị bỏ dở" mà không biết vì sao. GAS bận khi cấp request mới thì không ghi: chưa mất gì, nhịp sau hỏi lại.
- */
-function fbmSyncRelayNoteDropped(body, result) {
-  if (!result || result.code !== 'BUSY') { return; }
-  var carriesReply = body.kind === 'heartbeat' || body.kind === 'heartbeat_transport_failure' || body.command === 'continue' || body.command === 'transport_failure';
-  if (!carriesReply) { return; }
-  var waitSeconds = Math.round((typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000) / 1000);
-  logEvent({ source: 'fbm_sync', action: 'relay_busy_dropped', outcome: LOG_ERROR, reason: 'GAS đang bận việc khác quá ' + waitSeconds + ' giây nên không nhận được kết quả FBM Extension vừa gửi về; lượt này sẽ chờ tới hạn rồi bị đóng và chạy lại ở nhịp sau.', detail: { kind: String(body.kind || body.command || ''), hop: Number(body.hop || 0) } });
-}
+/** Phần nghiệp vụ của nhịp nền sau khi đã qua khóa relay; mọi từ chối ném lỗi có mã để `runEntryPoint` ghi Log và báo Sidebar. */
+FbmSync.relayHandle = function (body) {
+  if (!body.spreadsheetId || String(body.spreadsheetId) !== FbmSync.currentSpreadsheetId()) { throw FbmSync.relayError('RELAY_SPREADSHEET_MISMATCH', 'Extension gửi nhịp nền cho bảng tính khác với bảng tính đang gắn script; kiểm tra lại cấu hình relay.'); }
+  var mismatch = FbmSync.protocol.contractCheck(body.contract);
+  if (mismatch) { throw FbmSync.relayError(mismatch.code, mismatch.message + ' (Extension gửi mã "' + (mismatch.received || 'không có') + '", GAS cần "' + mismatch.expected + '").'); }
+  var command = String(body.command || '');
+  if (!FbmSync.relayCommandAllowed(command)) { throw FbmSync.relayError('RELAY_COMMAND_REJECTED', 'Relay không được gọi lệnh "' + command + '"; chỉ nhận heartbeat và continue.'); }
+  return FbmSync.relayCompact(FbmSync.controlDispatch(command, Object.assign({}, body.payload || {}, { source: 'relay' })));
+};
+FbmSync.relayError = function (code, message) { var error = new Error(message); error.code = code; return error; };

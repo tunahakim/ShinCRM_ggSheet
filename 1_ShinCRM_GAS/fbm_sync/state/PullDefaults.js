@@ -4,6 +4,8 @@
  * Ngầm định kéo từ FBM là kênh nhập riêng, không dùng chung với ngầm định khi nhập trên Sidebar: FBM không có trường "Xác thực" nên ShinCRM phải tự điền cho khách mới, còn người nhập tay trên Sidebar thì tự chọn.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
+var SETTINGS_SECTION_PROVIDERS = typeof SETTINGS_SECTION_PROVIDERS !== 'undefined' ? SETTINGS_SECTION_PROVIDERS : {};
+SETTINGS_SECTION_PROVIDERS.fbm_sync = function () { return fbmSettingsSections(); };
 
 function fbmSettingsSections() {
   return [

@@ -82,15 +82,11 @@ FbmSync.documentPropertyJson = function (key, context) {
   return documentPropertyJson(FbmSync.props(), key, context, 'object');
 };
 
-/** Khóa riêng cho state/cursor đồng bộ; không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. */
-FbmSync.orchestrationLock = function () {
-  if (typeof LockService !== 'undefined' && LockService.getScriptLock) { return LockService.getScriptLock(); }
-  if (typeof LockService !== 'undefined' && LockService.getDocumentLock) { return LockService.getDocumentLock(); }
-  return { tryLock: function () { return true; }, releaseLock: function () {} };
-};
+/** Khóa duy nhất của state/cursor đồng bộ (khóa script); không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. Không có khóa thay thế: thiếu khóa script thì lỗi to, không chạy không khóa. */
+FbmSync.orchestrationLock = function () { return LockService.getScriptLock(); };
 FbmSync.withOrchestrationLock = function (work) {
   var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
-  if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null }; }
+  if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: FbmSync.statusView() }; }
   // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
 };

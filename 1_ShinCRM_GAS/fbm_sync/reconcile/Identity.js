@@ -32,7 +32,7 @@ FbmSync.bindingCanUpgradeUsername = function (previous, next) {
 FbmSync.bindingClear = function () {
   var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, phase = String(state && state.phase || '');
   var active = !!(state && state.activeRequestId) || (!!(state && state.runId) && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(phase) < 0);
-  if (active) { return { ok: false, code: 'SYNC_ALREADY_RUNNING', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
+  if (active) { return { ok: false, code: 'SYNC_BUSY', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
   var props = FbmSync.props(), previous = FbmSync.bindingRead();
   if (previous.spreadsheetId) {
     props.setProperty(FbmSync.BINDING_CLEAR_KEY, JSON.stringify({ spreadsheetId: String(previous.spreadsheetId || ''), userId: String(previous.userId || ''), username: String(previous.username || ''), accountName: String(previous.accountName || ''), clearedAt: Date.now() }));

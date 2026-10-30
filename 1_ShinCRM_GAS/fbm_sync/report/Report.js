@@ -181,8 +181,8 @@ FbmSync.logTransportError = function (message, action, runId) {
     if (typeof logEvent === 'function') { logEvent({ source: 'sidebar', action: String(action || 'sidebar_error'), outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: reason }); }
     return FbmSync.statusView();
   }
-  // Tự giữ khóa như transport_failure; khóa bận thì vẫn phải ghi Log, không được im lặng.
-  var outcome = FbmSync.withOrchestrationLock(function () { return FbmSync.stateFailRun(reason, 'FBM_CLIENT_ERROR'); });
+  // Chạy trong khóa của cửa lệnh (lệnh `client_error`); khóa bận thì cửa lệnh ghi Log lúc bỏ.
+  var outcome = FbmSync.stateFailRun(reason, 'FBM_CLIENT_ERROR');
   var recorded = String(before.phase || '') === 'error' && String(before.lastError || '').indexOf(reason) >= 0;
   // stateFailRun đã đóng bước đang chạy với đúng lý do này, nên chỉ ghi thêm khi phiên không được chuyển sang lỗi ở đây.
   if (!(outcome && outcome.failed) && !recorded && typeof logEvent === 'function') {
@@ -224,5 +224,3 @@ FbmSync.previewRecords = function (entity, records) {
   FbmSync.documentPropertySet(FbmSync.PREVIEW_KEY, JSON.stringify(preview), 'preview');
   return preview;
 };
-/** API tương thích cho caller GAS cũ. */
-function fbmSyncStatus() { return FbmSync.statusView(); }

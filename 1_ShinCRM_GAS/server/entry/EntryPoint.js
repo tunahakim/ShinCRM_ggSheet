@@ -38,17 +38,21 @@ function entryRecover(name, source) {
  *
  * **Không tự lấy `LockService`.** Khóa lấy ở tầng nghiệp vụ, nơi biết mình sắp ghi gì; lấy khóa ở đây là lấy khóa cho cả những lượt chỉ đọc, và khóa của dự án không tái nhập nên một lượt đọc giữ khóa sẽ chặn đúng lượt ghi đang chờ nó.
  */
+/**
+ * Phạm vi riêng của một nhánh nghiệp vụ quanh mỗi cửa vào, đăng ký theo `source`: `{ begin(), end(), boundary(stage, name, error) }`. Nhánh nào cần thì tự đăng ký ở tệp của nhánh đó; lõi không đoán theo tên hàm và không biết nhánh nào tồn tại.
+ * Khai báo dạng `var ... typeof` vì GAS nạp tệp không theo thứ tự cố định: tệp đăng ký có thể chạy trước tệp này.
+ */
+var ENTRY_POINT_SCOPES = typeof ENTRY_POINT_SCOPES !== 'undefined' ? ENTRY_POINT_SCOPES : {};
+
 function runEntryPoint(name, source, fn) {
-  var trace = typeof fbmTraceBoundary === 'function' && /^fbm/i.test(String(name || ''));
+  var scope = Object.prototype.hasOwnProperty.call(ENTRY_POINT_SCOPES, source) ? ENTRY_POINT_SCOPES[source] : null;
   // Mốc đo DEV (server/dev/FbmPerfProbe.js); gỡ thư mục dev thì hàm không tồn tại và dòng này không làm gì. Tham số thứ tư là đối số gốc của cửa vào.
   var perf = typeof devPerfBegin === 'function' ? devPerfBegin(name, arguments[3]) : null;
   var failed = false, result;
-  // Bản đọc DocumentProperties sống đúng một lần gọi (server/state/DocumentStore.js): mở đầu tiên, đóng cuối cùng (sau `flushLog`). Phạm vi riêng của đồng bộ FBM (gom trace) mở trước mốc trace đầu tiên để mốc đó cũng được gom.
+  // Bản đọc DocumentProperties sống đúng một lần gọi (server/state/DocumentStore.js): mở đầu tiên, đóng cuối cùng (sau `flushLog`). Phạm vi riêng của nhánh mở trước mốc đầu tiên để mốc đó cũng được gom.
   documentStoreBegin();
   pendingChangesBegin();
-  var buffered = trace && typeof fbmCallBegin === 'function';
-  if (buffered) { fbmCallBegin(); }
-  if (trace) { fbmTraceBoundary('gas_entered', name); }
+  if (scope) { scope.begin(); scope.boundary('gas_entered', name); }
   try {
     result = fn();
     // Kết quả `ok: false` là cửa vào báo lại lỗi cũ chứ chưa hết lỗi.
@@ -56,7 +60,7 @@ function runEntryPoint(name, source, fn) {
     return result;
   } catch (err) {
     failed = true;
-    if (trace) { fbmTraceBoundary('gas_failed', name, err); }
+    if (scope) { scope.boundary('gas_failed', name, err); }
     entryFail(name, source, err);
     throw err;
   } finally {
@@ -72,12 +76,12 @@ function runEntryPoint(name, source, fn) {
         throw basketErr;
       }
     }
-    if (trace) { fbmTraceBoundary('before_flush', name); }
+    if (scope) { scope.boundary('before_flush', name); }
     try {
       flushLog();
     } finally {
-      if (trace) { fbmTraceBoundary('after_flush', name); if (!failed) { fbmTraceBoundary('gas_returned', name); } }
-      try { if (buffered) { fbmCallEnd(); } } finally { documentStoreEnd(); }
+      if (scope) { scope.boundary('after_flush', name); if (!failed) { scope.boundary('gas_returned', name); } }
+      try { if (scope) { scope.end(); } } finally { documentStoreEnd(); }
       if (perf) { devPerfEnd(perf, failed); }
     }
   }
