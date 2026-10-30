@@ -437,7 +437,8 @@ Phạm vi: GAS `fbm_sync/` và `server/service/FbmSyncService.js`, Sidebar `clie
   - [x] Viết sơ đồ các cấp và danh mục công cụ.
   - [x] Viết từng tiến trình theo tình huống và bảng hiện tại so với thiết kế.
   - [x] Viết tệp vi phạm ở lõi.
-  - [ ] Chủ dự án duyệt tài liệu thiết kế và trả lời D1–D11 ở mục 8 của nó. Đã chốt 2026-10-30: D12, (a), (b), (c), thêm vào B10; còn (d).
+  - [ ] Chủ dự án duyệt tài liệu thiết kế và trả lời mục 8 của nó. Đã chốt 2026-10-30: D1, D2, D4–D12, (a)–(d), thêm vào B10. Còn D3, D13–D15.
+  - [ ] Viết D11 vào thân tài liệu thiết kế (bỏ vòng `sidebarRun`).
 
 ### Chuẩn bị trước giai đoạn B (chủ dự án làm)
 - [x] Tạo một bản sao Sheet DEV làm bản lưu (Tệp › Tạo bản sao), không dùng để chạy.
