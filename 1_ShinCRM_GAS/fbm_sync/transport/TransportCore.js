@@ -367,7 +367,7 @@ FbmSync.sessionGateTransportRetry = function (state, requestId, code, message) {
   gate.noTabRetryRequestId = String(envelope.id || '');
   state.message = 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
   FbmSync.sessionGateRecordFailure(state, value, message || 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.', 'transport_retry');
-  return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView(), retrying: true };
+  return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
 FbmSync.sessionGateResponseStarted = function (state) {
   var gate = state && state.metadata && state.metadata.sessionGate;
