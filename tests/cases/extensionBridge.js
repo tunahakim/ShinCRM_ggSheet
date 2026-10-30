@@ -286,7 +286,7 @@ async function chay(so) {
     ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'gas_reply_failed', 'chain_finished'].every((stage) => workerSource.indexOf("noteChainStep('" + stage + "'") >= 0),
     ['fbm_tab_preparing', 'fbm_tab_reloading'].every((stage) => workerSource.indexOf("note('" + stage + "'") >= 0),
     workerSource.indexOf("kind: 'heartbeat_request', source: origin, spreadsheetId: config.spreadsheetId, trail: trail") >= 0,
-    workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || '') };") >= 0
+    workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };") >= 0
   ], [true, true, true, true]);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
@@ -591,9 +591,9 @@ async function chay(so) {
         scripting: { executeScript: () => { state.injects += 1; return Promise.resolve(); } },
         runtime: { lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
         alarms: { create() {}, get(name, done) { done(null); }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
-        storage: { local: { get(keys, done) { done({}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '')); } if (done) { done(); } } } }
+        storage: { local: { get(keys, done) { done(behaviour.relayStored ? { fbmWebAppUrl: relayConfig.url, fbmSyncKey: relayConfig.key, fbmSpreadsheetId: relayConfig.spreadsheetId } : {}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '') + (value.fbmChainTrail.httpStatus ? '@' + value.fbmChainTrail.httpStatus : '')); } if (done) { done(); } } } }
       },
-      fetch(url, options) { state.bodies.push(JSON.parse(options.body)); return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve('{"ok":true}'); } }); }
+      fetch(url, options) { state.bodies.push(JSON.parse(options.body)); if (behaviour.relayReply) { return Promise.resolve(behaviour.relayReply); } return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve('{"ok":true}'); } }); }
     };
     vm.createContext(context);
     vm.runInContext(workerSource, context, { filename: WORKER_FILE });
@@ -632,6 +632,18 @@ async function chay(so) {
   const ngoaiMien = tabWorker({ id: 9, status: 'complete', autoDiscardable: false }, { answers: true });
   const ketQuaNgoaiMien = await ngoaiMien.context.relayRun(relayConfig, reloadRequest('tab-ngoai-mien', 'https://example.com/'), 0, 'heartbeat');
   check(so, 'URL reloadFbmPage ngoài miền FBM: không đổi trang, không gửi request, báo FBM_TAB_NOT_READY', [ketQuaNgoaiMien.code, ngoaiMien.state.updates.length, ngoaiMien.state.executes], ['FBM_TAB_NOT_READY', 0, 0]);
+
+  // Relay trả 404 hoặc HTML: không được đổi thành `{ok:false}` rồi coi như GAS đã trả lời; hộp đen phải mang mã thật và httpStatus.
+  const relayHong = (status, text) => ({ ok: false, status, headers: { get() { return 'text/html'; } }, text() { return Promise.resolve(text); } });
+  const nop404 = tabWorker({ id: 10, status: 'complete', autoDiscardable: false }, { answers: true, relayReply: relayHong(404, '<html>Not found</html>') });
+  const ketQuaNop404 = await nop404.context.relayRun(relayConfig, tabRequest('nop-404'), 0, 'heartbeat');
+  check(so, 'Nộp kết quả gặp relay 404: hộp đen ghi gas_reply_failed kèm RELAY_ENDPOINT_NOT_FOUND và HTTP 404, không coi như GAS đã trả lời', [nop404.state.trails.filter((item) => /^gas_reply_failed/.test(item)).pop(), ketQuaNop404.ok, ketQuaNop404.code], ['gas_reply_failed:RELAY_ENDPOINT_NOT_FOUND@404', false, 'GAS_RELAY_FAILED']);
+  const nopHtml = tabWorker({ id: 11, status: 'complete', autoDiscardable: false }, { answers: true, relayReply: relayHong(200, '<html>Dang nhap</html>') });
+  await nopHtml.context.relayRun(relayConfig, tabRequest('nop-html'), 0, 'heartbeat');
+  check(so, 'Nộp kết quả nhận HTML thay vì JSON: hộp đen ghi RELAY_INVALID_JSON kèm HTTP 200', nopHtml.state.trails.filter((item) => /^gas_reply_failed/.test(item)).pop(), 'gas_reply_failed:RELAY_INVALID_JSON@200');
+  const hoiHtml = tabWorker({ id: 12, status: 'complete', autoDiscardable: false }, { answers: true, relayStored: true, relayReply: relayHong(404, 'x') });
+  const ketQuaHoiHtml = await hoiHtml.context.fbmHeartbeatNow('test');
+  check(so, 'Lần hỏi nền gặp relay 404: trả đúng mã RELAY_ENDPOINT_NOT_FOUND (không thành HEARTBEAT_FAILED) và hộp đen ghi mã kèm HTTP 404 cho lần hỏi sau', [ketQuaHoiHtml.code, hoiHtml.state.trails.pop()], ['RELAY_ENDPOINT_NOT_FOUND', 'gas_reply_failed:RELAY_ENDPOINT_NOT_FOUND@404']);
 
   // Mọi lời chờ của worker phải có hạn: hẹn giờ chỉ nằm ở các công cụ chờ, hàm gọi tab/executor/mạng phải chờ qua công cụ có hạn.
   const unboundedWaits = (source) => source.split(/\n(?=function \w+\()/).map((chunk) => ({ name: (chunk.match(/^function (\w+)\(/) || [])[1] || '', body: chunk })).filter((item) => item.name).filter((item) => {

@@ -467,14 +467,19 @@ function postRelay(url, key, body, timeoutMs) {
       noteRelayStatus({ stage: 'response_received', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, code: 'RELAY_RESPONSE_RECEIVED' });
       var parsed = null;
       try { parsed = JSON.parse(text); } catch (ignore) {
-        var htmlError = response.status === 404 ? 'GAS Web App không tồn tại ở URL đang lưu (HTTP 404).' : 'GAS relay trả về dữ liệu không phải JSON.';
-        parsed = { ok: false, code: response.status === 404 ? 'RELAY_ENDPOINT_NOT_FOUND' : 'RELAY_INVALID_JSON', error: htmlError, contentType: contentType, responsePrefix: responsePrefix };
+        // Không đổi thành `{ok:false}` rồi coi như GAS đã trả lời: kết quả FBM đã nộp sẽ bị bỏ mà không ai biết. Ném lỗi có mã thật để chuỗi báo lỗi và ghi hộp đen.
+        var notFound = response.status === 404, invalid = new Error(notFound ? 'GAS Web App không tồn tại ở URL đang lưu (HTTP 404).' : 'GAS relay trả về dữ liệu không phải JSON (HTTP ' + response.status + ').');
+        invalid.code = notFound ? 'RELAY_ENDPOINT_NOT_FOUND' : 'RELAY_INVALID_JSON';
+        invalid.httpStatus = response.status;
+        noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: false, code: invalid.code, httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: invalid.message });
+        throw invalid;
       }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
       noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: parsed && parsed.error || '' });
       return parsed;
     });
   }).catch(function (error) {
+    if (error && error.code === 'RELAY_ENDPOINT_NOT_FOUND' || error && error.code === 'RELAY_INVALID_JSON') { throw error; }
     var timeout = error && error.name === 'AbortError';
     var message = timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
     var code = timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', failure = new Error(message);
@@ -493,9 +498,9 @@ var fbmHeartbeatFlight = null;
  */
 var FBM_WORKER_STARTED_AT = Date.now();
 var FBM_CHAIN_TRAIL_KEY = 'fbmChainTrail';
-function noteChainStep(stage, request, hop, code) {
+function noteChainStep(stage, request, hop, code, httpStatus) {
   if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
-  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || '') };
+  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };
   try { chrome.storage.local.set({ fbmChainTrail: trail }); } catch (ignore) {}
 }
 function readChainTrail() {
@@ -538,8 +543,10 @@ function fbmHeartbeatNow(source) {
     });
   }).catch(function (error) {
     var message = String(error && error.message || error);
-    noteHeartbeatStatus('failed', { source: origin, code: 'HEARTBEAT_FAILED', error: message.slice(0, 240) });
-    return { ok: false, code: 'HEARTBEAT_FAILED', error: message };
+    var failedCode = String(error && error.code || 'HEARTBEAT_FAILED');
+    noteHeartbeatStatus('failed', { source: origin, code: failedCode, error: message.slice(0, 240) });
+    noteChainStep('gas_reply_failed', null, 0, failedCode, error && error.httpStatus);
+    return { ok: false, code: failedCode, error: message };
   }).finally(function () { fbmHeartbeatFlight = null; });
   return fbmHeartbeatFlight;
 }
@@ -559,7 +566,7 @@ function fbmTransportProbe(message) {
     return postRelay(config.url, config.key, { kind: 'transport_probe', spreadsheetId: config.spreadsheetId, sizeBytes: sizeBytes, padding: padding }, Number(message.timeoutMs || 0)).then(function (reply) {
       return { ok: !!reply && reply.ok !== false, ms: Date.now() - sentAt, code: reply && reply.code || '', error: reply && reply.error || '', receivedBytes: reply && reply.receivedBytes || 0 };
     });
-  }).catch(function (error) { return { ok: false, code: 'RELAY_FETCH_FAILED', error: String(error && error.message || error), ms: Date.now() - startedAt }; });
+  }).catch(function (error) { return { ok: false, code: String(error && error.code || 'RELAY_FETCH_FAILED'), error: String(error && error.message || error), ms: Date.now() - startedAt }; });
 }
 
 /**
@@ -693,7 +700,7 @@ function relayRun(config, gasReply, used, channel) {
       noteChainStep(failureReply && failureReply.ok === false ? 'gas_reply_failed' : 'chain_finished', next, hop + 1, failureCode);
       return Object.assign({}, failureReply || {}, { ok: false, code: failureCode, error: failureMessage });
     }, function (relayError) {
-      noteChainStep('gas_reply_failed', next, hop + 1, relayError && relayError.code || 'GAS_RELAY_FAILED');
+      noteChainStep('gas_reply_failed', next, hop + 1, relayError && relayError.code || 'GAS_RELAY_FAILED', relayError && relayError.httpStatus);
       var relayMessage = String(relayError && relayError.message || relayError || 'Không thể báo lỗi transport lên GAS.').slice(0, 240);
       noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
       return { ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage, request: null };
@@ -709,7 +716,7 @@ function relayRun(config, gasReply, used, channel) {
       if (!reply || reply.error) { return reportFailure(reply && reply.code, reply ? reply.error : 'Tab FBM không trả kết quả.'); }
       noteChainStep('gas_response_sent', next, hop + 1);
       return post(lane.reply(rawFbmReply(reply), hop + 1)).then(function (nextReply) { return relayRun(config, nextReply, hop + 1, 'background'); }, function (error) {
-        noteChainStep('gas_reply_failed', next, hop + 1, error && error.code || 'GAS_RELAY_FAILED');
+        noteChainStep('gas_reply_failed', next, hop + 1, error && error.code || 'GAS_RELAY_FAILED', error && error.httpStatus);
         return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
       });
     });
