@@ -201,7 +201,16 @@ async function cuaGoiGas(so) {
   let lan2 = 0;
   const hoi = workerNap({ gas() { lan2 += 1; if (lan2 === 1) { throw new Error('NETWORK_BLIP'); } return { ok: true, request: null, status: { runId: 'G2', phase: 'done' } }; } });
   const ketQuaHoi = (await chayLuot(hoi.ctx, 'G2', [5, 10])).ketQua;
-  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, không ghi ô lỗi, Sidebar nhận done', [lan2, hoi.st.bodies[0].payload.runId === hoi.st.bodies[1].payload.runId, hoi.st.storage.fbmExtensionFailure, ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)], [2, true, undefined, true, [true]]);
+  const oHoi = hoi.st.storage.fbmExtensionFailure;
+  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, Sidebar nhận done, lần hỏng vẫn nằm trong ô lỗi để lần hỏi nền sau đưa vào Log (lần hỏng có thể đã tới GAS)', [lan2, hoi.st.bodies[0].payload.runId === hoi.st.bodies[1].payload.runId, oHoi && [oHoi.command, oHoi.code, oHoi.attempts], ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)], [2, true, ['relay_continue', 'RELAY_FETCH_FAILED', 1], true, [true]]);
+
+  const tabs = [
+    { id: 1, url: 'https://docs.google.com/spreadsheets/d/' + SHEET + '/edit#gid=0' },
+    { id: 2, url: 'https://docs.google.com/spreadsheets/d/sheet-khac/edit' },
+    { id: 3, url: 'https://docs.google.com/spreadsheets/d/' + SHEET + '/edit', discarded: true },
+    { id: 4, url: 'https://docs.google.com/document/d/' + SHEET + '/edit' }
+  ];
+  check(so, 'Phục hồi cầu nối chỉ chạm tab đang thức của đúng Sheet đã cấu hình; chưa cấu hình thì mọi tab Sheet đang thức', [hoi.ctx.sheetsBridgeTabs(tabs, SHEET).map((tab) => tab.id), hoi.ctx.sheetsBridgeTabs(tabs, '').map((tab) => tab.id)], [[1], [1, 2]]);
 
   // Worker vừa khởi động, chưa nhận lịch thử lại: không tự đặt con số, hỏng là ghi ô lỗi ngay.
   let lan3 = 0;

@@ -2,6 +2,7 @@
 const NHOM = [
   require("./fbmSync/Control"),
   require("./fbmSync/RunPickup"),
+  require("./fbmSync/RelayResubmit"),
   require("./fbmSync/RelayLoop"),
   require("./fbmSync/SidebarDrive"),
   require("./fbmSync/Protocol"),

@@ -163,7 +163,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 47,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 36,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 35,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 2,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },

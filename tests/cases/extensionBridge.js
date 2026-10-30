@@ -301,7 +301,7 @@ async function chay(so) {
   check(so, 'relay config luu Spreadsheet ID', workerSource.indexOf('fbmSpreadsheetId: spreadsheetId') >= 0, true);
   check(so, 'relay config luu nhịp gas_poll va tuy chon startup', workerSource.indexOf('fbmPollMinutes') >= 0 && workerSource.indexOf('fbmRunOnStartup') >= 0 && workerSource.indexOf('config.extension') >= 0, true);
   check(so, 'service worker co quyen goi Sheets va Web App GAS', manifest.host_permissions.includes('https://docs.google.com/*') && manifest.host_permissions.includes('https://script.google.com/macros/*') && manifest.host_permissions.includes('https://script.googleusercontent.com/macros/*'), true);
-  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi (ten va version cung so)', [manifest.version, manifest.name], ['22.0', 'CRM Local Pro V22.0']);
+  check(so, 'manifest Extension dong bo cung phien ban phat hanh moi (ten va version cung so)', [manifest.version, manifest.name], ['22.1', 'CRM Local Pro V22.1']);
   check(so, 'relay GAS co timeout va luu chan doan toi thieu', workerSource.indexOf('GAS_RELAY_TIMEOUT_MS') >= 0 && workerSource.indexOf('RELAY_TIMEOUT') >= 0 && workerSource.indexOf("FBM_FAILURE_CELL_KEY = 'fbmExtensionFailure'") >= 0, true);
   const sidebarSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'Sidebar.html'), 'utf8');
   const entryPointsSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'EntryPoints.js'), 'utf8');
@@ -427,7 +427,7 @@ async function chay(so) {
     chrome: {
       tabs: { query: () => Promise.resolve([]), sendMessage() {} },
       scripting: { executeScript: () => Promise.resolve() },
-      runtime: { getManifest: () => ({ version: '22.0' }), lastError: null, onMessage: { addListener(fn) { workerMessageListener = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
+      runtime: { getManifest: () => ({ version: '22.1' }), lastError: null, onMessage: { addListener(fn) { workerMessageListener = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
       alarms: {
         create(name, info) { relayAlarms += 1; relayAlarm = { name, periodInMinutes: info && info.periodInMinutes }; },
         get(name, done) { done(relayAlarm && relayAlarm.name === name ? relayAlarm : null); },
@@ -451,7 +451,7 @@ async function chay(so) {
   workerContext.clearTimeout = () => {};
   workerContext.setTimeout = (fn, ms) => { const timer = { fn, ms: Number(ms), fired: false }; waitTimers.push(timer); return timer; };
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '22.0' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '22.1' }); return; }
     if (message.type === 'FBM_EXECUTE_V2') { sentAt.push(message.request.id + '@' + virtualNow); if (onSend) { onSend(message.request.id); } done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
   };
   // Đồng hồ giả: chỉ bắn hẹn giờ khoảng nghỉ (hàm `wake`; hẹn giờ hết hạn ping/tin nhắn tab là hàm khác), dời đồng hồ đúng bằng thời gian chờ.
@@ -500,7 +500,7 @@ async function chay(so) {
   workerContext.Date = Date;
   const sentItems = [];
   workerContext.chrome.tabs.sendMessage = (tabId, message, done) => {
-    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '22.0' }); return; }
+    if (message.type === 'FBM_PING_V2') { done({ ready: true, version: '22.1' }); return; }
     if (message.type !== 'FBM_EXECUTE_V2') { return; }
     sentItems.push(message.request);
     if (message.request.id === 'loi-mang') { done({ error: 'Failed to fetch', code: 'FBM_TRANSPORT_UNAVAILABLE', trace: [{ stage: 'fetch_finished', requestId: 'lo-env' }] }); return; }
@@ -630,12 +630,12 @@ async function chay(so) {
           },
           onUpdated: { addListener(fn) { state.listeners.push(fn); }, removeListener(fn) { state.listeners = state.listeners.filter((item) => item !== fn); } },
           sendMessage(tabId, message, done) {
-            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answers || (behaviour.answersAfterReload && state.reloads > 0)) { done({ ready: true, version: '22.0' }); } return; }
+            if (message.type === 'FBM_PING_V2') { state.pings += 1; if (behaviour.answers || (behaviour.answersAfterReload && state.reloads > 0)) { done({ ready: true, version: '22.1' }); } return; }
             if (message.type === 'FBM_EXECUTE_V2') { state.executes += 1; done({ result: { ok: true, status: 200, body: '{}', transport: { trace: [] } } }); }
           }
         },
         scripting: { executeScript: () => { state.injects += 1; return Promise.resolve(); } },
-        runtime: { getManifest: () => ({ version: '22.0' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
+        runtime: { getManifest: () => ({ version: '22.1' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
         alarms: { create() {}, get(name, done) { done(null); }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
         storage: { local: { get(keys, done) { done(behaviour.relayStored ? { fbmWebAppUrl: relayConfig.url, fbmSyncKey: relayConfig.key, fbmSpreadsheetId: relayConfig.spreadsheetId } : {}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '') + (value.fbmChainTrail.httpStatus ? '@' + value.fbmChainTrail.httpStatus : '')); } if (done) { done(); } } } }
       },
@@ -735,7 +735,7 @@ async function chay(so) {
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
       document: { documentElement: { innerHTML: '', textContent: String.raw`var payload={\"cookie\":\"461020379855cFHN_CRM_App\"};` } },
       fetch(url, options) { fetchCalls += 1; sentBody = options && options.body; if (String(url).indexOf('/GetGridViewPage') >= 0) { probeBody = sentBody; } return Promise.resolve(response); },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
@@ -790,7 +790,7 @@ async function chay(so) {
       Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
       document: { documentElement: { innerHTML: '', textContent: '' } },
       fetch() { return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(responseText).buffer); } }); },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
@@ -847,7 +847,7 @@ async function chay(so) {
         if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script>')); }
         return Promise.resolve(response('{}'));
       },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
@@ -877,7 +877,7 @@ async function chay(so) {
         if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":"x"}')); }
         return Promise.resolve(response('<html>Error</html>'));
       },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
@@ -907,7 +907,7 @@ async function chay(so) {
         if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response(accountHtml)); }
         return Promise.resolve(response('{}'));
       },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
@@ -979,7 +979,7 @@ async function chay(so) {
         if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('unexpected-account-page')); }
         return Promise.resolve(response('{}'));
       },
-      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.1' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
