@@ -128,6 +128,11 @@ FbmSync.identityMismatches = function (expected, runtime) {
   });
   return reasons;
 };
+/** Tên ô liên kết (đúng nhãn trên màn Tài khoản) cho từng lý do lệch, để người dùng biết sửa ô nào. */
+FbmSync.IDENTITY_MISMATCH_LABELS = { spreadsheet_mismatch: 'Spreadsheet ID', user_mismatch: 'Mã số user FBM', username_mismatch: 'Tên đăng nhập FBM', account_mismatch: 'Tên đầy đủ' };
+FbmSync.identityMismatchLabels = function (reasons) {
+  return (reasons || []).map(function (reason) { return FbmSync.IDENTITY_MISMATCH_LABELS[reason] || String(reason); }).join(', ');
+};
 /** Bản nháp kỳ vọng có thể điền dở (đăng nhập thử trước khi lưu liên kết): chỉ đưa vào phép so các trường bản nháp đã điền. */
 FbmSync.identityFilledFields = function (expected, runtime) {
   var want = expected || {}, got = runtime || {}, picked = {};

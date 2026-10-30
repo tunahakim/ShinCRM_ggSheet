@@ -325,6 +325,22 @@ async function chay(so) {
     identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1') === null
   ], ['customer', null, 'done', 1, 1, 0, false]);
 
+  // Kiểm liên kết với bản nháp chưa lưu: bước kiểm phiên so tài khoản FBM với bản nháp, không với liên kết đã lưu.
+  const draftCheck = async (draft, savedName) => {
+    const flow = workflowGas();
+    flow.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
+    flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: savedName });
+    const started = flow.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true, identity: draft });
+    const probe = await sendThroughExecutor(started.request, userResponse);
+    return flow.hop.FbmSync.continue(executorRaw(probe.reply, started.request.id));
+  };
+  const draftWrongName = await draftCheck({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anhhh' }, 'Le Tuan Anh');
+  check(so, 'kiem tra lien ket: ban nhap sai Ten day du thi dung o buoc kiem phien va bao lech dung o Ten day du, khong quet Customer', [
+    draftWrongName.ok, draftWrongName.code, draftWrongName.status.phase, draftWrongName.request || null, draftWrongName.status.lastError
+  ], [false, 'SESSION_IDENTITY_MISMATCH', 'error', null, 'Thông tin liên kết đang nhập không khớp tài khoản FBM đang mở ở: Tên đầy đủ.']);
+  const draftRight = await draftCheck({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' }, 'Ten Cu');
+  check(so, 'kiem tra lien ket: lien ket da luu cu nhung ban nhap khop tai khoan FBM thi qua buoc kiem phien va sang xac thuc Customer', [draftRight.ok, draftRight.request && draftRight.request.meta.kind], [true, 'authorize']);
+
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
