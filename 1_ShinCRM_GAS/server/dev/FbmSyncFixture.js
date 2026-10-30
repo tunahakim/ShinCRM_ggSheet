@@ -217,3 +217,10 @@ function fbmRepairFalseMissingApply() { return fbmRepairFalseMissing(true); }
 function fbmFixtureSave(entity, records, source) {
   return FbmSync.recordChange(function () { return { save: [{ entity: entity, records: records, source: source }] }; }).saves[0];
 }
+
+/** Mở ngay một lượt nền chỉ đọc qua đúng cổng lệnh `start`, để nghiệm thu nút dừng nền mà không chờ nhịp hỏi của Extension. Lượt nằm ở bước kiểm phiên tới khi Extension hỏi; chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
+function fbmDevOpenBackgroundRun() {
+  var opened = FbmSync.controlDispatchLocked('start', { mode: 'read', scan: 'full', origin: 'background', manual: false });
+  var status = FbmSync.statusView();
+  return { ok: opened && opened.ok !== false, code: opened && opened.code || '', running: status.running, origin: status.origin, phase: status.phase, message: status.message };
+}
