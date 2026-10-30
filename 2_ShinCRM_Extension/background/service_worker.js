@@ -311,13 +311,24 @@ function fbmCancelBatch() {
 }
 function fbmCancelledSince(since) { return since > 0 && FBM_CANCEL_AT >= since; }
 
-/** Tự phục hồi các tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message. */
+/**
+ * Tự phục hồi cầu nối ở tab Sheets đang mở; lỗi một tab không làm worker ngừng nhận message.
+ * Đã cấu hình Sheet thì chỉ chạm tab của đúng Sheet đó: tab Sheet khác hay tab bị Chrome cho ngủ (discarded) không có Sidebar ShinCRM, phục hồi chúng chỉ sinh lỗi giả mỗi lần worker thức dậy.
+ */
 function recoverSheetsBridges() {
-  return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
-    return Promise.all((tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); }).map(function (tab) {
+  return Promise.all([getRelayConfig(), chrome.tabs.query({ url: ['https://docs.google.com/*'] })]).then(function (found) {
+    return Promise.all(sheetsBridgeTabs(found[1], found[0] && found[0].spreadsheetId).map(function (tab) {
       return ensureSheetsBridge(tab.id).catch(function (error) { return noteExtensionFailure('sheets_bridge', Object.assign(error || new Error('SHEETS_BRIDGE_NOT_READY'), { code: String(error && error.code || 'SHEETS_BRIDGE_NOT_READY') }), 1); });
     }));
   }).catch(function (error) { return noteExtensionFailure('sheets_bridge', Object.assign(error || new Error('SHEETS_TAB_QUERY_FAILED'), { code: 'SHEETS_TAB_QUERY_FAILED' }), 1); });
+}
+/** Tab Sheets cần cầu nối: tab đang thức, thuộc Sheet đã cấu hình (chưa cấu hình thì mọi Sheet, để Sidebar lần đầu gửi được cấu hình). */
+function sheetsBridgeTabs(tabs, spreadsheetId) {
+  var id = String(spreadsheetId || '');
+  return (tabs || []).filter(function (tab) {
+    var url = String(tab && tab.url || '');
+    return !tab.discarded && /^https:\/\/docs\.google\.com\/spreadsheets\//i.test(url) && (!id || url.indexOf('/spreadsheets/d/' + id) >= 0);
+  });
 }
 
 /** Gửi request nghiệp vụ (hoặc lô) đúng một lần tới tab đã qua `prepareFbmTab`. */
@@ -648,10 +659,13 @@ function relayCall(config, kind, payload, timeoutMs) {
       var sent = { command: command, spreadsheetId: config.spreadsheetId, payload: Object.assign(body, { machineId: machineId }) };
       function attempt() {
         attempts += 1;
+        // Ghi hộp đen ở mọi lần hỏng, kể cả khi lần thử sau thành công: lần hỏng có thể đã tới GAS (GAS xử lý xong, câu trả lời mất trên đường về), lần hỏi nền sau đưa mã lỗi thật vào Log.
         return postRelay(config.url, config.key, sent, timeoutMs).catch(function (error) {
           var waitMs = relayRetrySchedule[attempts - 1];
-          if (!waitMs) { return noteExtensionFailure('relay_' + kind, error, attempts).then(function () { throw error; }); }
-          return relayRetryWait(waitMs).then(attempt);
+          return noteExtensionFailure('relay_' + kind, error, attempts).then(function () {
+            if (!waitMs) { throw error; }
+            return relayRetryWait(waitMs).then(attempt);
+          });
         });
       }
       return attempt();
