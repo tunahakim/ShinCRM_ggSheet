@@ -154,7 +154,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 }
 var FBM_EXECUTOR_VERSION = '21.22';
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '8d2b578969a1';
+var FBM_CONTRACT_VERSION = '746304ea1225';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -350,6 +350,17 @@ function executeBatch(tabId, envelope) {
   return next(0);
 }
 
+/**
+ * Phong bì GAS mang mã hợp đồng của GAS; lệch mã với Extension đang chạy thì không chạm tab FBM (Extension cũ có thể hiểu sai phong bì mới). Lỗi có mã `EXTENSION_PROTOCOL_MISMATCH` đi về GAS như mọi lỗi gửi request, GAS ghi Log và Sidebar báo tải lại Extension.
+ */
+function envelopeContractCheck(request) {
+  var received = String(request && request.contract || '');
+  if (received === FBM_CONTRACT_VERSION) { return null; }
+  var error = new Error('Extension đang dùng bản giao thức "' + FBM_CONTRACT_VERSION + '", GAS gửi bản "' + (received || 'không có') + '"; hãy tải lại Extension (chrome://extensions → ShinCRM → Tải lại).');
+  error.code = 'EXTENSION_PROTOCOL_MISMATCH';
+  return error;
+}
+
 /** Mọi response FBM về GAS (qua Sidebar hay nhịp nền) đều đi qua đây, nên đóng dấu mã hợp đồng ở đúng một chỗ. */
 function stampContract(reply) {
   if (reply && reply.result && typeof reply.result === 'object') {
@@ -453,13 +464,14 @@ function noteRelayStatus(status) {
   } catch (ignore) {}
 }
 
+/** Mọi lời gọi relay lên GAS đi qua đây: thân luôn mang khóa relay và mã hợp đồng; GAS lệch mã thì từ chối với `EXTENSION_PROTOCOL_MISMATCH`. */
 function postRelay(url, key, body, timeoutMs) {
   var limitMs = Number(timeoutMs || 0) || GAS_RELAY_TIMEOUT_MS;
   var controller = typeof AbortController === 'function' ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, limitMs) : null;
   var requestSentAt = Date.now();
   noteRelayStatus({ stage: 'request_sent', requestSentAt: requestSentAt, code: 'RELAY_REQUEST_SENT' });
-  return workerKeepAlive(fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key }, body)) }).then(function (response) {
+  return workerKeepAlive(fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key, contract: FBM_CONTRACT_VERSION }, body)) }).then(function (response) {
     return response.text().then(function (text) {
       var responseReceivedAt = Date.now();
       var contentType = response.headers.get('content-type') || '';
@@ -524,7 +536,7 @@ function fbmHeartbeatNow(source) {
     }
     noteHeartbeatStatus('relay_configured', { source: origin });
     return readChainTrail().then(function (trail) {
-      return postRelay(config.url, config.key, { kind: 'heartbeat_request', source: origin, spreadsheetId: config.spreadsheetId, trail: trail });
+      return postRelay(config.url, config.key, { command: 'heartbeat', spreadsheetId: config.spreadsheetId, payload: { trigger: origin, trail: trail } });
     }).then(function (gasRequest) {
       if (!gasRequest || gasRequest.ok !== true) {
         var requestCode = String(gasRequest && gasRequest.code || 'HEARTBEAT_REQUEST_NOT_READY');
@@ -536,7 +548,7 @@ function fbmHeartbeatNow(source) {
         return gasRequest;
       }
       noteHeartbeatStatus('fbm_request_sent', { source: origin });
-      return relayRun(config, gasRequest, 0, 'heartbeat').then(function (result) {
+      return relayRun(config, gasRequest, 0).then(function (result) {
         noteHeartbeatStatus('gas_response_received', { source: origin, ok: !(result && result.ok === false), code: String(result && result.code || '') });
         return result && result.ok === false ? Object.assign({ ok: false }, result) : { ok: true, gas: result || null };
       });
@@ -551,23 +563,6 @@ function fbmHeartbeatNow(source) {
   return fbmHeartbeatFlight;
 }
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
-
-/**
- * Đo trần đường truyền gói lớn bằng gói đệm vô nghĩa, không chạm FBM: `sidebar` trả gói về Sidebar để Sidebar gửi GAS (đường lượt chạy tay), `relay` gửi gói thẳng lên Web App (đường lượt nền).
- * Chỉ trả về thời gian và câu trả lời của GAS, không trả lại gói.
- */
-function fbmTransportProbe(message) {
-  var sizeBytes = Math.max(0, Math.round(Number(message && message.sizeBytes || 0))), startedAt = Date.now();
-  var padding = new Array(sizeBytes + 1).join('x');
-  if (message && message.route === 'sidebar') { return Promise.resolve({ ok: true, padding: padding, buildMs: Date.now() - startedAt }); }
-  return getRelayConfig().then(function (config) {
-    if (!config) { return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Extension chưa có cấu hình relay của file này.' }; }
-    var sentAt = Date.now();
-    return postRelay(config.url, config.key, { kind: 'transport_probe', spreadsheetId: config.spreadsheetId, sizeBytes: sizeBytes, padding: padding }, Number(message.timeoutMs || 0)).then(function (reply) {
-      return { ok: !!reply && reply.ok !== false, ms: Date.now() - sentAt, code: reply && reply.code || '', error: reply && reply.error || '', receivedBytes: reply && reply.receivedBytes || 0 };
-    });
-  }).catch(function (error) { return { ok: false, code: String(error && error.code || 'RELAY_FETCH_FAILED'), error: String(error && error.message || error), ms: Date.now() - startedAt }; });
-}
 
 /**
  * Thế hệ cấu hình relay: tăng mỗi lần Extension chuyển sang Sheet khác. Chuỗi nền mang thế hệ lúc nó đọc cấu hình; lệch thế hệ nghĩa là Sheet đã đổi giữa chừng, chuỗi phải dừng chứ không được chạy tiếp cho Sheet cũ.
@@ -652,28 +647,17 @@ function configureRelay(config) {
   return relayConfigureFlight;
 }
 
-/**
- * Kênh nộp kết quả về GAS. Request đầu của nhịp nền do `heartbeat_request` cấp nên nộp qua kênh Giữ phiên; GAS trả request kế tiếp thì từ đó mọi bước nộp qua kênh `background_sync`.
- * Hai kênh chỉ khác hình dạng dữ liệu; đường chạy request là một (`relayRun`), nên lỗi tab hay lỗi mạng ở kênh nào cũng được báo về GAS như nhau.
- */
-var RELAY_CHANNELS = {
-  heartbeat: {
-    reply: function (response, hop) { return { kind: 'heartbeat', response: response, hop: hop }; },
-    failure: function (request, code, message) { return { kind: 'heartbeat_transport_failure', requestId: String(request.id), code: code, error: message }; }
-  },
-  background: {
-    reply: function (response, hop) { return { kind: 'background_sync', command: 'continue', payload: { response: response }, hop: hop }; },
-    failure: function (request, code, message, hop) { return { kind: 'background_sync', command: 'transport_failure', payload: { requestId: String(request.id), code: code, message: message }, hop: hop }; }
-  }
-};
+/** Hai hình dạng nộp về GAS, cùng lệnh `continue`: kết quả request, hoặc lỗi không gửi được request (kèm `requestId`). GAS quyết theo cursor, Extension không cần biết request thuộc bước nào. */
+function relayReplyBody(response, hop) { return { command: 'continue', payload: { response: response, hop: hop } }; }
+function relayFailureBody(request, code, message, hop) { return { command: 'continue', payload: { error: { requestId: String(request.id), code: code, message: message }, hop: hop } }; }
 
 /**
  * Người điều phối duy nhất chạy chuỗi request GAS cấp cho nhịp nền: chuẩn bị tab → gửi tab → nộp kết quả → nhận request kế tiếp, cho tới khi GAS không cấp nữa.
  * Mọi lỗi trước khi có kết quả (không có tab, tab không phản hồi, tab trả lỗi, nộp kết quả hỏng) đều đi đúng một đường: báo `transport failure` về GAS; GAS có thể cấp request mới thì chạy tiếp.
  * Hộp đen ghi trước mỗi bước để lần hỏi sau GAS biết lượt dừng ở đâu nếu worker bị tắt.
  */
-function relayRun(config, gasReply, used, channel) {
-  var next = gasReply && gasReply.request, hop = Number(used || 0), lane = RELAY_CHANNELS[channel] || RELAY_CHANNELS.background;
+function relayRun(config, gasReply, used) {
+  var next = gasReply && gasReply.request, hop = Number(used || 0);
   if (!next || !config || !config.url || !config.key) {
     if (gasReply && gasReply.ok === false) { noteChainStep('gas_reply_failed', null, hop, gasReply.code || gasReply.error || 'GAS_REPLY_FAILED'); } else { noteChainStep('chain_finished', null, hop); }
     return Promise.resolve(gasReply);
@@ -683,7 +667,7 @@ function relayRun(config, gasReply, used, channel) {
     // Người dùng đã chuyển Extension sang Sheet khác: báo một lần cho GAS cũ để nó đóng request này rồi dừng, không chạm tab FBM, không chạy request nó cấp tiếp.
     noteChainStep('config_switched', next, hop, 'RELAY_CONFIG_SWITCHED');
     var switchedMessage = 'Extension đã chuyển đồng bộ nền sang Sheet khác theo xác nhận của người dùng; dừng chuỗi của Sheet này.';
-    return postRelay(config.url, config.key, Object.assign(lane.failure(next, 'RELAY_CONFIG_SWITCHED', switchedMessage, hop + 1), { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)).then(function () {
+    return postRelay(config.url, config.key, Object.assign(relayFailureBody(next, 'RELAY_CONFIG_SWITCHED', switchedMessage, hop + 1), { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)).then(function () {
       return { ok: false, code: 'RELAY_CONFIG_SWITCHED', error: switchedMessage, request: null };
     }, function (relayError) {
       var relayMessage = String(relayError && relayError.message || relayError || 'Không báo được việc chuyển Sheet lên GAS cũ.').slice(0, 240);
@@ -695,8 +679,8 @@ function relayRun(config, gasReply, used, channel) {
   function reportFailure(code, message) {
     var failureCode = String(code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
     noteChainStep('failure_sent', next, hop + 1, failureCode);
-    return post(lane.failure(next, failureCode, failureMessage, hop + 1)).then(function (failureReply) {
-      if (failureReply && failureReply.request) { return relayRun(config, failureReply, hop + 1, 'background'); }
+    return post(relayFailureBody(next, failureCode, failureMessage, hop + 1)).then(function (failureReply) {
+      if (failureReply && failureReply.request) { return relayRun(config, failureReply, hop + 1); }
       noteChainStep(failureReply && failureReply.ok === false ? 'gas_reply_failed' : 'chain_finished', next, hop + 1, failureCode);
       return Object.assign({}, failureReply || {}, { ok: false, code: failureCode, error: failureMessage });
     }, function (relayError) {
@@ -706,6 +690,8 @@ function relayRun(config, gasReply, used, channel) {
       return { ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage, request: null };
     });
   }
+  var mismatch = envelopeContractCheck(next);
+  if (mismatch) { return reportFailure(mismatch.code, mismatch.message); }
   return prepareFbmTab(next, function (stage, code) { noteChainStep(stage, next, hop, code); }).then(function (tab) {
     if (!tab) { return reportFailure('FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.'); }
     noteChainStep('fbm_tab_sent', next, hop);
@@ -715,7 +701,7 @@ function relayRun(config, gasReply, used, channel) {
       noteChainStep('fbm_tab_replied', next, hop);
       if (!reply || reply.error) { return reportFailure(reply && reply.code, reply ? reply.error : 'Tab FBM không trả kết quả.'); }
       noteChainStep('gas_response_sent', next, hop + 1);
-      return post(lane.reply(rawFbmReply(reply), hop + 1)).then(function (nextReply) { return relayRun(config, nextReply, hop + 1, 'background'); }, function (error) {
+      return post(relayReplyBody(rawFbmReply(reply), hop + 1)).then(function (nextReply) { return relayRun(config, nextReply, hop + 1); }, function (error) {
         noteChainStep('gas_reply_failed', next, hop + 1, error && error.code || 'GAS_RELAY_FAILED', error && error.httpStatus);
         return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
       });
@@ -753,10 +739,6 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     sendResponse(fbmCancelBatch());
     return false;
   }
-  if (message && message.type === 'FBM_TRANSPORT_PROBE') {
-    fbmTransportProbe(message).then(sendResponse);
-    return true;
-  }
   if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
   var requestId = String(message.id || '');
   var existingFlight = requestId && fbmRequestFlights[requestId];
@@ -764,6 +746,8 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     existingFlight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE') }); });
     return true;
   }
+  var mismatch = envelopeContractCheck(message.request);
+  if (mismatch) { sendResponse({ error: mismatch.message, code: mismatch.code }); return false; }
   var flight = prepareFbmTab(message.request).then(function (tab) {
     if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.', code: 'FBM_TAB_NOT_FOUND' }, message.request, 'fbm_tab_not_found'); }
     return sendToFbmTab(tab.id, message.request).then(function (reply) { return addWorkerTrace(addWorkerTrace(reply, message.request, 'worker_received'), message.request, 'fbm_tab_found'); });
