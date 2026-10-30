@@ -4,19 +4,12 @@
  */
 function fbmCommandRun(name, command, payload) { return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.controlDispatch(command, payload); }, payload); }
 
-function fbmStartSync(mode, clientTrace, pack) { return fbmCommandRun('fbmStartSync', 'start', { kind: 'sync', mode: mode, pack: pack, clientTrace: clientTrace }); }
-function fbmStartIdentityCheck(identity) { return fbmCommandRun('fbmStartIdentityCheck', 'start', { kind: 'identity_check', identity: identity || null }); }
-function fbmStartIdentityProbe() { return fbmCommandRun('fbmStartIdentityProbe', 'start', { kind: 'identity_probe' }); }
-function fbmStartLoginTest(credentialRef, expectedIdentity) { return fbmCommandRun('fbmStartLoginTest', 'start', { kind: 'login_test', credentialRef: credentialRef, identity: expectedIdentity || null }); }
-function fbmStartForceLogin() { return fbmCommandRun('fbmStartForceLogin', 'start', { kind: 'login_force' }); }
-/** `input`: `{ response, clientTrace }` khi Extension trả kết quả request, hoặc `{ error: { requestId, code, message } }` khi không gửi được request. */
-function fbmContinueSync(input) { return fbmCommandRun('fbmContinueSync', 'continue', input || {}); }
+/** Một cửa cho mọi lệnh mở lượt Extension chở (`start`, `approve_push`, `open_conflict`); payload mang `machineId` của máy sẽ nhận lượt. Kết quả có `runId` thay phong bì: Sidebar chuyển runId cho Extension, không cầm phong bì. */
+function fbmDriveCommand(command, payload) { return fbmCommandRun('fbmDriveCommand', FbmSync.driveCommandName(command), payload || {}); }
 function fbmCancelSync() { return fbmCommandRun('fbmCancelSync', 'cancel', {}); }
 function fbmStopBackground() { return fbmCommandRun('fbmStopBackground', 'stop_background', {}); }
 function fbmResetSyncState() { return fbmCommandRun('fbmResetSyncState', 'reset_state', {}); }
-function fbmApprovePush() { return fbmCommandRun('fbmApprovePush', 'approve_push', {}); }
 function fbmRetryPushFailures() { return fbmCommandRun('fbmRetryPushFailures', 'retry_push_failures', {}); }
-function fbmOpenConflict() { return fbmCommandRun('fbmOpenConflict', 'open_conflict', {}); }
 function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, snapshot) { return fbmCommandRun('fbmConfirmConflict', 'confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, fbmValues: fbmValues, shinValues: shinValues, snapshot: snapshot }); }
 function fbmGetSyncStatus() { return fbmCommandRun('fbmGetSyncStatus', 'status', {}); }
 function fbmGetSyncTrace() { return fbmCommandRun('fbmGetSyncTrace', 'trace_read', {}); }

@@ -108,28 +108,22 @@ FbmSync.relaySwitchDecisionLog = function (decision, fromSpreadsheetId) {
   logEvent({ source: 'fbm_sync', action: switching ? 'relay_spreadsheet_switched' : 'relay_spreadsheet_kept', outcome: LOG_WARN, reason: switching ? 'Người dùng xác nhận chuyển đồng bộ nền của Extension từ Sheet ' + from + ' sang Sheet này.' : 'Người dùng giữ Extension đồng bộ nền cho Sheet ' + from + '; Sheet này chưa nhận đồng bộ nền.', detail: { fromSpreadsheetId: from } });
   return { ok: true };
 };
-/** DTO gọn cho relay nền; Sidebar vẫn nhận statusView đầy đủ qua google.script.run. `httpStatus` là mã HTTP của response FBM (chỉ có ở kết quả lỗi đọc FBM), không phải `status` (status là DTO trạng thái). */
-FbmSync.relayCompact = function (result) {
-  var value = result || {}, status = value.status || {};
+/**
+ * Thân trả cho Extension sau khi đã qua `publicResult`. `status` là statusView đầy đủ vì Extension chuyển nguyên cho Sidebar đang mở vẽ (lượt tay giờ do Extension chở); `conflict` là bản xung đột vừa đọc lại để Sidebar mở hộp quyết.
+ * `httpStatus` là mã HTTP của response FBM (chỉ có ở kết quả lỗi đọc FBM), không phải `status`. `trailAck` là mốc ô lỗi Extension GAS vừa ghi Log, Extension xóa ô khi mốc chưa đổi. `retryMs` là giãn cách Extension thử lại lần gọi relay hỏng kế tiếp.
+ */
+FbmSync.relayCompact = function (result, trailAck) {
+  var value = result || {};
   return {
     ok: value.ok !== false,
     code: String(value.code || ''),
     error: String(value.error || value.message || ''),
     httpStatus: Number(value.httpStatus || 0),
     request: value.request || null,
-    status: {
-      runId: String(status.runId || ''),
-      mode: String(status.mode || ''),
-      phase: String(status.phase || ''),
-      direction: String(status.direction || ''),
-      entity: String(status.entity || ''),
-      counts: status.counts || {},
-      current: String(status.current || ''),
-      message: String(status.message || ''),
-      updatedAt: Number(status.updatedAt || 0),
-      lastError: String(status.lastError || ''),
-      lastFailureCode: String(status.lastFailureCode || '')
-    }
+    status: value.status || null,
+    conflict: value.conflict || null,
+    trailAck: Number(trailAck || 0),
+    retryMs: FbmSync.BUDGET.relayRetryMs.slice()
   };
 };
 
@@ -167,6 +161,10 @@ FbmSync.relayHandle = function (body) {
   if (mismatch) { throw FbmSync.relayError(mismatch.code, mismatch.message + ' (Extension gửi mã "' + (mismatch.received || 'không có') + '", GAS cần "' + mismatch.expected + '").'); }
   var command = String(body.command || '');
   if (!FbmSync.relayCommandAllowed(command)) { throw FbmSync.relayError('RELAY_COMMAND_REJECTED', 'Relay không được gọi lệnh "' + command + '"; chỉ nhận heartbeat và continue.'); }
-  return FbmSync.relayCompact(FbmSync.controlDispatch(command, Object.assign({}, body.payload || {}, { source: 'relay' })));
+  var payload = body.payload || {};
+  if (!String(payload.machineId || '')) { throw FbmSync.relayError('RELAY_MACHINE_ID_REQUIRED', 'Extension gọi relay mà không gửi mã máy; GAS không biết máy nào đang chở lượt.'); }
+  var failure = FbmSync.relayFailureEntry(payload.trail);
+  if (failure) { logEvent(failure.entry); }
+  return FbmSync.relayCompact(FbmSync.controlDispatch(command, payload, 'relay'), failure ? failure.at : 0);
 };
 FbmSync.relayError = function (code, message) { var error = new Error(message); error.code = code; return error; };

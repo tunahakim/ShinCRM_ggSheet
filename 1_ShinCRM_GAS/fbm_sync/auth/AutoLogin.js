@@ -183,6 +183,8 @@ FbmSync.loginTestRequest = function (credentialRef, expectedIdentity, options) {
   if (!ref) { return { ok: false, code: 'LOGIN_CREDENTIAL_REF_INVALID', message: 'Chưa có thông tin đăng nhập để thử.' }; }
   var state = FbmSync.stateRead(), active = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
   if (state.activeRequestId || (state.runId && active)) { return { ok: false, code: 'SYNC_BUSY', message: 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.' }; }
+  // Extension nhận lượt theo mã lượt; Sheet chưa từng chạy lượt nào thì chưa có mã để nhận.
+  if (!state.runId) { state.runId = Date.now().toString(36); }
   state.phase = 'checking_session';
   state.entity = '';
   state.cursor = { kind: 'login', credentialRef: ref, testOnly: true, purpose: force ? 'force' : 'test', expectedIdentity: expectedIdentity && typeof expectedIdentity === 'object' ? FbmSync.identityNormalize(expectedIdentity) : FbmSync.boundIdentity() };

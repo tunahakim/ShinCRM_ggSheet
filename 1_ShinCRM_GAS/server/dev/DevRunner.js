@@ -27,7 +27,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeCreateSheet', 'viewProbeAutoRender', 'viewProbeTabTint', 'viewWipeLegacyKeys',
   'measureReloadJournalBaseline', 'measureBasketFlushBreakdown', 'measureSaveBreakdown', 'measureSheetReadGap', 'measureSheetReadPrefetch', 'measureSheetReadCopy', 'measureViewRender', 'measureSheetReadCalls', 'probeTriggerState', 'triggersEnsure', 'reloadMatrixProbe', 'reloadPayloadProbe',
-  'fbmStartSync', 'fbmGetSyncStatus', 'fbmContinueSync', 'fbmCancelSync', 'fbmStartIdentityCheck', 'fbmStartIdentityProbe', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmStartLoginTest', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmSaveSettings'
+  'fbmDriveCommand', 'fbmGetSyncStatus', 'fbmCancelSync', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmSaveSettings'
 ];
 
 /**

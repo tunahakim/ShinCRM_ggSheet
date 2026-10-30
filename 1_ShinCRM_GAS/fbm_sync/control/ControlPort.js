@@ -7,15 +7,17 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * `slice`: chạy trong ranh giới lát `runSlice` (lỗi giữa lát chuyển lượt sang lỗi trước khi nhả khóa).
  * `reply`: lệnh mang kết quả FBM hoặc báo lỗi về; GAS bận mà bỏ thì bên gửi không gửi lại, nên phải ghi Log lúc bỏ.
  * `relay`: Web App relay được gọi lệnh này.
+ * `drives`: lệnh mở lượt Extension phải chở; Sidebar gửi kèm mã máy Extension sẽ nhận lượt, thiếu thì từ chối trước khi chạy để không có lượt mở mà không ai nhận được.
+ * `guard`: phép chặn chạy trong khóa trước người điều phối và trước ranh giới lát; nhận ô lượt cửa lệnh đọc trong khóa, không tự đọc; trả kết quả là từ chối, không ghi gì.
  */
 FbmSync.COMMANDS = {
-  start: { lock: true, run: function (input) { return FbmSync.commandStart(input); } },
-  continue: { lock: true, slice: true, reply: true, relay: true, run: function (input) { return FbmSync.commandContinue(input); } },
+  start: { lock: true, drives: true, run: function (input) { return FbmSync.commandStart(input); } },
+  continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input) { return FbmSync.commandContinue(input); } },
   heartbeat: { lock: true, relay: true, run: function (input) { return fbmSyncHeartbeatRequest(input); } },
   cancel: { lock: true, run: function () { return fbmSyncCancel(); } },
   stop_background: { lock: true, run: function () { return FbmSync.stopBackground(); } },
-  approve_push: { lock: true, slice: true, run: function () { return fbmSyncApprovePush(); } },
-  open_conflict: { lock: true, run: function () { return FbmSync.openConflict(); } },
+  approve_push: { lock: true, slice: true, drives: true, run: function () { return fbmSyncApprovePush(); } },
+  open_conflict: { lock: true, drives: true, run: function () { return FbmSync.openConflict(); } },
   confirm_conflict: { lock: true, run: function (input) { return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.fbmValues, input.shinValues, input.snapshot); } },
   save_settings: { lock: true, run: function (input) { return FbmSync.commandSaveSettings(input); } },
   set_master: { lock: true, run: function (input) { return FbmSync.setMasterEnabled(input.enabled === true); } },
@@ -41,14 +43,33 @@ FbmSync.commandSpec = function (name) {
   }
   return FbmSync.COMMANDS[name];
 };
+/** Cửa mở lượt của Sidebar chỉ nhận lệnh có cờ `drives`; lệnh khác đi qua cửa riêng của nó. */
+FbmSync.driveCommandName = function (name) {
+  if (FbmSync.commandSpec(String(name || '')).drives === true) { return String(name); }
+  var rejected = new Error('Lệnh "' + String(name || '') + '" không phải lệnh mở lượt.');
+  rejected.code = 'DRIVE_COMMAND_REJECTED';
+  throw rejected;
+};
 FbmSync.relayCommandAllowed = function (name) {
   return Object.prototype.hasOwnProperty.call(FbmSync.COMMANDS, name) && FbmSync.COMMANDS[name].relay === true;
 };
 
-FbmSync.controlDispatch = function (command, payload) {
-  var name = String(command || ''), spec = FbmSync.commandSpec(name), input = payload || {}, result;
-  var run = function () { return spec.slice ? FbmSync.runSlice(function () { return spec.run(input); }) : spec.run(input); };
-  if (!spec.lock) { return FbmSync.publicResult(run()); }
+/**
+ * `channel` do lối vào đặt (`relay` chỉ từ `relayHandle`), không lấy từ payload, nên Sidebar không tự xưng là relay được. Phong bì chỉ rời GAS qua relay: trên kênh Sidebar `nextEnvelope` giữ chỗ nhận lượt và kết quả mang `runId` thay phong bì.
+ */
+FbmSync.controlDispatch = function (command, payload, channel) {
+  var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' ? 'relay' : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;
+  if (spec.drives && !String(input.machineId || '')) { return FbmSync.publicResult({ ok: false, code: 'SYNC_MACHINE_ID_REQUIRED', message: 'Sidebar chưa lấy được mã máy của Extension nên chưa mở lượt được; tải lại Sidebar rồi thử lại.' }); }
+  var body = function () {
+    var refused = spec.guard ? spec.guard(input, FbmSync.stateRead()) : null;
+    if (refused) { return refused; }
+    return spec.slice ? FbmSync.runSlice(function () { return spec.run(input); }) : spec.run(input);
+  };
+  var run = function () {
+    FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };
+    try { return body(); } finally { FbmSync.issueContext = null; }
+  };
+  if (!spec.lock) { return FbmSync.publicResult(FbmSync.channelResult(run(), via)); }
   try {
     result = FbmSync.withOrchestrationLock(run);
   } catch (error) {
@@ -56,7 +77,20 @@ FbmSync.controlDispatch = function (command, payload) {
     result = FbmSync.storageFailureResult(error);
   }
   if (result && result.code === 'BUSY' && spec.reply) { FbmSync.busyDropLog(name, input); }
-  return FbmSync.publicResult(result);
+  return FbmSync.publicResult(FbmSync.channelResult(result, via));
+};
+/** Kênh Sidebar: dấu giữ chỗ thành `runId` kèm giãn cách thử lại relay cho Extension; phong bì thật lọt ra kênh Sidebar là lỗi lập trình nên ném. */
+FbmSync.channelResult = function (result, via) {
+  var request = result && result.request;
+  if (via === 'relay' || !request) { return result; }
+  if (request.pickup !== true) {
+    var leak = new Error('Phong bì FBM sắp ra kênh Sidebar; phong bì chỉ được đi qua relay.');
+    leak.code = 'ENVELOPE_CHANNEL_VIOLATION';
+    throw leak;
+  }
+  var out = Object.assign({}, result, { runId: request.runId, relayRetryMs: FbmSync.BUDGET.relayRetryMs.slice() });
+  delete out.request;
+  return out;
 };
 
 /** Kho state hỏng khi đang ghi: trả status "kẹt" kèm lối đặt lại thay vì ném, không thì người dùng không có lối thoát (FBM-044). */
@@ -90,7 +124,8 @@ FbmSync.PUBLIC_RESULT_FIELDS = [
   'ok', 'code', 'message', 'error', 'request', 'status', 'statusView', 'resumed', 'pending', 'noop', 'stale', 'empty', 'remaining', 'conflict',
   'binding', 'identityStatus', 'identity', 'login', 'credentialMode', 'settings', 'total', 'reset', 'missing', 'enabled', 'trace',
   'url', 'key', 'spreadsheetId', 'extension', 'masterEnabled', 'backgroundEnabled', 'configured', 'credentialRef', 'public',
-  'autoOpenTab', 'retryEnabled', 'retryMinutes', 'lastAttemptAt', 'lastLoginAt', 'nextRetryAt', 'lastError', 'config', 'schedule', 'sessionVerified', 'restarted', 'probing', 'imported', 'marked', 'approvalRequired'
+  'autoOpenTab', 'retryEnabled', 'retryMinutes', 'lastAttemptAt', 'lastLoginAt', 'nextRetryAt', 'lastError', 'config', 'schedule', 'sessionVerified', 'restarted', 'probing', 'imported', 'marked', 'approvalRequired',
+  'runId', 'relayRetryMs'
 ];
 FbmSync.publicResult = function (result) {
   var value = FbmSync.transportValue(result);
@@ -146,12 +181,28 @@ FbmSync.commandStart = function (input) {
  */
 FbmSync.commandContinue = function (input) {
   FbmSync.traceImport(input.clientTrace);
+  if (!input.response && !input.error) { return FbmSync.envelopePickup(); }
   if (input.error) { return fbmSyncHeartbeatTransportFailure(input.error); }
   if (input.source === 'relay' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
-  // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật.
-  var before = input.source === 'relay' ? null : FbmSync.statusView(), result = FbmSync.continue(input.response);
-  if (before && result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); }
+  // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật. Xét theo lượt chứ không theo kênh: lượt tay cũng nộp qua relay.
+  var before = FbmSync.statusView(), result = FbmSync.continue(input.response);
+  if (before.origin !== 'background' && result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); }
   return result;
+};
+
+/**
+ * Chỉ máy đang chở lượt được nộp hay nhận lượt đó: Extension máy khác (Sheet mở ở hai máy) có runId hoặc response cũ vẫn bị chặn trước khi chạm ô lượt. Không có `continue` mang cả response lẫn lỗi rỗng ngoài lần nhận lượt, nên lần nhận sai lượt hoặc nhận lần hai bị từ chối ở đây.
+ */
+FbmSync.continueGuard = function (input, state) {
+  var machineId = String(input.machineId || '');
+  if (state.runId && String(state.driverMachineId || '') !== machineId) {
+    return { ok: false, code: 'RUN_DRIVER_MISMATCH', message: 'Lượt ' + String(state.runId) + ' đang do máy khác chở; GAS không nhận kết quả từ máy này.', status: FbmSync.statusView() };
+  }
+  if (input.response || input.error) { return null; }
+  if (!input.runId || String(input.runId) !== String(state.runId || '') || String(state.activeRequestId || '') !== FbmSync.PICKUP_PREFIX + String(state.runId || '')) {
+    return { ok: false, code: 'RUN_PICKUP_REJECTED', message: 'Lượt ' + String(input.runId || '') + ' không còn chờ Extension nhận (đã được nhận, đã đóng hoặc đã có lượt khác).', status: FbmSync.statusView() };
+  }
+  return null;
 };
 
 /** Mỗi lần lưu chỉ một mục cài đặt; mục lạ thì từ chối. Mục `sync` kèm `master` (true/false) đổi công tắc tổng sau khi lưu cài đặt đạt, để cài đặt sai không đổi được công tắc. */

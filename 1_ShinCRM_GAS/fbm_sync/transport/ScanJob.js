@@ -37,8 +37,9 @@ FbmSync.scanJobRequest = function (state) {
   var activity = cursor.entity === 'activity';
   var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerListRequest(cursor);
   request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
-  // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha.
-  request.meta.job = { jobId: cursor.jobId, fields: FbmSync.scanFields(cursor.entity), idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
+  // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha. Cột giữ lại đi qua `meta.keep` như mọi request đọc lưới.
+  request.meta.keep = { fields: FbmSync.scanFields(cursor.entity) };
+  request.meta.job = { jobId: cursor.jobId, idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
   return request;
 };
 

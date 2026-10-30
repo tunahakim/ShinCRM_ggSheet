@@ -495,6 +495,15 @@ FbmSync.EXTENSION_TRAIL_STAGES = {
   gas_reply_failed: 'GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt'
 };
 /** Chỉ giữ tên bước, mã request, số hop và mốc giờ từ hộp đen: Extension là nguồn ngoài, không chép nguyên văn vào Log. */
+/**
+ * Ô lỗi của hộp đen: lỗi Extension không báo được lúc xảy ra (gọi GAS hỏng vì 404, HTML, quá giờ; không đặt được chuông hỏi GAS) nên lần gọi được kế tiếp mang theo. `command` là việc Extension đang làm. Trả dòng Log cần ghi và mốc ô (`at`) làm `trailAck`; ô không có thì trả null. Chỉ dựng dữ liệu, người điều phối ghi Log.
+ */
+FbmSync.relayFailureEntry = function (trail) {
+  var cell = trail && typeof trail === 'object' ? trail.relayFailure : null;
+  if (!cell || typeof cell !== 'object' || !Number(cell.at || 0)) { return null; }
+  var code = String(cell.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60), httpStatus = Number(cell.httpStatus || 0), attempts = Number(cell.attempts || 0), command = String(cell.command || '').replace(/[^a-z_]/g, '').slice(0, 40);
+  return { at: Number(cell.at), entry: { source: 'fbm_sync', action: 'relay_call_failed', outcome: LOG_ERROR, reason: 'Extension báo lỗi lúc ' + (command || 'không rõ việc') + ': ' + (code || 'không rõ mã') + (httpStatus ? ' (HTTP ' + httpStatus + ')' : '') + (attempts ? ', đã thử ' + attempts + ' lần' : '') + '. Lỗi ghi lúc ' + new Date(Number(cell.at)).toISOString() + '.', detail: { code: code, httpStatus: httpStatus, attempts: attempts, command: command, at: Number(cell.at) } } };
+};
 FbmSync.extensionTrailSafe = function (trail) {
   if (!trail || typeof trail !== 'object') { return null; }
   return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), httpStatus: Number(trail.httpStatus || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0), code: String(trail.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60) };

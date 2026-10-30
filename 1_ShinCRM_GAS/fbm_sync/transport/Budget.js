@@ -12,6 +12,8 @@ FbmSync.BUDGET = {
   gasSoftMs: 300000,
   gasHardMs: 360000,
   gasTransitMs: 30000,
+  // Giãn cách Extension thử lại một lần gọi relay hỏng (404, HTML, quá giờ); hết danh sách thì dừng và để nhịp nền sau hỏi lại.
+  relayRetryMs: [5000, 15000, 45000],
   // Đăng nhập là chuỗi fetch nối tiếp trong executor (trang gốc, salt, đơn vị, Login, trang tài khoản) rồi mở lại trang làm việc.
   loginFetches: 6,
   activityBatchCustomers: 50,
@@ -61,11 +63,11 @@ FbmSync.budgetTimeoutMs = function (request, requestGap) {
   return total;
 };
 
-/** Hạn GAS thu hồi request đang bay: Extension hết hạn, cộng đường về Sidebar và đường lên GAS. */
+/** Hạn GAS thu hồi request đang bay: Extension hết hạn, cộng đường trong Extension (tab → service worker) và đường relay lên GAS. */
 FbmSync.budgetDeadlineAt = function (issuedAt, timeoutMs) { return Number(issuedAt) + Number(timeoutMs) + FbmSync.BUDGET.bridgeMs + FbmSync.BUDGET.gasTransitMs; };
 
-/** Sidebar chờ Extension trả envelope bấy nhiêu: hạn của Extension cộng đường postMessage qua cửa sổ Sheets. */
-FbmSync.budgetExtensionReplyMs = function (timeoutMs) { return Number(timeoutMs) + FbmSync.BUDGET.bridgeMs; };
+/** Hạn Extension đến nhận lượt Sidebar vừa mở: Sidebar chuyển runId qua cầu nối rồi Extension gọi relay, không có fetch FBM ở giữa. */
+FbmSync.budgetPickupDeadlineAt = function (heldAt) { return FbmSync.budgetDeadlineAt(heldAt, 0); };
 
 /** Bên gửi response lên GAS (Sidebar, relay nền) chờ bấy nhiêu: GAS không chạy quá trần nền tảng. */
 FbmSync.budgetGasReplyMs = function () { return FbmSync.BUDGET.gasHardMs + FbmSync.BUDGET.gasTransitMs; };

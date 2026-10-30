@@ -229,16 +229,16 @@ function fbmDevOpenBackgroundRun() {
 function fbmDevProbeStopBackground() {
   var view = function (status) { var s = status || {}; return { running: s.running, origin: s.origin, phase: s.phase }; };
   var opened = fbmDevOpenBackgroundRun();
-  var blocked = fbmStartSync('read');
+  var blocked = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' });
   var stopped = fbmStopBackground();
-  var restarted = fbmStartSync('read');
+  var restarted = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' });
   var cancelled = fbmCancelSync();
   var released = fbmDevReleaseUnsentRequest();
   return {
     opened: opened,
     blocked: { ok: blocked.ok, code: blocked.code || '', status: view(blocked.status) },
     stopped: { ok: stopped.ok, code: stopped.code || '', status: view(stopped.status) },
-    restarted: { ok: restarted.ok, code: restarted.code || '', status: view(restarted.status), firstRequest: restarted.request && restarted.request.meta && restarted.request.meta.kind || '' },
+    restarted: { ok: restarted.ok, code: restarted.code || '', status: view(restarted.status), runId: restarted.runId || '' },
     cancelled: { ok: cancelled.ok, code: cancelled.code || '', status: view(cancelled.status || cancelled) },
     released: released
   };
@@ -248,7 +248,8 @@ function fbmDevProbeStopBackground() {
 function fbmDevReleaseUnsentRequest() {
   var requestId = String(FbmSync.stateRead().activeRequestId || '');
   if (!requestId) { return { released: false, status: FbmSync.statusView().phase }; }
-  var result = fbmReportSyncTransportFailure(requestId, 'DEV_PROBE_NOT_SENT', 'Hàm dò DEV cấp request nhưng không gửi qua Extension.');
+  var state = FbmSync.stateRead();
+  var result = FbmSync.controlDispatch('continue', { machineId: String(state.driverMachineId || ''), error: { requestId: requestId, code: 'DEV_PROBE_NOT_SENT', message: 'Hàm dò DEV cấp request nhưng không gửi qua Extension.' } }, 'relay');
   var status = result && (result.status || result) || {};
   return { released: true, code: result && result.code || '', running: status.running, phase: status.phase };
 }

@@ -387,9 +387,16 @@ FbmSync.pauseForRuntimeLimit = function (state) {
   if (FbmSync.stateWrite) { FbmSync.stateWrite(current); }
   return null;
 };
+/**
+ * Kênh của lời gọi đang chạy, do cửa lệnh đặt: `relay` (Extension) hoặc `sidebar`. Phong bì chỉ rời GAS qua relay; trên kênh Sidebar `nextEnvelope` giữ chỗ nhận lượt thay vì phát, Extension đến nhận bằng `continue{runId}`.
+ * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay.
+ */
+FbmSync.issueContext = null;
+FbmSync.PICKUP_PREFIX = 'pickup:';
 /** Bọc request nội bộ thành envelope gửi qua Extension. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
+  if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
   // Đang tắt thì không cấp request kế tiếp. Request đã gửi trước đó không thể thu hồi;
   // state được chuyển sang paused để người dùng xem và chủ động tiếp tục sau khi bật lại.
   if (!FbmSync.masterEnabled()) {
@@ -484,11 +491,11 @@ FbmSync.nextEnvelope = function (request) {
   }
   meta.timeoutMs = FbmSync.budgetTimeoutMs(request, requestGap);
   meta.fetchMs = FbmSync.budgetFetchMs(meta);
-  meta.extensionReplyMs = FbmSync.budgetExtensionReplyMs(meta.timeoutMs);
   meta.gasReplyMs = FbmSync.budgetGasReplyMs();
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
+    if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
     state.lastProgressAt = Date.now();
     state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
     FbmSync.stateWrite(state);
@@ -496,6 +503,32 @@ FbmSync.nextEnvelope = function (request) {
   if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined }); }
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
+};
+/**
+ * Giữ chỗ nhận lượt cho máy đang mở lượt từ Sidebar. Lúc Extension đến nhận, GAS dựng lại request từ cursor, nên request định phát phải dựng lại được từ cursor: lệch là lỗi lập trình, ném ngay chứ không để Extension nhận nhầm bước.
+ * Chỗ giữ là một request đang chờ có hạn (`REQUEST_IN_FLIGHT` với nhịp nền máy khác); quá hạn mà không ai nhận thì luật lượt treo đóng lượt như request không được trả lời.
+ */
+FbmSync.envelopeHold = function (request) {
+  var state = FbmSync.stateRead(), rebuilt = FbmSync.requestForCursor(state), machineId = String(FbmSync.issueContext.machineId || ''), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
+  if (!machineId) { fail('SYNC_MACHINE_ID_REQUIRED', 'Lệnh mở lượt từ Sidebar thiếu mã máy Extension sẽ chở lượt.'); }
+  if (!state.runId) { fail('PICKUP_RUN_ID_MISSING', 'Lượt vừa mở không có mã lượt nên Extension không nhận được.'); }
+  if (!rebuilt || String(rebuilt.meta && rebuilt.meta.kind || '') !== String(request.meta && request.meta.kind || '') || String(rebuilt.url || '') !== String(request.url || '')) {
+    fail('PICKUP_CURSOR_MISMATCH', 'Request mở lượt (bước ' + String(request.meta && request.meta.kind || '') + ') không dựng lại được từ cursor ' + String(state.cursor && state.cursor.kind || 'trống') + '.');
+  }
+  state.activeRequestId = FbmSync.PICKUP_PREFIX + state.runId;
+  state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now());
+  state.driverMachineId = machineId;
+  FbmSync.stateWrite(state);
+  return { pickup: true, runId: String(state.runId) };
+};
+/** Extension nhận lượt Sidebar vừa mở: bỏ chỗ giữ rồi phát request đầu dựng từ cursor. Lần nhận sai lượt, sai máy hay nhận lần hai đã bị `continueGuard` chặn trước. */
+FbmSync.envelopePickup = function () {
+  var state = FbmSync.stateRead(), held = FbmSync.PICKUP_PREFIX + String(state.runId || '');
+  FbmSync.requestAnswered(state, held);
+  state.activeRequestId = '';
+  state.deadlineAt = 0;
+  FbmSync.stateWrite(state);
+  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.requestForCursor(state)), status: FbmSync.statusView() };
 };
 /** Lấy requestId từ trace transport mà GAS đã yêu cầu Extension giữ lại. */
 FbmSync.responseRequestId = function (rawResponse) {
@@ -514,7 +547,7 @@ FbmSync.responseRequestId = function (rawResponse) {
 FbmSync.requestForCursor = function (state) {
   var cursor = state && state.cursor || {};
   if (cursor.kind === 'heartbeat') { return FbmSync.sessionSystemRequest('heartbeat'); }
-  if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: false }); }
+  if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: cursor.testOnly === true, force: cursor.purpose === 'force' }); }
   if (cursor.kind === 'login_identity_authorize') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); }
   if (cursor.kind === 'login_identity_user') { return FbmSync.sessionSystemRequest('identity_user_grid'); }
   if (cursor.kind === 'session_probe') { return FbmSync.sessionSystemRequest('session_probe'); }
@@ -528,5 +561,6 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
   if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
+  if (cursor.kind === 'conflict_refresh') { return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }); }
   return null;
 };
