@@ -1,6 +1,6 @@
 /* Cầu nối FBM: nhận request, fetch trong tab đăng nhập, trả response thô. */
 (function () {
-  var EXECUTOR_VERSION = '21.22';
+  var EXECUTOR_VERSION = chrome.runtime.getManifest().version;
   /** Mã request trong vết là mã GAS cấp (`meta.trace.requestId`); phần tử lô có `id` chỉ là thứ tự trong lô, dùng nó thì GAS coi response là cũ và bỏ. */
   function traceEvent(trace, stage, request, extra) {
     var reservation = request && request.meta && request.meta.trace && request.meta.trace.requestId;
@@ -267,10 +267,26 @@
     if (typeof data === 'string') { data = JSON.parse(data); }
     return data && Array.isArray(data.Rows) && data.ViewPage && Array.isArray(data.ViewPage.Fields) ? data : null;
   }
-  /** Chiếu cột và cắt gói; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. */
+  function fieldName(field) { return String(field && (field.AliasName || field.aliasName || field.Name || field.name) || ''); }
+  /**
+   * Giữ đúng cột GAS liệt kê trong `meta.keep.fields`, theo thứ tự GAS gửi; cột FBM không có thì bỏ qua để GAS tự báo thiếu cột khi đọc.
+   * Chạy trong tab vì response quét có thể vài MB, không ra khỏi tab được. Chỉ chạm response lưới; trang đăng nhập hay lỗi FBM đi nguyên về GAS.
+   */
+  function replyPick(data, keep) {
+    var names = data.ViewPage.Fields.map(fieldName);
+    var wanted = (keep && Array.isArray(keep.fields) ? keep.fields : []).map(String).filter(function (name) { return names.indexOf(name) >= 0; }), positions = wanted.map(function (name) { return names.indexOf(name); });
+    return { Rows: data.Rows.map(function (row) { var values = Array.isArray(row) ? row : []; return positions.map(function (position) { return values[position] === undefined ? null : values[position]; }); }), ViewPage: { Fields: wanted.map(function (name) { return { AliasName: name }; }) }, TotalRowCount: Number(data.TotalRowCount || 0) };
+  }
+  /** Response lưới thì giữ cột theo `keep`; không phải lưới hoặc không có `keep` thì trả nguyên văn bản. */
+  function replyPickText(text, keep) {
+    if (!keep) { return text; }
+    var data = null;
+    try { data = gridData(text); } catch (notGrid) { return text; }
+    return data ? JSON.stringify({ d: replyPick(data, keep) }) : text;
+  }
+  /** Cắt gói từ lưới đã qua `replyPick`; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. */
   function scanChunks(data, job) {
-    var names = data.ViewPage.Fields.map(function (field) { return String(field && (field.AliasName || field.aliasName || field.Name || field.name) || ''); });
-    var wanted = (job.fields || []).filter(function (name) { return names.indexOf(name) >= 0; }), positions = wanted.map(function (name) { return names.indexOf(name); });
+    var wanted = data.ViewPage.Fields.map(fieldName);
     var idPosition = wanted.indexOf(String(job.idField || '')), keep = Array.isArray(job.keepIds) ? {} : null, total = Number(data.TotalRowCount || 0);
     if (keep) { job.keepIds.forEach(function (id) { keep[String(id)] = true; }); }
     var fieldsText = JSON.stringify(wanted.map(function (name) { return { AliasName: name }; }));
@@ -280,10 +296,10 @@
     var target = Number(job.chunkTargetBytes || 0), max = Number(job.chunkMaxBytes || 0), chunks = [], current = [], size = fixed, oversize = [], kept = 0;
     data.Rows.forEach(function (row) {
       var values = Array.isArray(row) ? row : [];
-      if (keep && !keep[String(values[positions[idPosition]])]) { return; }
-      var text = JSON.stringify(positions.map(function (position) { return values[position] === undefined ? null : values[position]; })), bytes = quotedLength(text) + 1;
+      if (keep && !keep[String(values[idPosition])]) { return; }
+      var text = JSON.stringify(values), bytes = quotedLength(text) + 1;
       kept += 1;
-      if (fixed + bytes > max) { oversize.push(idPosition >= 0 ? String(values[positions[idPosition]]) : ''); return; }
+      if (fixed + bytes > max) { oversize.push(idPosition >= 0 ? String(values[idPosition]) : ''); return; }
       if (current.length && size + bytes > target) { chunks.push(shell(current.join(','))); current = []; size = fixed; }
       current.push(text); size += bytes;
     });
@@ -333,7 +349,7 @@
         traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length });
         var data = null;
         // Response không phải grid (lỗi HTTP, trang đăng nhập, Bugs của FBM) đi nguyên về GAS để cổng phiên phân loại như request thường.
-        if (req.meta && req.meta.kind === 'scan_job' && response.ok) { try { data = gridData(body); } catch (ignoreParse) { data = null; } }
+        if (req.meta && req.meta.kind === 'scan_job' && response.ok) { try { data = gridData(body); } catch (notGrid) { data = null; } }
         // Response không phải grid mà lớn hơn một gói thì không gửi nguyên về GAS (vượt trần đường truyền); trang đăng nhập hay Bugs của FBM vốn nhỏ nên vẫn đi nguyên.
         if (req.meta && req.meta.kind === 'scan_job' && !data && body.length > Number(req.meta.job && req.meta.job.chunkMaxBytes || 0)) {
           var unparseable = new Error('Response FBM của việc quét không đọc được dạng bảng (' + Math.round(body.length / 1048576) + ' MB).');
@@ -341,14 +357,16 @@
           throw unparseable;
         }
         if (data) {
-          var cut = scanChunks(data, req.meta.job || {});
+          var cut = scanChunks(replyPick(data, req.meta.keep), req.meta.job || {});
           scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize };
           traceEvent(trace, 'scan_job_cut', req, { responseLength: body.length, code: 'chunks:' + cut.chunks.length });
           var first = scanChunkResult(0, trace, req);
           first.transport = Object.assign({}, captured, first.transport);
           return first;
         }
-        return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: body, transport: Object.assign({}, captured, { trace: trace }) };
+        var picked = response.ok ? replyPickText(body, req.meta && req.meta.keep) : body;
+        if (picked !== body) { traceEvent(trace, 'reply_picked', req, { responseLength: picked.length }); }
+        return { ok: response.ok, status: response.status, headers: { contentType: response.headers.get('content-type') || '' }, body: picked, transport: Object.assign({}, captured, { trace: trace }) };
       });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });

@@ -56,9 +56,19 @@ function chromeApi(invoke) {
   });
 }
 
+/** Miền FBM duy nhất Extension được chạm. Mọi URL trong envelope (request, lô, trang mở tab, trang tải lại, trang sau đăng nhập) qua đúng một phép kiểm `envelopeSiteCheck` trước khi tìm tab. */
+var FBM_SITE = 'https://fbo.com.vn:8888/';
+function envelopeSiteCheck(request) {
+  var meta = request && request.meta || {}, urls = [request && request.url].concat((request && Array.isArray(request.items) ? request.items : []).map(function (item) { return item && item.url; }), [meta.openFbmContext && meta.openFbmContext.url, meta.reloadFbmPage, meta.afterLoginUrl]);
+  var outside = urls.filter(function (url) { return url !== undefined && url !== null && url !== '' && String(url).indexOf(FBM_SITE) !== 0; });
+  if (!outside.length) { return null; }
+  var error = new Error('Envelope mang địa chỉ ngoài miền FBM; Extension không mở và không gửi.');
+  error.code = 'FBM_URL_OUTSIDE_SITE';
+  return error;
+}
 /** Tìm tab FBM đang đăng nhập để content script thực hiện fetch cùng cookie. */
 function findFbmTab() {
-  return chrome.tabs.query({ url: ['https://fbo.com.vn:8888/*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
+  return chrome.tabs.query({ url: [FBM_SITE + '*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
 /**
  * Chờ tab tải xong trong hạn. `start` (nếu có) chạy sau khi đã gắn listener, nên lệnh tải lại hay đổi trang không thể xong trước khi kịp nghe.
@@ -126,6 +136,7 @@ function prepareFbmTab(request, onStage) {
     return keepFbmTabLoaded(tab).then(function () {
       return readyFbmTab(tab, Date.now() + Math.floor(Math.max(0, deadlineAt - Date.now()) / 2));
     }).catch(function (firstError) {
+      if (firstError && firstError.code === 'FBM_SITE_ACCESS_BLOCKED') { throw firstError; }
       note('fbm_tab_reloading', String(firstError && firstError.code || 'FBM_TAB_NOT_READY'));
       return waitFbmTabComplete(tab.id, deadlineAt, function () { return chromeApi(function (done) { return chrome.tabs.reload(tab.id, {}, done); }); }).then(function (reloaded) {
         return readyFbmTab(Object.assign({}, tab, reloaded || {}, { id: tab.id, status: 'complete', discarded: false }), deadlineAt);
@@ -133,18 +144,19 @@ function prepareFbmTab(request, onStage) {
     }).then(function (readyTab) {
       return openFbmPageIfAsked(readyTab, request, deadlineAt, note);
     }).catch(function (error) {
+      // Chrome chặn quyền site không phải tab chưa sẵn sàng: giữ nguyên mã và chữ gốc để GAS báo đúng việc người dùng phải làm, không thử lại.
+      if (error && error.code === 'FBM_SITE_ACCESS_BLOCKED') { throw error; }
       throw Object.assign(new Error('Tab FBM không phản hồi kể cả sau khi tự tải lại: ' + String(error && error.message || error)), { code: 'FBM_TAB_NOT_READY' });
     });
   });
 }
 /**
  * GAS cấp `meta.reloadFbmPage` khi trang đang mở không có mã hoặc tên người dùng để đối chiếu (tab đứng ở trang Login, trang lỗi hay trang tải từ trước khi đăng nhập). Extension chỉ đổi trang tới đúng URL đó, chờ tải xong và có executor; không tự quyết khi nào cần.
- * Chỉ nhận URL trong miền FBM để lệnh hỏng không đưa tab ra trang khác.
+ * URL đã qua `envelopeSiteCheck` trước khi tìm tab.
  */
 function openFbmPageIfAsked(tab, request, deadlineAt, note) {
   var url = String(request && request.meta && request.meta.reloadFbmPage || '');
   if (!url) { return Promise.resolve(tab); }
-  if (url.indexOf('https://fbo.com.vn:8888/') !== 0) { return Promise.reject(Object.assign(new Error('Địa chỉ tải lại trang FBM không thuộc miền FBM.'), { code: 'FBM_TAB_NOT_READY' })); }
   note('fbm_page_reloading');
   return waitFbmTabComplete(tab.id, deadlineAt, function () {
     return chromeApi(function (done) { return chrome.tabs.update(tab.id, { url: url }, done); });
@@ -152,9 +164,10 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
     return readyFbmTab(Object.assign({}, tab, loaded || {}, { id: tab.id, status: 'complete', discarded: false }), deadlineAt);
   });
 }
-var FBM_EXECUTOR_VERSION = '21.22';
+/** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
+var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '746304ea1225';
+var FBM_CONTRACT_VERSION = 'f792d61b2a2b';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -180,14 +193,20 @@ function scheduleGasPoll(extensionConfig) {
         gasPollAlarmKnown = true;
         gasPollAlarmMinutes = minutes;
         var result = chrome.alarms.create(GAS_POLL_ALARM, { periodInMinutes: minutes });
-        if (result && typeof result.catch === 'function') { result.catch(function (err) { console.warn('Không đặt được nhịp hỏi GAS:', err); }); }
+        if (result && typeof result.catch === 'function') { result.catch(function (err) { alarmFailure('ALARM_CREATE_FAILED', err); }); }
       };
       if (typeof chrome.alarms.get !== 'function') { create(); return; }
       chrome.alarms.get(GAS_POLL_ALARM, function (alarm) { if (!alarm || Number(alarm.periodInMinutes || 0) !== minutes) { create(); } else { gasPollAlarmKnown = true; gasPollAlarmMinutes = minutes; } });
     }
   } catch (err) {
-    console.warn('Không đặt được nhịp hỏi GAS:', err);
+    alarmFailure('ALARM_CREATE_FAILED', err);
   }
+}
+/** Lỗi đặt/dừng chuông hỏi GAS: ghi ô lỗi hộp đen để GAS ghi Log ở lần hỏi sau và báo ngay Sidebar đang mở. */
+function alarmFailure(code, error) {
+  var failure = Object.assign(new Error(String(error && error.message || error)), { code: code });
+  noteExtensionFailure('alarm', failure, 1);
+  extensionFailureForward(code, 'Extension không đặt được nhịp hỏi GAS: ' + failure.message);
 }
 
 /** Alarm là nhịp kỹ thuật; GAS quyết định mỗi nhịp có cấp việc hay không. */
@@ -197,7 +216,7 @@ function stopGasPoll() {
     gasPollAlarmMinutes = 0;
     if (chrome.alarms && chrome.alarms.clear) { return chrome.alarms.clear(GAS_POLL_ALARM); }
   } catch (err) {
-    console.warn('Không dừng được nhịp hỏi GAS:', err);
+    alarmFailure('ALARM_CLEAR_FAILED', err);
   }
   return undefined;
 }
@@ -221,13 +240,19 @@ function sendTabMessage(tabId, message, timeoutMs) {
   });
 }
 
+/** Chrome từ chối nạp script vì người dùng chặn quyền Extension trên site FBM: đổi sang `FBM_SITE_ACCESS_BLOCKED` kèm chữ gốc của Chrome; lỗi khác giữ nguyên. */
+function siteAccessError(error) {
+  var text = String(error && error.message || error);
+  if (/cannot access|permission|host permissions|ExtensionsSettings/i.test(text)) { throw Object.assign(new Error('Chrome đang chặn Extension truy cập site FBM: ' + text), { code: 'FBM_SITE_ACCESS_BLOCKED' }); }
+  throw error;
+}
 /** Ping trước, chỉ nạp executor khi chưa có đầu nhận; mọi bước nằm trong hạn `deadlineAt` của envelope. */
 var FBM_PING_MS = 1500;
 function ensureFbmExecutor(tabId, deadlineAt) {
   function ping() { return sendTabMessage(tabId, { type: 'FBM_PING_V2' }, Math.min(FBM_PING_MS, Math.max(0, deadlineAt - Date.now()))); }
   return ping().then(function (reply) {
     if (reply && reply.ready && String(reply.version || '') === FBM_EXECUTOR_VERSION) { return reply; }
-    return waitUntil(chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }), deadlineAt, 'FBM_TAB_NOT_READY', 'Không nạp được executor vào tab FBM trong thời gian an toàn.').then(ping).then(function (injectedReply) {
+    return waitUntil(chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).catch(siteAccessError), deadlineAt, 'FBM_TAB_NOT_READY', 'Không nạp được executor vào tab FBM trong thời gian an toàn.').then(ping).then(function (injectedReply) {
       if (!injectedReply || !injectedReply.ready) {
         var executorError = new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.');
         executorError.code = 'FBM_TAB_NOT_READY';
@@ -290,9 +315,9 @@ function fbmCancelledSince(since) { return since > 0 && FBM_CANCEL_AT >= since; 
 function recoverSheetsBridges() {
   return chrome.tabs.query({ url: ['https://docs.google.com/*'] }).then(function (tabs) {
     return Promise.all((tabs || []).filter(function (tab) { return /https:\/\/docs\.google\.com\/spreadsheets\//i.test(String(tab && tab.url || '')); }).map(function (tab) {
-      return ensureSheetsBridge(tab.id).catch(function (error) { console.warn('Không khôi phục được bridge Google Sheet:', error); });
+      return ensureSheetsBridge(tab.id).catch(function (error) { return noteExtensionFailure('sheets_bridge', Object.assign(error || new Error('SHEETS_BRIDGE_NOT_READY'), { code: String(error && error.code || 'SHEETS_BRIDGE_NOT_READY') }), 1); });
     }));
-  }).catch(function (error) { console.warn('Không dò được tab Google Sheet:', error); });
+  }).catch(function (error) { return noteExtensionFailure('sheets_bridge', Object.assign(error || new Error('SHEETS_TAB_QUERY_FAILED'), { code: 'SHEETS_TAB_QUERY_FAILED' }), 1); });
 }
 
 /** Gửi request nghiệp vụ (hoặc lô) đúng một lần tới tab đã qua `prepareFbmTab`. */
@@ -435,134 +460,35 @@ function rawFbmReply(reply) {
   return reply;
 }
 
-/** Gọi Web App relay và đọc kết quả handoff mà không ghi payload vào log. */
-// GAS Web App có thể mất hơn 15 giây khi cold start hoặc đang chờ Spreadsheet lock.
-// Giữ giới hạn hữu hạn để alarm không treo vô hạn, nhưng đủ rộng cho redirect /exec.
+// Lời gọi xin request (ask) chờ hạn này; lời gọi nộp kết quả của một envelope chờ theo `meta.gasReplyMs` GAS ghi trong envelope đó, vì GAS có thể đang xử lý cả một lô. GAS Web App có thể mất hơn 15 giây khi cold start hoặc đang chờ khóa.
 var GAS_RELAY_TIMEOUT_MS = 30000;
-// Lời gọi nộp response của một envelope chờ theo `meta.gasReplyMs` GAS ghi trong envelope đó, vì GAS có thể đang xử lý cả một lô; hạn trên chỉ cho lời gọi chưa gắn envelope (xin request heartbeat).
 function relayTimeoutFor(request) { return Number(request && request.meta && request.meta.gasReplyMs || 0) || GAS_RELAY_TIMEOUT_MS; }
 var relayConfigureFlight = null;
 
-/** Lưu dấu chẩn đoán relay tối thiểu để có thể kiểm tra khi không có Sidebar. */
-function noteRelayStatus(status) {
-  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
-  var item = status || {};
-  try {
-    chrome.storage.local.set({ fbmRelayLastStatus: {
-      at: Date.now(),
-      stage: String(item.stage || ''),
-      requestSentAt: Number(item.requestSentAt || 0),
-      responseReceivedAt: Number(item.responseReceivedAt || 0),
-      ok: item.ok === true,
-      code: String(item.code || ''),
-      httpStatus: Number(item.httpStatus || 0),
-      responseLength: Number(item.responseLength || 0),
-      contentType: String(item.contentType || '').slice(0, 120),
-      responsePrefix: String(item.responsePrefix || '').slice(0, 160),
-      error: String(item.error || '').slice(0, 240)
-    } });
-  } catch (ignore) {}
-}
-
-/** Mọi lời gọi relay lên GAS đi qua đây: thân luôn mang khóa relay và mã hợp đồng; GAS lệch mã thì từ chối với `EXTENSION_PROTOCOL_MISMATCH`. */
+/** Một lần POST lên Web App relay: thân luôn mang khóa relay và mã hợp đồng. Trả JSON GAS viết; 404, trang HTML, hết giờ hay mạng hỏng thì ném lỗi mang mã thật và `httpStatus`, không bao giờ đổi thành `{ok:false}` như thể GAS đã trả lời. */
 function postRelay(url, key, body, timeoutMs) {
   var limitMs = Number(timeoutMs || 0) || GAS_RELAY_TIMEOUT_MS;
   var controller = typeof AbortController === 'function' ? new AbortController() : null;
   var timer = controller ? setTimeout(function () { controller.abort(); }, limitMs) : null;
-  var requestSentAt = Date.now();
-  noteRelayStatus({ stage: 'request_sent', requestSentAt: requestSentAt, code: 'RELAY_REQUEST_SENT' });
   return workerKeepAlive(fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'omit', redirect: 'follow', signal: controller && controller.signal, body: JSON.stringify(Object.assign({ key: key, contract: FBM_CONTRACT_VERSION }, body)) }).then(function (response) {
     return response.text().then(function (text) {
-      var responseReceivedAt = Date.now();
-      var contentType = response.headers.get('content-type') || '';
-      var responsePrefix = text.replace(/[\r\n\t]+/g, ' ').slice(0, 160);
-      noteRelayStatus({ stage: 'response_received', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, code: 'RELAY_RESPONSE_RECEIVED' });
       var parsed = null;
-      try { parsed = JSON.parse(text); } catch (ignore) {
-        // Không đổi thành `{ok:false}` rồi coi như GAS đã trả lời: kết quả FBM đã nộp sẽ bị bỏ mà không ai biết. Ném lỗi có mã thật để chuỗi báo lỗi và ghi hộp đen.
+      try { parsed = JSON.parse(text); } catch (notJson) {
         var notFound = response.status === 404, invalid = new Error(notFound ? 'GAS Web App không tồn tại ở URL đang lưu (HTTP 404).' : 'GAS relay trả về dữ liệu không phải JSON (HTTP ' + response.status + ').');
         invalid.code = notFound ? 'RELAY_ENDPOINT_NOT_FOUND' : 'RELAY_INVALID_JSON';
         invalid.httpStatus = response.status;
-        noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: false, code: invalid.code, httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: invalid.message });
         throw invalid;
       }
       if (!response.ok && parsed && !parsed.error) { parsed.error = 'GAS relay HTTP ' + response.status; }
-      noteRelayStatus({ stage: 'completed', requestSentAt: requestSentAt, responseReceivedAt: responseReceivedAt, ok: response.ok && parsed && parsed.ok !== false, code: parsed && parsed.code || (response.ok ? 'OK' : 'RELAY_HTTP_ERROR'), httpStatus: response.status, responseLength: text.length, contentType: contentType, responsePrefix: responsePrefix, error: parsed && parsed.error || '' });
       return parsed;
     });
   }).catch(function (error) {
-    if (error && error.code === 'RELAY_ENDPOINT_NOT_FOUND' || error && error.code === 'RELAY_INVALID_JSON') { throw error; }
-    var timeout = error && error.name === 'AbortError';
-    var message = timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.');
-    var code = timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED', failure = new Error(message);
-    noteRelayStatus({ stage: 'failed', requestSentAt: requestSentAt, ok: false, code: code, error: message });
-    failure.code = code;
+    if (error && (error.code === 'RELAY_ENDPOINT_NOT_FOUND' || error.code === 'RELAY_INVALID_JSON')) { throw error; }
+    var timeout = error && error.name === 'AbortError', failure = new Error(timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.'));
+    failure.code = timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED';
     throw failure;
   }).finally(function () { if (timer) { clearTimeout(timer); } }));
 }
-
-var fbmHeartbeatFlight = null;
-
-/** Ghi chẩn đoán heartbeat tối thiểu; không lưu cookie hay payload FBM. */
-/**
- * Hộp đen của lượt nền: bước cuối Extension làm được, cất xuống `chrome.storage.local` trước khi làm bước đó. Chrome tắt service worker giữa lượt thì không còn ai báo lỗi; lần hỏi sau mang hộp đen lên để dòng Log "bị bỏ dở" của GAS nói được Extension dừng ở đâu.
- * `workerStartedAt` là lúc service worker hiện tại khởi động: lần hỏi sau thấy nó mới hơn bước cuối nghĩa là worker đã bị tắt và dựng lại. Chỉ ghi tên bước, mã request và giờ — không ghi nội dung request hay response.
- */
-var FBM_WORKER_STARTED_AT = Date.now();
-var FBM_CHAIN_TRAIL_KEY = 'fbmChainTrail';
-function noteChainStep(stage, request, hop, code, httpStatus) {
-  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
-  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };
-  try { chrome.storage.local.set({ fbmChainTrail: trail }); } catch (ignore) {}
-}
-function readChainTrail() {
-  return storageGet(FBM_CHAIN_TRAIL_KEY).then(function (trail) { return trail ? Object.assign({}, trail, { workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: FBM_WORKER_STARTED_AT }) : null; }).catch(function () { return null; });
-}
-
-function noteHeartbeatStatus(stage, extra) {
-  if (!chrome.storage || !chrome.storage.local || !chrome.storage.local.set) { return; }
-  try { chrome.storage.local.set({ fbmHeartbeatLastStatus: Object.assign({ at: Date.now(), stage: String(stage || '') }, extra || {}) }); } catch (ignore) {}
-}
-
-/** Chạy ngay một heartbeat để nghiệm thu; alarm 5 phút chỉ gọi lại đúng luồng này. GAS phải cấp envelope trước; không có envelope thì tuyệt đối không chạm tab FBM. */
-function fbmHeartbeatNow(source) {
-  if (fbmHeartbeatFlight) { return fbmHeartbeatFlight; }
-  var origin = String(source || 'manual');
-  noteHeartbeatStatus('started', { source: origin });
-  fbmHeartbeatFlight = getRelayConfig().then(function (config) {
-    if (!config) {
-      noteHeartbeatStatus('blocked_config', { source: origin, code: 'RELAY_CONFIG_MISSING' });
-      return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở Sidebar một lần.' };
-    }
-    noteHeartbeatStatus('relay_configured', { source: origin });
-    return readChainTrail().then(function (trail) {
-      return postRelay(config.url, config.key, { command: 'heartbeat', spreadsheetId: config.spreadsheetId, payload: { trigger: origin, trail: trail } });
-    }).then(function (gasRequest) {
-      if (!gasRequest || gasRequest.ok !== true) {
-        var requestCode = String(gasRequest && gasRequest.code || 'HEARTBEAT_REQUEST_NOT_READY');
-        noteHeartbeatStatus('blocked_gas_request', { source: origin, code: requestCode, error: String(gasRequest && (gasRequest.error || gasRequest.message) || 'GAS chưa cấp request heartbeat.').slice(0, 240) });
-        return Object.assign({}, gasRequest || {}, { ok: false, code: requestCode, error: String(gasRequest && (gasRequest.error || gasRequest.message) || 'GAS chưa cấp request heartbeat.') });
-      }
-      if (!gasRequest.request) {
-        noteHeartbeatStatus('gas_noop', { source: origin, code: String(gasRequest.code || 'HEARTBEAT_NOOP') });
-        return gasRequest;
-      }
-      noteHeartbeatStatus('fbm_request_sent', { source: origin });
-      return relayRun(config, gasRequest, 0).then(function (result) {
-        noteHeartbeatStatus('gas_response_received', { source: origin, ok: !(result && result.ok === false), code: String(result && result.code || '') });
-        return result && result.ok === false ? Object.assign({ ok: false }, result) : { ok: true, gas: result || null };
-      });
-    });
-  }).catch(function (error) {
-    var message = String(error && error.message || error);
-    var failedCode = String(error && error.code || 'HEARTBEAT_FAILED');
-    noteHeartbeatStatus('failed', { source: origin, code: failedCode, error: message.slice(0, 240) });
-    noteChainStep('gas_reply_failed', null, 0, failedCode, error && error.httpStatus);
-    return { ok: false, code: failedCode, error: message };
-  }).finally(function () { fbmHeartbeatFlight = null; });
-  return fbmHeartbeatFlight;
-}
-if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
 
 /**
  * Thế hệ cấu hình relay: tăng mỗi lần Extension chuyển sang Sheet khác. Chuỗi nền mang thế hệ lúc nó đọc cấu hình; lệch thế hệ nghĩa là Sheet đã đổi giữa chừng, chuỗi phải dừng chứ không được chạy tiếp cho Sheet cũ.
@@ -635,9 +561,9 @@ function configureRelay(config) {
         var error = chrome.runtime.lastError;
         if (error) { resolve({ ok: false, code: 'RELAY_CONFIG_SAVE_FAILED', error: error.message }); return; }
         if (switching) {
-          // Hộp đen của chuỗi cũ thuộc Sheet cũ, không được mang lên GAS của Sheet mới.
+          // Hộp đen của chuỗi cũ (bước cuối và ô lỗi) thuộc Sheet cũ, không được mang lên GAS của Sheet mới.
           relayConfigGeneration += 1;
-          chrome.storage.local.remove([FBM_CHAIN_TRAIL_KEY]);
+          chrome.storage.local.remove([FBM_CHAIN_TRAIL_KEY, FBM_FAILURE_CELL_KEY]);
         }
         scheduleGasPoll(normalized.extension);
         resolve({ ok: true, code: switching ? 'RELAY_SPREADSHEET_SWITCHED' : 'RELAY_CONFIG_SAVED' });
@@ -647,72 +573,198 @@ function configureRelay(config) {
   return relayConfigureFlight;
 }
 
-/** Hai hình dạng nộp về GAS, cùng lệnh `continue`: kết quả request, hoặc lỗi không gửi được request (kèm `requestId`). GAS quyết theo cursor, Extension không cần biết request thuộc bước nào. */
-function relayReplyBody(response, hop) { return { command: 'continue', payload: { response: response, hop: hop } }; }
-function relayFailureBody(request, code, message, hop) { return { command: 'continue', payload: { error: { requestId: String(request.id), code: code, message: message }, hop: hop } }; }
-
 /**
- * Người điều phối duy nhất chạy chuỗi request GAS cấp cho nhịp nền: chuẩn bị tab → gửi tab → nộp kết quả → nhận request kế tiếp, cho tới khi GAS không cấp nữa.
- * Mọi lỗi trước khi có kết quả (không có tab, tab không phản hồi, tab trả lỗi, nộp kết quả hỏng) đều đi đúng một đường: báo `transport failure` về GAS; GAS có thể cấp request mới thì chạy tiếp.
- * Hộp đen ghi trước mỗi bước để lần hỏi sau GAS biết lượt dừng ở đâu nếu worker bị tắt.
+ * Hộp đen của chuỗi: bước cuối Extension làm được, cất xuống `chrome.storage.local` trước khi làm bước đó. Chrome tắt service worker giữa lượt thì không còn ai báo lỗi; lần hỏi sau mang hộp đen lên để dòng Log "bị bỏ dở" của GAS nói được Extension dừng ở đâu.
+ * `workerStartedAt` là lúc service worker hiện tại khởi động: lần hỏi sau thấy nó mới hơn bước cuối nghĩa là worker đã bị tắt và dựng lại. Chỉ ghi tên bước, mã request và giờ — không ghi nội dung request hay response.
+ * Ô lỗi (`fbmExtensionFailure`) nằm ở khóa riêng để bước sau không ghi đè: lỗi gọi GAS hay đặt chuông không báo được lúc đó, lần hỏi sau mang lên, GAS ghi Log rồi trả `trailAck` thì xóa.
  */
-function relayRun(config, gasReply, used) {
-  var next = gasReply && gasReply.request, hop = Number(used || 0);
-  if (!next || !config || !config.url || !config.key) {
-    if (gasReply && gasReply.ok === false) { noteChainStep('gas_reply_failed', null, hop, gasReply.code || gasReply.error || 'GAS_REPLY_FAILED'); } else { noteChainStep('chain_finished', null, hop); }
-    return Promise.resolve(gasReply);
-  }
-  noteChainStep('gas_request_received', next, hop);
-  if (config.generation !== relayConfigGeneration) {
-    // Người dùng đã chuyển Extension sang Sheet khác: báo một lần cho GAS cũ để nó đóng request này rồi dừng, không chạm tab FBM, không chạy request nó cấp tiếp.
-    noteChainStep('config_switched', next, hop, 'RELAY_CONFIG_SWITCHED');
-    var switchedMessage = 'Extension đã chuyển đồng bộ nền sang Sheet khác theo xác nhận của người dùng; dừng chuỗi của Sheet này.';
-    return postRelay(config.url, config.key, Object.assign(relayFailureBody(next, 'RELAY_CONFIG_SWITCHED', switchedMessage, hop + 1), { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)).then(function () {
-      return { ok: false, code: 'RELAY_CONFIG_SWITCHED', error: switchedMessage, request: null };
-    }, function (relayError) {
-      var relayMessage = String(relayError && relayError.message || relayError || 'Không báo được việc chuyển Sheet lên GAS cũ.').slice(0, 240);
-      noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
-      return { ok: false, code: 'RELAY_CONFIG_SWITCHED', error: switchedMessage + ' ' + relayMessage, request: null };
-    });
-  }
-  function post(body) { return postRelay(config.url, config.key, Object.assign(body, { spreadsheetId: config.spreadsheetId }), relayTimeoutFor(next)); }
-  function reportFailure(code, message) {
-    var failureCode = String(code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240);
-    noteChainStep('failure_sent', next, hop + 1, failureCode);
-    return post(relayFailureBody(next, failureCode, failureMessage, hop + 1)).then(function (failureReply) {
-      if (failureReply && failureReply.request) { return relayRun(config, failureReply, hop + 1); }
-      noteChainStep(failureReply && failureReply.ok === false ? 'gas_reply_failed' : 'chain_finished', next, hop + 1, failureCode);
-      return Object.assign({}, failureReply || {}, { ok: false, code: failureCode, error: failureMessage });
-    }, function (relayError) {
-      noteChainStep('gas_reply_failed', next, hop + 1, relayError && relayError.code || 'GAS_RELAY_FAILED', relayError && relayError.httpStatus);
-      var relayMessage = String(relayError && relayError.message || relayError || 'Không thể báo lỗi transport lên GAS.').slice(0, 240);
-      noteRelayStatus({ stage: 'failed', ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage });
-      return { ok: false, code: 'GAS_RELAY_FAILED', error: relayMessage, request: null };
-    });
-  }
-  var mismatch = envelopeContractCheck(next);
-  if (mismatch) { return reportFailure(mismatch.code, mismatch.message); }
-  return prepareFbmTab(next, function (stage, code) { noteChainStep(stage, next, hop, code); }).then(function (tab) {
-    if (!tab) { return reportFailure('FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.'); }
-    noteChainStep('fbm_tab_sent', next, hop);
-    return sendToFbmTab(tab.id, next).catch(function (error) {
-      return { error: String(error && error.message || error), code: String(error && error.code || 'FBM_TRANSPORT_UNAVAILABLE') };
-    }).then(function (reply) {
-      noteChainStep('fbm_tab_replied', next, hop);
-      if (!reply || reply.error) { return reportFailure(reply && reply.code, reply ? reply.error : 'Tab FBM không trả kết quả.'); }
-      noteChainStep('gas_response_sent', next, hop + 1);
-      return post(relayReplyBody(rawFbmReply(reply), hop + 1)).then(function (nextReply) { return relayRun(config, nextReply, hop + 1); }, function (error) {
-        noteChainStep('gas_reply_failed', next, hop + 1, error && error.code || 'GAS_RELAY_FAILED', error && error.httpStatus);
-        return reportFailure('FBM_TRANSPORT_UNAVAILABLE', error && error.message || error);
-      });
-    });
-  }, function (error) {
-    return reportFailure(error && error.code, error && error.message || error);
+var FBM_WORKER_STARTED_AT = Date.now();
+var FBM_CHAIN_TRAIL_KEY = 'fbmChainTrail';
+var FBM_FAILURE_CELL_KEY = 'fbmExtensionFailure';
+function noteChainStep(stage, request, hop, code, httpStatus) {
+  var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };
+  return storageSet({ [FBM_CHAIN_TRAIL_KEY]: trail }).catch(function (error) { extensionFailureForward('TRAIL_WRITE_FAILED', 'Extension không ghi được hộp đen: ' + String(error && error.message || error)); });
+}
+/** Ghi ô lỗi của hộp đen. `command` là việc Extension đang làm (ví dụ `relay_continue`, `gas_poll_schedule`). */
+function noteExtensionFailure(command, error, attempts) {
+  var cell = { at: Date.now(), command: String(command || ''), code: String(error && error.code || 'EXTENSION_FAILED'), httpStatus: Number(error && error.httpStatus || 0), attempts: Number(attempts || 0) };
+  return storageSet({ [FBM_FAILURE_CELL_KEY]: cell }).catch(function (writeError) { extensionFailureForward('TRAIL_WRITE_FAILED', 'Extension không ghi được ô lỗi hộp đen: ' + String(writeError && writeError.message || writeError)); });
+}
+function readChainTrail() {
+  return Promise.all([storageGet(FBM_CHAIN_TRAIL_KEY), storageGet(FBM_FAILURE_CELL_KEY)]).then(function (saved) {
+    var trail = saved[0], failure = saved[1];
+    if (!trail && !failure) { return null; }
+    return Object.assign({}, trail || {}, { workerStartedAt: Number(trail && trail.workerStartedAt || 0), currentWorkerStartedAt: FBM_WORKER_STARTED_AT }, failure ? { relayFailure: failure } : {});
+  });
+}
+/** GAS đã ghi Log ô lỗi có mốc `ack`: xóa ô nếu chưa có lỗi mới hơn ghi đè. */
+function trailClear(ack) {
+  if (!Number(ack || 0)) { return Promise.resolve(); }
+  return storageGet(FBM_FAILURE_CELL_KEY).then(function (cell) {
+    if (!cell || Number(cell.at || 0) !== Number(ack)) { return null; }
+    return chromeApi(function (done) { return chrome.storage.local.remove([FBM_FAILURE_CELL_KEY], done); });
   });
 }
 
-/** Định tuyến request từ Sidebar tới đúng tab FBM, không xử lý dữ liệu nghiệp vụ. */
-var fbmRequestFlights = Object.create(null);
+/** Mã máy của Extension này, tạo một lần và giữ trong `chrome.storage.local`. GAS ghi máy chở lượt và từ chối kết quả từ máy khác. */
+var FBM_MACHINE_ID_KEY = 'fbmMachineId';
+var machineIdFlight = null;
+function machineIdRead() {
+  if (machineIdFlight) { return machineIdFlight; }
+  machineIdFlight = storageGet(FBM_MACHINE_ID_KEY).then(function (saved) {
+    if (saved) { return String(saved); }
+    var bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    var created = 'may-' + bytesToBase64(bytes).replace(/[+/=]/g, '').slice(0, 16);
+    return storageSet({ [FBM_MACHINE_ID_KEY]: created }).then(function () { return created; });
+  }).catch(function (error) { machineIdFlight = null; throw error; });
+  return machineIdFlight;
+}
+
+/**
+ * Giãn cách thử lại lần gọi relay hỏng, do GAS gửi kèm mọi lần trả lời (`retryMs`) và Sidebar chuyển kèm `run_now`. Extension không giữ con số riêng: chưa nhận được lần nào (worker vừa khởi động) thì không thử lại, chuông hỏi kế tiếp là lần thử lại.
+ */
+var relayRetrySchedule = [];
+function relayRetryLearn(list) {
+  if (Array.isArray(list) && list.every(function (value) { return Number(value) > 0; })) { relayRetrySchedule = list.map(Number); }
+}
+function relayRetryWait(ms) { return workerKeepAlive(new Promise(function (resolve) { setTimeout(resolve, ms); })); }
+
+/**
+ * Cổng duy nhất Extension gọi GAS: `ask` xin việc nền (lệnh `heartbeat`), `continue` nộp kết quả, báo lỗi hoặc nhận lượt. Thân mang Sheet, mã máy và hộp đen (lần hỏi); GAS trả `trailAck` thì xóa ô lỗi đã được ghi Log.
+ * Lỗi gọi (404, không phải JSON, hết giờ, mạng) thử lại theo `relayRetrySchedule`; hết lượt thử thì ghi ô lỗi hộp đen rồi ném lỗi mang mã thật.
+ */
+/** Hai việc của cổng gọi GAS: lệnh GAS tương ứng và có mang hộp đen hay không. Việc lạ thì ném, không có nhánh mặc định. */
+var RELAY_CALLS = {
+  ask: { command: 'heartbeat', trail: true },
+  continue: { command: 'continue', trail: false }
+};
+function relayCall(config, kind, payload, timeoutMs) {
+  if (!Object.prototype.hasOwnProperty.call(RELAY_CALLS, kind)) { return Promise.reject(Object.assign(new Error('Cổng gọi GAS không có việc "' + kind + '".'), { code: 'RELAY_CALL_UNKNOWN' })); }
+  var command = RELAY_CALLS[kind].command, attempts = 0;
+  return machineIdRead().then(function (machineId) {
+    var withTrail = RELAY_CALLS[kind].trail ? readChainTrail().then(function (trail) { return Object.assign({}, payload, { trail: trail }); }) : Promise.resolve(Object.assign({}, payload));
+    return withTrail.then(function (body) {
+      var sent = { command: command, spreadsheetId: config.spreadsheetId, payload: Object.assign(body, { machineId: machineId }) };
+      function attempt() {
+        attempts += 1;
+        return postRelay(config.url, config.key, sent, timeoutMs).catch(function (error) {
+          var waitMs = relayRetrySchedule[attempts - 1];
+          if (!waitMs) { return noteExtensionFailure('relay_' + kind, error, attempts).then(function () { throw error; }); }
+          return relayRetryWait(waitMs).then(attempt);
+        });
+      }
+      return attempt();
+    });
+  }).then(function (reply) {
+    relayRetryLearn(reply && reply.retryMs);
+    return trailClear(reply && reply.trailAck).then(function () { return reply; });
+  });
+}
+
+/**
+ * Chuyển trạng thái lượt (statusView GAS vừa trả) hoặc lỗi Extension sang Sidebar đang mở của đúng Sheet: gửi tới các tab Google Sheets, cầu nối iframe chỉ nhận khi trùng Spreadsheet đang mở.
+ * Tab không có Sidebar hay cầu nối không trả lời là bình thường (Sidebar đóng), lượt vẫn chạy và Sidebar mở lại sẽ đọc status từ GAS.
+ */
+function statusForward(spreadsheetId, message) {
+  return chrome.tabs.query({ url: ['https://docs.google.com/spreadsheets/*'] }).then(function (tabs) {
+    return Promise.all((tabs || []).map(function (tab) { return sendTabMessage(tab.id, Object.assign({ type: 'CRM_FBM_STATUS', spreadsheetId: String(spreadsheetId || '') }, message), 1000); }));
+  }, function (error) { return noteExtensionFailure('status_forward', error, 1); });
+}
+/** Lỗi Extension cần người dùng thấy ngay: chuyển sang Sidebar đang mở của Sheet đang cấu hình relay. */
+function extensionFailureForward(code, message, httpStatus) {
+  return getRelayConfig().then(function (config) {
+    return statusForward(config && config.spreadsheetId, { failure: { code: String(code || 'EXTENSION_FAILED'), message: String(message || '').slice(0, 240), httpStatus: Number(httpStatus || 0) } });
+  });
+}
+
+/** Thân nộp về GAS: kết quả request (`response`) hoặc lỗi không gửi được request (`error` kèm `requestId`). GAS quyết theo cursor, Extension không cần biết request thuộc bước nào. */
+function relayReplyPayload(response, hop) { return { response: response, hop: hop }; }
+function relayFailurePayload(request, code, message, hop) { return { error: { requestId: String(request.id), code: String(code || 'FBM_TRANSPORT_UNAVAILABLE'), message: String(message || 'Extension không gửi được request tới tab FBM.').slice(0, 240) }, hop: hop }; }
+
+/** Chạy một envelope GAS cấp: kiểm hợp đồng và miền, chuẩn bị tab, gửi đúng một lần. Trả thân nộp về GAS; mọi lỗi trước khi có kết quả thành thân báo lỗi mang mã thật. */
+function envelopeRun(request, hop) {
+  var refused = envelopeContractCheck(request) || envelopeSiteCheck(request);
+  if (refused) { return Promise.resolve(relayFailurePayload(request, refused.code, refused.message, hop)); }
+  return prepareFbmTab(request, function (stage, code) { noteChainStep(stage, request, hop, code); }).then(function (tab) {
+    if (!tab) { return relayFailurePayload(request, 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM đang mở.', hop); }
+    noteChainStep('fbm_tab_sent', request, hop);
+    return sendToFbmTab(tab.id, request).then(function (reply) {
+      noteChainStep('fbm_tab_replied', request, hop);
+      if (!reply || reply.error) { return relayFailurePayload(request, reply && reply.code, reply ? reply.error : 'Tab FBM không trả kết quả.', hop); }
+      return relayReplyPayload(rawFbmReply(reply), hop);
+    });
+  }).catch(function (error) {
+    return relayFailurePayload(request, error && error.code, error && error.message || error, hop);
+  });
+}
+
+/**
+ * Vòng duy nhất chở lát giữa GAS và tab FBM, cho cả nhịp nền và lượt tay: gọi GAS → chạy envelope → nộp → lặp tới khi GAS không cấp request nữa. Mỗi lần GAS trả lời thì chuyển status sang Sidebar đang mở.
+ * Lượt tay vào vòng bằng `continue{runId}` (nhận lượt Sidebar vừa mở), nhịp nền bằng `ask`. Người dùng chuyển Extension sang Sheet khác giữa chừng thì báo một lần cho GAS cũ để nó đóng request rồi dừng.
+ */
+var relayLoopFlight = null;
+function relayLoop(config, first) {
+  var hop = 0;
+  function finish(reply) {
+    noteChainStep(reply && reply.ok === false ? 'gas_reply_failed' : 'chain_finished', null, hop, reply && reply.ok === false ? reply.code || 'GAS_REPLY_FAILED' : '');
+    return reply;
+  }
+  function step(reply) {
+    var request = reply && reply.request;
+    // `done`: GAS không cấp request kế, chuỗi của lượt này đã hết; Sidebar chờ lượt tay dựa vào cờ này, không đoán theo phase. `ok` chuyển nguyên của GAS: lượt đạt vẫn có thể mang mã (`LOGIN_OK`).
+    statusForward(config.spreadsheetId, { ok: !(reply && reply.ok === false), status: reply && reply.status || null, conflict: reply && reply.conflict || null, code: String(reply && reply.code || ''), error: String(reply && reply.error || ''), done: !request });
+    if (!request) { return finish(reply); }
+    noteChainStep('gas_request_received', request, hop);
+    if (config.generation !== relayConfigGeneration) {
+      noteChainStep('config_switched', request, hop, 'RELAY_CONFIG_SWITCHED');
+      return relayCall(config, 'continue', relayFailurePayload(request, 'RELAY_CONFIG_SWITCHED', 'Extension đã chuyển đồng bộ nền sang Sheet khác theo xác nhận của người dùng; dừng chuỗi của Sheet này.', hop + 1), relayTimeoutFor(request)).then(function () {
+        return finish({ ok: false, code: 'RELAY_CONFIG_SWITCHED', request: null });
+      });
+    }
+    return envelopeRun(request, hop + 1).then(function (payload) {
+      hop += 1;
+      noteChainStep(payload.error ? 'failure_sent' : 'gas_response_sent', request, hop, payload.error && payload.error.code);
+      return relayCall(config, 'continue', payload, relayTimeoutFor(request));
+    }).then(step);
+  }
+  return relayCall(config, first.kind, first.payload || {}).then(step).catch(function (error) {
+    noteChainStep('gas_reply_failed', null, hop, error && error.code || 'GAS_RELAY_FAILED', error && error.httpStatus);
+    extensionFailureForward(error && error.code || 'GAS_RELAY_FAILED', error && error.message || error, error && error.httpStatus);
+    return { ok: false, code: String(error && error.code || 'GAS_RELAY_FAILED'), error: String(error && error.message || error) };
+  });
+}
+/** Một vòng tại một thời điểm trong worker: lần gọi đến khi vòng khác đang chạy thì nối sau vòng đó, không chạy song song hai vòng trên cùng tab FBM. */
+function relayLoopStart(first) {
+  var previous = relayLoopFlight || Promise.resolve();
+  var flight = previous.then(function () {
+    return getRelayConfig().then(function (config) {
+      if (!config) {
+        var missing = Object.assign(new Error('Thiếu cấu hình relay; hãy mở Sidebar một lần.'), { code: 'RELAY_CONFIG_MISSING' });
+        noteExtensionFailure(first.kind, missing, 0);
+        return { ok: false, code: missing.code, error: missing.message };
+      }
+      return relayLoop(config, first);
+    });
+  });
+  relayLoopFlight = flight;
+  flight.then(function () { if (relayLoopFlight === flight) { relayLoopFlight = null; } });
+  return flight;
+}
+/** Nhịp hỏi GAS (chuông, khởi động Chrome, Sidebar mở). GAS phải cấp envelope trước; không có envelope thì không chạm tab FBM. */
+function fbmHeartbeatNow(source) { return relayLoopStart({ kind: 'ask', payload: { trigger: String(source || 'manual') } }); }
+if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
+/** Sidebar vừa mở lượt tay: đánh thức vòng để nhận lượt `runId`, kể cả ở máy không chạy nền. Vòng xong thì Extension về đúng trạng thái trước (không đổi chuông hỏi nền). */
+function fbmRunNow(runId, retryMs) {
+  if (!String(runId || '')) { return Promise.resolve({ ok: false, code: 'RUN_ID_REQUIRED', error: 'Sidebar gửi lệnh chạy mà không có mã lượt.' }); }
+  relayRetryLearn(retryMs);
+  return getRelayConfig().then(function (config) {
+    if (!config) { return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở lại Sidebar để gửi cấu hình cho Extension.' }; }
+    relayLoopStart({ kind: 'continue', payload: { runId: String(runId) } });
+    return { ok: true, accepted: true };
+  });
+}
+
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message && message.type === 'FBM_ENCRYPT_CREDENTIALS') {
@@ -739,25 +791,19 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     sendResponse(fbmCancelBatch());
     return false;
   }
-  if (!message || message.type !== 'FBM_EXECUTE_REQUEST') { return false; }
-  var requestId = String(message.id || '');
-  var existingFlight = requestId && fbmRequestFlights[requestId];
-  if (existingFlight) {
-    existingFlight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE') }); });
+  if (message && message.type === 'FBM_MACHINE_ID') {
+    machineIdRead().then(function (machineId) { sendResponse({ ok: true, machineId: machineId }); }, function (error) { sendResponse({ ok: false, code: 'MACHINE_ID_READ_FAILED', error: String(error && error.message || error) }); });
     return true;
   }
-  var mismatch = envelopeContractCheck(message.request);
-  if (mismatch) { sendResponse({ error: mismatch.message, code: mismatch.code }); return false; }
-  var flight = prepareFbmTab(message.request).then(function (tab) {
-    if (!tab) { return addWorkerTrace({ error: 'Không tìm thấy tab FBM đang mở.', code: 'FBM_TAB_NOT_FOUND' }, message.request, 'fbm_tab_not_found'); }
-    return sendToFbmTab(tab.id, message.request).then(function (reply) { return addWorkerTrace(addWorkerTrace(reply, message.request, 'worker_received'), message.request, 'fbm_tab_found'); });
-  });
-  if (requestId) {
-    fbmRequestFlights[requestId] = flight;
-    flight.then(function () { delete fbmRequestFlights[requestId]; }, function () { delete fbmRequestFlights[requestId]; });
+  if (message && message.type === 'FBM_RUN_NOW') {
+    fbmRunNow(message.runId, message.retryMs).then(sendResponse, function (error) { sendResponse({ ok: false, code: String(error && error.code || 'RUN_NOW_FAILED'), error: String(error && error.message || error) }); });
+    return true;
   }
-  flight.then(sendResponse, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE') }); });
-  return true;
+  if (message && message.type === 'FBM_BRIDGE_FAILURE') {
+    noteExtensionFailure('bridge', Object.assign(new Error(String(message.message || '')), { code: String(message.code || 'BRIDGE_POST_FAILED') }), 1).then(function () { sendResponse({ ok: true }); });
+    return true;
+  }
+  return false;
 });
 
 /** Khôi phục alarm khi Extension cài mới; Chrome startup có thể hỏi GAS một lượt. */
@@ -767,13 +813,13 @@ chrome.runtime.onStartup.addListener(function () {
   getRelayConfig().then(function (config) {
     if (config && config.extension && config.extension.runOnStartup === true) { return fbmHeartbeatNow('startup'); }
     return null;
-  }).catch(function (error) { console.warn('Không hỏi GAS được ở startup:', error); });
+  }).catch(function (error) { return noteExtensionFailure('startup', error, 1); });
 });
 restoreHeartbeatSchedule();
 recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm || alarm.name !== GAS_POLL_ALARM) { return; }
-  fbmHeartbeatNow('alarm').then(function (result) { if (!result || result.ok !== true) { console.warn('Heartbeat FBM không chạy:', result); } });
+  fbmHeartbeatNow('alarm');
 });
 

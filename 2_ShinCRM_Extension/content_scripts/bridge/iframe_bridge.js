@@ -54,7 +54,7 @@ function isReadPlan(value) {
 
 function acceptReadPlan(data) {
   if (!isReadPlan(data.readPlan)) { return; }
-  if (data.spreadsheetId && typeof readSpreadsheetId === 'function' && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
+  if (data.spreadsheetId && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
   // Sidebar gửi kèm read plan ở mọi nhịp bắt tay; chỉ plan mới mới cần đọc lại ô, nếu không Extension bắn lại context mỗi giây.
   if (JSON.stringify(data.readPlan) === JSON.stringify(CRM_READ_PLAN)) { return; }
   CRM_READ_PLAN = data.readPlan;
@@ -99,7 +99,7 @@ function isInvalidatedExtensionError(error) {
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     if (!message || message.type !== 'CRM_BRIDGE_PING') { return false; }
-    sendResponse({ ready: true, version: '21.7' });
+    sendResponse({ ready: true, version: chrome.runtime.getManifest().version });
     return false;
   });
 }
@@ -125,78 +125,60 @@ function bridgeErrorMessage(error) {
   return String(error && error.message || error || 'Extension không xử lý được yêu cầu.');
 }
 
-// 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce.
+/**
+ * Lệnh Sidebar → worker đi qua đúng một bảng: mỗi dòng là loại tin worker nhận, tin trả về Sidebar và trường được chép sang worker.
+ * Bridge không đọc nội dung, chỉ chuyển; trả lời luôn mang `result`, `code`, `error` cùng một dạng.
+ */
+var BRIDGE_COMMANDS = {
+  CRM_FBM_CONFIG: { worker: 'FBM_CONFIGURE_RELAY', reply: 'CRM_FBM_CONFIG_ACK', fields: function (data) { return { config: data.config || {} }; } },
+  CRM_FBM_CREDENTIALS: { worker: 'FBM_ENCRYPT_CREDENTIALS', reply: 'CRM_FBM_CREDENTIALS_RESULT', fields: function (data) { return { credentials: data.credentials || {} }; } },
+  CRM_FBM_CREDENTIAL_METADATA: { worker: 'FBM_GET_CREDENTIAL_METADATA', reply: 'CRM_FBM_CREDENTIAL_METADATA_RESULT', fields: function (data) { return { credentialRef: String(data.credentialRef || '') }; } },
+  CRM_FBM_CREDENTIAL_CLEAR: { worker: 'FBM_CLEAR_CREDENTIALS', reply: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', fields: function (data) { return { credentialRef: String(data.credentialRef || '') }; } },
+  CRM_FBM_CANCEL: { worker: 'FBM_CANCEL_BATCH', reply: 'CRM_FBM_CANCEL_RESULT', fields: function () { return {}; } },
+  CRM_FBM_MACHINE_ID: { worker: 'FBM_MACHINE_ID', reply: 'CRM_FBM_MACHINE_ID_RESULT', fields: function () { return {}; } },
+  CRM_FBM_RUN_NOW: { worker: 'FBM_RUN_NOW', reply: 'CRM_FBM_RUN_NOW_RESULT', fields: function (data) { return { runId: String(data.runId || ''), retryMs: Array.isArray(data.retryMs) ? data.retryMs : [] }; } }
+};
+
+/** Tin có việc chỉ nhận từ đúng khung Sidebar vừa bắt tay: origin trong allowlist, đúng window, đúng nonce, đúng phiên Extension. */
+function bridgeGuard(event, data) {
+  return isAllowedSidebarOrigin(event.origin) && event.source === sidebarWindow && String(data.nonce || '') === sidebarNonce && isCurrentExtensionSession(data);
+}
+
+/** Gửi tin về Sidebar; gửi hỏng thì kênh coi như đã đóng và worker ghi ô lỗi hộp đen để GAS ghi Log ở lần hỏi sau. */
+function bridgePost(message, code) {
+  if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) { return false; }
+  try {
+    sidebarWindow.postMessage(Object.assign({ nonce: sidebarNonce, sessionId: extensionSessionId }, message), sidebarOrigin);
+    return true;
+  } catch (error) {
+    sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = '';
+    bridgeFailureReport(code || 'BRIDGE_POST_FAILED', error);
+    return false;
+  }
+}
+function bridgeFailureReport(code, error) {
+  if (!bridgeContextAlive()) { return; }
+  sendRequestToWorker({ type: 'FBM_BRIDGE_FAILURE', code: code, message: String(error && error.message || error || '') }, function () {});
+}
+
+/** Worker chuyển trạng thái lượt (`CRM_FBM_STATUS`) tới mọi tab Sheets; chỉ tab đúng Spreadsheet mới chuyển tiếp vào Sidebar của nó. */
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    if (!message || message.type !== 'CRM_FBM_STATUS') { return false; }
+    var own = String(message.spreadsheetId || '') === String(readSpreadsheetId() || '');
+    sendResponse({ delivered: own && bridgePost({ action: 'CRM_FBM_STATUS', ok: message.ok !== false, status: message.status || null, conflict: message.conflict || null, code: String(message.code || ''), error: String(message.error || ''), failure: message.failure || null, done: message.done === true }, 'BRIDGE_STATUS_POST_FAILED') });
+    return false;
+  });
+}
+
+// 1. Bắt tay: kiểm origin, ghi nhớ đích, đáp tiếng kèm đúng nonce. Lệnh có việc đi qua `BRIDGE_COMMANDS`.
 function bridgeOnMessage(event) {
   if (!bridgeContextAlive()) { bridgeRetire(); return; }
-  var data = event.data;
-  if (data && data.action === 'CRM_FBM_CONFIG') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    sendRequestToWorker({ type: 'FBM_CONFIGURE_RELAY', config: data.config || {} }, function (error, reply) {
-      if (error && console && console.warn) { console.warn('Không lưu được cấu hình relay FBM:', error); }
-      try {
-        event.source.postMessage({ action: 'CRM_FBM_CONFIG_ACK', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || ''), currentSpreadsheetId: String(!error && reply && reply.currentSpreadsheetId || '') }, event.origin);
-      } catch (ignoreAck) {}
-    });
-    return;
-  }
-  if (data && data.action === 'CRM_FBM_CREDENTIALS') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    sendRequestToWorker({ type: 'FBM_ENCRYPT_CREDENTIALS', credentials: data.credentials || {} }, function (error, reply) {
-      try {
-        event.source.postMessage({ action: 'CRM_FBM_CREDENTIALS_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
-      } catch (ignoreCredentialsAck) {}
-    });
-    return;
-  }
-  if (data && data.action === 'CRM_FBM_CREDENTIAL_METADATA') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    sendRequestToWorker({ type: 'FBM_GET_CREDENTIAL_METADATA', credentialRef: String(data.credentialRef || '') }, function (error, reply) {
-      try {
-        event.source.postMessage({ action: 'CRM_FBM_CREDENTIAL_METADATA_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
-      } catch (ignoreMetadataAck) {}
-    });
-    return;
-  }
-  if (data && data.action === 'CRM_FBM_CREDENTIAL_CLEAR') {
-    if (!isAllowedSidebarOrigin(event.origin) || event.source !== sidebarWindow || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    sendRequestToWorker({ type: 'FBM_CLEAR_CREDENTIALS', credentialRef: String(data.credentialRef || '') }, function (error, reply) {
-      try {
-        event.source.postMessage({ action: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', nonce: sidebarNonce, sessionId: extensionSessionId, id: String(data.id || ''), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || '') }, event.origin);
-      } catch (ignoreClearAck) {}
-    });
-    return;
-  }
-  if (data && data.action === 'CRM_FBM_CANCEL') {
-    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    sendRequestToWorker({ type: 'FBM_CANCEL_BATCH' }, function (error) { if (error && console && console.warn) { console.warn('Không báo được lệnh dừng cho Extension:', error); } });
-    return;
-  }
-  if (data && data.action === 'CRM_FBM_REQUEST') {
-    // Chuyển nguyên request qua service worker; bridge không phân tích response FBM.
-    if (!isAllowedSidebarOrigin(event.origin) || String(data.nonce || '') !== sidebarNonce || !isCurrentExtensionSession(data)) { return; }
-    // Sheets có thể thay WindowProxy sau reload; nonce vẫn định danh đúng Sidebar.
-    if (event.source && event.source !== sidebarWindow) { sidebarWindow = event.source; sidebarOrigin = event.origin; }
-    // `data.id` is only the Sidebar waiter id. The GAS reservation id lives in
-    // request.meta.trace.requestId and must remain the sole `requestId` used by
-    // GAS stale-response validation.
-    var bridgeTrace = { at: Date.now(), stage: 'bridge_received', clientRequestId: String(data.id || '') };
-    sendRequestToWorker({ type: 'FBM_EXECUTE_REQUEST', id: data.id, request: data.request }, function (error, reply) {
-      try {
-        var trace = (reply && reply.result && reply.result.transport && reply.result.transport.trace) || (reply && reply.trace) || [];
-        var bridgeResponseTrace = Object.assign({}, bridgeTrace, { at: Date.now(), stage: 'bridge_response_sent' });
-        trace = [bridgeTrace].concat(trace, [bridgeResponseTrace]);
-        if (reply && reply.result && typeof reply.result === 'object') { reply.result.transport = reply.result.transport || {}; reply.result.transport.trace = trace; }
-        event.source.postMessage({
-          action: 'CRM_FBM_RESPONSE',
-          nonce: sidebarNonce,
-          id: data.id,
-          result: error ? null : (reply && reply.result),
-          error: error ? bridgeErrorMessage(error) : (reply && reply.error),
-          code: error ? bridgeErrorCode(error) : (reply && reply.code),
-          trace: trace,
-          retryable: false
-        }, event.origin);
-      } catch (err) { sidebarWindow = null; sidebarOrigin = ''; sidebarNonce = ''; }
+  var data = event.data, command = data && BRIDGE_COMMANDS[data.action];
+  if (command) {
+    if (!bridgeGuard(event, data)) { return; }
+    sendRequestToWorker(Object.assign({ type: command.worker }, command.fields(data)), function (error, reply) {
+      bridgePost({ action: command.reply, id: String(data.id || ''), ok: !error && !(reply && reply.ok === false), result: error ? null : reply, code: error ? bridgeErrorCode(error) : (reply && reply.code || ''), error: error ? bridgeErrorMessage(error) : (reply && reply.error || ''), currentSpreadsheetId: String(!error && reply && reply.currentSpreadsheetId || '') }, 'BRIDGE_REPLY_POST_FAILED');
     });
     return;
   }
@@ -214,18 +196,7 @@ function bridgeOnMessage(event) {
   if (Number(data.channelAliveMs) > 0) { channelAliveMs = Number(data.channelAliveMs); }
   if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 
-  try {
-    event.source.postMessage({
-      action: 'CRM_HANDSHAKE_ACK',
-      nonce: sidebarNonce,
-      sessionId: extensionSessionId,
-      at: Date.now()
-    }, event.origin);
-  } catch (err) {
-    sidebarWindow = null;
-    sidebarOrigin = '';
-    sidebarNonce = '';
-  }
+  bridgePost({ action: 'CRM_HANDSHAKE_ACK', at: Date.now() }, 'BRIDGE_HANDSHAKE_POST_FAILED');
 }
 window.addEventListener('message', bridgeOnMessage);
 
@@ -240,7 +211,7 @@ function bridgeOnBindEvent(event) {
   if (!data || data.source !== 'SHINCRM_EXTENSION' || data.action !== 'CRM_BIND_EVENT') { return; }
   if (!bridgeContextAlive()) { bridgeRetire(); return; }
   if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) { return; }
-  var message = { nonce: sidebarNonce, sessionId: extensionSessionId };
+  var message = {};
   if (data.kind === 'alive') {
     var now = Date.now();
     if (channelAliveMs > 0 && now - channelAliveSentAt < channelAliveMs) { return; }
@@ -252,13 +223,7 @@ function bridgeOnBindEvent(event) {
     if (data.kind === 'open') { message.sameSession = data.sameSession === true; }
     else { message.firstChunk = data.firstChunk === true; message.hasChange = data.hasChange === true; }
   }
-  try {
-    sidebarWindow.postMessage(message, sidebarOrigin);
-  } catch (err) {
-    sidebarWindow = null;
-    sidebarOrigin = '';
-    sidebarNonce = '';
-  }
+  bridgePost(message, 'BRIDGE_BIND_POST_FAILED');
 }
 window.addEventListener('message', bridgeOnBindEvent);
 
@@ -266,14 +231,5 @@ window.addEventListener('message', bridgeOnBindEvent);
 function sendContextToSidebar(context) {
   if (!bridgeContextAlive()) { bridgeRetire(); return; }
   if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) return;
-  try {
-      context.action = 'CRM_CONTEXT';
-      context.nonce = sidebarNonce;
-      context.sessionId = extensionSessionId;
-      sidebarWindow.postMessage(context, sidebarOrigin);
-  } catch (err) {
-      sidebarWindow = null;
-      sidebarOrigin = '';
-      sidebarNonce = '';
-  }
+  bridgePost(Object.assign({}, context, { action: 'CRM_CONTEXT' }), 'BRIDGE_CONTEXT_POST_FAILED');
 }

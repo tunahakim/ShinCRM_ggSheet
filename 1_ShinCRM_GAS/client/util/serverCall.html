@@ -13,7 +13,7 @@
  * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
  * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
  *
- * Hạn chờ mặc định `CALL_SERVER_TIMEOUT_MS`; bên gọi đã tự sở hữu hạn chờ và chẩn đoán riêng (như `fbmContinueSync`) truyền `{ timeoutMs: 0 }` để tắt hạn ở đây, nếu không hạn ngắn hơn ở đây sẽ cắt trước và biến một bước GAS chậm nhưng vẫn đang chạy thành lỗi thường.
+ * Hạn chờ mặc định `CALL_SERVER_TIMEOUT_MS`; bên gọi đã tự sở hữu hạn chờ và chẩn đoán riêng truyền `{ timeoutMs: 0 }` để tắt hạn ở đây, nếu không hạn ngắn hơn ở đây sẽ cắt trước và biến một bước GAS chậm nhưng vẫn đang chạy thành lỗi thường.
  *
  * Phép đo thời gian mỗi vòng cũng nằm ở đây, và cũng vì lý do "một cửa duy nhất": đây là chỗ duy nhất thấy được **cả hai
  * đầu** của một vòng gọi, nên là chỗ duy nhất đo được tiền đi đường. Việc giữ và cộng các con số thuộc `callTiming`.

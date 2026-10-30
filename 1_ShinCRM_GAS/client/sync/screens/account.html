@@ -13,7 +13,8 @@ function fbmSyncLoginActionBlocks() {
   if (editing) {
     actions.push(fbmSyncConfigButton('connection', { edit: FBM_SYNC_ACCOUNT_SCHEMA.login.edit, save: FBM_SYNC_ACCOUNT_SCHEMA.login.save }, { id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.save, disabled: active }));
   }
-  return [FBM_SYNC_ACCOUNT_UI.layout.actionStack(actions)];
+  // FBM vừa từ chối vì phiên cũ còn giữ: nút hủy phiên cũ hiện cả ở màn Tài khoản, nơi người dùng vừa bấm Đăng nhập thử.
+  return [FBM_SYNC_ACCOUNT_UI.layout.actionStack(actions)].concat(fbmSyncRunForceLoginBlocks(FBM_SYNC_CLIENT.lastStatus));
 }
 function fbmSyncLoginPolicyNavigationBlocks() {
   return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection') }))];
