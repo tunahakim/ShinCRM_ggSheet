@@ -57,6 +57,18 @@ async function chay(so) {
     blocked.code, blocked.request || null, blockedState.phase, blockedState.lastFailureCode, /Cannot access/.test(blocked.status && blocked.status.lastError || blockedState.lastError), logs.some((line) => JSON.stringify(line).indexOf('FBM_SITE_ACCESS_BLOCKED') >= 0)
   ], ['FBM_SITE_ACCESS_BLOCKED', null, 'error', 'FBM_SITE_ACCESS_BLOCKED', true, true]);
 
+  // Bật tự mở tab FBM mà Extension không thấy tab: GAS cấp lại đúng request một lần kèm lệnh mở tab; không thấy lần nữa thì đóng lượt bằng lỗi.
+  const policy = FbmSync.sessionGatePolicy;
+  FbmSync.sessionGatePolicy = () => Object.assign(policy(), { autoOpenTab: true });
+  const tabRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
+  const tabPick = FbmSync.controlDispatch('continue', { runId: tabRun.runId, machineId: 'may-A' }, 'relay').request;
+  const noTab = (id) => FbmSync.controlDispatch('continue', { machineId: 'may-A', error: { requestId: id, code: 'FBM_TAB_NOT_FOUND', message: 'Không thấy tab FBM.' } }, 'relay');
+  const retry = noTab(tabPick.id);
+  check(so, 'tự mở tab bật, Extension không thấy tab: GAS trả request thử lại cùng bước kèm lệnh mở tab, qua được cửa ra của GAS', [retry.ok, retry.code, retry.request && retry.request.meta.kind, !!(retry.request && retry.request.meta.openFbmContext)], [true, 'FBM_TAB_RETRY_REQUEST_READY', tabPick.meta.kind, true]);
+  const twiceNoTab = noTab(retry.request.id);
+  check(so, 'thử lại vẫn không thấy tab: không thử lần nữa, lượt về lỗi FBM_TAB_NOT_FOUND', [twiceNoTab.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_FOUND']);
+  FbmSync.sessionGatePolicy = policy;
+
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
   check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);
   check(so, 'payload không tự xưng được là relay: kênh do lối vào đặt', (() => { let seen = ''; const spec = FbmSync.COMMANDS.status, real = spec.run; spec.run = (input) => { seen = input.source; return { ok: true }; }; FbmSync.controlDispatch('status', { source: 'relay' }); spec.run = real; return seen; })(), 'sidebar');
