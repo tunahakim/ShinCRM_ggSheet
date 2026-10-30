@@ -417,7 +417,7 @@ Biểu mẫu **không** có thư mục riêng: bộ máy dựng form là `client
 
 The client UI uses `client/ui/popupList.html` as the shared popup primitive. `client/ui/listPicker.html` is the single behavior controller for suggestion lists (open on focus, select-on-open, arrows/Enter/Tab/Esc, hide on blur or on pick); `search.html` and `combo.html` only declare their row source and pick action, and `customerPicker.html` supplies the customer rows.
 
-`Checklist tái cấu trúc cầu nối GAS-FBM.md` ghi tiến độ chuyển toàn bộ quyết định FBM về GAS và giữ Extension ở vai trò transport bridge.
+Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết định FBM ở GAS: xem `Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/2. Thiết kế đích.md`.
 
 ## 2_ShinCRM_Extension
 

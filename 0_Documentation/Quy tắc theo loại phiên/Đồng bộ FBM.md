@@ -5,7 +5,7 @@ Chỉ đọc tệp này khi phiên có chạm luồng đồng bộ FBM (code GAS
 ## Đọc tài liệu
 
 - Đọc `0_Documentation/00. Tài liệu chính thức/09. Đồng bộ FBM/00. Mục lục và phạm vi.md`, các chuyên đề 09 liên quan trực tiếp, checklist của phiên và `0_Documentation/Phiên code/Câu hỏi đêm.md`; không đọc toàn bộ 09 khi việc không cần. Sau khi ngữ cảnh bị nén thì đọc lại đúng các tài liệu thuộc phạm vi đang làm.
-- Các tệp quá nặng chỉ tìm đúng mục cần, cấm đọc cả tệp: `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md` (lưu trữ, chỉ tìm đúng mã G hoặc FBM-xxx), `Checklist rà soát đồng bộ FBM trước vận hành thật.md` (ma trận luồng F/E), `Audit pipeline đồng bộ FBM.md` (hồ sơ lưu trữ).
+- Hồ sơ FBM cũ nằm ở `Phiên code/Lưu trữ chờ dọn/`, chỉ tìm đúng mục cần (mã G hoặc FBM-xxx), cấm đọc cả tệp: `2026.10.06 Kế hoạch sửa lỗi FBM sau audit.md`, `Checklist rà soát đồng bộ FBM trước vận hành thật.md` (ma trận luồng F/E), `Audit pipeline đồng bộ FBM.md`.
 
 ## Lỗi và dữ liệu nhạy cảm
 
