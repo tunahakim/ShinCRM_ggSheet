@@ -495,6 +495,8 @@ FbmSync.nextEnvelope = function (request) {
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
   if (FbmSync.stateWrite) {
     state.activeRequestId = id;
+    state.activeRequestSig = FbmSync.requestSig(request);
+    if (state.resubmit && state.resubmit.answered && state.resubmit.answered === FbmSync.requestWatch.lastAnswered) { state.resubmit.issued = id; }
     if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
     state.lastProgressAt = Date.now();
     state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
@@ -516,19 +518,33 @@ FbmSync.envelopeHold = function (request) {
     fail('PICKUP_CURSOR_MISMATCH', 'Request mở lượt (bước ' + String(request.meta && request.meta.kind || '') + ') không dựng lại được từ cursor ' + String(state.cursor && state.cursor.kind || 'trống') + '.');
   }
   state.activeRequestId = FbmSync.PICKUP_PREFIX + state.runId;
+  state.activeRequestSig = FbmSync.requestSig(request);
   state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now());
   state.driverMachineId = machineId;
   FbmSync.stateWrite(state);
   return { pickup: true, runId: String(state.runId) };
 };
-/** Extension nhận lượt Sidebar vừa mở: bỏ chỗ giữ rồi phát request đầu dựng từ cursor. Lần nhận sai lượt, sai máy hay nhận lần hai đã bị `continueGuard` chặn trước. */
-FbmSync.envelopePickup = function () {
-  var state = FbmSync.stateRead(), held = FbmSync.PICKUP_PREFIX + String(state.runId || '');
+/** Dấu của request đang chờ (bước và URL) để lần phát lại từ cursor so được với thứ đã phát; không chứa thân request. */
+FbmSync.requestSig = function (request) { return String(request && request.meta && request.meta.kind || '') + ' ' + String(request && request.url || ''); };
+/**
+ * Phát lại request đang chờ bằng cách dựng lại từ cursor, dùng cho hai việc: Extension nhận lượt Sidebar vừa mở (chỗ giữ `pickup:`) và Extension nộp lặp kết quả GAS đã xử lý (`answeredId`).
+ * Request dựng lại phải trùng dấu request đang chờ; lệch là lỗi lập trình nên ném ngay chứ không để Extension chạy nhầm bước. Nộp lặp giữ `resubmit.answered` để lần nộp lặp sau nữa vẫn được nhận ra.
+ */
+FbmSync.envelopeReissue = function (state, answeredId) {
+  var held = String(state.activeRequestId || ''), request = FbmSync.requestForCursor(state), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
+  if (!request) { fail('REISSUE_CURSOR_EMPTY', 'Không dựng lại được request đang chờ vì cursor ' + String(state.cursor && state.cursor.kind || 'trống') + ' không có request.'); }
+  if (state.activeRequestSig && FbmSync.requestSig(request) !== String(state.activeRequestSig)) { fail('REISSUE_CURSOR_MISMATCH', 'Request dựng lại từ cursor (' + FbmSync.requestSig(request) + ') khác request đang chờ (' + String(state.activeRequestSig) + ').'); }
   FbmSync.requestAnswered(state, held);
+  if (answeredId) { state.resubmit = { answered: String(answeredId), issued: '' }; FbmSync.requestWatch.lastAnswered = String(answeredId); }
   state.activeRequestId = '';
   state.deadlineAt = 0;
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.requestForCursor(state)), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
+};
+/** Nộp lặp: lượt còn request đang chờ thì phát lại nó, lượt đã đóng thì trả status để Extension kết thúc chuỗi. Không chạy lại nghiệp vụ của lần nộp đầu. */
+FbmSync.envelopeResubmit = function (state) {
+  if (!state.activeRequestId) { return { ok: true, request: null, status: FbmSync.statusView() }; }
+  return FbmSync.envelopeReissue(state, state.resubmit.answered);
 };
 /** Lấy requestId từ trace transport mà GAS đã yêu cầu Extension giữ lại. */
 FbmSync.responseRequestId = function (rawResponse) {

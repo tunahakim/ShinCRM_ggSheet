@@ -12,7 +12,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.COMMANDS = {
   start: { lock: true, drives: true, run: function (input) { return FbmSync.commandStart(input); } },
-  continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input) { return FbmSync.commandContinue(input); } },
+  continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input, state) { return FbmSync.commandContinue(input, state); } },
   heartbeat: { lock: true, relay: true, run: function (input) { return fbmSyncHeartbeatRequest(input); } },
   cancel: { lock: true, run: function () { return fbmSyncCancel(); } },
   stop_background: { lock: true, run: function () { return FbmSync.stopBackground(); } },
@@ -61,9 +61,9 @@ FbmSync.controlDispatch = function (command, payload, channel) {
   var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' ? 'relay' : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;
   if (spec.drives && !String(input.machineId || '')) { return FbmSync.publicResult({ ok: false, code: 'SYNC_MACHINE_ID_REQUIRED', message: 'Sidebar chưa lấy được mã máy của Extension nên chưa mở lượt được; tải lại Sidebar rồi thử lại.' }); }
   var body = function () {
-    var refused = spec.guard ? spec.guard(input, FbmSync.stateRead()) : null;
+    var state = spec.guard ? FbmSync.stateRead() : null, refused = spec.guard ? spec.guard(input, state) : null;
     if (refused) { return refused; }
-    return spec.slice ? FbmSync.runSlice(function () { return spec.run(input); }) : spec.run(input);
+    return spec.slice ? FbmSync.runSlice(function () { return spec.run(input, state); }) : spec.run(input, state);
   };
   var run = function () {
     FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };
@@ -179,9 +179,10 @@ FbmSync.commandStart = function (input) {
  * Nộp kết quả của request đang chờ (`response`) hoặc lỗi không gửi được request (`error` kèm `requestId`). Lượt đọc lại xung đột và lượt nền đi chung cửa này; `FbmSync.continue` theo cursor chọn bộ xử lý.
  * Relay chỉ nộp khi công tắc tổng còn bật: tắt giữa chừng thì không xử lý tiếp, lượt tự đóng khi quá hạn.
  */
-FbmSync.commandContinue = function (input) {
+FbmSync.commandContinue = function (input, state) {
   FbmSync.traceImport(input.clientTrace);
-  if (!input.response && !input.error) { return FbmSync.envelopePickup(); }
+  if (!input.response && !input.error) { return FbmSync.envelopeReissue(state, ''); }
+  if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return fbmSyncHeartbeatTransportFailure(input.error); }
   if (input.source === 'relay' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
   // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật. Xét theo lượt chứ không theo kênh: lượt tay cũng nộp qua relay.

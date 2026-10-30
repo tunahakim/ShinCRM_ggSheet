@@ -209,7 +209,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
+  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -359,18 +359,31 @@ FbmSync.stateWrite = function (state) {
  * Chỉ nhớ trong RAM của lần gọi: request đang chờ theo lần đọc/ghi gần nhất, các request đã được trả lời (kể cả trả lời muộn) và hộp đen Extension gửi kèm lần hỏi nền. Không tốn thêm lần đọc kho.
  * Bỏ request khi còn trong hạn (dừng, cổng phiên chặn) là GAS chủ động, không ghi ở đây.
  */
-FbmSync.requestWatch = { open: null, answered: {}, trail: undefined };
+FbmSync.requestWatch = { open: null, answered: {}, lastAnswered: '', trail: undefined };
 FbmSync.requestWatchNote = function (state) {
   // Bước và lượt lấy lúc request mới xuất hiện: về sau GAS có thể đổi cursor (chọn tiến trình, đóng lượt) khi request cũ vẫn nằm đó.
   var id = String(state && state.activeRequestId || ''), seen = FbmSync.requestWatch.open && FbmSync.requestWatch.open.id === id ? FbmSync.requestWatch.open : null;
   FbmSync.requestWatch.open = id ? { id: id, deadlineAt: Number(state.deadlineAt || 0), kind: seen ? seen.kind : String(state.cursor && state.cursor.kind || ''), runId: seen ? seen.runId : String(state.runId || '') } : null;
 };
-/** Cổng duy nhất nhận ra response thuộc request đang chờ; đánh dấu đã trả lời để luật request quá hạn không báo nhầm trả lời muộn. */
+/**
+ * Cổng duy nhất nhận ra response thuộc request đang chờ; đánh dấu đã trả lời để luật request quá hạn không báo nhầm trả lời muộn.
+ * Ghi `resubmit.answered` để nhận ra lần nộp lặp của chính request này (relay thử lại khi lần đầu GAS đã xử lý nhưng câu trả lời không về tới Extension). Nơi gọi luôn ghi state ngay sau đó vì còn phải bỏ request đang chờ.
+ */
 FbmSync.requestAnswered = function (state, responseRequestId) {
   var id = String(state && state.activeRequestId || '');
   if (!id || !responseRequestId || String(responseRequestId) !== id) { return false; }
   FbmSync.requestWatch.answered[id] = true;
+  FbmSync.requestWatch.lastAnswered = id;
+  state.resubmit = { answered: id, issued: '' };
   return true;
+};
+/**
+ * Lần nộp (kết quả hoặc lỗi) mang mã request vừa được trả lời, trong khi request đang chờ đúng là request GAS cấp ngay sau câu trả lời đó (hoặc lượt đã đóng, không cấp gì): đây là nộp lặp, không phải response cũ.
+ * Điều kiện `issued` chặn response thật sự cũ của lượt trước: request đang chờ đã khác thứ cấp sau câu trả lời thì không coi là nộp lặp.
+ */
+FbmSync.submitResubmitted = function (state, requestId) {
+  var mark = state && state.resubmit || {};
+  return !!requestId && !!mark.answered && String(requestId) === String(mark.answered) && String(state.activeRequestId || '') === String(mark.issued || '');
 };
 /** Hộp đen Extension gửi kèm lần hỏi nền; chỉ lần gọi đến từ Extension mới có, nên dòng Log của lượt Sidebar không nhắc hộp đen. */
 FbmSync.requestWatchTrail = function (trail) { FbmSync.requestWatch.trail = trail || null; };
