@@ -97,7 +97,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
 │   │   ├── SelectionService.js   Cổng một request khi không có Extension: probeSelectionAndReload trả selection, mã khách khi vị trí đổi và quyết định reload trong cùng response. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
-│   │   ├── FbmSyncService.js     Entry points ổn định cho Sidebar đồng bộ FBM.
+│   │   ├── FbmSyncService.js     Hàm Sidebar gọi của đồng bộ FBM, mỗi hàm là adapter một dòng vào `FbmSync.controlDispatch`; khai ranh giới ghi vết và mục cài đặt của FBM vào bảng khai mở của lõi.
 │   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
@@ -138,7 +138,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
 │       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
-│       ├── TransportProbe.js     Đo trần đường truyền gói lớn của việc quét bằng gói đệm (đường Sidebar và đường relay nền), ghi cỡ và thời gian vào Log; không chạm FBM. Cặp với client/dev/transportProbe.html; EntryPoints.js chỉ gọi nếu hàm còn tồn tại.
 │       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
 │
@@ -157,8 +156,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── fbmSyncStatusScreen.html Block trạng thái và tiến trình riêng của phiên.
 │   │   ├── fbmSyncSettingsScreen.html Block nhận diện tài khoản được màn Tài khoản FBM tái sử dụng; không còn checkbox ghi.
 │   │   └── fbmSyncAuditScreen.html Block preview, audit và chi tiết lỗi/xung đột.
-│   ├── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cùng server/dev/ và gỡ dòng include tương ứng trong Sidebar.html.
-│   │   └── transportProbe.html    Lệnh đo trần đường truyền gói lớn, kích từ Console tab Google Sheet; cặp với server/dev/TransportProbe.js.
 │   ├── link\                     Cầu nối ô đang chọn: ưu tiên postMessage an toàn từ Extension, khi vắng mới mở đường dò máy chủ có nhịp và luật dừng.
 │   │   ├── sheetLink.html        Tai nghe CRM_CONTEXT thô từ Extension: đối chiếu reads với Store rồi bật followSelection. Bắt tay có tiếng đáp, đèn sống chết suy từ ACK chứ không suy từ im lặng.
 │   │   ├── selectionPoll.html    Máy trạng thái dự phòng khi vắng Extension: nhịp dò 2/6 giây, bốn luật dừng, đèn sét bốn trạng thái và băng cảnh báo sau ba giây ân hạn.
@@ -247,8 +244,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\CustomerCount.js Bước đếm khách cuối lượt và thân Giữ phiên: số khách mốc, request đếm cùng bộ lọc với lượt lấy danh sách, lệch mốc thì chạy Quét nhanh.
     ├── transport\ActivityScan.js Lấy toàn bộ giao dịch bằng việc quét giữ id đã biết: chia khoảng ngày khi quá lớn, đọc lại theo id trước khi gắn cờ "không thấy".
     ├── transport\ActivityBatch.js Lô giao dịch nhiều khách một lần gọi GAS: kế hoạch lô trong cursor, vị trí trang ở khóa riêng, lỗi từng khách.
-    ├── transport\EntryPoints.js Entry point cho Sidebar, DEV runner và Web App relay.
-    ├── control\ControlPort.js  Cổng lệnh trung lập và DTO thông báo; adapter kênh không chứa nghiệp vụ.
+    ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
+    ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
