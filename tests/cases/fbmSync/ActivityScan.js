@@ -38,7 +38,7 @@ function executorWith(fetchImpl) {
     console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined, Uint8Array,
     document: { documentElement: { innerHTML: '<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script><script>var menu={"username":"Le Tuan Anh"};</script>', textContent: '' } },
     fetch: fetchImpl,
-    chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(EXECUTOR, 'utf8'), context, { filename: EXECUTOR });

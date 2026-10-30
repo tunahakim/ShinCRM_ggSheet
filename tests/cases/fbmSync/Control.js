@@ -14,7 +14,7 @@ async function chay(so) {
 
   check(so, 'lệnh không có trong bảng thì từ chối với COMMAND_UNKNOWN, không có nhánh mặc định', [loi(() => FbmSync.controlDispatch('get_master_switch', {})), loi(() => FbmSync.controlDispatch('transport_failure', {})), loi(() => FbmSync.controlDispatch('', {}))], ['COMMAND_UNKNOWN', 'COMMAND_UNKNOWN', 'COMMAND_UNKNOWN']);
   check(so, 'relay chỉ được gọi heartbeat và continue', Object.keys(FbmSync.COMMANDS).filter((name) => FbmSync.relayCommandAllowed(name)).sort(), ['continue', 'heartbeat']);
-  check(so, 'loại lượt lạ của lệnh start thì từ chối', loi(() => FbmSync.controlDispatch('start', { kind: 'bulk' })), 'SYNC_START_KIND_UNKNOWN');
+  check(so, 'loại lượt lạ của lệnh start thì từ chối', loi(() => FbmSync.controlDispatch('start', { kind: 'bulk', machineId: 'may-A' })), 'SYNC_START_KIND_UNKNOWN');
   check(so, 'mục cài đặt lạ thì từ chối', loi(() => FbmSync.controlDispatch('save_settings', { section: 'all', value: {} })), 'SETTINGS_SECTION_UNKNOWN');
 
   // Cổng relay: khóa đúng nhưng lệnh ngoài danh sách, mã giao thức lệch hoặc Sheet khác thì ném lỗi có mã trước khi chạm state.
@@ -31,14 +31,14 @@ async function chay(so) {
   FbmSync.stateWrite(running);
   FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
   const busyState = JSON.stringify(FbmSync.stateRead());
-  const loginBusy = FbmSync.controlDispatch('start', { kind: 'login_test' });
+  const loginBusy = FbmSync.controlDispatch('start', { kind: 'login_test', machineId: 'may-A' });
   check(so, 'Đăng nhập thử khi lượt khác đang chạy thì trả SYNC_BUSY, không cấp request và không đổi ô lượt', [loginBusy.code, loginBusy.request || null, JSON.stringify(FbmSync.stateRead()) === busyState], ['SYNC_BUSY', null, true]);
 
   // Khóa đang bị lượt khác giữ: lệnh ghi không chạy, lệnh nộp kết quả bị bỏ thì phải ghi Log.
   const logs = [];
   hop.logEvent = (line) => { logs.push(line); };
   scriptLock.held = true;
-  const locked = FbmSync.controlDispatch('continue', { response: { ok: true, status: 200, body: '{}' } });
+  const locked = FbmSync.controlDispatch('continue', { machineId: 'may-A', response: { ok: true, status: 200, body: '{}' } }, 'relay');
   scriptLock.held = false;
   check(so, 'khóa bận thì lệnh continue không chạy và bỏ kết quả có dòng Log', [locked.code, logs.some((line) => line.action === 'busy_reply_dropped')], ['BUSY', true]);
 

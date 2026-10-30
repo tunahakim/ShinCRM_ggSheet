@@ -1,6 +1,9 @@
 /** Điều phối các nhóm kiểm tra FBM; mỗi file con chỉ giữ một trách nhiệm. */
 const NHOM = [
   require("./fbmSync/Control"),
+  require("./fbmSync/RunPickup"),
+  require("./fbmSync/RelayLoop"),
+  require("./fbmSync/SidebarDrive"),
   require("./fbmSync/Protocol"),
   require("./fbmSync/Contract"),
   require("./fbmSync/Builders"),

@@ -144,6 +144,7 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 18,
+    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 1,
@@ -162,13 +163,11 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 47,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 32,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 36,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 2,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {
-    '2_ShinCRM_Extension/background/service_worker.js': 4,
-    '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js': 4,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
   },
   typeofFunction: {
@@ -208,7 +207,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 1,
     '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js': 2,
     '2_ShinCRM_Extension/background/service_worker.js': 11,
-    '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js': 1,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
   },
   phaseList: {
@@ -262,7 +260,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 5,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,

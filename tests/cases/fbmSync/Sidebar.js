@@ -13,6 +13,8 @@ function taoBoTest() {
   const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, confirm: () => true, addEventListener: () => {} } });
   // Hằng của sheetLink.html, bộ test fbmSync không nạp tệp đó.
   hop.SHEET_LINK_ORIGIN = 'https://docs.google.com';
+  // Dòng thông báo của notices.html; bộ test không nạp tệp đó, test cần xem thông báo thì tự thay hàm này.
+  hop.noticeSet = () => {};
   hop.FBM_SYNC_CLIENT = {
     active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
@@ -57,8 +59,6 @@ function taoBoTest() {
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/ui/popupList.html', 'client/ui/recordDecision.html', 'client/sync/fbmSync.html');
   hop.FBM_SYNC_CLIENT.active = true;
-  // Giữ bản thật của hai cửa chờ vì nhiều test bên dưới thay chúng bằng hàm giả.
-  hop.banThat = { extensionRequest: hop.fbmSyncExtensionRequest, continueServer: hop.fbmSyncContinueServer };
   return { hop, dom, screen: dom.root, content };
 }
 
@@ -163,9 +163,14 @@ async function testOwnRunId(so) {
   // Chỉ phiên Sidebar tự khởi chạy mới được báo kèm mã phiên; lượt mới bắt đầu thì quên mã cũ để lỗi trước khi GAS cấp mã không dừng nhầm phiên nền.
   const { hop } = taoBoTest();
   const runIdCalls = [];
-  hop.callServer = (name, args) => { runIdCalls.push({ name, args }); return Promise.resolve({}); };
+  hop.setTimeout = setTimeout; hop.clearTimeout = clearTimeout;
+  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
+  hop.callServer = (name, args) => { runIdCalls.push({ name, args }); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: true, runId: 'run-7', relayRetryMs: [5000], status: { runId: 'run-7', phase: 'running', running: true } } : {}); };
   hop.fbmSyncSetRunning(true);
-  await hop.fbmSyncLoop({ ok: true, runId: 'run-7', phase: 'done' });
+  const luot = hop.fbmSyncDrive('start', { kind: 'pull' }, 'đồng bộ');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  hop.fbmSyncStatusReceived({ status: { runId: 'run-7', phase: 'done' }, done: true });
+  await luot;
   const maSoHuu = hop.FBM_SYNC_CLIENT.ownRunId;
   await hop.fbmSyncLogClientError(new Error('Extension không trả response'), '', 'sync_run', hop.FBM_SYNC_CLIENT.ownRunId);
   await hop.fbmSyncLogClientError(new Error('Lỗi lưu cài đặt'), '', 'connection_save');
@@ -545,11 +550,12 @@ async function chay(so) {
   };
   check(so, 'Mức quét hiện ở Lấy và Hai chiều với dòng mô tả đúng gói đang chọn, ẩn ở Đẩy và Kiểm tra an toàn', [packView('read', 'quick'), packView('write', 'deep'), packView('read', 'all'), packView('push', 'deep')[0], packView('check', 'deep')[0]], [[true, true], [true, true], [true, true], false, false]);
   check(so, 'Mức quét có đúng ba gói theo thứ tự, mặc định Quét nhanh', [packSchema.options.map((option) => option.label), hop.fbmSyncRunPack('read').length > 0, packSchema.defaultValue], [['Quét nhanh', 'Quét kỹ', 'Quét toàn bộ'], true, 'quick']);
-  const packStarts = [], packCallServer = hop.callServer;
-  hop.callServer = (name, args) => { if (name === 'fbmStartSync') { packStarts.push([args[0], args[2]]); } return Promise.resolve({ ok: true }); };
+  const packStarts = [], packDrive = hop.fbmSyncDrive, packPaint = hop.fbmSyncPaint;
+  hop.fbmSyncDrive = (command, payload) => { packStarts.push([payload.mode, payload.pack]); return Promise.resolve({ ok: true, status: { phase: 'done', counts: {} } }); };
+  hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.pack = 'deep';
-  await hop.fbmSyncStartServer('write', 0); await hop.fbmSyncStartServer('push', 0);
-  hop.callServer = packCallServer; hop.FBM_SYNC_CLIENT.mode = 'read'; hop.FBM_SYNC_CLIENT.pack = 'quick';
+  await hop.fbmSyncRunStart('write'); await hop.fbmSyncRunStart('push');
+  hop.fbmSyncDrive = packDrive; hop.fbmSyncPaint = packPaint; hop.FBM_SYNC_CLIENT.mode = 'read'; hop.FBM_SYNC_CLIENT.pack = 'quick';
   check(so, 'Bắt đầu đồng bộ gửi Mức quét đã chọn cho Hai chiều, gửi rỗng cho Đẩy', packStarts, [['write', 'deep'], ['push', '']]);
   dom.document.getElementById('fbm-sync-setting-request-gap-min').value = '1';
   dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
@@ -580,12 +586,11 @@ async function chay(so) {
   hop.fbmSyncPaint = (status) => paints.push(status);
   hop.FBM_SYNC_CLIENT.lastStatus = { phase: 'idle', counts: {} };
   hop.callServer = () => Promise.reject(new Error('GAS_TEST_FAILURE'));
-  const cancelPosts = [];
-  hop.SHEET_LINK_NONCE = 'nonce-dung'; hop.FBM_SYNC_RELAY_SESSION = 'phien-dung';
-  hop.window.top = { postMessage: (message, origin) => cancelPosts.push({ message, origin }) };
+  const cancelRpc = [], realRpc = hop.fbmSyncExtensionRpc;
+  hop.fbmSyncExtensionRpc = (action, fields, purpose) => { cancelRpc.push([action, fields, purpose]); return Promise.resolve({}); };
   await hop.fbmSyncCancel();
-  hop.window.top = { postMessage() {} };
-  check(so, 'Bấm Dừng báo ngay Extension dừng lô đang chạy, đúng phiên Extension và chỉ gửi cho trang Sheet', cancelPosts.map((item) => [item.message.action, item.message.nonce, item.message.sessionId, item.origin]), [['CRM_FBM_CANCEL', 'nonce-dung', 'phien-dung', 'https://docs.google.com']]);
+  hop.fbmSyncExtensionRpc = realRpc;
+  check(so, 'Bấm Dừng báo ngay Extension dừng lô đang chạy qua cổng RPC duy nhất của Sidebar (nonce và phiên Extension do cổng đó gắn)', cancelRpc.map((item) => [item[0], item[1]]), [['CRM_FBM_CANCEL', {}]]);
   hop.fbmSyncRetryPushFailures().catch(() => {});
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Cancel thất bại vẫn hiện lỗi trên UI', paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0), true);
@@ -597,11 +602,11 @@ async function chay(so) {
   hop.callServer = (name) => name === 'fbmCancelSync' ? Promise.resolve({ ok: true, code: 'SYNC_CANCEL_PENDING', status: { running: true, phase: 'pull_customer', message: 'Đang chờ response để dừng.' } }) : Promise.resolve({});
   await hop.fbmSyncCancel();
   check(so, 'Cancel khi request đang bay giữ relay đến response cuối thay vì bỏ dở state', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, true]);
-  hop.fbmSyncExtensionRequest = () => Promise.resolve({});
-  hop.fbmSyncContinueServer = () => Promise.resolve({ ok: true, request: null, status: { phase: 'paused' } });
-  const stopPaints = [];
+  const stopPaints = [], stopDrive = hop.fbmSyncDrive;
   hop.fbmSyncPaint = (status) => { stopPaints.push({ phase: status && (status.status || status).phase, cancelling: hop.FBM_SYNC_CLIENT.cancelRequested }); };
-  await hop.fbmSyncLoop({ request: { meta: { entity: 'customer' } } });
+  hop.fbmSyncDrive = () => { hop.FBM_SYNC_CLIENT.cancelRequested = true; return Promise.resolve({ ok: true, status: { phase: 'paused', counts: {} } }); };
+  await hop.fbmSyncRunStart('read');
+  hop.fbmSyncDrive = stopDrive;
   const lastStopPaint = stopPaints[stopPaints.length - 1] || {};
   check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
   check(so, 'Dừng xong thì lần vẽ cuối đã hạ cờ đang dừng, nút không kẹt ở "Đang dừng…" chờ lần hỏi trạng thái sau', [lastStopPaint.phase, lastStopPaint.cancelling], ['paused', false]);
@@ -627,53 +632,35 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', forceLoginOffered: true, message: 'FBM từ chối đăng nhập', counts: {} });
   const forceShown = coNutHuyPhien(content);
   render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', message: 'FBM từ chối đăng nhập', counts: {} });
-  const forceCalls = [];
+  const forceCalls = [], rpcForce = hop.fbmSyncExtensionRpc;
+  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
   hop.callServer = (name) => { forceCalls.push(name); return Promise.resolve({ ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'không mở' }); };
   hop.uiDecisionOpen = () => Promise.resolve(false);
   await hop.fbmSyncForceLogin();
   hop.uiDecisionOpen = () => Promise.resolve(true);
   await hop.fbmSyncForceLogin();
-  check(so, 'FBM-057: nút "Hủy phiên cũ và đăng nhập" chỉ hiện khi GAS mở; bấm Quay lại không gọi GAS, xác nhận mới gọi fbmStartForceLogin; GAS từ chối thì lỗi được ghi Log', [forceShown, coNutHuyPhien(content), forceCalls], [true, false, ['fbmStartForceLogin', 'fbmLogSyncError']]);
-  const forceRuns = [], realRun = hop.fbmSyncRun, realLoop = hop.fbmSyncLoginTestLoop;
-  hop.callServer = () => Promise.resolve({ ok: true, request: { id: 'login-1' }, status: { running: true, phase: 'checking_session' } });
-  hop.fbmSyncLoginTestLoop = () => Promise.resolve({ ok: true, code: 'LOGIN_OK', status: { phase: 'done', message: 'Đã hủy phiên cũ' } });
+  hop.fbmSyncExtensionRpc = rpcForce;
+  check(so, 'FBM-057: nút "Hủy phiên cũ và đăng nhập" chỉ hiện khi GAS mở; bấm Quay lại không gọi GAS, xác nhận mới gọi fbmDriveCommand; GAS từ chối thì lỗi được ghi Log', [forceShown, coNutHuyPhien(content), forceCalls], [true, false, ['fbmDriveCommand', 'fbmLogSyncError']]);
+  const forceRuns = [], forceDrives = [], realRun = hop.fbmSyncRun, realDrive = hop.fbmSyncDrive;
+  hop.fbmSyncDrive = (command, payload) => { forceDrives.push([command, payload.kind]); return Promise.resolve({ ok: true, code: 'LOGIN_OK', status: { phase: 'done', message: 'Đã hủy phiên cũ' } }); };
   hop.fbmSyncRun = (mode) => { forceRuns.push(mode); return Promise.resolve(null); };
   hop.FBM_SYNC_CLIENT.mode = 'read';
   await hop.fbmSyncForceLogin();
-  hop.fbmSyncRun = realRun; hop.fbmSyncLoginTestLoop = realLoop;
-  check(so, 'FBM-057: hủy phiên cũ và đăng nhập xong thì tự chạy lại đúng loại đồng bộ đang chọn', forceRuns, ['read']);
-  const waitingPaints = [];
-  hop.fbmSyncPaint = (status) => waitingPaints.push(status);
-  hop.FBM_SYNC_CLIENT.running = true;
-  await hop.fbmSyncLoop({ ok: true, request: { meta: { kind: 'activity_edit_open', id: '174813' } }, status: { running: true, phase: 'push', entityLabel: 'Giao dịch' } });
-  check(so, 'FBM-006: request Activity không mang meta.entity vẫn hiện "Đang chờ tab FBM trả dữ liệu giao dịch...", lấy nhãn từ GAS',
-    waitingPaints.map((item) => item.message).filter((message) => /Đang chờ tab FBM/.test(message)), ['Đang chờ tab FBM trả dữ liệu giao dịch...']);
-  hop.fbmSyncPaint = () => {};
-  // FBM-017: callback lỗi giữa phiên vẽ lỗi lên snapshot GAS gần nhất, không dựng bộ đếm 0 và không làm mất pipeline.
-  const errorPaints = [], savedExtensionRequest = hop.fbmSyncExtensionRequest, savedCallServer = hop.callServer;
+  hop.fbmSyncRun = realRun; hop.fbmSyncDrive = realDrive;
+  check(so, 'FBM-057: hủy phiên cũ và đăng nhập xong thì tự chạy lại đúng loại đồng bộ đang chọn', [forceDrives, forceRuns], [[['start', 'login_force']], ['read']]);
+  // FBM-017: lỗi giữa phiên vẽ lỗi lên snapshot GAS gần nhất, không dựng bộ đếm 0 và không làm mất pipeline.
+  const errorPaints = [], savedCallServer = hop.callServer, savedDrive = hop.fbmSyncDrive;
   hop.fbmSyncPaint = (status) => { const snapshot = status.status || status; hop.FBM_SYNC_CLIENT.lastStatus = snapshot; errorPaints.push(snapshot); };
-  hop.fbmSyncExtensionRequest = () => Promise.reject(new Error('Mất kết nối tới GAS'));
   const gasSnapshot = { runId: 'run-017', running: true, phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
-  hop.callServer = (name) => name === 'fbmApprovePush' ? Promise.resolve({ ok: true, request: { meta: { kind: 'customer_edit_open' } }, status: gasSnapshot }) : Promise.resolve(null);
+  hop.FBM_SYNC_CLIENT.lastStatus = gasSnapshot;
+  hop.fbmSyncDrive = () => Promise.reject(new Error('Mất kết nối tới GAS'));
+  hop.callServer = () => Promise.resolve({});
   await hop.fbmSyncApprovePush();
   const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
-  check(so, 'FBM-017: callback lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
+  check(so, 'FBM-017: lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
     [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],
     ['error', 'Mất kết nối tới GAS', 'run-017', gasSnapshot.counts, 1]);
-  hop.fbmSyncExtensionRequest = savedExtensionRequest; hop.callServer = savedCallServer;
-  const hanCho = [], savedSetTimeout = hop.setTimeout, savedRunning = hop.FBM_SYNC_CLIENT.running;
-  hop.setTimeout = (fn, ms) => { hanCho.push(ms); return 0; };
-  hop.callServer = () => new Promise(() => {});
-  hop.FBM_SYNC_CLIENT.running = true;
-  const savedTop = hop.window.top;
-  hop.window.top = { postMessage: () => {} };
-  hop.SHEET_LINK_NONCE = hop.SHEET_LINK_NONCE || 'nonce-test'; hop.FBM_SYNC_RELAY_SESSION = hop.FBM_SYNC_RELAY_SESSION || 'phien-test';
-  hop.banThat.extensionRequest({ id: 'lo-1', meta: { kind: 'batch', extensionReplyMs: 47000, gasReplyMs: 390000, trace: { requestId: 'lo-1' } } }).catch((error) => hanCho.push(error.message));
-  hop.banThat.continueServer({ request: { meta: { gasReplyMs: 390000 } }, status: {} }, { id: 'lo-1' });
-  hop.window.top = savedTop;
-  hop.setTimeout = savedSetTimeout; hop.callServer = savedCallServer; hop.FBM_SYNC_CLIENT.running = savedRunning;
-  delete hop.FBM_SYNC_CLIENT.waiting['lo-1'];
-  check(so, 'Sidebar chờ Extension và chờ GAS đúng hạn GAS ghi trong envelope, không theo con số riêng của Sidebar', hanCho.filter((ms) => ms !== hop.FBM_SYNC_GAS_CONTINUE_WARN_MS), [47000, 390000]);
+  hop.fbmSyncDrive = savedDrive; hop.callServer = savedCallServer;
   hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
   const stoppingAction = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_customer', masterEnabled: true, enabled: true });
@@ -683,21 +670,21 @@ async function chay(so) {
   const nutTay = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', origin: 'manual', masterEnabled: true, enabled: true });
   check(so, 'Nút chạy: lượt nền đang chạy vẫn là Bắt đầu đồng bộ (bấm thì hỏi), chỉ lượt tay mới có nút dừng', [nutNen.id, nutNen.label, nutNen.disabled, nutTay.id], ['fbm-sync-start', 'Bắt đầu đồng bộ', false, 'fbm-sync-cancel']);
   // Bấm chạy tay khi lượt nền đang chạy: GAS trả SYNC_BACKGROUND_RUNNING, Sidebar hỏi người dùng; chỉ khi chọn dừng mới gọi lệnh dừng nền.
-  const savedStartServer = hop.fbmSyncStartServer, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
+  const savedRpcNen = hop.fbmSyncExtensionRpc, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
+  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
   const nenStatus = { running: true, phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };
   let dungChua = false;
   const chayNen = async (choice) => {
     const ghi = { popup: null, goi: [], start: 0, nutKhiDung: null };
-    hop.fbmSyncStartServer = () => { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : { ok: false, code: 'TEST_STOP' }); };
     hop.uiDecisionChoose = (opts) => { ghi.popup = opts; return Promise.resolve(choice); };
-    hop.callServer = (name) => { ghi.goi.push(name); ghi.nutKhiDung = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', masterEnabled: true, enabled: true }).label; return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: dungChua ? true : false } }); };
+    hop.callServer = (name) => { if (name === 'fbmDriveCommand') { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : { ok: false, code: 'TEST_STOP' }); } ghi.goi.push(name); ghi.nutKhiDung = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', masterEnabled: true, enabled: true }).label; return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: dungChua ? true : false } }); };
     ghi.ket = await hop.fbmSyncRunStart('read');
     ghi.sau = [hop.FBM_SYNC_CLIENT.backgroundStopping, hop.FBM_SYNC_CLIENT.running];
     return ghi;
   };
   const xNen = await chayNen('cancel'), dungNen = await chayNen('stop'), choNen = await chayNen('wait');
   dungChua = true; const dungHong = await chayNen('stop').catch((error) => ({ loi: error.message })); dungChua = false;
-  hop.fbmSyncStartServer = savedStartServer; hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
+  hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
   check(so, 'Chạy tay gặp lượt nền: popup nêu bước đang chạy và giờ bắt đầu, hai nút dừng ngay / để nền chạy tiếp', [xNen.popup.title, xNen.popup.lines, xNen.popup.choices.map((c) => c.id + ':' + c.label)], ['Đồng bộ nền đang chạy', ['Bước đang chạy: Đang đọc giao dịch.', 'Bắt đầu lúc 2026-10-19 15:03.'], ['stop:Dừng đồng bộ nền và chạy đồng bộ ngay', 'wait:Để đồng bộ nền chạy tiếp, tôi sẽ chạy đồng bộ sau']]);
   check(so, 'Nút X của popup nền: không gọi dừng nền, không chờ, không gọi lại lệnh gốc; nút chạy mở lại', [xNen.goi, xNen.cho, xNen.start, xNen.ket.code, xNen.sau], [[], null, 1, 'SYNC_BACKGROUND_SKIPPED', [false, false]]);
   // Nút X ở mọi thao tác: màn về như vừa mở (không dòng báo, không cờ thao tác, tab Xung đột về Tóm tắt), vẽ bằng status thật GAS trả, không gọi GAS thêm.
@@ -706,7 +693,7 @@ async function chay(so) {
     const ghi = { goi: [], ve: [] };
     hop.fbmSyncPaint = (status) => { ghi.ve.push(status); };
     hop.uiDecisionChoose = () => Promise.resolve('cancel');
-    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve(name === lenh ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : null); };
+    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : null); };
     chuanBi();
     ghi.ket = await bam();
     const c = hop.FBM_SYNC_CLIENT;
@@ -718,10 +705,10 @@ async function chay(so) {
   const xLienKet = await xBam('fbmStartIdentityCheck', () => { hop.FBM_SYNC_CLIENT.accountNotices = { identity: { kind: 'success', message: 'cũ' }, accountSettings: null, login: { kind: 'info', message: 'cũ' } }; hop.fbmSyncSetRunning(true); }, () => hop.fbmSyncCheckIdentityStart({ spreadsheetId: 's', userId: 'u', username: 'n', accountName: 'a' }));
   const xTuDien = await xBam('fbmStartIdentityProbe', () => { hop.FBM_SYNC_CLIENT.running = false; }, () => hop.fbmSyncAutoFill());
   const xXungDot = await xBam('fbmOpenConflict', () => { hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.conflictOpening = false; hop.FBM_SYNC_CLIENT.lastStatus = { metadata: { conflictCount: 2 } }; hop.FBM_SYNC_CLIENT.resultsTab = 'conflict'; }, () => hop.fbmSyncConflictTabLoad());
-  hop.fbmSyncPaint = savedPaintX; hop.uiDecisionChoose = savedChooseX; hop.callServer = savedCallX;
+  hop.fbmSyncPaint = savedPaintX; hop.uiDecisionChoose = savedChooseX; hop.callServer = savedCallX; hop.fbmSyncExtensionRpc = savedRpcNen;
   check(so, 'Nút X: màn quay về như vừa mở và vẽ bằng status thật GAS, chỉ một lần gọi lệnh gốc (kiểm liên kết, tự điền, tab Xung đột)',
     [xLienKet.goi, xLienKet.sau, xLienKet.veCuoi, xTuDien.goi, xTuDien.sau, xTuDien.veCuoi, xXungDot.goi, xXungDot.sau, xXungDot.veCuoi, hop.FBM_SYNC_CLIENT.conflictOpening],
-    [['fbmStartIdentityCheck'], sachX, true, ['fbmStartIdentityProbe'], sachX, true, ['fbmOpenConflict'], sachX, true, false]);
+    [['fbmDriveCommand'], sachX, true, ['fbmDriveCommand'], sachX, true, ['fbmDriveCommand'], sachX, true, false]);
   check(so, 'Chọn dừng nền: gọi đúng một lệnh dừng nền (nút khóa và báo đang dừng), thấy running:false thì gọi lệnh gốc ngay không chờ không dò; xong thì mở lại', [dungNen.goi, dungNen.nutKhiDung, dungNen.start, dungNen.ket.code, dungNen.sau], [['fbmStopBackground'], 'Đang dừng đồng bộ nền...', 2, 'TEST_STOP', [false, false]]);
   check(so, 'Chọn để nền chạy tiếp: không gọi dừng nền, không gọi lại lệnh gốc, màn về như vừa mở', [choNen.goi, choNen.start, choNen.ket.code], [[], 1, 'SYNC_BACKGROUND_SKIPPED']);
   check(so, 'Dừng nền mà GAS còn báo running:true thì báo lỗi ghi Log và không chạy lệnh gốc', [dungHong.goi.slice(0, 2), dungHong.start], [['fbmStopBackground', 'fbmLogSyncError'], 1]);
@@ -762,8 +749,8 @@ async function chay(so) {
   loginUsername.value = 'anhlt'; loginPassword.value = 'mat-khau-can-giu';
   let encryptedCredentials = null;
   hop.fbmSyncEncryptCredentials = (credentials) => { encryptedCredentials = credentials; return Promise.resolve({ credentialRef: 'test-ref' }); };
-  hop.fbmSyncLoginTestLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } });
-  hop.callServer = (name) => name === 'fbmStartLoginTest' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({});
+  hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } });
+  hop.callServer = () => Promise.resolve({});
   await hop.fbmSyncTestLogin(testButton);
   check(so, 'Đăng nhập thử chế độ sửa dùng đúng username/mật khẩu trong form và không xóa mật khẩu', [encryptedCredentials.username, encryptedCredentials.password, loginPassword.value, hop.FBM_SYNC_CLIENT.accountNotices.login.kind, hop.FBM_SYNC_CLIENT.accountNotices.login.message], ['anhlt', 'mat-khau-can-giu', 'mat-khau-can-giu', 'success', 'Đã kiểm tra.']);
 
@@ -772,17 +759,18 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   loginPassword.value = '****';
   let viewLoginArgs = null;
-  hop.callServer = (name, args) => { if (name === 'fbmStartLoginTest') { viewLoginArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
+  hop.fbmSyncDrive = (command, payload) => { viewLoginArgs = [payload.credentialRef, payload.identity]; return Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } }); };
+  hop.callServer = () => Promise.resolve({});
   const viewLoginButton = dom.document.getElementById('fbm-sync-login-test');
   await hop.fbmSyncTestLogin(viewLoginButton);
   check(so, 'Đăng nhập thử chế độ xem dùng credential đã lưu, không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [['saved-ref', { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'success']);
 
   hop.FBM_SYNC_CLIENT.running = false;
   hop.sheetLinkExtensionAlive = () => true;
-  const realFbmSyncLoop = hop.fbmSyncLoop;
-  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
+  const identityDone = { ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } };
   let editIdentityArgs = null;
-  hop.callServer = (name, args) => { if (name === 'fbmStartIdentityCheck') { editIdentityArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
+  hop.fbmSyncDrive = (command, payload) => { editIdentityArgs = [payload.identity]; return Promise.resolve(identityDone); };
+  hop.callServer = () => Promise.resolve({});
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết chế độ xem dùng binding hiện tại và báo n/N', [editIdentityArgs, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], [[{ spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
 
@@ -790,33 +778,35 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   let viewIdentityArgs = null;
-  hop.callServer = (name, args) => { if (name === 'fbmStartIdentityCheck') { viewIdentityArgs = args; return Promise.resolve({ ok: true, request: {} }); } return Promise.resolve({}); };
+  hop.fbmSyncDrive = (command, payload) => { viewIdentityArgs = payload.identity; return Promise.resolve(identityDone); };
+  hop.callServer = () => Promise.resolve({});
   await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết chế độ xem dùng binding đã lưu', viewIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
-  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'paused', lastFailureCode: 'AUTO_LOGIN_THROTTLED', lastError: 'Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', metadata: {} } });
+  check(so, 'Kiểm tra liên kết chế độ xem dùng binding đã lưu', viewIdentityArgs, { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' });
+  hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: { phase: 'paused', lastFailureCode: 'AUTO_LOGIN_THROTTLED', lastError: 'Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', metadata: {} } });
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   const pausedIdentityCalls = [];
-  hop.callServer = (name) => { pausedIdentityCalls.push(name); return name === 'fbmStartIdentityCheck' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({}); };
+  hop.callServer = (name) => { pausedIdentityCalls.push(name); return Promise.resolve({}); };
   await hop.fbmSyncCheckIdentity();
   check(so, 'Kiểm tra liên kết bị cổng đăng nhập chặn thì hiện đúng lý do GAS, không ghi thêm lỗi chung chung', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message, pausedIdentityCalls.indexOf('fbmLogSyncError') < 0], ['error', 'Kiểm tra liên kết không thành công: Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', true]);
-  hop.fbmSyncLoop = () => Promise.resolve({ ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } });
   // ACK cũ (tab ẩn làm chậm nhịp ping) không được kết luận Extension vắng: ping ngay, ACK về thì chạy tiếp.
   let bridgeAlive = false;
   const lateAckCalls = [];
   hop.sheetLinkExtensionAlive = () => bridgeAlive;
   hop.sheetLinkMs = () => 5;
   hop.sheetLinkHandshakePing = () => { bridgeAlive = true; hop.fbmSyncNotifyBridgeReady(); };
-  hop.callServer = (name) => { lateAckCalls.push(name); return name === 'fbmStartIdentityCheck' ? Promise.resolve({ ok: true, request: {} }) : Promise.resolve({}); };
+  hop.fbmSyncDrive = (command, payload) => { lateAckCalls.push('drive:' + payload.kind); return Promise.resolve(identityDone); };
+  hop.callServer = (name) => { lateAckCalls.push(name); return Promise.resolve({}); };
   await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết khi ACK Extension đã cũ thì ping lại và chạy tiếp khi Extension trả lời, không báo lỗi bắt tay', [lateAckCalls.indexOf('fbmStartIdentityCheck') >= 0, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind], [true, 'warning']);
+  check(so, 'Kiểm tra liên kết khi ACK Extension đã cũ thì ping lại và chạy tiếp khi Extension trả lời, không báo lỗi bắt tay', [lateAckCalls.indexOf('drive:identity_check') >= 0, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind], [true, 'warning']);
   bridgeAlive = false;
   hop.sheetLinkHandshakePing = () => {};
   const absentCalls = [];
+  hop.fbmSyncDrive = (command, payload) => { absentCalls.push('drive:' + payload.kind); return Promise.resolve(identityDone); };
   hop.callServer = (name) => { absentCalls.push(name); return Promise.resolve({}); };
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   hop.fbmSyncWaitForBridge = () => Promise.resolve(false);
   await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết khi Extension vắng thật thì báo Sidebar, ghi Log và không gọi GAS khởi chạy', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, absentCalls.indexOf('fbmLogSyncError') >= 0, absentCalls.indexOf('fbmStartIdentityCheck') < 0, hop.FBM_SYNC_CLIENT.running], ['error', true, true, false]);
+  check(so, 'Kiểm tra liên kết khi Extension vắng thật thì báo Sidebar, ghi Log và không gọi GAS khởi chạy', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, absentCalls.indexOf('fbmLogSyncError') >= 0, absentCalls.indexOf('drive:identity_check') < 0, hop.FBM_SYNC_CLIENT.running], ['error', true, true, false]);
   hop.sheetLinkExtensionAlive = () => true;
 
 
@@ -827,16 +817,20 @@ async function chay(so) {
   hop.callServer = (name, args) => {
     if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, identity: { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } } }); }
     if (name === 'fbmStopBackground') { return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: false } }); }
-    if (name === 'fbmStartIdentityCheck') {
-      resumedIdentityArgs = args;
+    if (name === 'fbmDriveCommand') {
+      resumedIdentityArgs = args[1].identity;
       if (stoppingIdentityCall) { stoppingIdentityCall = false; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }); }
-      return Promise.resolve({ ok: true, request: {} });
+      return Promise.resolve(identityDone);
     }
     return Promise.resolve({});
   };
+  hop.fbmSyncDrive = realDrive;
+  const rpcIdentity = hop.fbmSyncExtensionRpc;
+  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
   await hop.fbmSyncCheckIdentity();
+  hop.fbmSyncExtensionRpc = rpcIdentity;
   hop.uiDecisionChoose = chooseIdentity;
-  check(so, 'Kiểm tra liên kết sau khi dừng phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
+  check(so, 'Kiểm tra liên kết sau khi dừng phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' });
 
   const originHop = taoBoTest().hop;
   let messageListener = null;
@@ -844,14 +838,15 @@ async function chay(so) {
   originHop.fbmSyncInstall();
   originHop.SHEET_LINK_NONCE = 'nonce-origin';
   originHop.FBM_SYNC_RELAY_SESSION = 'relay-1';
+  originHop.SHEET_LINK_EXTENSION_SESSION = 'relay-1';
   originHop.clearTimeout = clearTimeout;
   const relaySettled = [];
-  originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1'] = { timer: null, resolve: () => relaySettled.push('resolve'), reject: () => relaySettled.push('reject') };
+  originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1'] = { reply: 'CRM_FBM_CONFIG_ACK', timer: null, resolve: () => relaySettled.push('resolve'), reject: () => relaySettled.push('reject') };
   const ack = { action: 'CRM_FBM_CONFIG_ACK', nonce: originHop.SHEET_LINK_NONCE, sessionId: 'relay-1', id: 'ack-1', ok: true };
   messageListener({ origin: 'https://evil.example', data: ack });
-  check(so, 'message từ origin lạ mang lệnh Extension đúng nonce không làm đổi FBM_SYNC_CLIENT', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [[], true]);
+  check(so, 'message từ origin lạ mang lệnh Extension đúng nonce không làm đổi FBM_SYNC_CLIENT', [relaySettled, !!originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1']], [[], true]);
   messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: ack });
-  check(so, 'cùng message từ origin Google Sheets thì được nhận', [relaySettled, !!originHop.FBM_SYNC_CLIENT.relayWaiters['ack-1']], [['resolve'], false]);
+  check(so, 'cùng message từ origin Google Sheets thì được nhận', [relaySettled, !!originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1']], [['resolve'], false]);
   // Extension đang giữ Sheet khác: Sidebar phải hỏi người dùng; chỉ khi bấm chuyển mới gửi lại kèm switchFrom.
   originHop.setTimeout = setTimeout;
   const switchPosts = [], switchDialogs = [], switchLogs = [];
@@ -868,7 +863,7 @@ async function chay(so) {
   check(so, 'Extension đang giữ Sheet khác, người dùng bấm giữ: hộp hỏi nêu Sheet đang giữ, không gửi lại cấu hình, ghi Log lựa chọn', [giuSheetCu, switchPosts.length, switchDialogs.length, /sheet-cu/.test(switchDialogs[0] && switchDialogs[0].message), switchLogs], ['RELAY_SPREADSHEET_KEPT', 1, 1, true, [['fbmLogRelaySwitchDecision', 'keep', 'sheet-cu']]]);
   switchPosts.length = 0; switchLogs.length = 0; switchChoice = true;
   const chuyenSheet = await originHop.fbmSyncPostRelayConfigConfirmed(relayConfigThu);
-  check(so, 'Người dùng bấm chuyển: Sidebar ghi Log rồi gửi lại cấu hình kèm switchFrom đúng Sheet Extension đang giữ', [chuyenSheet, switchPosts.map((config) => config.switchFrom), switchLogs], [true, ['', 'sheet-cu'], [['fbmLogRelaySwitchDecision', 'switch', 'sheet-cu']]]);
+  check(so, 'Người dùng bấm chuyển: Sidebar ghi Log rồi gửi lại cấu hình kèm switchFrom đúng Sheet Extension đang giữ', [!!chuyenSheet, switchPosts.map((config) => config.switchFrom), switchLogs], [true, ['', 'sheet-cu'], [['fbmLogRelaySwitchDecision', 'switch', 'sheet-cu']]]);
   const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
   hop.fbmSyncInstall();
   const inputField = dom.document.createElement('div'); inputField.id = 'fbm-identity-user-field'; inputField.className = 'shin-form-field is-invalid';
@@ -896,8 +891,7 @@ async function chay(so) {
   await new Promise((resolve) => setTimeout(resolve, 0));
   check(so, 'Lỗi mở lại bản ghi hiện rõ và không khóa nút', [retryButton.disabled, paints.some((item) => String(item.message).indexOf('RETRY_FAILURE') >= 0)], [false, true]);
 
-  const resolveCalls = [], resolveExtension = hop.fbmSyncExtensionRequest, resolveServer = hop.callServer, resolveOpen = hop.fbmSyncOpenConflict;
-  hop.fbmSyncExtensionRequest = (request) => { resolveCalls.push(['extension', request]); return Promise.resolve({}); };
+  const resolveCalls = [], resolveServer = hop.callServer, resolveOpen = hop.fbmSyncOpenConflict;
   hop.fbmSyncOpenConflict = () => { resolveCalls.push(['reopen']); return Promise.resolve(null); };
   hop.callServer = (name, args) => { resolveCalls.push([name, args]); return Promise.resolve(name === 'fbmConfirmConflict' ? { ok: false, code: 'CONFLICT_REOPEN', message: 'mở lại' } : {}); };
   hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', left: '0901', right: '0902' }, { field: 'ten_kh', left: 'A', right: 'B' }] };
@@ -962,7 +956,7 @@ async function chay(so) {
   await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'fbm', null);
   check(so, 'Dòng không còn ở trạng thái xung đột chờ quyết: báo rồi chuyển sang xung đột kế tiếp', resolveCalls.map((c) => c[0]), ['fbmConfirmConflict', 'reopen']);
   hop.recordConflictChoose = resolveConflictChoose; hop.recordBusyChoose = resolveBusyChoose; hop.fbmSyncPaint = resolvePaint;
-  hop.fbmSyncExtensionRequest = resolveExtension; hop.callServer = resolveServer; hop.fbmSyncOpenConflict = resolveOpen;
+  hop.callServer = resolveServer; hop.fbmSyncOpenConflict = resolveOpen;
 
   hop.fbmSyncResolveConflict = () => Promise.reject(new Error('CONFLICT_FAILURE'));
   hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
@@ -978,19 +972,14 @@ async function chay(so) {
   check(so, 'Lỗi mạng và lỗi bridge đều hiện Sidebar và gọi ghi Sheet Log', [errorLogs.length, paints.some((item) => item.phase === 'error' && String(item.message).indexOf('NETWORK_DOWN') >= 0), paints.some((item) => item.phase === 'error' && String(item.message).indexOf('EXTENSION_DOWN') >= 0)], [2, true, true]);
   hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
   check(so, 'Hai lỗi cùng message ở hai thời điểm đều ghi Log, không dedupe vĩnh viễn', errorLogs.length, 3);
-  hop.callServer = (name, args) => name === 'fbmContinueSync' && args[0].error && args[0].error.code === 'FBM_TAB_NOT_FOUND' && args[0].error.requestId === 'request-1' ? Promise.resolve({ ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: { id: 'retry-once' } }) : Promise.resolve({ ok: true });
-  const transportRetry = await hop.fbmSyncReportTransportFailure({ id: 'request-1' }, new Error('Không thấy tab FBM'), 'FBM_TAB_NOT_FOUND');
-  check(so, 'Sidebar nhận request retry no-tab do GAS cấp thay vì tự quyết policy', [transportRetry.code, transportRetry.request.id], ['FBM_TAB_RETRY_REQUEST_READY', 'retry-once']);
-  hop.callServer = () => Promise.reject(new Error('NETWORK_DOWN'));
-  const transportReportError = new Error('Bridge failed');
-  const failedTransportReport = await hop.fbmSyncReportTransportFailure({ id: 'request-2' }, transportReportError, 'FBM_TRANSPORT_UNAVAILABLE');
-  check(so, 'GAS mất mạng khi báo transport không bị đánh dấu đã ghi nhận', [failedTransportReport.code, transportReportError.transportReported], ['GAS_REPORT_FAILED', false]);
-
-  const loopPaints = [];
+  const loopPaints = [], driveThat = hop.fbmSyncDrive;
   hop.FBM_SYNC_CLIENT.running = true;
   hop.fbmSyncPaint = (status) => { loopPaints.push(status); };
-  await realFbmSyncLoop({ ok: false, code: 'FBM_TAB_NOT_FOUND', request: null });
-  check(so, 'Sidebar không kết thúc im lặng khi GAS trả lỗi không có request', [hop.FBM_SYNC_CLIENT.running, loopPaints.some((item) => item && item.phase === 'error' && String(item.message).indexOf('FBM_TAB_NOT_FOUND') >= 0)], [false, true]);
+  hop.callServer = () => Promise.resolve({ ok: true });
+  hop.fbmSyncDrive = () => Promise.resolve({ ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không thấy tab FBM' });
+  await hop.fbmSyncRunStart('read');
+  hop.fbmSyncDrive = driveThat;
+  check(so, 'Sidebar không kết thúc im lặng khi GAS từ chối mở lượt (kết quả lỗi không có runId)', [hop.FBM_SYNC_CLIENT.running, loopPaints.some((item) => item && item.phase === 'error' && String(item.message).indexOf('Không thấy tab FBM') >= 0)], [false, true]);
 }
 
 module.exports = { chay, taoBoTest };

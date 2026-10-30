@@ -6,7 +6,7 @@ const { workflowGas } = require('./Workflow');
 
 const SECRETS = ['COOKIE_MAU', 'AUTH_KHACH_MAU', 'AUTH_GIAO_DICH_MAU'];
 /** Hàm phải chạy được với ô lượt mẫu, không được phép ném lỗi môi trường giả. */
-const REQUIRED = ['fbmCancelSync', 'fbmResetSyncState', 'fbmStartSync', 'fbmStopBackground', 'fbmGetSyncStatus'];
+const REQUIRED = ['fbmCancelSync', 'fbmResetSyncState', 'fbmStopBackground', 'fbmGetSyncStatus'];
 
 function entryPointNames() {
   const source = fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8');
@@ -36,7 +36,7 @@ async function chay(so) {
     if (SECRETS.some((secret) => body.indexOf(secret) >= 0)) { leaks.push(name); }
   });
   check(so, 'mọi hàm fbm* của Sidebar chạy với ô lượt mẫu (cookie, token) trả kết quả không chứa cookie/token', [leaks, REQUIRED.filter((name) => ran.indexOf(name) < 0)], [[], []]);
-  check(so, 'danh sách hàm fbm* quét từ nguồn không rỗng (chặn test rỗng vì đổi cách khai báo)', names.length >= 20, true);
+  check(so, 'danh sách hàm fbm* quét từ nguồn không rỗng (chặn test rỗng vì đổi cách khai báo)', names.length >= 15, true);
 
   seed();
   const cancelled = hop.fbmCancelSync().status;
@@ -49,7 +49,7 @@ async function chay(so) {
   flow.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
   flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const draft = { spreadsheetId: 'sheet-workflow', userId: '9999', username: 'NHAP', accountName: 'Ban Nhap' };
-  const started = flow.hop.fbmStartIdentityCheck(draft);
+  const started = flow.hop.fbmDriveCommand('start', { kind: 'identity_check', identity: draft, machineId: 'may-A' });
   check(so, 'Kiểm liên kết với bốn ô nháp: state.identityTarget bằng bản nháp, không phải liên kết đã lưu', [started.ok, flow.hop.FbmSync.stateRead().identityTarget], [true, draft]);
 }
 

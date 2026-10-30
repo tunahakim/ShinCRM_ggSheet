@@ -56,10 +56,10 @@ async function chay(so) {
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
   relay.noticeRaise = (notice) => { relayLog.reports.push([notice.title, notice.topic]); return true; };
   relay.noticeResolve = () => null;
-  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
+  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/State.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
   // Cửa lệnh giả: phần này chỉ kiểm cổng HTTP (khóa, Sheet, mã giao thức, danh sách lệnh relay, Log); cửa lệnh thật kiểm ở Control.
   const relayDispatched = [];
-  relay.FbmSync.controlDispatch = (command, input) => { relayDispatched.push([command, input.source]); return { ok: true, code: 'RELAY_TEST_DONE', request: null, status: {} }; };
+  relay.FbmSync.controlDispatch = (command, input, channel) => { relayDispatched.push([command, channel]); return { ok: true, code: 'RELAY_TEST_DONE', request: null, status: {} }; };
   Object.assign(relay.FbmSync, { currentSpreadsheetId: () => 'sheet-relay-test', extensionConfigPublic: () => ({}), masterEnabled: () => true, backgroundEnabled: () => true });
   const contract = relay.FbmSync.protocol.contract;
   const relayConfigError = () => { try { relay.FbmSync.relayConfig(); return ''; } catch (err) { return String(err.message); } };
@@ -85,10 +85,10 @@ async function chay(so) {
   const relayPost = (body) => JSON.parse(relay.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).text);
   // Địa chỉ đã ghi từ trên nên các lời gọi dưới không thêm dòng Log; đếm lại từ đầu.
   relayLog.lines = []; relayLog.flushes = 0; relayLog.reports = [];
-  const relayOk = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { trigger: 'alarm' } });
+  const relayOk = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { trigger: 'alarm', machineId: 'may-A' } });
   check(so, 'FBM-034: nhịp nền thành công đi đúng một lệnh relay vào cửa lệnh với nguồn relay và xả bộ đệm Log đúng một lần', [relayOk.code, relayDispatched, relayLog.flushes], ['RELAY_TEST_DONE', [['heartbeat', 'relay']], 1]);
   relay.FbmSync.controlDispatch = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
-  const relayBoom = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} });
+  const relayBoom = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { machineId: 'may-A' } });
   const boomLine = relayLog.lines.filter((line) => line.action === 'fbmRelay')[0] || {};
   check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension',
     [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'entry_failure']]]);

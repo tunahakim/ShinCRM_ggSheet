@@ -131,12 +131,12 @@ function scanHarness(options) {
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const sent = await deliver(step.request, h);
       if (sent.fail) {
-        step = F.controlDispatch('continue', { error: { requestId: step.request.id, code: sent.fail, message: sent.message } });
+        step = F.controlDispatch('continue', { error: { requestId: step.request.id, code: sent.fail, message: sent.message } }, 'relay');
         trace.statuses.push(step.status);
         continue;
       }
       try {
-        step = F.controlDispatch('continue', { response: sent.raw });
+        step = F.controlDispatch('continue', { response: sent.raw }, 'relay');
       } catch (error) {
         trace.errors.push(String(error && error.message || error));
         if (!h.afterError) { throw error; }
@@ -150,11 +150,11 @@ function scanHarness(options) {
   /** Một lần Extension hỏi GAS theo alarm `gas_poll` như relay thật: lệnh `heartbeat` hỏi việc, mọi kết quả nộp qua lệnh `continue` tới khi GAS trả `request: null`; trần 200 vòng chỉ để test không treo. */
   async function poll(hooks) {
     const h = hooks || {};
-    let step = F.controlDispatch('heartbeat', { source: 'relay', trigger: h.source || 'alarm' });
+    let step = F.controlDispatch('heartbeat', { trigger: h.source || 'alarm' }, 'relay');
     for (let used = 0; step && step.request && used < 200; used += 1) {
       const request = step.request, sent = await deliver(request, h);
-      if (sent.fail) { step = F.controlDispatch('continue', { source: 'relay', error: { requestId: request.id, code: sent.fail, message: sent.message }, hop: used + 1 }); continue; }
-      step = F.controlDispatch('continue', { source: 'relay', response: sent.raw, hop: used + 1 });
+      if (sent.fail) { step = F.controlDispatch('continue', { error: { requestId: request.id, code: sent.fail, message: sent.message }, hop: used + 1 }, 'relay'); continue; }
+      step = F.controlDispatch('continue', { response: sent.raw, hop: used + 1 }, 'relay');
     }
     return step;
   }
@@ -163,7 +163,7 @@ function scanHarness(options) {
 
 /** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */
 function scanRequest(id, job) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, job: Object.assign({ jobId: 'J-1', fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'], idField: 'stt_rec_kh', keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
+  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idField: 'stt_rec_kh', keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
 }
 function chunkRequest(id, jobId, chunkIndex) {
   return { id, url: 'https://fbm.test/AppService/Grid', body: {}, meta: { kind: 'scan_chunk', fetchMs: 5000, job: { jobId, chunkIndex } } };

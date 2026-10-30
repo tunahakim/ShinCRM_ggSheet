@@ -127,7 +127,7 @@ function executorSession() {
         sent = { url: String(url), body: options && options.body };
         return Promise.resolve(fbmResponse(responseBody));
       },
-      chrome: { runtime: { onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+      chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
     vm.runInContext(source, context, { filename: EXECUTOR });
@@ -215,7 +215,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
   let fbmMessages = 0;
   const context = {
     console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
-    TextEncoder, TextDecoder, Uint8Array, btoa: (value) => Buffer.from(value, 'binary').toString('base64'), atob: (value) => Buffer.from(value, 'base64').toString('binary'),
+    TextEncoder, TextDecoder, Uint8Array, crypto: globalThis.crypto, btoa: (value) => Buffer.from(value, 'binary').toString('base64'), atob: (value) => Buffer.from(value, 'base64').toString('binary'),
     chrome: {
       tabs: {
         query(query) {
@@ -231,7 +231,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
         }
       },
       scripting: { executeScript: () => Promise.resolve() },
-      runtime: { lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
+      runtime: { getManifest: () => ({ version: '22.0' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
       alarms: { create() {}, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
       storage: { local: {
         get(keys, done) {
@@ -254,7 +254,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
 }
 
 /** Kết quả từng bước Đăng nhập thử nộp về như mọi response: lệnh `continue` của cửa lệnh. */
-function noiDangNhap(hop, response) { return hop.FbmSync.controlDispatch('continue', { response }); }
+function noiDangNhap(hop, response) { return hop.FbmSync.controlDispatch('continue', { response }, 'relay'); }
 
 async function chay(so) {
   section('FBM sync — workflow theo tài liệu');
@@ -849,10 +849,10 @@ async function chay(so) {
   const truocCap = Date.now();
   const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false })), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
-  check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS và chờ Extension, deadlineAt thu hồi cộng đường về và đường lên', [
-    loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loEnvelope.meta.extensionReplyMs, loState.activeRequestId === loEnvelope.id,
+  check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
+    loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
     loState.deadlineAt >= truocCap + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs && loState.deadlineAt <= Date.now() + loEnvelope.meta.timeoutMs + B.bridgeMs + B.gasTransitMs
-  ], [2, undefined, 'batch', B.tabReadyMs + 2 * B.fetchMs, B.batchMaxBytes, B.gasHardMs + B.gasTransitMs, B.tabReadyMs + 2 * B.fetchMs + B.bridgeMs, true, true]);
+  ], [2, undefined, 'batch', B.tabReadyMs + 2 * B.fetchMs, B.batchMaxBytes, B.gasHardMs + B.gasTransitMs, true, true]);
 
   const deadlineLogs = [];
   const deadlineFlow = workflowGas({ logEvent: (event) => deadlineLogs.push(event), LOG_ERROR: 'error' });
@@ -910,13 +910,13 @@ async function chay(so) {
   const noTabResult = await noTabWorker.context.fbmHeartbeatNow('workflow');
   check(so, 'alarm khong co tab: Extension nop transport failure dung reservation va khong tu fetch FBM', [
     noTabResult.code, noTabWorker.relayCalls.map((item) => [item.body.command, (item.body.payload.error || {}).requestId || '', (item.body.payload.error || {}).code || '']), noTabWorker.metrics().fbmMessages
-  ], ['FBM_TAB_NOT_FOUND', [['heartbeat', '', ''], ['continue', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
+  ], ['TRANSPORT_RECORDED', [['heartbeat', '', ''], ['continue', 'reserved-heartbeat', 'FBM_TAB_NOT_FOUND']], 0]);
 
   const autoOpenWorker = workerHarness([
     { ok: true, request: { id: 'open-heartbeat', contract: MA_HOP_DONG, url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{}', meta: { timeoutMs: 30000, openFbmContext: { url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', active: false } } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '22.0' }; }
     if (message.type === 'FBM_EXECUTE_V2') { return { result: { ok: true, status: 200, body: '{"d":{"TotalRowCount":12,"Rows":[]}}', transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } }; }
     return null;
   });
@@ -928,7 +928,7 @@ async function chay(so) {
     { ok: true, request: { id: 'heartbeat-envelope', contract: MA_HOP_DONG, url: 'https://fbo.com.vn:8888/service', method: 'POST', bodyText: '{"from":"gas"}', meta: { timeoutMs: 30000, gasReplyMs: 390000 } } },
     { ok: true, code: 'HEARTBEAT_COMPLETE', request: null }
   ], [{ id: 17 }], (tabId, message) => {
-    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '21.22' }; }
+    if (message.type === 'FBM_PING_V2') { return { ready: true, version: '22.0' }; }
     if (message.type === 'FBM_EXECUTE_V2') {
       return { result: { ok: true, status: 200, body: rawHeartbeat, transport: { trace: [{ stage: 'executor_response_sent', requestId: message.request.id }] } } };
     }
@@ -1004,7 +1004,7 @@ async function chay(so) {
       if (kind === 'batch' && request.meta.entity === 'category') { fullLookupFields.push(request.items.map((item) => item.body.controller)); }
       if (activityBatch) { fullBatches.push(request); }
       if (activityBatch && round === 0 && options && options.loseTab) {
-        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { error: { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' } });
+        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { error: { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' } }, 'relay');
         fullStatuses.push(fullStep.status);
         continue;
       }
@@ -1051,7 +1051,7 @@ async function chay(so) {
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
-        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw });
+        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw }, 'relay');
         if (withTrace) { fullFlow.hop.FbmSync.traceEvent('engine_after', { operation: 'fbmContinueSync' }); }
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
