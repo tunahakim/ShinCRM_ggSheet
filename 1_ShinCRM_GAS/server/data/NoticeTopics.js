@@ -18,6 +18,8 @@ var NOTICE_TOPICS = {
   settings_stale: { level: 'warning', clear: 'on_success' },
   /** `LOG_TRACE` đang bật nên sheet Log có thể chứa dữ liệu khách nguyên văn. Tự hết khi tắt. */
   log_trace_on: { level: 'warning', clear: 'on_success' },
+  /** Không cài được trigger của chủ tệp (server/entry/TriggerSetup.js). Không phạm vi; gỡ khi chủ tệp mở Sidebar và trigger đủ. */
+  trigger_setup: { level: 'error', clear: 'on_success' },
   /** Bảng tra nhanh cú pháp lọc, mở từ lệnh menu. */
   filter_reference: { level: 'info', clear: 'dismiss' }
 };

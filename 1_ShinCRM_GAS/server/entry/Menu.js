@@ -27,18 +27,22 @@ function onOpen() {
 
 /** Trigger cài đặt mở sidebar khi tệp được mở. Lỗi hiện ở Sidebar lần mở sau qua cổng thông báo. */
 function shinAutoShowSidebar() {
-  return runEntryPoint('shinAutoShowSidebar', 'core', sidebarShow);
+  return runEntryPoint('shinAutoShowSidebar', 'core', sidebarOpen);
 }
 
-/** Cài một trigger mở sidebar duy nhất trên Spreadsheet hiện tại. `false` nghĩa là trigger đã có. */
-function shinInstallSidebarOpenTrigger() {
-  var book = SpreadsheetApp.getActiveSpreadsheet();
-  var exists = ScriptApp.getProjectTriggers().some(function (trigger) {
-    return trigger.getHandlerFunction() === 'shinAutoShowSidebar';
-  });
-  if (exists) { return false; }
-  ScriptApp.newTrigger('shinAutoShowSidebar').forSpreadsheet(book).onOpen().create();
-  return true;
+/**
+ * Người điều phối mở Sidebar: đảm bảo trigger của chủ tệp rồi dựng khung.
+ * Cài trigger hỏng không chặn việc mở Sidebar: lỗi đi qua cổng thông báo và ghi Log khi thông báo mới xuất hiện hoặc đổi nội dung, để mỗi lần mở không ghi trùng một dòng. Người khác chủ tệp không gỡ được thông báo, vì họ không thấy trigger của chủ tệp.
+ */
+function sidebarOpen() {
+  try {
+    var result = triggersEnsure();
+    if (!result.skipped) { noticeResolve('trigger_setup', ''); }
+  } catch (err) {
+    var changed = noticeRaise({ topic: 'trigger_setup', scope: '', source: 'core', title: errorMessage(err), lines: ['Sửa trực tiếp trên Sheet sẽ không tự cập nhật vào Sidebar cho tới khi trigger được cài.'], hint: 'Chủ tệp mở lại Sidebar để thử cài lại. Chi tiết ở sheet Log.' });
+    if (changed) { logEvent({ source: 'core', action: 'triggersEnsure', outcome: LOG_ERROR, reason: errorMessage(err), detail: { code: err && err.code ? String(err.code) : '', stack: err && err.stack ? String(err.stack) : '(không có stack)' } }); }
+  }
+  return sidebarShow();
 }
 
 function shinRenderCurrentView(source) {
@@ -74,15 +78,12 @@ function shinShowFilterQuickReference() {
 }
 
 /**
- * Lệnh menu mở sidebar; tự cài trigger mở sidebar khi tệp được mở nếu chưa có.
+ * Lệnh menu mở sidebar, qua cùng người điều phối với trigger mở tệp.
  *
  * Hàm này **không nạp dữ liệu**. Nó chỉ dựng khung; sidebar tự gọi `loadCore` qua `google.script.run` sau khi khung đã hiện. Tách như vậy vì thời gian nạp thuộc về sidebar, nơi có chỗ vẽ chỉ báo tiến trình — còn nếu nạp ở đây thì người dùng bấm menu rồi ngồi nhìn một khoảng trống vài giây không có gì báo là hệ thống đang chạy.
  */
 function shinShowSidebar() {
-  return runEntryPoint('shinShowSidebar', 'core', function () {
-    shinInstallSidebarOpenTrigger();
-    return sidebarShow();
-  });
+  return runEntryPoint('shinShowSidebar', 'core', sidebarOpen);
 }
 
 /** Dựng khung sidebar và hiện nó. Dùng chung cho lệnh menu và trigger mở tệp. */

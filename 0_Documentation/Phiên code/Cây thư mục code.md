@@ -106,7 +106,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── NoticeGate.js         Cổng thông báo duy nhất: phát, gỡ, bỏ, liệt kê. Mỗi thông báo một khóa NOTICE:<key> trong DocumentProperties; lõi không biết kênh, Sidebar là một adapter.
 │   ├── entry\                    Cửa vào hệ thống.
 │   │   ├── EntryPoint.js         Vỏ bọc runEntryPoint: lỗi thì phát thông báo theo cửa vào, ghi log và ném lại; thành công thì gỡ thông báo đó; luôn xả bộ đệm log ở finally.
-│   │   └── Menu.js               onOpen dựng menu; trigger cài đặt mở Sidebar, còn lệnh menu tự cài lại trigger này khi cần.
+│   │   ├── Menu.js               onOpen dựng menu; sidebarOpen (lệnh menu và trigger mở tệp) đảm bảo trigger rồi mở Sidebar.
+│   │   └── TriggerSetup.js       triggersEnsure: chỉ chủ tệp cài ba trigger cài đặt, mỗi trigger đúng một bản; probeTriggerState.
 │   ├── view\                     Dựng sheet quản lý: đọc bộ lọc, sắp xếp và vẽ lại vùng dữ liệu.
 │   │   ├── FilterMessages.js      Thông báo lỗi và trạng thái cho bộ lọc sheet quản lý.
 │   │   ├── FilterParser.js        Phân tích điều kiện lọc từ sheet quản lý.
@@ -115,7 +116,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── ViewSheetSetup.js      Tạo sheet quản trị từ DATA_SCHEMA, bổ sung cột điều khiển, ghi chú và validation.
 │   │   ├── ViewLedger.js          Sổ trạng thái mỗi sheet quản trị: lượt thử gần nhất (dữ liệu, ô điều khiển, kết quả); quyết sheet cũ và có cần thử lại.
 │   │   └── ViewTabTint.js         Tô cam tab sheet quản trị đang cũ, trả màu người dùng đặt khi vẽ xong.
-│   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị.
+│   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị (việc cài trigger ở entry/TriggerSetup.js).
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
 │       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
