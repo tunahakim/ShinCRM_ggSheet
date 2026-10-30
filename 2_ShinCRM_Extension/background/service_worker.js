@@ -167,7 +167,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 /** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
 var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = 'f792d61b2a2b';
+var FBM_CONTRACT_VERSION = '203c4ff28fe9';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -637,12 +637,12 @@ function machineIdRead() {
  */
 var relayRetrySchedule = [];
 function relayRetryLearn(list) {
-  if (Array.isArray(list) && list.every(function (value) { return Number(value) > 0; })) { relayRetrySchedule = list.map(Number); }
+  if (Array.isArray(list) && list.length && list.every(function (value) { return Number(value) > 0; })) { relayRetrySchedule = list.map(Number); }
 }
 function relayRetryWait(ms) { return workerKeepAlive(new Promise(function (resolve) { setTimeout(resolve, ms); })); }
 
 /**
- * Cổng duy nhất Extension gọi GAS: `ask` xin việc nền (lệnh `heartbeat`), `continue` nộp kết quả, báo lỗi hoặc nhận lượt. Thân mang Sheet, mã máy và hộp đen (lần hỏi); GAS trả `trailAck` thì xóa ô lỗi đã được ghi Log.
+ * Cổng duy nhất Extension gọi GAS: `ask` hỏi việc (lệnh `heartbeat`; GAS trả request của lượt tay đang chờ máy này hoặc việc nền đến hạn), `continue` nộp kết quả hoặc báo lỗi. Thân mang Sheet, mã máy và hộp đen (lần hỏi); GAS trả `trailAck` thì xóa ô lỗi đã được ghi Log.
  * Lỗi gọi (404, không phải JSON, hết giờ, mạng) thử lại theo `relayRetrySchedule`; hết lượt thử thì ghi ô lỗi hộp đen rồi ném lỗi mang mã thật.
  */
 /** Hai việc của cổng gọi GAS: lệnh GAS tương ứng và có mang hộp đen hay không. Việc lạ thì ném, không có nhánh mặc định. */
@@ -768,13 +768,12 @@ function relayLoopStart(first) {
 /** Nhịp hỏi GAS (chuông, khởi động Chrome, Sidebar mở). GAS phải cấp envelope trước; không có envelope thì không chạm tab FBM. */
 function fbmHeartbeatNow(source) { return relayLoopStart({ kind: 'ask', payload: { trigger: String(source || 'manual') } }); }
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
-/** Sidebar vừa mở lượt tay: đánh thức vòng để nhận lượt `runId`, kể cả ở máy không chạy nền. Vòng xong thì Extension về đúng trạng thái trước (không đổi chuông hỏi nền). */
-function fbmRunNow(runId, retryMs) {
-  if (!String(runId || '')) { return Promise.resolve({ ok: false, code: 'RUN_ID_REQUIRED', error: 'Sidebar gửi lệnh chạy mà không có mã lượt.' }); }
+/** Sidebar vừa mở lượt tay: chỉ đánh thức một lần hỏi GAS ngay, GAS tự biết lượt nào đang chờ máy này. Tin đánh thức mất thì lần hỏi theo chuông vẫn nhận lượt; chuông hỏi nền không đổi. */
+function fbmRunNow(retryMs) {
   relayRetryLearn(retryMs);
   return getRelayConfig().then(function (config) {
     if (!config) { return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở lại Sidebar để gửi cấu hình cho Extension.' }; }
-    relayLoopStart({ kind: 'continue', payload: { runId: String(runId) } });
+    fbmHeartbeatNow('run_now');
     return { ok: true, accepted: true };
   });
 }
@@ -810,7 +809,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   if (message && message.type === 'FBM_RUN_NOW') {
-    fbmRunNow(message.runId, message.retryMs).then(sendResponse, function (error) { sendResponse({ ok: false, code: String(error && error.code || 'RUN_NOW_FAILED'), error: String(error && error.message || error) }); });
+    fbmRunNow(message.retryMs).then(sendResponse, function (error) { sendResponse({ ok: false, code: String(error && error.code || 'RUN_NOW_FAILED'), error: String(error && error.message || error) }); });
     return true;
   }
   if (message && message.type === 'FBM_BRIDGE_FAILURE') {

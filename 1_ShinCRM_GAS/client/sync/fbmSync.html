@@ -61,6 +61,8 @@ function syncPanelToggle() {
     fbmSyncApplyIdentityStatus(bundle.identity);
     fbmSyncApplySettings(bundle.settings);
     var status = fbmSyncStatusApply(bundle.status, ticket, true);
+    // Lượt tay mở rồi mà tin đánh thức mất (Sidebar đóng trước khi gửi): mở lại màn thì đánh thức lại, không phải chờ chuông.
+    if (bundle.status.awaitingPickup) { fbmSyncExtensionWake([]).catch(function (error) { fbmSyncLogClientError(error, 'Không đánh thức được Extension nhận lượt đang chờ.', 'extension_wake'); }); }
     return fbmSyncApplyLoginStatus(bundle.login).then(function () { return status; });
   }).catch(function (error) {
     fbmSyncPaintError(error, 'Không tải được trạng thái đồng bộ FBM.', 'sidebar_open');
@@ -711,7 +713,7 @@ function fbmSyncCancelExtensionBatch() {
   });
 }
 /**
- * Mọi lượt tay đi qua đây: hỏi mã máy của Extension, gọi GAS mở lượt; GAS chỉ trả `runId`, Extension của đúng máy này nhận lượt và chở từng lát qua relay, trạng thái về Sidebar bằng `CRM_FBM_STATUS`.
+ * Mọi lượt tay đi qua đây: hỏi mã máy của Extension, gọi GAS mở lượt; GAS giữ lượt cho máy này và chỉ trả `runId`. Sidebar đánh thức Extension hỏi GAS ngay, lần hỏi đó nhận lượt và chở từng lát qua relay, trạng thái về Sidebar bằng `CRM_FBM_STATUS`.
  * Trả kết quả cuối của lượt `{ ok, code, error, status, conflict }` khi Extension báo chuỗi đã hết (`done`). Lệnh không mở lượt (không có `runId`, ví dụ không còn xung đột) trả nguyên kết quả GAS.
  * Gặp lượt nền đang chạy thì hỏi người dùng (`fbmSyncAfterBackground`); chọn dừng nền thì mở lại đúng một lần. Apps Script chưa nạp được mã dự án thì thử lại một lần, vì lúc đó GAS chưa chạy gì.
  */
@@ -730,14 +732,16 @@ function fbmSyncDrive(command, payload, task) {
     FBM_SYNC_CLIENT.ownRunId = String(started.runId);
     if (started.status) { fbmSyncStatusApply(started.status, fbmSyncStatusTicket()); }
     var finished = fbmSyncRunWait(started.runId);
-    return fbmSyncExtensionRpc('CRM_FBM_RUN_NOW', { runId: started.runId, retryMs: started.relayRetryMs || [] }, 'nhận lượt chạy').then(function () { return finished; }, function (error) {
+    return fbmSyncExtensionWake(started.relayRetryMs || []).then(function () { return finished; }, function (error) {
       fbmSyncRunWaitDrop();
       throw error;
     });
   });
 }
+/** Đánh thức Extension hỏi GAS ngay; đánh thức thừa vô hại vì GAS trả lời theo ô lượt. */
+function fbmSyncExtensionWake(retryMs) { return fbmSyncExtensionRpc('CRM_FBM_RUN_NOW', { retryMs: retryMs }, 'hỏi GAS nhận lượt'); }
 /**
- * Chờ lượt `runId` hết chuỗi. Extension im quá `FBM_SYNC_RUN_SILENCE_MS` (Chrome tắt worker, tab Sheets mất cầu nối) thì hỏi GAS một lần: lượt đã đóng thì kết thúc theo status GAS, còn chạy thì chờ tiếp.
+ * Chờ lượt `runId` hết chuỗi. Extension im quá `FBM_SYNC_RUN_SILENCE_MS` (Chrome tắt worker, tab Sheets mất cầu nối) thì hỏi GAS một lần: lượt đã đóng thì kết thúc theo status GAS, còn chạy thì chờ tiếp; lượt vẫn chờ Extension nhận thì đánh thức lại.
  * Chỉ một lượt tay tại một thời điểm nên chỉ có một chỗ chờ.
  */
 function fbmSyncRunWait(runId) {
@@ -755,7 +759,11 @@ function fbmSyncRunWaitArm() {
     callServer('fbmGetSyncStatus').then(function (bundle) {
       var status = bundle && bundle.status || {};
       if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
-      if (status.running && String(status.runId || '') === waiter.runId) { fbmSyncRunWaitArm(); return; }
+      if (status.running && String(status.runId || '') === waiter.runId) {
+        fbmSyncRunWaitArm();
+        if (status.awaitingPickup) { fbmSyncExtensionWake([]).catch(function (error) { fbmSyncLogClientError(error, 'Không đánh thức được Extension nhận lượt đang chờ.', 'extension_wake'); }); }
+        return;
+      }
       fbmSyncRunWaitEnd({ ok: status.phase !== 'error', code: String(status.lastFailureCode || ''), error: String(status.lastError || ''), status: status, conflict: null });
     }, function (error) {
       if (FBM_SYNC_CLIENT.runWaiter === waiter) { fbmSyncRunWaitEnd(null, error); }
