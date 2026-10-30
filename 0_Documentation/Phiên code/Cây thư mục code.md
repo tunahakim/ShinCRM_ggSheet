@@ -372,6 +372,7 @@ tests\
     │   ├── Gate.js                 Kiểm cửa ghi chiều lấy về: danh sách đọc của lượt, tra mã khách không lọc quyền, khách vắng và giao dịch đổi khách cha, xét lại hai trạng thái đóng băng.
     │   ├── ScanPack.js             Kiểm gói quét: so giao dịch cuối, dừng sau chuỗi khách im lặng, gắn cờ "không thấy" chỉ trong khách đã đọc, mỗi gói đúng thao tác.
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
+    │   ├── StaticRules.js          Quét mã FBM theo quy tắc kiến trúc cứng (state, lỗi im lặng, typeof hàm, phase, DocumentProperties, popup, kind, số cứng, logEvent, baseline) với danh sách ngoại lệ chỉ được co lại.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.

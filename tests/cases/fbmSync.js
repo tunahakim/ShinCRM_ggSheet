@@ -21,7 +21,8 @@ const NHOM = [
   require("./fbmSync/Rotation"),
   require("./fbmSync/Gate"),
   require("./fbmSync/Settings"),
-  require("./fbmSync/RelayResend")
+  require("./fbmSync/RelayResend"),
+  require("./fbmSync/StaticRules")
 ];
 
 async function chay(so) { for (const nhom of NHOM) { await nhom.chay(so); } }
