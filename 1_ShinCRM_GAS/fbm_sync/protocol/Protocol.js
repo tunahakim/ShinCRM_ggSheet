@@ -54,13 +54,11 @@ FbmSync.protocol = {
   },
   /** Giữ lại lỗi FBM ngắn gọn để người dùng biết vì sao request ghi bị từ chối. */
   httpErrorMessage: function (status, body) {
-    var detail = '';
-    try {
-      var parsed = JSON.parse(String(body || ''));
-      var data = parsed && (parsed.d || parsed);
-      var bug = data && data.Bugs;
-      detail = bug && (bug.Message || bug.message) || '';
-    } catch (ignore) {}
+    // Body không phải JSON (trang HTML lỗi, rỗng) là trường hợp thường gặp, không phải lỗi: parse trả `parseError` thay vì ném, và câu trả lời bên dưới nói rõ không có nội dung đọc được.
+    var parsed = FbmSync.protocol.parse(String(body || ''));
+    var data = parsed && !parsed.parseError && (parsed.d || parsed);
+    var bug = data && data.Bugs;
+    var detail = bug && (bug.Message || bug.message) || '';
     return 'HTTP ' + status + (detail ? ': ' + detail : ': FBM không trả nội dung lỗi đọc được.');
   },
   /** Phiên sống chỉ được xác nhận bằng ba điều kiện tích cực do FBM đo được. */

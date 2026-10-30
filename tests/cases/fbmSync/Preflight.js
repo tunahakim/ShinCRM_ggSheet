@@ -110,7 +110,7 @@ async function chay(so) {
   hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng' });
   const owner = hop.FbmSync.runPreflight({ mode: 'write' });
   const ownerWarn = owner.warnings.filter((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH');
-  check(so, 'Activity lệch owner: preflight cảnh báo không chặn và loại khỏi số ứng viên; việc bỏ qua thật do markPushSkipped lúc đẩy', [owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH'), ownerWarn.length, owner.candidateCount], [false, 1, 0]);
+  check(so, 'Activity lệch owner: preflight cảnh báo không chặn và loại khỏi số ứng viên; việc bỏ qua thật do markPushSkippedBatch lúc đẩy', [owner.blocking.some((item) => item.code === 'FBM_ACTIVITY_OWNER_MISMATCH'), ownerWarn.length, owner.candidateCount], [false, 1, 0]);
   // Bản ghi hợp lệ cạnh bản ghi lỗi riêng vẫn vào danh sách đẩy.
   ungVien((entity) => entity === 'activity' ? [{ entity: 'activity', kind: 'edit', id: 'ACT-LECH', record: { id: 'ACT-LECH', taskType: 'Gọi điện chăm sóc', owner: 'Owner khác' } }, { entity: 'activity', kind: 'edit', id: 'ACT-OK', record: { id: 'ACT-OK', owner: 'Owner đúng', taskType: 'Gọi điện', content: 'Gọi lại', workDate: '2026-10-01' } }] : []);
   const gateTruoc = hop.FbmSync.readCategoryGate;

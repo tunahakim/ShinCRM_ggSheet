@@ -105,7 +105,7 @@ function chay(so) {
   // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
   const escData = {}, escLogs = [];
   const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
-  const escHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', runEntryPoint: (name, source, fn) => fn() });
+  const escHop = taoHopCat({ FbmSync: { transportValue: (value) => value }, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', runEntryPoint: (name, source, fn) => fn() });
   napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
@@ -127,13 +127,13 @@ function chay(so) {
   const escReset = escHop.FbmSync.stateReset();
   check(so, 'FBM-044: đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log', [escReset.ok, escData.FBM_SYNC_STATE_V1, escData.FBM_SYNC_PENDING_PUSHES_V1, escHop.FbmSync.stateRead().phase, escLogs.some((event) => event.action === 'state_reset')], [true, undefined, '{"activity:ACT-1":{"hash":"h"}}', 'idle', true]);
 
-  // Lưu cài đặt chung gộp công tắc tổng: một lời gọi Sidebar, đổi công tắc trước, công tắc lỗi thì không lưu cài đặt, luôn trả status mới.
+  // Lưu cài đặt chung gộp công tắc tổng: một lời gọi Sidebar, lưu cài đặt (đã kiểm) trước rồi mới đổi công tắc, cài đặt sai thì công tắc giữ nguyên, luôn trả status mới.
   const saveOrder = [];
   let masterReply = { ok: true };
   const saveHop = taoHopCat({ runEntryPoint: (name, source, fn) => fn(), FbmSync: {
     transportValue: (value) => value,
     controlDispatchLocked: (action, args) => { saveOrder.push([action, args.enabled]); return masterReply; },
-    syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return { ok: true, settings }; },
+    syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return settings.approvalThreshold < 0 ? { ok: false, code: 'FBM_SYNC_SETTINGS_INVALID', field: 'approvalThreshold' } : { ok: true, settings }; },
     statusView: () => ({ phase: 'idle', masterEnabled: false })
   } });
   napServer(saveHop, 'server/service/FbmSyncService.js');
@@ -141,9 +141,11 @@ function chay(so) {
   const withoutMaster = saveHop.fbmSaveSyncSettings({ approvalThreshold: 3 }, null);
   masterReply = { ok: false, code: 'SYNC_RUNNING' };
   const masterFailed = saveHop.fbmSaveSyncSettings({ approvalThreshold: 4 }, true);
-  check(so, 'Lưu cài đặt chung: đổi công tắc tổng trước khi lưu, null thì không đụng công tắc, công tắc lỗi thì không lưu; kết quả mang status mới',
+  const invalidSettings = saveHop.fbmSaveSyncSettings({ approvalThreshold: -1 }, true);
+  check(so, 'Lưu cài đặt chung: lưu cài đặt trước rồi đổi công tắc tổng, null thì không đụng công tắc; kết quả mang status mới',
     [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase, masterFailed.code],
-    [[['set_master_switch', false], ['save', 2], ['save', 3], ['set_master_switch', true]], true, { phase: 'idle', masterEnabled: false }, 'idle', 'SYNC_RUNNING']);
+    [[['save', 2], ['set_master_switch', false], ['save', 3], ['save', 4], ['set_master_switch', true], ['save', -1]], true, { phase: 'idle', masterEnabled: false }, 'idle', 'SYNC_RUNNING']);
+  check(so, 'Lưu cài đặt chung: cài đặt sai thì trả lỗi kèm status và công tắc tổng giữ nguyên (không có lệnh đổi công tắc)', [invalidSettings.ok, invalidSettings.code, invalidSettings.status.phase, saveOrder.filter((step) => step[0] === 'set_master_switch').length], [false, 'FBM_SYNC_SETTINGS_INVALID', 'idle', 2]);
 
   // Gói mở màn: bốn phần đọc qua đúng hàm đọc của từng cửa, một lời gọi; một phần ném lỗi thì cả gói ném để Sidebar báo.
   const bundleReads = [];

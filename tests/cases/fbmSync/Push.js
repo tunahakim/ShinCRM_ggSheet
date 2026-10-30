@@ -1,6 +1,6 @@
 /** Kiểm tra chiều push, khóa, owner và log. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer, giuBanGhiDongBo, soBan, TRANG_FBM_THU, datUngVienDay, boUngVienDay } = require('../../lib/load-gas');
+const { taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, TRANG_FBM_THU, datUngVienDay, boUngVienDay } = require('../../lib/load-gas');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 async function chay(so) {
@@ -62,7 +62,7 @@ async function chay(so) {
     approval.FbmSync.canWriteSheet('write'), approval.FbmSync.canWriteFbm('write')
   ], [true, false, false, true, false, false, true, true, true]);
   let pullWriteCalls = 0;
-  approval.FbmSync.pullWrite = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  approval.FbmSync.pullWrite = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
   approval.FbmSync.statePatch({ counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   const readPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-1' }], 'read');
   const checkPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-2' }], 'check');
@@ -330,7 +330,7 @@ async function chay(so) {
   push.logEvent = (event) => skippedLogs.push(event);
   push.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-SKIP' }] : [];
   const skippedState = { counts: { skipped: 0 }, metadata: {} };
-  push.FbmSync.markPushSkipped(skippedState, { entity: 'activity', id: 'ACT-SKIP' }, push.FbmSync.SYNC_STATUS.unknownCategory, 'Category chua khop');
+  push.FbmSync.markPushSkippedBatch(skippedState, [{ entity: 'activity', id: 'ACT-SKIP', hold: { status: push.FbmSync.SYNC_STATUS.unknownCategory, reason: 'Category chua khop' } }]);
   check(so, 'Push record bị hoãn chỉ tăng state, không ghi Log chi tiết', [skippedState.counts.skipped, skippedLogs.length], [1, 0]);
   push.FbmSync.readLocal = () => [];
   push.logEvent = (event) => {
@@ -338,6 +338,75 @@ async function chay(so) {
     skippedLogs.push(event);
   };
   check(so, 'Xung đột phát hiện giữa lượt không còn công tắc dừng cả chiều đẩy: chỉ dòng xung đột bị pushCandidates loại', typeof push.FbmSync.stopPushOnConflicts, 'undefined');
+  {
+    // Log của chặng đẩy qua bộ gom của lát: mỗi nhóm đúng một dòng.
+    const savedLogEvent = push.logEvent, savedRead = push.FbmSync.readLocal, savedGate = push.writeGateSave, savedPendingSet = push.FbmSync.pendingPushSet, issueLogs = [];
+    const flush = () => { issueLogs.length = 0; push.logEvent = (event) => issueLogs.push(event); push.FbmSync.recordIssuesFlush(); return issueLogs.slice(); };
+    push.logEvent = () => {}; push.FbmSync.recordIssuesFlush();
+    const errorCandidate = (id, raw) => ({ entity: 'customer', kind: 'edit', id, raw, record: { id, fbmId: 'F-' + id } });
+    const failure = { code: 'FBM_ERROR', reason: 'FBM từ chối ghi' };
+    push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'X-BAN' }, { id: 'X-DOI', ten: 'mới' }] : [];
+    giuBanGhi(push, 'nguoidung', 'customer', 'X-BAN', 'Người dùng đang sửa dòng này');
+    const busyState = push.FbmSync.stateStart('', 'push', 0), changedState = push.FbmSync.stateStart('', 'push', 0), goneState = push.FbmSync.stateStart('', 'push', 0);
+    const results = [push.FbmSync.markPushError(busyState, errorCandidate('X-BAN'), failure, 'customer_edit_save'), push.FbmSync.markPushError(changedState, errorCandidate('X-DOI', { id: 'X-DOI', ten: 'cũ' }), failure, 'customer_edit_save'), push.FbmSync.markPushError(goneState, errorCandidate('X-MAT'), failure, 'customer_edit_save')];
+    push.recordGateRun({ by: 'nguoidung', run: 'run-thu', decide: () => ({ release: [{ entity: 'customer', ids: ['X-BAN'] }] }) });
+    const errorLogs = flush();
+    check(so, 'markPushError: cửa ghi trả bận, đổi hay vắng thì sổ lỗi và số đếm đã cộng nên Log vẫn phải có, kèm lý do chưa ghi lên dòng', [results, [busyState, changedState, goneState].map((item) => item.counts.error), errorLogs.map((event) => event.outcome), ['Người dùng đang sửa dòng này', 'vừa được sửa sau lúc chọn', 'không còn trên Sheet'].map((text, index) => errorLogs[index] && errorLogs[index].reason.indexOf(text) >= 0 && errorLogs[index].reason.indexOf('FBM từ chối ghi') >= 0)], [['busy', 'changed', 'gone'], [1, 1, 1], ['error', 'error', 'error'], [true, true, true]]);
+
+    // Nhiều bản ghi bị giữ trong một lát: câu cho người dùng nêu mã (mỗi mã một câu khác nhau), câu cho Log là một câu chung nên bộ gom ra đúng một dòng.
+    push.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-1' }, { id: 'ACT-2' }, { id: 'ACT-3' }] : [];
+    const holdContext = { settings: () => ({ accountName: 'Lê Tuấn Anh' }), categoryGate: {} };
+    const skipState = { counts: { skipped: 0 }, metadata: {} }, messages = [], held = [];
+    ['ACT-1', 'ACT-2', 'ACT-3'].forEach((id) => {
+      const candidate = { entity: 'activity', kind: 'edit', id, record: { id, owner: 'Người khác' } }, hold = push.FbmSync.pushHold(candidate, holdContext);
+      candidate.hold = hold; held.push(candidate);
+    });
+    push.FbmSync.markPushSkippedBatch(skipState, held); messages.push(skipState.message);
+    const skipLogs = flush();
+    check(so, 'FBM-021: lát có nhiều bản ghi bị giữ thì Log đúng một dòng loại đó, kèm số lượng và danh sách mã; câu trên Sidebar vẫn nêu mã bản ghi', [skipState.counts.skipped, skipLogs.length, skipLogs[0] && skipLogs[0].detail.count, skipLogs[0] && skipLogs[0].detail.ids, skipLogs[0] && skipLogs[0].reason.indexOf('ACT-1, ACT-2, ACT-3') >= 0, messages[0].indexOf('ACT-3') >= 0], [3, 1, 3, ['ACT-1', 'ACT-2', 'ACT-3'], true, true]);
+
+    // Sổ chờ xác nhận ghi trước Sheet: ghi Sheet hỏng thì mục chờ vẫn còn, lượt sau không mất dấu lệnh đã tới FBM (FBM-027).
+    const order = [];
+    push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'C-THU-TU', fbmId: '', fbmHash: '' }] : [];
+    push.FbmSync.pendingPushSet = (entity, id, value) => { order.push('so-cho'); return savedPendingSet(entity, id, value); };
+    push.writeGateSave = () => { order.push('sheet'); return { ok: true }; };
+    const orderResponse = { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-THU-TU' }, { Name: 'ma_kh', Value: 'ALT00077' }] } };
+    push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save');
+    check(so, 'FBM-027: áp kết quả đẩy ghi sổ chờ xác nhận trước, ghi Sheet sau', order, ['so-cho', 'sheet']);
+    push.FbmSync.pendingPushClear('customer', 'C-THU-TU');
+    push.writeGateSave = () => { throw new Error('Sheet hỏng'); };
+    let sheetFailure = '';
+    try { push.FbmSync.markPushResult({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save'); } catch (error) { sheetFailure = String(error && error.message || error); }
+    const keptPending = push.FbmSync.pendingPushGet('customer', 'C-THU-TU');
+    check(so, 'FBM-027: ghi Sheet ném lỗi sau khi FBM đã lưu thì lỗi nổi lên và mục chờ xác nhận vẫn còn đủ hash, mã FBM', [sheetFailure !== '', keptPending && typeof keptPending.hSHIN, keptPending && keptPending.fbmId], [true, 'string', 'A-THU-TU']);
+    push.FbmSync.pendingPushClear('customer', 'C-THU-TU');
+    push.FbmSync.pendingPushSet = savedPendingSet; push.writeGateSave = savedGate; push.FbmSync.readLocal = savedRead; push.logEvent = savedLogEvent;
+  }
+  {
+    // FBM-021: ba bản ghi bị giữ rồi một bản ghi đẩy được thì ba bản ghi giữ chỉ tốn một lần ghi Sheet, lần ghi kế là "đang đẩy" của bản ghi đẩy được.
+    const savedGate = push.writeGateSave, savedRead = push.FbmSync.readLocal, savedLogEvent = push.logEvent, writes = [], skipLogs = [];
+    const hold = (cause) => ({ status: push.FbmSync.SYNC_STATUS.skipped, reason: 'Bỏ qua customer: ' + cause, cause: 'Bỏ qua customer: ' + cause });
+    push.FbmSync.readLocal = () => [];
+    datUngVienDay(push, () => [
+      { kind: 'edit', id: 'H-1', record: { id: 'H-1', fbmId: 'F-H1' }, hold: hold('Thiếu Mã số thuế.') },
+      { kind: 'edit', id: 'H-2', record: { id: 'H-2', fbmId: 'F-H2' }, raw: { id: 'H-2', fbmId: 'F-H2', ten: 'bản lúc chọn' }, hold: hold('Thiếu Mã số thuế.') },
+      { kind: 'edit', id: 'H-3', record: { id: 'H-3', fbmId: 'F-H3' }, hold: hold('Thiếu Mã số thuế.') },
+      { kind: 'edit', id: 'P-1', record: { id: 'P-1', fbmId: 'F-P1', fbmHash: 'h-p1' } }
+    ]);
+    const savedSettings = push.FbmSync.scriptSettings; push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
+    push.writeGateSave = (request) => { writes.push(request.records.map((row) => row.id + ':' + row.syncStatus)); return { ok: true }; };
+    push.logEvent = (event) => skipLogs.push(event);
+    const batchState = push.FbmSync.stateStart('', 'push', 0);
+    batchState.session = pushState.session;
+    batchState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
+    push.FbmSync.stateWrite(batchState);
+    const batchRequest = push.FbmSync.nextPushRequest(batchState), batchAfter = push.FbmSync.stateRead();
+    push.FbmSync.recordIssuesFlush();
+    check(so, 'FBM-021: ba bản ghi giữ (một dòng đã đổi giữa chừng) chỉ một lần ghi Sheet, rồi mới tới lần ghi "đang đẩy"; dòng đã đổi không được tính', [writes, batchRequest && batchRequest.meta.kind, batchAfter.counts.skipped, batchAfter.cursor.progress, batchAfter.current], [[['H-1:' + push.FbmSync.SYNC_STATUS.skipped, 'H-3:' + push.FbmSync.SYNC_STATUS.skipped], ['P-1:' + push.FbmSync.SYNC_STATUS.pushing]], 'customer_edit_open', 2, 2, 'P-1']);
+    check(so, 'FBM-021: lô giữ đó ra đúng một dòng Log kèm hai mã', [skipLogs.length, skipLogs[0] && skipLogs[0].detail.ids], [1, ['H-1', 'H-3']]);
+    push.FbmSync.pushRelease('customer', 'P-1');
+    push.FbmSync.scriptSettings = savedSettings; push.writeGateSave = savedGate; push.FbmSync.readLocal = savedRead; push.logEvent = savedLogEvent;
+  }
 
   const activityCandidate = { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', fbmSyncPermission: push.FbmSync.pullDefaultPermission() } };
   datUngVienDay(push, () => [activityCandidate]);

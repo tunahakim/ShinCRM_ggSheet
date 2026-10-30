@@ -43,6 +43,8 @@ function chay(so) {
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
     napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+    // Hủy phiên trả status công khai; ca này chỉ kiểm sổ bước nên status giả là đủ.
+    nen.FbmSync.statusView = () => ({ ok: true });
     const st = nen.FbmSync.stateStart('', 'checking_session', 0);
     nen.FbmSync.businessStepStart(st, 'run', {});
     nen.FbmSync.businessStepStart(st, 'session', {});
@@ -184,7 +186,7 @@ function chay(so) {
   ghi.nen.FbmSync.canWriteSheet = () => true;
   ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};
   ghi.nen.writeGateSave = () => ({ ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] });
-  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
   const cursorGhi = JSON.stringify(ghi.nen.FbmSync.stateRead().cursor || {});
   ghi.nen.FbmSync.continue = () => { ghi.nen.FbmSync.pullRecords('customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;

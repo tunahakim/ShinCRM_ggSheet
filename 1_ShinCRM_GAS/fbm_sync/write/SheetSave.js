@@ -51,22 +51,40 @@ FbmSync.recordSignature = function (record) { return JSON.stringify(record || nu
  * `options`: `expect` chữ ký lúc chọn ứng viên (bỏ trống khi dòng đã do đồng bộ giữ); `build(local)` trả `{ patch, release, hold, value }`; `release` nhả mặc định; `releaseGone` nhả khi dòng đã vắng; `allowGone` không ném khi dòng vắng.
  */
 FbmSync.pushRowChange = function (entity, id, options) {
-  var opts = options || {}, release = function (yes) { return yes ? [{ entity: entity, ids: [id] }] : []; };
+  return FbmSync.recordChange(function (gate) { return FbmSync.pushRowPlan(gate, entity, id, options || {}); }).value;
+};
+
+/**
+ * Phép kiểm và quyết của MỘT dòng trong cửa (vắng, bận, đổi sau lúc chọn, rồi hàm quyết), dùng chung cho `pushRowChange` và `pushRowsChange` để hai đường không thể kiểm khác nhau. Trả kế hoạch `{ save, hold, release, value }` cho cửa; `options` như `pushRowChange`.
+ */
+FbmSync.pushRowPlan = function (gate, entity, id, opts) {
+  var release = function (yes) { return yes ? [{ entity: entity, ids: [id] }] : []; };
+  var local = gate.readById(entity, FbmSync.recordSchemas(), id);
+  if (!local) {
+    if (!opts.allowGone) { throw FbmSync.sheetWriteError(entity, [{ id: id }], 'push', { gone: [id] }); }
+    return { release: release(opts.releaseGone), value: { status: 'gone', local: null } };
+  }
+  var busy = gate.busy(entity, [id])[id];
+  if (busy) { return { value: { status: 'busy', local: local, busy: busy } }; }
+  if (opts.expect !== undefined && FbmSync.recordSignature(local) !== opts.expect) { return { value: { status: 'changed', local: local } }; }
+  var built = opts.build ? opts.build(local) || {} : {};
+  return {
+    save: built.patch ? [{ entity: entity, records: [built.patch], source: 'push' }] : [],
+    hold: built.hold ? [{ entity: entity, ids: [id], reason: built.hold }] : [],
+    release: release(built.release === undefined ? opts.release : built.release),
+    value: { status: 'ok', local: local, value: built.value }
+  };
+};
+
+/**
+ * Ghi nhiều dòng của chiều đẩy trong MỘT lần qua cửa (một lần ghi Sheet cho mỗi entity). `items` là `[{ entity, id, expect, patch }]`; mỗi dòng được kiểm như `pushRowChange` (vắng thì `gone`, không ném) và dòng không `ok` thì không ghi gì. Trả trạng thái từng dòng theo đúng thứ tự `items`, dạng `{ status, local, busy }`.
+ */
+FbmSync.pushRowsChange = function (items) {
+  if (!items.length) { return []; }
   return FbmSync.recordChange(function (gate) {
-    var local = gate.readById(entity, FbmSync.recordSchemas(), id);
-    if (!local) {
-      if (!opts.allowGone) { throw FbmSync.sheetWriteError(entity, [{ id: id }], 'push', { gone: [id] }); }
-      return { release: release(opts.releaseGone), value: { status: 'gone', local: null } };
-    }
-    var busy = gate.busy(entity, [id])[id];
-    if (busy) { return { value: { status: 'busy', local: local, busy: busy } }; }
-    if (opts.expect !== undefined && FbmSync.recordSignature(local) !== opts.expect) { return { value: { status: 'changed', local: local } }; }
-    var built = opts.build ? opts.build(local) || {} : {};
-    return {
-      save: built.patch ? [{ entity: entity, records: [built.patch], source: 'push' }] : [],
-      hold: built.hold ? [{ entity: entity, ids: [id], reason: built.hold }] : [],
-      release: release(built.release === undefined ? opts.release : built.release),
-      value: { status: 'ok', local: local, value: built.value }
-    };
+    var plans = items.map(function (item) { return FbmSync.pushRowPlan(gate, item.entity, item.id, { expect: item.expect, allowGone: true, build: function () { return { patch: item.patch }; } }); });
+    var save = {};
+    plans.forEach(function (plan) { (plan.save || []).forEach(function (part) { (save[part.entity] = save[part.entity] || { entity: part.entity, records: [], source: part.source }).records.push(part.records[0]); }); });
+    return { save: Object.keys(save).map(function (entity) { return save[entity]; }), value: plans.map(function (plan) { return plan.value; }) };
   }).value;
 };

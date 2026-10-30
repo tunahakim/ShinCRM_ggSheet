@@ -37,10 +37,9 @@ function fbmSyncCancel() {
     FbmSync.stateWrite(state);
     return { ok: true, code: 'SYNC_CANCEL_PENDING', pending: true, status: FbmSync.statusView() };
   }
-  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
-  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0;
-  if (!failed) { state.phase = 'paused'; state.message = 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.'; state.lastError = ''; }
-  return FbmSync.stateWrite(state);
+  FbmSync.stateWrite(FbmSync.runCloseNow(state, failed ? null : { phase: 'paused', message: 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.' }));
+  // Trả status công khai, không trả ô lượt: ô lượt mang cookie và token phiên FBM.
+  return FbmSync.statusView();
 }
 function fbmGetLoginConfig() { return FbmSync.loginConfigPublic(); }
 function fbmSetAutoLogin(enabled) { return FbmSync.loginConfigSetEnabled(enabled === true); }

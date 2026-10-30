@@ -182,6 +182,13 @@ async function chay(so) {
   const writesBeforeTraceImport = propertyWrites;
   check(so, 'trace client ghi theo lo mot lan', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [2, 1]);
   check(so, 'trace client gui lai khong ghi lap', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [0, 1]);
+  const realStateRead = orchestration.FbmSync.stateRead;
+  orchestration.FbmSync.stateRead = () => { const failure = new Error('state hỏng'); failure.code = 'STATE_UNREADABLE'; throw failure; };
+  let traceContextCode = '';
+  try { orchestration.FbmSync.traceContext({}); } catch (err) { traceContextCode = err.code; }
+  orchestration.FbmSync.stateRead = realStateRead;
+  check(so, 'trace đọc state hỏng thì ném lỗi có mã, không ghi vết với ngữ cảnh rỗng', traceContextCode, 'STATE_UNREADABLE');
+  check(so, 'body lỗi FBM không phải JSON cho câu báo rõ, body có Bugs cho nội dung lỗi', [orchestration.FbmSync.protocol.httpErrorMessage(500, '<html>lỗi</html>'), orchestration.FbmSync.protocol.httpErrorMessage(400, '{"d":{"Bugs":{"Message":"Sai"}}}')], ['HTTP 500: FBM không trả nội dung lỗi đọc được.', 'HTTP 400: Sai']);
    orchestration.FbmSync.statePatch({ origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: dateEnvelope.id, deadlineAt: Date.now() + 60000, metadata: { sessionGate: {} }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: dateEnvelope.id }] } });
     check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.code, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, 'TRANSPORT_ERROR', null, 'error', 'TRANSPORT_ERROR']);
@@ -385,6 +392,8 @@ async function chay(so) {
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là Extension đã chạy hết lượt vì GAS trả lời không còn request tiếp. Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.');
   check(so, 'Hộp đen Extension: GAS trả lỗi thì Log nêu mã lỗi Extension nhận được, chỉ giữ ký tự an toàn', heartbeat.FbmSync.extensionTrailText({ stage: 'gas_reply_failed', at: 1000, code: 'RELAY_TIMEOUT<script>' }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_TIMEOUTscript.');
+  check(so, 'Hộp đen Extension: relay 404 thì Log nêu mã RELAY_ENDPOINT_NOT_FOUND kèm HTTP 404', heartbeat.FbmSync.extensionTrailText({ stage: 'gas_reply_failed', at: 1000, code: 'RELAY_ENDPOINT_NOT_FOUND', httpStatus: 404 }, 1000),
+    'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_ENDPOINT_NOT_FOUND (HTTP 404).');
   check(so, 'Hộp đen Extension: lượt dừng lúc tự tải lại tab FBM thì Log nói rõ bước đó, mã lỗi và việc phần chạy nền khởi động lại', heartbeat.FbmSync.extensionTrailText({ stage: 'fbm_tab_reloading', requestId: 'r-1', code: 'FBM_TAB_NOT_READY', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là tab FBM không phản hồi, Extension đang tự tải lại tab, request r-1. Mã lỗi: FBM_TAB_NOT_READY. Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).');
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'done', scan: 'full', chain: { current: 'heartbeat' } });
@@ -446,13 +455,17 @@ async function chay(so) {
   check(so, 'trạng thái gửi Sidebar nêu lượt đang chạy là của ai', heartbeat.FbmSync.statusView().origin, 'background');
   const manualRequest = heartbeat.FbmSync.start({ mode: 'read', manual: true });
   check(so, 'chạy tay giữa lượt nền không tự dừng nền mà trả mã để Sidebar hỏi người dùng', [manualRequest.ok, manualRequest.code, !!manualRequest.status, heartbeat.FbmSync.stateRead().metadata.manualPending, heartbeat.FbmSync.stateRead().runId], [false, 'SYNC_BACKGROUND_RUNNING', true, null, 'background-run']);
-  const stopRequest = heartbeat.FbmSync.stopBackground();
-  check(so, 'chỉ lệnh dừng nền mới đặt cờ dừng sau response hiện tại', [stopRequest.ok, stopRequest.code, !!heartbeat.FbmSync.stateRead().metadata.manualPending], [true, 'SYNC_BACKGROUND_STOPPING', true]);
+  const stopRequest = heartbeat.FbmSync.stopBackground(), afterStop = heartbeat.FbmSync.stateRead(), stoppedStatus = stopRequest.status;
+  check(so, 'lệnh dừng nền đóng lượt nền NGAY: phase không còn đang chạy, running:false, không đặt cờ chờ lát kế', [stopRequest.ok, stopRequest.code, stoppedStatus.running, afterStop.phase, afterStop.runId, afterStop.activeRequestId, afterStop.origin, afterStop.metadata.manualPending], [true, 'SYNC_BACKGROUND_STOPPED', false, 'idle', '', '', 'manual', null]);
+  const beforeLate = JSON.stringify(heartbeat.FbmSync.stateRead());
   const stoppedBackground = heartbeat.FbmSync.continue({ d: { Rows: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'background-request' }] } });
-  check(so, 'phien nen dung va san sang cho manual sau khi nhan response', [stoppedBackground.manualReady, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().runId], [true, 'idle', '']);
+  check(so, 'response đến muộn của lượt nền đã dừng bị loại STALE_RESPONSE, không cấp request và không đổi state', [stoppedBackground.ok, stoppedBackground.code, stoppedBackground.request, JSON.stringify(heartbeat.FbmSync.stateRead()) === beforeLate], [false, 'STALE_RESPONSE', null, true]);
+  const runningStatus = (phase) => { heartbeat.FbmSync.statePatch({ runId: 'status-run', phase }); return heartbeat.FbmSync.statusView().running; };
+  check(so, 'statusView().running lấy từ danh sách phase ở State.js, có waiting_session và không có awaiting_approval/paused', ['waiting_session', 'checking_session', 'push', 'awaiting_approval', 'paused', 'idle'].map(runningStatus), [true, true, true, false, false, false]);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', origin: 'manual' });
   const manualRun = heartbeat.FbmSync.stateRead(); manualRun.runId = 'manual-run'; manualRun.origin = 'manual'; manualRun.phase = 'pull_customer'; heartbeat.FbmSync.stateWrite(manualRun);
   const stopManual = heartbeat.FbmSync.stopBackground();
-  check(so, 'lệnh dừng nền gặp lượt tay thì không đặt cờ dừng', [stopManual.code, heartbeat.FbmSync.stateRead().metadata.manualPending || null], ['SYNC_BACKGROUND_IDLE', null]);
+  check(so, 'lệnh dừng nền gặp lượt tay thì không đóng gì', [stopManual.code, heartbeat.FbmSync.stateRead().runId], ['SYNC_BACKGROUND_IDLE', 'manual-run']);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', origin: 'manual' });
   const preservedState = heartbeat.FbmSync.stateRead();
   preservedState.runId = 'preserve-run'; preservedState.phase = 'pull_customer'; preservedState.cursor = { kind: 'customer_grid', pageIndex: 4 }; preservedState.activeRequestId = 'preserve-request';

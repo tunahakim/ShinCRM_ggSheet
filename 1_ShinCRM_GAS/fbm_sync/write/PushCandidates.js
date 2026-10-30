@@ -113,15 +113,15 @@ FbmSync.pushReview = function (entity, record, customer, context) {
   return candidate;
 };
 
-/** Các phép xét không cần FBM của bước đẩy, theo thứ tự: người phụ trách, danh mục, đủ trường. Trả `{ code, status, reason }` hoặc `null`. */
+/** Các phép xét không cần FBM của bước đẩy, theo thứ tự: người phụ trách, danh mục, đủ trường. Trả `{ code, status, reason, cause }` hoặc `null`; `reason` nêu mã bản ghi, `cause` là cùng câu đó không nêu mã để Log gom cả nhóm thành một dòng. */
 FbmSync.pushHold = function (candidate, context) {
   var entity = candidate.entity, head = 'Bỏ qua ' + entity + ' ' + candidate.id + ': ';
   var ownerError = entity === 'activity' ? FbmSync.pushOwnerError(candidate, context.settings()) : '';
-  if (ownerError) { return { code: 'owner', status: FbmSync.SYNC_STATUS.skipped, reason: head + ownerError }; }
+  if (ownerError) { return { code: 'owner', status: FbmSync.SYNC_STATUS.skipped, reason: head + ownerError, cause: 'Bỏ qua ' + entity + ': ' + ownerError }; }
   var categoryErrors = FbmSync.validatePushCategories(candidate.record, entity, context.categoryGate);
-  if (categoryErrors.length) { return { code: 'category', status: FbmSync.SYNC_STATUS.unknownCategory, reason: head + categoryErrors[0].result.reason }; }
+  if (categoryErrors.length) { return { code: 'category', status: FbmSync.SYNC_STATUS.unknownCategory, reason: head + categoryErrors[0].result.reason, cause: 'Bỏ qua ' + entity + ': ' + categoryErrors[0].result.reason }; }
   var eligibilityErrors = FbmSync.pushEligibilityErrors(candidate.record, entity);
-  if (eligibilityErrors.length) { return { code: 'eligibility', status: FbmSync.SYNC_STATUS.skipped, reason: head + eligibilityErrors.join(' ') }; }
+  if (eligibilityErrors.length) { return { code: 'eligibility', status: FbmSync.SYNC_STATUS.skipped, reason: head + eligibilityErrors.join(' '), cause: 'Bỏ qua ' + entity + ': ' + eligibilityErrors.join(' ') }; }
   return null;
 };
 
@@ -132,7 +132,7 @@ FbmSync.pushOwnerError = function (candidate, settings) {
   var owner = String(candidate.record && candidate.record.owner || '');
   if (!configured) { return ''; }
   if (owner && owner !== configured) {
-    return 'Activity ' + String(candidate.id || '') + ' thuộc owner FBM "' + owner + '", khác tài khoản FBM đang đăng nhập "' + configured + '".';
+    return 'Activity thuộc owner FBM "' + owner + '", khác tài khoản FBM đang đăng nhập "' + configured + '".';
   }
   return '';
 };

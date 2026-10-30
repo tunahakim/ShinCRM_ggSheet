@@ -49,14 +49,12 @@ FbmSync.compareFbmId = function (a, b) {
   return left < right ? -1 : left > right ? 1 : 0;
 };
 
-/** Pull chỉ ghi record mới/thay đổi an toàn; không bao giờ xóa. */
+/** Pull chỉ ghi record mới/thay đổi an toàn; không bao giờ xóa. Không ghi ô lượt: khách bị chặn danh tính trả về ở `identityBlocks` để người điều phối gộp vào bản state nó đang giữ, vì ghi ở đây sẽ bị bản của người điều phối đè mất. */
 FbmSync.pullWrite = function (entity, records) {
   // Pull không ghi đè thay đổi cục bộ; chỉ đánh dấu pending hoặc conflict.
-  if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, conflictsKept: 0, conflictsCleared: 0, skipped: 0 }; }
-  var state = FbmSync.stateRead();
-  var orphaned = 0;
-  var categoryGate = FbmSync.stateCategoryGate(state);
-  state.metadata = state.metadata || {};
+  if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, conflictsKept: 0, conflictsCleared: 0, skipped: 0, identityBlocks: [] }; }
+  var orphaned = 0, identityBlocks = [];
+  var categoryGate = FbmSync.stateCategoryGate(FbmSync.stateRead());
   // Đọc cục bộ, nối khách cha, so ba chiều và ghi trong một hàm quyết: một lần Lưu hay Xóa của người dùng không chen được vào giữa lúc đọc và lúc ghi.
   var change = FbmSync.recordChange(function (gate) {
   var localRecords = gate.read(entity, FbmSync.recordSchemas());
@@ -92,9 +90,7 @@ FbmSync.pullWrite = function (entity, records) {
       var taxIssue = FbmSync.customerTaxIdentityIssue(localByTaxNumber, incoming);
       if (taxIssue) {
         skipped += 1;
-        state.metadata = state.metadata || {};
-        state.metadata.identityBlocks = Array.isArray(state.metadata.identityBlocks) ? state.metadata.identityBlocks : [];
-        state.metadata.identityBlocks.push({ entity: 'customer', taxNumber: taxIssue.tax, fbmCustomerCode: String(incoming.fbmCustomerCode || ''), reason: taxIssue.reason, at: Date.now() });
+        identityBlocks.push({ entity: 'customer', taxNumber: taxIssue.tax, fbmCustomerCode: String(incoming.fbmCustomerCode || ''), reason: taxIssue.reason, at: Date.now() });
         if (taxIssue.records.length === 1) { statusWrites.push({ id: taxIssue.records[0].id, syncStatus: FbmSync.SYNC_STATUS.error }); }
         FbmSync.logPullRecord(entity, incoming, taxIssue.records.length === 1 ? taxIssue.records[0] : null, FbmSync.SYNC_STATUS.error, 'Không nối được Customer theo MST: ' + taxIssue.reason + '.');
         return;
@@ -248,9 +244,8 @@ FbmSync.pullWrite = function (entity, records) {
   return { save: allWrites.length ? [{ entity: entity, records: allWrites, source: 'pull' }] : [], release: recovered.length ? [{ entity: entity, ids: recovered }] : [], value: { written: allWrites.length ? writes.length + ownedOnly : 0, batches: allWrites.length ? 1 : 0, conflicts: conflicts, conflictsKept: Object.keys(kept).length, conflictsCleared: Object.keys(cleared).length, skipped: skipped + orphaned, pendingClears: pendingClears } };
   });
   var outcome = change.value;
-  var result = { ok: true, written: outcome.written, conflicts: outcome.conflicts, conflictsKept: outcome.conflictsKept, conflictsCleared: outcome.conflictsCleared, skipped: outcome.skipped, sheetWriteBatches: outcome.batches };
+  var result = { ok: true, written: outcome.written, conflicts: outcome.conflicts, conflictsKept: outcome.conflictsKept, conflictsCleared: outcome.conflictsCleared, skipped: outcome.skipped, sheetWriteBatches: outcome.batches, identityBlocks: identityBlocks };
   if (typeof FbmSync.pendingPushClear === 'function') { outcome.pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); }); }
-  if (typeof FbmSync.stateWrite === 'function') { FbmSync.stateWrite(state); }
   return result;
 };
 

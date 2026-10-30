@@ -141,7 +141,7 @@ async function testSharedShellLifecycle(so) {
     [search.hidden, undo.hidden, warning.hidden], [false, true, false]);
 
   const restoredBody = content.textContent;
-  hop.fbmSyncPaint({ phase: 'pull_customer', counts: { completed: 1 } });
+  hop.fbmSyncPaint({ running: true, phase: 'pull_customer', counts: { completed: 1 } });
   check(so, 'status den muon sau khi dong khong ve de len man form da phuc hoi', content.textContent, restoredBody);
 
   hop.FBM_SYNC_CLIENT.active = true;
@@ -177,9 +177,24 @@ async function testOwnRunId(so) {
     ['run-7', ['sync_run|run-7', 'connection_save|'], '']);
 }
 
+async function testErrorPathFailures(so) {
+  // Đường báo lỗi của Sidebar hỏng (ghi Log, hủy phiên) thì lý do phải hiện trên Sidebar và được ghi Log, không nuốt.
+  const { hop } = taoBoTest();
+  const calls = [], painted = [];
+  hop.fbmSyncPaint = (status) => { painted.push(status.message); };
+  hop.callServer = (name, args) => { calls.push(name + (args && args[2] ? '|' + args[2] : '')); return name === 'fbmLogSyncError' && args[2] === 'log_down' ? Promise.reject(new Error('GAS không nhận Log')) : name === 'fbmCancelSync' ? Promise.reject(new Error('hủy thất bại')) : Promise.resolve({}); };
+  const logResult = await hop.fbmSyncLogClientError(new Error('Lỗi gốc'), '', 'log_down');
+  await hop.fbmSyncCancelAfterError();
+  const status = hop.fbmSyncClientErrorStatus('Lỗi gốc');
+  const later = hop.fbmSyncClientErrorStatus('Lỗi khác');
+  check(so, 'ghi Log lỗi Sidebar hỏng thì lý do hiện trên Sidebar, kết quả mang mã', [logResult.code, painted.length === 1 && painted[0].indexOf('Lỗi gốc') >= 0 && painted[0].indexOf('GAS không nhận Log') >= 0], ['GAS_LOG_FAILED', true]);
+  check(so, 'hủy phiên hỏng thì ghi Log cancel_failed và lý do nối vào thông báo lỗi kế tiếp, chỉ một lần', [calls.indexOf('fbmLogSyncError|cancel_failed') >= 0, status.message.indexOf('Không hủy được phiên đồng bộ: hủy thất bại') >= 0, later.message], [true, true, 'Lỗi khác']);
+}
+
 async function chay(so) {
   await testSharedShellLifecycle(so);
   await testOwnRunId(so);
+  await testErrorPathFailures(so);
   section('FBM sync — Sidebar UI smoke');
   let bo;
   try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
@@ -187,7 +202,7 @@ async function chay(so) {
   const info = dom.document.getElementById('sidebar-info');
 
   const idle = { phase: 'idle', label: 'Sẵn sàng', mode: 'read', counts: {}, masterEnabled: true };
-  const active = { phase: 'pull_customer', runId: 'r1', cursor: { kind: 'customer_grid' }, label: 'Đang đọc khách hàng', mode: 'read', counts: {} };
+  const active = { running: true, phase: 'pull_customer', runId: 'r1', cursor: { kind: 'customer_grid' }, label: 'Đang đọc khách hàng', mode: 'read', counts: {} };
   const preflightError = { phase: 'error', runId: 'r2', cursor: {}, lastFailureCode: 'SYNC_PREFLIGHT_FAILED', label: 'Có lỗi', counts: {} };
   const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
 
@@ -236,7 +251,7 @@ async function chay(so) {
     remove: (name) => { statusButton.className = statusButton.className.split(/\s+/).filter((item) => item && item !== name).join(' '); }
   };
   dom.root.appendChild(statusButton);
-  hop.fbmSyncPaintHeaderState({ phase: 'checking_session', masterEnabled: false });
+  hop.fbmSyncPaintHeaderState({ running: true, phase: 'checking_session', masterEnabled: false });
   check(so, 'icon Đồng bộ không quay khi công tắc tổng tắt', [statusButton.className.indexOf('shin-sync-status-running') >= 0, statusButton.getAttribute('aria-label')], [false, 'Đồng bộ FBM']);
 
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' } };
@@ -404,7 +419,7 @@ async function chay(so) {
   ]);
   check(so, 'Thẻ Trạng thái phiên hiện thông tin lượt từng dòng; dòng Đang xử lý chỉ có khi lượt còn chạy', [
     hop.fbmSyncStatusInfoLines({ phase: 'done', direction: 'Hai chiều', scanPack: 'quick', session: { customer: true, activity: false }, entityLabel: 'Tổng hợp' }),
-    hop.fbmSyncStatusInfoLines({ phase: 'pull_activity', direction: 'FBM → ShinCRM', scanPack: '', entityLabel: 'Giao dịch', current: 'CUS-000001' })
+    hop.fbmSyncStatusInfoLines({ running: true, phase: 'pull_activity', direction: 'FBM → ShinCRM', scanPack: '', entityLabel: 'Giao dịch', current: 'CUS-000001' })
   ], [
     ['Chiều chạy: Hai chiều', 'Mức quét: Quét nhanh', 'Phiên FBM: khách hàng đã xác nhận, giao dịch chưa có'],
     ['Chiều chạy: FBM → ShinCRM', 'Đang xử lý: Giao dịch CUS-000001']
@@ -412,7 +427,7 @@ async function chay(so) {
   const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
   check(so, 'trạng thái đang chạy được cập nhật tại chỗ, không dựng lại màn hình', [patchedLiveStatus, content.children[0] === runFirstNode, content.textContent.indexOf('Đang đối soát') >= 0], [true, true, true]);
   const previousFinished = { phase: 'done', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đã hoàn tất', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'done' }, { id: 'category', label: 'Category', state: 'done' }, { id: 'customer', label: 'Đọc Customer', state: 'done' }, { id: 'activity', label: 'Đọc Activity', state: 'done' }, { id: 'reconcile', label: 'Đối soát', state: 'done' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'done' }] } };
-  const nextRunChecking = { phase: 'checking_session', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đang chạy', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'current' }, { id: 'category', label: 'Category', state: 'pending' }, { id: 'customer', label: 'Đọc Customer', state: 'pending' }, { id: 'activity', label: 'Đọc Activity', state: 'pending' }, { id: 'reconcile', label: 'Đối soát', state: 'pending' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'pending' }] } };
+  const nextRunChecking = { running: true, phase: 'checking_session', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đang chạy', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'current' }, { id: 'category', label: 'Category', state: 'pending' }, { id: 'customer', label: 'Đọc Customer', state: 'pending' }, { id: 'activity', label: 'Đọc Activity', state: 'pending' }, { id: 'reconcile', label: 'Đối soát', state: 'pending' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'pending' }] } };
   render(hop, content, hop.fbmSyncRenderRun, previousFinished);
   const previousPipeline = content.querySelector('.shin-sync-pipeline');
   const nextRunPatched = hop.fbmSyncPatchLiveStatus(content, nextRunChecking, 'run');
@@ -579,7 +594,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
   const cancelPaint = hop.fbmSyncPaint;
   hop.fbmSyncPaint = () => {};
-  hop.callServer = (name) => name === 'fbmCancelSync' ? Promise.resolve({ ok: true, code: 'SYNC_CANCEL_PENDING', status: { phase: 'pull_customer', message: 'Đang chờ response để dừng.' } }) : Promise.resolve({});
+  hop.callServer = (name) => name === 'fbmCancelSync' ? Promise.resolve({ ok: true, code: 'SYNC_CANCEL_PENDING', status: { running: true, phase: 'pull_customer', message: 'Đang chờ response để dừng.' } }) : Promise.resolve({});
   await hop.fbmSyncCancel();
   check(so, 'Cancel khi request đang bay giữ relay đến response cuối thay vì bỏ dở state', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, true]);
   hop.fbmSyncExtensionRequest = () => Promise.resolve({});
@@ -620,7 +635,7 @@ async function chay(so) {
   await hop.fbmSyncForceLogin();
   check(so, 'FBM-057: nút "Hủy phiên cũ và đăng nhập" chỉ hiện khi GAS mở; bấm Quay lại không gọi GAS, xác nhận mới gọi fbmStartForceLogin; GAS từ chối thì lỗi được ghi Log', [forceShown, coNutHuyPhien(content), forceCalls], [true, false, ['fbmStartForceLogin', 'fbmLogSyncError']]);
   const forceRuns = [], realRun = hop.fbmSyncRun, realLoop = hop.fbmSyncLoginTestLoop;
-  hop.callServer = () => Promise.resolve({ ok: true, request: { id: 'login-1' }, status: { phase: 'checking_session' } });
+  hop.callServer = () => Promise.resolve({ ok: true, request: { id: 'login-1' }, status: { running: true, phase: 'checking_session' } });
   hop.fbmSyncLoginTestLoop = () => Promise.resolve({ ok: true, code: 'LOGIN_OK', status: { phase: 'done', message: 'Đã hủy phiên cũ' } });
   hop.fbmSyncRun = (mode) => { forceRuns.push(mode); return Promise.resolve(null); };
   hop.FBM_SYNC_CLIENT.mode = 'read';
@@ -630,7 +645,7 @@ async function chay(so) {
   const waitingPaints = [];
   hop.fbmSyncPaint = (status) => waitingPaints.push(status);
   hop.FBM_SYNC_CLIENT.running = true;
-  await hop.fbmSyncLoop({ ok: true, request: { meta: { kind: 'activity_edit_open', id: '174813' } }, status: { phase: 'push', entityLabel: 'Giao dịch' } });
+  await hop.fbmSyncLoop({ ok: true, request: { meta: { kind: 'activity_edit_open', id: '174813' } }, status: { running: true, phase: 'push', entityLabel: 'Giao dịch' } });
   check(so, 'FBM-006: request Activity không mang meta.entity vẫn hiện "Đang chờ tab FBM trả dữ liệu giao dịch...", lấy nhãn từ GAS',
     waitingPaints.map((item) => item.message).filter((message) => /Đang chờ tab FBM/.test(message)), ['Đang chờ tab FBM trả dữ liệu giao dịch...']);
   hop.fbmSyncPaint = () => {};
@@ -638,7 +653,7 @@ async function chay(so) {
   const errorPaints = [], savedExtensionRequest = hop.fbmSyncExtensionRequest, savedCallServer = hop.callServer;
   hop.fbmSyncPaint = (status) => { const snapshot = status.status || status; hop.FBM_SYNC_CLIENT.lastStatus = snapshot; errorPaints.push(snapshot); };
   hop.fbmSyncExtensionRequest = () => Promise.reject(new Error('Mất kết nối tới GAS'));
-  const gasSnapshot = { runId: 'run-017', phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
+  const gasSnapshot = { runId: 'run-017', running: true, phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
   hop.callServer = (name) => name === 'fbmApprovePush' ? Promise.resolve({ ok: true, request: { meta: { kind: 'customer_edit_open' } }, status: gasSnapshot }) : Promise.resolve(null);
   await hop.fbmSyncApprovePush();
   const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
@@ -661,31 +676,29 @@ async function chay(so) {
   check(so, 'Sidebar chờ Extension và chờ GAS đúng hạn GAS ghi trong envelope, không theo con số riêng của Sidebar', hanCho.filter((ms) => ms !== hop.FBM_SYNC_GAS_CONTINUE_WARN_MS), [47000, 390000]);
   hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
-  const stoppingAction = hop.fbmSyncRunActionBlock({ phase: 'pull_customer', masterEnabled: true, enabled: true });
+  const stoppingAction = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_customer', masterEnabled: true, enabled: true });
   check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
-  const nutNen = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
-  const nutTay = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'manual', masterEnabled: true, enabled: true });
-  hop.FBM_SYNC_CLIENT.backgroundWait = 'conflict';
-  const nutCho = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
-  hop.FBM_SYNC_CLIENT.backgroundWait = null;
-  check(so, 'Nút chạy: lượt nền đang chạy vẫn là Bắt đầu đồng bộ (bấm thì hỏi), chỉ lượt tay mới có nút dừng; đang chờ lượt nền thì khóa và báo đang chờ', [nutNen.id, nutNen.label, nutNen.disabled, nutTay.id, nutCho.label, nutCho.disabled], ['fbm-sync-start', 'Bắt đầu đồng bộ', false, 'fbm-sync-cancel', 'Đang chờ đồng bộ nền xong...', true]);
+  const nutNen = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
+  const nutTay = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', origin: 'manual', masterEnabled: true, enabled: true });
+  check(so, 'Nút chạy: lượt nền đang chạy vẫn là Bắt đầu đồng bộ (bấm thì hỏi), chỉ lượt tay mới có nút dừng', [nutNen.id, nutNen.label, nutNen.disabled, nutTay.id], ['fbm-sync-start', 'Bắt đầu đồng bộ', false, 'fbm-sync-cancel']);
   // Bấm chạy tay khi lượt nền đang chạy: GAS trả SYNC_BACKGROUND_RUNNING, Sidebar hỏi người dùng; chỉ khi chọn dừng mới gọi lệnh dừng nền.
-  const savedStartServer = hop.fbmSyncStartServer, savedWaitIdle = hop.fbmSyncWaitForBackgroundIdle, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
-  const nenStatus = { phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };
+  const savedStartServer = hop.fbmSyncStartServer, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
+  const nenStatus = { running: true, phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };
+  let dungChua = false;
   const chayNen = async (choice) => {
-    const ghi = { popup: null, goi: [], cho: null, start: 0 };
-    hop.fbmSyncStartServer = () => { ghi.start += 1; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus }); };
+    const ghi = { popup: null, goi: [], start: 0, nutKhiDung: null };
+    hop.fbmSyncStartServer = () => { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : { ok: false, code: 'TEST_STOP' }); };
     hop.uiDecisionChoose = (opts) => { ghi.popup = opts; return Promise.resolve(choice); };
-    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPING' }); };
-    hop.fbmSyncWaitForBackgroundIdle = (task, startCall) => { const nut = hop.fbmSyncRunActionBlock({ phase: 'pull_activity', masterEnabled: true, enabled: true }); ghi.cho = [task, nut.disabled, nut.label]; return Promise.resolve({ ok: false, code: 'TEST_STOP' }); };
+    hop.callServer = (name) => { ghi.goi.push(name); ghi.nutKhiDung = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', masterEnabled: true, enabled: true }).label; return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: dungChua ? true : false } }); };
     ghi.ket = await hop.fbmSyncRunStart('read');
     ghi.sau = [hop.FBM_SYNC_CLIENT.backgroundStopping, hop.FBM_SYNC_CLIENT.running];
     return ghi;
   };
   const xNen = await chayNen('cancel'), dungNen = await chayNen('stop'), choNen = await chayNen('wait');
-  hop.fbmSyncStartServer = savedStartServer; hop.fbmSyncWaitForBackgroundIdle = savedWaitIdle; hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
-  check(so, 'Chạy tay gặp lượt nền: popup nêu bước đang chạy và giờ bắt đầu, hai nút dừng ngay / tự chạy khi nền xong', [xNen.popup.title, xNen.popup.lines, xNen.popup.choices.map((c) => c.id + ':' + c.label)], ['Đồng bộ nền đang chạy', ['Bước đang chạy: Đang đọc giao dịch.', 'Bắt đầu lúc 2026-10-19 15:03.'], ['stop:Dừng đồng bộ nền và chạy đồng bộ ngay', 'wait:Tự chạy đồng bộ khi đồng bộ nền xong']]);
+  dungChua = true; const dungHong = await chayNen('stop').catch((error) => ({ loi: error.message })); dungChua = false;
+  hop.fbmSyncStartServer = savedStartServer; hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
+  check(so, 'Chạy tay gặp lượt nền: popup nêu bước đang chạy và giờ bắt đầu, hai nút dừng ngay / để nền chạy tiếp', [xNen.popup.title, xNen.popup.lines, xNen.popup.choices.map((c) => c.id + ':' + c.label)], ['Đồng bộ nền đang chạy', ['Bước đang chạy: Đang đọc giao dịch.', 'Bắt đầu lúc 2026-10-19 15:03.'], ['stop:Dừng đồng bộ nền và chạy đồng bộ ngay', 'wait:Để đồng bộ nền chạy tiếp, tôi sẽ chạy đồng bộ sau']]);
   check(so, 'Nút X của popup nền: không gọi dừng nền, không chờ, không gọi lại lệnh gốc; nút chạy mở lại', [xNen.goi, xNen.cho, xNen.start, xNen.ket.code, xNen.sau], [[], null, 1, 'SYNC_BACKGROUND_SKIPPED', [false, false]]);
   // Nút X ở mọi thao tác: màn về như vừa mở (không dòng báo, không cờ thao tác, tab Xung đột về Tóm tắt), vẽ bằng status thật GAS trả, không gọi GAS thêm.
   const savedPaintX = hop.fbmSyncPaint, savedChooseX = hop.uiDecisionChoose, savedCallX = hop.callServer;
@@ -709,37 +722,25 @@ async function chay(so) {
   check(so, 'Nút X: màn quay về như vừa mở và vẽ bằng status thật GAS, chỉ một lần gọi lệnh gốc (kiểm liên kết, tự điền, tab Xung đột)',
     [xLienKet.goi, xLienKet.sau, xLienKet.veCuoi, xTuDien.goi, xTuDien.sau, xTuDien.veCuoi, xXungDot.goi, xXungDot.sau, xXungDot.veCuoi, hop.FBM_SYNC_CLIENT.conflictOpening],
     [['fbmStartIdentityCheck'], sachX, true, ['fbmStartIdentityProbe'], sachX, true, ['fbmOpenConflict'], sachX, true, false]);
-  check(so, 'Chọn dừng nền: gọi đúng một lệnh dừng nền, trong lúc chờ nút khóa và báo đang dừng; xong thì mở lại', [dungNen.goi, dungNen.cho, dungNen.sau], [['fbmStopBackground'], ['run', true, 'Đang dừng đồng bộ nền...'], [false, false]]);
-  check(so, 'Chọn chờ nền xong: không gọi dừng nền, chỉ chờ rồi chạy lại lệnh gốc', [choNen.goi, choNen.cho && choNen.cho[0], choNen.cho && choNen.cho[2] === 'Đang dừng đồng bộ nền...'], [[], 'run', false]);
+  check(so, 'Chọn dừng nền: gọi đúng một lệnh dừng nền (nút khóa và báo đang dừng), thấy running:false thì gọi lệnh gốc ngay không chờ không dò; xong thì mở lại', [dungNen.goi, dungNen.nutKhiDung, dungNen.start, dungNen.ket.code, dungNen.sau], [['fbmStopBackground'], 'Đang dừng đồng bộ nền...', 2, 'TEST_STOP', [false, false]]);
+  check(so, 'Chọn để nền chạy tiếp: không gọi dừng nền, không gọi lại lệnh gốc, màn về như vừa mở', [choNen.goi, choNen.start, choNen.ket.code], [[], 1, 'SYNC_BACKGROUND_SKIPPED']);
+  check(so, 'Dừng nền mà GAS còn báo running:true thì báo lỗi ghi Log và không chạy lệnh gốc', [dungHong.goi.slice(0, 2), dungHong.start], [['fbmStopBackground', 'fbmLogSyncError'], 1]);
 
-  // Hàm chờ dùng chung: chờ GAS nhả lượt nền rồi gọi lệnh gốc; lệnh gốc gặp lượt nền kế tiếp thì chờ tiếp, không hỏi lại; quá hạn thì báo lỗi.
-  const savedTimeout = hop.setTimeout, savedStatusOnce = hop.fbmSyncStatusOnce;
-  hop.setTimeout = (fn) => fn();
-  const trangThai = [{ phase: 'pull_activity', runId: 'nen-1' }, { phase: 'idle', runId: '' }, { phase: 'idle', runId: '' }];
-  hop.fbmSyncStatusOnce = () => Promise.resolve(trangThai.shift() || { phase: 'idle', runId: '' });
-  const lenhGoc = [{ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }, { ok: true, code: 'STARTED' }];
-  let goiLenh = 0;
-  const choXong = await hop.fbmSyncWaitForBackgroundIdle('run', () => { goiLenh += 1; return Promise.resolve(lenhGoc.shift()); }, Date.now() + 60000);
-  let quaHan = '';
-  await hop.fbmSyncWaitForBackgroundIdle('run', () => Promise.resolve({ ok: true }), Date.now() - 1).catch((error) => { quaHan = error.message; });
-  hop.setTimeout = savedTimeout; hop.fbmSyncStatusOnce = savedStatusOnce;
   const savedCallStatus = hop.callServer, savedPaintStatus = hop.fbmSyncPaint;
   hop.callServer = () => Promise.resolve({ phase: 'idle', runId: '', updatedAt: Date.now() + 1000 });
   hop.fbmSyncPaint = () => undefined;
   const docThat = await hop.fbmSyncStatusOnce();
   hop.callServer = savedCallStatus; hop.fbmSyncPaint = savedPaintStatus;
-  check(so, 'Đọc trạng thái luôn trả status GAS kể cả khi đã vẽ, để hàm chờ lượt nền thấy được phase idle', [docThat && docThat.phase, docThat && docThat.runId], ['idle', '']);
-  check(so, 'Chờ lượt nền: chỉ gọi lệnh gốc khi GAS nhả lượt, gặp lượt nền kế thì chờ tiếp; quá hạn báo lỗi rõ, không chạy lệnh gốc', [goiLenh, choXong.code, quaHan.indexOf('chưa chạy đồng bộ') >= 0], [2, 'STARTED', true]);
+  check(so, 'Đọc trạng thái luôn trả status GAS kể cả khi đã vẽ', [docThat && docThat.phase, docThat && docThat.runId], ['idle', '']);
 
   // Thẻ xung đột: còn số đếm mà RAM chưa có bản ghi thì nói lý do, không báo "không có xung đột".
   const theXungDot = () => JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 2 } }));
-  hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.backgroundWait = 'conflict';
-  const theCho = theXungDot();
-  hop.FBM_SYNC_CLIENT.backgroundWait = null; hop.FBM_SYNC_CLIENT.conflictNote = 'Không mở được bản ghi xung đột: lỗi thử';
+  hop.FBM_SYNC_CLIENT.conflict = null;
+  hop.FBM_SYNC_CLIENT.conflictNote = 'Không mở được bản ghi xung đột: lỗi thử';
   const theLoi = theXungDot();
   hop.FBM_SYNC_CLIENT.conflictNote = '';
   const theRong = JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 0 } }));
-  check(so, 'Thẻ xung đột còn số đếm mà chưa mở được bản ghi hiện đúng lý do (chờ nền, lỗi mở); hết xung đột mới báo không có', [theCho.indexOf('Đang chờ đồng bộ nền') >= 0, theLoi.indexOf('lỗi thử') >= 0, theCho.indexOf('Không có xung đột') < 0, theRong.indexOf('Không có xung đột') >= 0], [true, true, true, true]);
+  check(so, 'Thẻ xung đột còn số đếm mà chưa mở được bản ghi hiện đúng lý do (đang mở, lỗi mở); hết xung đột mới báo không có', [theLoi.indexOf('lỗi thử') >= 0, theRong.indexOf('Không có xung đột') >= 0], [true, true]);
   hop.fbmSyncPaint = cancelPaint;
 
   const loginButton = dom.document.createElement('button');
@@ -819,13 +820,13 @@ async function chay(so) {
   hop.sheetLinkExtensionAlive = () => true;
 
 
-  const waitForIdentityBackground = hop.fbmSyncWaitForBackgroundIdle, chooseIdentity = hop.uiDecisionChoose;
-  hop.fbmSyncWaitForBackgroundIdle = (task, startCall) => startCall();
-  hop.uiDecisionChoose = () => Promise.resolve('wait');
+  const chooseIdentity = hop.uiDecisionChoose;
+  hop.uiDecisionChoose = () => Promise.resolve('stop');
   let resumedIdentityArgs = null, stoppingIdentityCall = true;
   hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
   hop.callServer = (name, args) => {
     if (name === 'fbmGetIdentityStatus') { return Promise.resolve({ status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } }); }
+    if (name === 'fbmStopBackground') { return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: false } }); }
     if (name === 'fbmStartIdentityCheck') {
       resumedIdentityArgs = args;
       if (stoppingIdentityCall) { stoppingIdentityCall = false; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }); }
@@ -834,8 +835,8 @@ async function chay(so) {
     return Promise.resolve({});
   };
   await hop.fbmSyncCheckIdentity();
-  hop.fbmSyncWaitForBackgroundIdle = waitForIdentityBackground; hop.uiDecisionChoose = chooseIdentity;
-  check(so, 'Kiểm tra liên kết sau khi chờ phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
+  hop.uiDecisionChoose = chooseIdentity;
+  check(so, 'Kiểm tra liên kết sau khi dừng phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, [{ spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' }]);
 
   const originHop = taoBoTest().hop;
   let messageListener = null;

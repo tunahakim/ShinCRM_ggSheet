@@ -58,7 +58,9 @@ async function chay(so) {
   const emptyConfig = taoHopCat({ FbmSync: {} });
   napServer(emptyConfig, 'fbm_sync/schema/FbmFields.js');
   emptyConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: '' });
-  check(so, 'nguong chấp thuận rỗng dùng mặc định 10', emptyConfig.FbmSync.approvalThreshold(), 10);
+  let thresholdError = null;
+  try { emptyConfig.FbmSync.approvalThreshold(); } catch (error) { thresholdError = error.code; }
+  check(so, 'ngưỡng chấp thuận sai kiểu ném lỗi có mã, không rơi về mặc định', thresholdError, 'FBM_APPROVAL_THRESHOLD_INVALID');
   const zeroConfig = taoHopCat({ FbmSync: {} });
   napServer(zeroConfig, 'fbm_sync/schema/FbmFields.js');
   zeroConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: 0 });

@@ -21,7 +21,9 @@ const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
  * hàm thuần thì không được đụng vào nó.
  */
 function taoHopCat(stubs) {
-  const hopCat = Object.assign({ console: console }, stubs || {});
+  // `Utilities` có sẵn vì chỉ là hàm thuần (độ dài byte, mã ngẫu nhiên); mã GAS gọi thẳng, không dò sự có mặt của nó.
+  const utilities = { newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }), getUuid: () => 'test-uuid-' + (++utilities.seq), seq: 0 };
+  const hopCat = Object.assign({ console: console, Utilities: utilities }, stubs || {});
   vm.createContext(hopCat);
   return hopCat;
 }
@@ -183,7 +185,7 @@ const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPoli
  */
 function capDauDaySach(hopCat) {
   const F = hopCat.FbmSync;
-  if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ scopeLimited: false, scopeCodes: [] }); }
+  if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ approvalThreshold: 10, scopeLimited: false, scopeCodes: [] }); }
   // Tài khoản đã liên kết đọc bằng hàm thật của Identity.js (kho trống thì chưa liên kết); không cấp hàm giả để hàm bị đổi tên là test hỏng ngay.
   if (typeof F.boundIdentity !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/Identity.js'), hopCat, { filename: 'fbm_sync/reconcile/Identity.js' }); }
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }

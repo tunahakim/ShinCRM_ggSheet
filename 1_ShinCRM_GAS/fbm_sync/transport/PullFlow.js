@@ -8,17 +8,14 @@ FbmSync.backgroundRunningResult = function () {
 };
 
 /**
- * Nơi duy nhất đặt cờ dừng lượt nền, chỉ gọi khi người dùng chọn "Dừng đồng bộ nền" ở popup. Lượt nền dừng sau response FBM đang bay (dữ liệu đã nhận vẫn được ghi).
- * Lượt đang chạy là lượt tay, hoặc không có lượt nào, thì không đặt gì: lượt tay chỉ người dùng tự dừng bằng nút Dừng.
+ * Nơi duy nhất dừng lượt nền, chỉ gọi khi người dùng chọn "Dừng đồng bộ nền" ở popup. Đóng lượt NGAY trong khóa: response FBM đang bay của lượt này đến muộn sẽ bị loại `STALE_RESPONSE` và không ghi gì, nên Sidebar chạy lệnh gốc được ngay khi nhận `status.running: false`.
+ * Lượt đang chạy là lượt tay, hoặc không có lượt nào, thì không đóng gì: lượt tay chỉ người dùng tự dừng bằng nút Dừng.
  */
 FbmSync.stopBackground = function () {
   var current = FbmSync.stateRead();
   if (!FbmSync.runInProgress(current) || String(current.origin || '') !== 'background') { return { ok: true, code: 'SYNC_BACKGROUND_IDLE', status: FbmSync.statusView() }; }
-  current.metadata = current.metadata || {};
-  current.metadata.manualPending = { requestedAt: Date.now() };
-  current.message = 'Đã nhận yêu cầu dừng; phiên nền sẽ dừng sau response FBM hiện tại.';
-  FbmSync.stateWrite(current);
-  return { ok: true, code: 'SYNC_BACKGROUND_STOPPING', status: FbmSync.statusView() };
+  FbmSync.stateWrite(FbmSync.runCloseNow(current, { phase: 'idle', origin: 'manual', message: 'Đã dừng đồng bộ nền theo yêu cầu; có thể chạy phiên thủ công.' }));
+  return { ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: FbmSync.statusView() };
 };
 
 FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
@@ -112,6 +109,7 @@ FbmSync.pullRecords = function (entity, records, mode) {
   state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
   state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0) - Number(result.conflictsCleared || 0));
   state.counts.skipped += Number(result.skipped || 0);
+  if (result.identityBlocks.length) { state.metadata.identityBlocks = (Array.isArray(state.metadata.identityBlocks) ? state.metadata.identityBlocks : []).concat(result.identityBlocks); }
   if (typeof FbmSync.businessStepAdd === 'function') {
     FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0) + Number(result.conflictsKept || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
   }

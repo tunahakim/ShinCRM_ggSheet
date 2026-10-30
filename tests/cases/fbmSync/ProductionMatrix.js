@@ -23,7 +23,7 @@ function makeSync() {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, SETTINGS: { CHUNK_ROWS: 2000 }, Date,
     PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => documentProperties },
     logEvent(event) { logs.push(event); }, logTrace() {}, LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict', flushLog() {},
-    Utilities: { getUuid: () => 'production-matrix-uuid' },
+    Utilities: { getUuid: () => 'production-matrix-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     shinOpenBook: () => ({ getId: () => 'production-matrix-sheet' })
   });
@@ -466,7 +466,7 @@ async function chay(so) {
     [rv.local.customer.map((row) => row.syncStatus), rv.local.customer.map((row) => row.companyName), rvPull.conflicts, rvPull.conflictsKept, rvPull.conflictsCleared, rvPull.skipped],
     [['đã đồng bộ', 'chờ đối soát', 'đã đồng bộ', 'xung đột chờ quyết'], ['Tên Shin 1', 'Tên Shin 2', 'Tên FBM 3', 'Tên Shin 4'], 0, 1, 3, 0]);
   const rvFlow = makeSync(), RVF = rvFlow.hop.FbmSync;
-  RVF.pullWrite = () => ({ ok: true, written: 2, conflicts: 1, conflictsKept: 2, conflictsCleared: 3, skipped: 0 });
+  RVF.pullWrite = () => ({ ok: true, written: 2, conflicts: 1, conflictsKept: 2, conflictsCleared: 3, skipped: 0, identityBlocks: [] });
   const rvFlowState = RVF.stateStart('', 'pull_customer', 0);
   rvFlowState.mode = 'read'; rvFlowState.metadata.conflictCount = 5; RVF.stateWrite(rvFlowState);
   RVF.pullRecords('customer', [{}], 'write');

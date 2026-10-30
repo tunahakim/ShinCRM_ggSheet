@@ -82,9 +82,7 @@ if (typeof FbmSync.transportValue !== 'function') {
 }
 /** Cổng tự giữ dấu hiệu cho request login do chính cổng khởi động. */
 FbmSync.sessionGateToken = function () {
-  var uuid = '';
-  try { uuid = typeof Utilities !== 'undefined' && Utilities.getUuid ? Utilities.getUuid() : ''; } catch (ignore) {}
-  return 'sg_' + String(uuid || (Date.now().toString(36) + '_' + Math.random().toString(36).slice(2))).replace(/[^A-Za-z0-9_-]/g, '');
+  return 'sg_' + Utilities.getUuid().replace(/[^A-Za-z0-9_-]/g, '');
 };
 FbmSync.sessionGatePolicy = function () {
   var value = typeof FbmSync.loginConfigRead === 'function' ? FbmSync.loginConfigRead() : {};

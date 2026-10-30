@@ -33,7 +33,7 @@ function fbmDevSetVerifyStatusDefault() {
 
 /** Đặt ngưỡng chấp thuận đẩy về mặc định của code qua đúng cửa lưu cài đặt đồng bộ mà Sidebar dùng. */
 function fbmDevResetApprovalThreshold() {
-  var saved = FbmSync.syncSettingsSave({ approvalThreshold: FbmSync.DEFAULT_APPROVAL_THRESHOLD });
+  var saved = FbmSync.syncSettingsSave({ approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold });
   if (!saved.ok) { throw new Error(saved.message); }
   return { approvalThreshold: saved.settings.approvalThreshold };
 }

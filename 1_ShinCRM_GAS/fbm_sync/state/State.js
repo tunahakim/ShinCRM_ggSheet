@@ -9,6 +9,18 @@ FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer',
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 /** Lượt còn dở (đang chạy hoặc chờ chấp thuận). Lượt đã kết thúc ở bất kỳ trạng thái cuối nào, kể cả tạm dừng vì tự đăng nhập bị từ chối, không chặn lịch nền mở lượt mới. */
 FbmSync.runInProgress = function (state) { return !!(state && state.runId) && ['idle'].concat(FbmSync.TERMINAL_PHASES).indexOf(String(state.phase || '')) < 0; };
+/**
+ * Nơi duy nhất đóng lượt ngay (không chờ response đang bay): nhả bản ghi đang giữ và xóa con trỏ lượt trên state truyền vào, trả chính state đó; người điều phối gọi nó rồi tự ghi. Response đến muộn của lượt đã đóng bị loại ở `requestAnswered` (`STALE_RESPONSE`) vì `activeRequestId` đã rỗng.
+ * `closing` = { phase, message } đặt trạng thái cuối; bỏ trống thì giữ nguyên phase và lỗi hiện có (lượt đã lỗi phải giữ nguyên lỗi).
+ */
+FbmSync.runCloseNow = function (state, closing) {
+  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
+  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0;
+  state.metadata = state.metadata || {};
+  state.metadata.cancelPending = false;
+  if (closing) { state.phase = closing.phase; state.message = closing.message; state.lastError = ''; if (closing.origin) { state.origin = closing.origin; } }
+  return state;
+};
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
 /** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
 /** Chế độ chạy hợp lệ từ lựa chọn của người dùng hoặc lịch nền; giá trị lạ về `read` (chỉ lấy về), không bao giờ thành chế độ có đẩy. */
@@ -46,9 +58,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
   var previous = null, loadPrevious = function () {
     try { previous = key === FbmSync.STATE_KEY ? FbmSync.documentPropertyJson(key, 'state đồng bộ') : null; } catch (previousFailed) { previous = { runId: '', phase: 'không đọc được state cũ: ' + (previousFailed.code || previousFailed.message) }; }
   };
-  try {
-    if (typeof Utilities !== 'undefined' && Utilities.newBlob) { bytes = Utilities.newBlob(text).getBytes().length; }
-  } catch (ignoreBytes) {}
+  bytes = Utilities.newBlob(text).getBytes().length;
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
     var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
     tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
@@ -491,7 +501,7 @@ FbmSync.EXTENSION_TRAIL_STAGES = {
 /** Chỉ giữ tên bước, mã request, số hop và mốc giờ từ hộp đen: Extension là nguồn ngoài, không chép nguyên văn vào Log. */
 FbmSync.extensionTrailSafe = function (trail) {
   if (!trail || typeof trail !== 'object') { return null; }
-  return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0), code: String(trail.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60) };
+  return { stage: String(trail.stage || '').slice(0, 40), requestId: String(trail.requestId || '').slice(0, 80), hop: Number(trail.hop || 0), httpStatus: Number(trail.httpStatus || 0), at: Number(trail.at || 0), workerStartedAt: Number(trail.workerStartedAt || 0), currentWorkerStartedAt: Number(trail.currentWorkerStartedAt || 0), code: String(trail.code || '').replace(/[^A-Za-z0-9_ .:-]/g, '').slice(0, 60) };
 };
 /**
  * Câu tiếng người cho dòng Log request không có trả lời: Extension dừng ở bước nào, và phần chạy nền của nó có khởi động lại sau bước đó không.
@@ -503,7 +513,7 @@ FbmSync.extensionTrailText = function (trail, now) {
   var ago = t.at ? Math.max(0, Math.round((Number(now || Date.now()) - t.at) / 60000)) : -1;
   var text = 'Hộp đen Extension: bước cuối' + (ago >= 0 ? ' (cách đây ' + ago + ' phút)' : '') + ' là ' + (FbmSync.EXTENSION_TRAIL_STAGES[t.stage] || t.stage) + (t.requestId ? ', request ' + t.requestId : '') + '.';
   if (t.stage === 'chain_finished') { return text + ' Lượt còn mở là lỗi phía GAS, không phải Extension bỏ dở.'; }
-  if (t.code) { text += (t.stage === 'fbm_tab_preparing' ? ' Trạng thái tab lúc tìm thấy: ' : ' Mã lỗi: ') + t.code + '.'; } else if (t.stage === 'gas_reply_failed') { text += ' Mã lỗi: không rõ.'; }
+  if (t.code) { text += (t.stage === 'fbm_tab_preparing' ? ' Trạng thái tab lúc tìm thấy: ' : ' Mã lỗi: ') + t.code + (t.httpStatus ? ' (HTTP ' + t.httpStatus + ')' : '') + '.'; } else if (t.stage === 'gas_reply_failed') { text += ' Mã lỗi: không rõ.'; }
   if (t.stage === 'gas_reply_failed') { return text; }
   if (t.workerStartedAt && t.currentWorkerStartedAt) {
     text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).' : ' Phần chạy nền của Extension vẫn chạy liền từ bước đó, không khởi động lại.';

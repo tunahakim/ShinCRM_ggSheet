@@ -38,7 +38,7 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
 function fbmSyncConfigClone(value) {
   if (value === undefined || value === null) { return value; }
   if (typeof value !== 'object') { return value; }
-  try { return JSON.parse(JSON.stringify(value)); } catch (ignore) { return value; }
+  return JSON.parse(JSON.stringify(value));
 }
 
 function fbmSyncConfigState(key) {

@@ -138,7 +138,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
   hop.fbmSyncPaint(idle());
   const runNode = content.children[0];
-  hop.fbmSyncPaint(Object.assign(idle(), { phase: 'pull_customer', runId: 'run-snapshot', cursor: { kind: 'customer_grid' }, label: 'Snapshot Chạy đồng bộ mới', counts: { completed: 3, succeeded: 2 } }));
+  hop.fbmSyncPaint(Object.assign(idle(), { running: true, phase: 'pull_customer', runId: 'run-snapshot', cursor: { kind: 'customer_grid' }, label: 'Snapshot Chạy đồng bộ mới', counts: { completed: 3, succeeded: 2 } }));
   check(so, 'snapshot GAS vá Chạy đồng bộ tại chỗ, không thay node màn hình', [content.children[0] === runNode, content.textContent.indexOf('Pipeline đang chạy') >= 0], [true, true]);
 
   ['run', 'account', 'results', 'settings'].forEach((screen) => {
@@ -185,7 +185,7 @@ async function chay(so) {
   hop.fbmSyncApprovePush = () => { approved += 1; return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(awaiting);
   click(dom, dom.document.getElementById('fbm-sync-approve'));
-  const active = Object.assign(idle(), { phase: 'pull_customer', mode: 'read', runId: 'run-1', cursor: { kind: 'customer_grid' } });
+  const active = Object.assign(idle(), { running: true, phase: 'pull_customer', mode: 'read', runId: 'run-1', cursor: { kind: 'customer_grid' } });
   let cancelled = 0;
   hop.fbmSyncCancel = () => { cancelled += 1; return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(active);

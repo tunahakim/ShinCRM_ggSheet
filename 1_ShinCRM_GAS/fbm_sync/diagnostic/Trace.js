@@ -8,8 +8,8 @@ FbmSync.TRACE_LIMIT = 24;
 FbmSync.traceClip = function (value, limit) { return String(value || '').slice(0, Number(limit || 160)); };
 
 FbmSync.traceContext = function (extra) {
-  var state = {};
-  try { state = FbmSync.stateRead ? FbmSync.stateRead() : {}; } catch (ignore) {}
+  // State đọc hỏng thì ném thẳng (có mã): ngữ cảnh trace rỗng sẽ ghi vết sai thay vì báo lỗi.
+  var state = FbmSync.stateRead();
   var cursor = state.cursor || {}, value = extra || {};
   return {
     runId: FbmSync.traceClip(value.runId !== undefined ? value.runId : state.runId || '', 80),
@@ -81,13 +81,11 @@ FbmSync.traceRead = function (limit) {
 
 FbmSync.traceResponse = function (raw) {
   var value = raw, length = 0, status = 0;
-  try {
-    if (raw && typeof raw === 'object' && raw.body !== undefined) {
-      value = raw.body;
-      status = Number(raw.status || 0) || 0;
-    }
-    length = typeof value === 'string' ? value.length : JSON.stringify(value || null).length;
-  } catch (ignore) {}
+  if (raw && typeof raw === 'object' && raw.body !== undefined) {
+    value = raw.body;
+    status = Number(raw.status || 0) || 0;
+  }
+  length = typeof value === 'string' ? value.length : JSON.stringify(value || null).length;
   return { httpStatus: status, responseLength: length };
 };
 

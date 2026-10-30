@@ -1,11 +1,7 @@
 /** Entry point ổn định cho Sidebar; mọi call đi qua runEntryPoint. */
 /** Ghi dấu vết tối giản của callback để phân biệt lỗi trả về với lượt chạy bị kẹt; không lưu response FBM. */
 function fbmTraceContinue(stage, error) {
-  try {
-    if (typeof FbmSync.traceEvent === 'function') {
-      FbmSync.traceEvent('gas_' + String(stage || ''), { operation: 'fbmContinueSync', error: error ? String(error && error.message || error) : '' });
-    }
-  } catch (ignore) {}
+  FbmSync.traceEvent('gas_' + String(stage || ''), { operation: 'fbmContinueSync', error: error ? String(error && error.message || error) : '' });
 }
 function fbmTraceBoundary(stage, name, error) {
   if (typeof FbmSync.traceEvent !== 'function') { return; }
@@ -14,9 +10,19 @@ function fbmTraceBoundary(stage, name, error) {
 /** Mở/đóng bộ đệm DocumentProperties của một lần gọi; `runEntryPoint` gọi qua tên toàn cục để lõi không phụ thuộc FbmSync. */
 function fbmCallBegin() { var outermost = typeof FbmSync.propertyBufferBegin === 'function' && FbmSync.propertyBufferBegin(); if (outermost && typeof FbmSync.budgetCallBegin === 'function') { FbmSync.budgetCallBegin(); } }
 function fbmCallEnd() { if (typeof FbmSync.propertyBufferEnd === 'function') { FbmSync.propertyBufferEnd(); } }
-/** Chuẩn hóa toàn bộ kết quả công khai trước khi qua google.script.run; không để Date lọt ra callback. */
+/**
+ * Cửa ra duy nhất của mọi hàm `fbm*` về Sidebar: đổi Date sang dạng JSON và gỡ khóa phiên FBM. Gỡ theo hình dạng, không theo tên khóa đơn lẻ: object có `customerAuthorized` hoặc `activityAuthorized` là ô phiên của state nên mất cả ba khóa bí mật (kèm `cookie`).
+ * Không gỡ `cookie`/`authorized` ở object khác: body request FBM gửi Sidebar chuyển cho Extension cần chính các khóa đó.
+ */
 function fbmPublicResult(result) {
-  return typeof FbmSync.transportValue === 'function' ? FbmSync.transportValue(result) : result;
+  return fbmPublicStrip(FbmSync.transportValue(result));
+}
+function fbmPublicStrip(value) {
+  if (Array.isArray(value)) { return value.map(fbmPublicStrip); }
+  if (!value || typeof value !== 'object') { return value; }
+  var isSession = Object.prototype.hasOwnProperty.call(value, 'customerAuthorized') || Object.prototype.hasOwnProperty.call(value, 'activityAuthorized'), out = {};
+  Object.keys(value).forEach(function (key) { if (isSession && ['customerAuthorized', 'activityAuthorized', 'cookie'].indexOf(key) >= 0) { return; } out[key] = fbmPublicStrip(value[key]); });
+  return out;
 }
 /** Bắt đầu một phiên đọc/ghi theo mode được chọn. */
 function fbmStartSync(mode, clientTrace, pack) { return runEntryPoint('fbmStartSync', 'sidebar', function () { fbmTraceBoundary('gas_entered', 'fbmStartSync'); if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('engine_before', 'fbmStartSync'); var result = FbmSync.controlDispatchLocked('start', { mode: mode, pack: pack, origin: 'manual', manual: true }); fbmTraceBoundary('engine_after', 'fbmStartSync'); if (result && result.status) { fbmTraceBoundary('before_log', 'fbmStartSync'); FbmSync.logStatus(result.status, 'start'); fbmTraceBoundary('after_log', 'fbmStartSync'); } return fbmPublicResult(result); }, { mode: mode, pack: pack, clientTrace: clientTrace }); }
@@ -27,15 +33,15 @@ function fbmApprovePush() { return runEntryPoint('fbmApprovePush', 'sidebar', fu
 /** Gửi response thô của Extension cho cursor hiện tại. */
 function fbmContinueSync(response, clientTrace) { return runEntryPoint('fbmContinueSync', 'sidebar', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceContinue('entered'); try { var before = FbmSync.statusView(); fbmTraceBoundary('engine_before', 'fbmContinueSync', null); var result = FbmSync.controlDispatchLocked('continue', { response: response }); fbmTraceBoundary('engine_after', 'fbmContinueSync', null); fbmTraceContinue('returned'); if (result && FbmSync.shouldLogStatus(before, result.status)) { fbmTraceBoundary('before_log', 'fbmContinueSync'); FbmSync.logStatus(result.status, 'slice'); fbmTraceBoundary('after_log', 'fbmContinueSync'); } return fbmPublicResult(result); } catch (err) { fbmTraceContinue('failed', err); fbmTraceBoundary('gas_failed', 'fbmContinueSync', err); throw err; } }, { response: response, clientTrace: clientTrace }); }
 /** Dừng phiên đồng bộ mà không đụng dữ liệu nghiệp vụ. */
-function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', function () { return FbmSync.controlDispatchLocked('cancel', {}); }, {}); }
+function fbmCancelSync() { return runEntryPoint('fbmCancelSync', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('cancel', {})); }, {}); }
 /** Lối thoát khi màn đồng bộ kẹt vì không lưu/đọc được trạng thái phiên; GAS tự từ chối nếu phiên còn chạy bình thường. */
-function fbmResetSyncState() { return runEntryPoint('fbmResetSyncState', 'sidebar', function () { return FbmSync.controlDispatchLocked('reset_state', {}); }, {}); }
+function fbmResetSyncState() { return runEntryPoint('fbmResetSyncState', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('reset_state', {})); }, {}); }
 /** Đăng nhập thử, hủy phiên cũ và nhận từng bước đăng nhập phải qua runEntryPoint: Log đăng nhập chỉ nằm trong bộ đệm, không có vỏ này thì dòng Log của nhánh thành công mất (gặp thật 2026-10-07). */
 function fbmStartLoginTest(credentialRef, expectedIdentity) { return runEntryPoint('fbmStartLoginTest', 'sidebar', function () { return fbmPublicResult(FbmSync.loginTestRequest(credentialRef, expectedIdentity || null)); }, {}); }
 function fbmStartForceLogin() { return runEntryPoint('fbmStartForceLogin', 'sidebar', function () { return fbmPublicResult(FbmSync.loginForceRequest()); }, {}); }
 function fbmLoginTestResult(response) { return runEntryPoint('fbmLoginTestResult', 'sidebar', function () { return fbmPublicResult(FbmSync.loginTestResult(response)); }, {}); }
 /** Đọc snapshot tiến độ hiện tại; Sidebar chỉ polling khi đang chạy. */
-function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', fbmSyncStatusRead, {}); }
+function fbmGetSyncStatus() { return runEntryPoint('fbmGetSyncStatus', 'sidebar', function () { return fbmPublicResult(fbmSyncStatusRead()); }, {}); }
 function fbmSyncStatusRead() {
   // Reload có thể là caller duy nhất sau khi callback cuối bị mất. Thu hồi phiên
   // treo dưới cùng orchestration lock để không giữ nút "Dừng đồng bộ" vô hạn.
@@ -52,44 +58,46 @@ function fbmSyncStatusRead() {
   return result;
 }
 /** Sidebar báo lỗi: `runId` chỉ có khi lỗi thuộc phiên Sidebar đang tự chạy, GAS mới dừng phiên đó; `action` là tên thao tác ghi vào Log. */
-function fbmLogSyncError(message, clientTrace, action, runId) { return runEntryPoint('fbmLogSyncError', 'sidebar', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return FbmSync.logTransportError(message, action, runId); }, { message: message, clientTrace: clientTrace, action: action, runId: runId }); }
+function fbmLogSyncError(message, clientTrace, action, runId) { return runEntryPoint('fbmLogSyncError', 'sidebar', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } fbmTraceBoundary('gas_entered', 'fbmLogSyncError'); return fbmPublicResult(FbmSync.logTransportError(message, action, runId)); }, { message: message, clientTrace: clientTrace, action: action, runId: runId }); }
 /** Nhận nốt dấu vết Sidebar sau callback cuối của phiên thành công. */
-function fbmLogSyncTrace(clientTrace) { return runEntryPoint('fbmLogSyncTrace', 'sidebar', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } return { ok: true, imported: Array.isArray(clientTrace) ? clientTrace.length : 0 }; }, { clientTrace: clientTrace }); }
+function fbmLogSyncTrace(clientTrace) { return runEntryPoint('fbmLogSyncTrace', 'sidebar', function () { if (FbmSync.traceImport) { FbmSync.traceImport(clientTrace); } return fbmPublicResult({ ok: true, imported: Array.isArray(clientTrace) ? clientTrace.length : 0 }); }, { clientTrace: clientTrace }); }
 /** Thu hồi đúng reservation khi Sidebar không chuyển được envelope tới tab FBM. */
 function fbmReportSyncTransportFailure(requestId, code, message) { return runEntryPoint('fbmReportSyncTransportFailure', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('transport_failure', { requestId: requestId, code: code, message: message })); }, { requestId: requestId, code: code, message: message }); }
 /** Đọc vết độc lập sau timeout; không tiếp tục cursor và không gửi request FBM. */
-function fbmGetSyncTrace() { return runEntryPoint('fbmGetSyncTrace', 'sidebar', function () { return { ok: true, trace: FbmSync.traceRead(24) }; }); }
-function fbmGetMasterSwitch() { return runEntryPoint('fbmGetMasterSwitch', 'sidebar', function () { return FbmSync.controlDispatch('get_master_switch', {}); }); }
-function fbmGetBackgroundSwitch() { return runEntryPoint('fbmGetBackgroundSwitch', 'sidebar', function () { return FbmSync.controlDispatch('get_background_switch', {}); }); }
-function fbmGetIdentityStatus(runtime) { return runEntryPoint('fbmGetIdentityStatus', 'sidebar', function () { return FbmSync.controlDispatchLocked('identity_status', { runtime: runtime || {} }); }); }
-function fbmSaveIdentityBinding(binding) { return runEntryPoint('fbmSaveIdentityBinding', 'sidebar', function () { return FbmSync.controlDispatchLocked('save_identity_binding', { binding: binding || {} }); }); }
+function fbmGetSyncTrace() { return runEntryPoint('fbmGetSyncTrace', 'sidebar', function () { return fbmPublicResult({ ok: true, trace: FbmSync.traceRead(24) }); }); }
+function fbmGetMasterSwitch() { return runEntryPoint('fbmGetMasterSwitch', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatch('get_master_switch', {})); }); }
+function fbmGetBackgroundSwitch() { return runEntryPoint('fbmGetBackgroundSwitch', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatch('get_background_switch', {})); }); }
+function fbmGetIdentityStatus(runtime) { return runEntryPoint('fbmGetIdentityStatus', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('identity_status', { runtime: runtime || {} })); }); }
+function fbmSaveIdentityBinding(binding) { return runEntryPoint('fbmSaveIdentityBinding', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('save_identity_binding', { binding: binding || {} })); }); }
 function fbmGetSyncSettings() { return runEntryPoint('fbmGetSyncSettings', 'sidebar', function () { return fbmPublicResult({ ok: true, settings: fbmSyncSettingsView() }); }); }
 function fbmSyncSettingsView() { var spreadsheetId = FbmSync.currentSpreadsheetId(); var settings = typeof FbmSync.syncSettingsPublic === 'function' ? FbmSync.syncSettingsPublic() : { approvalThreshold: FbmSync.approvalThreshold() }; settings.spreadsheetId = spreadsheetId; settings.account = typeof FbmSync.accountSettingsPublic === 'function' ? FbmSync.accountSettingsPublic() : { customerPrefix: '', customerCodeLength: '' }; settings.extension = typeof FbmSync.extensionConfigPublic === 'function' ? FbmSync.extensionConfigPublic() : { pollMinutes: 5, runOnStartup: true }; settings.background = typeof FbmSync.backgroundSchedulePublic === 'function' ? FbmSync.backgroundSchedulePublic() : {}; return settings; }
 /** Gói mở màn Đồng bộ FBM: trạng thái phiên, liên kết tài khoản, cài đặt và cấu hình đăng nhập trong một lời gọi, mỗi phần đọc qua đúng hàm đọc của cửa riêng. Một phần lỗi thì cả gói lỗi để Sidebar báo một lần, không vẽ màn thiếu phần. */
 function fbmGetPanelBundle() { return runEntryPoint('fbmGetPanelBundle', 'sidebar', function () {
   return fbmPublicResult({ ok: true, status: fbmSyncStatusRead(), identity: FbmSync.controlDispatchLocked('identity_status', { runtime: {} }), settings: fbmSyncSettingsView(), login: FbmSync.loginConfigPublic() });
 }); }
-/** Nút Lưu cài đặt chung gồm cả công tắc tổng: `masterEnabled` là true/false khi người dùng đổi công tắc, null khi không đổi. Đổi công tắc qua đúng lệnh của `fbmSetMasterSwitch`, rồi lưu cài đặt, rồi trả status mới trong cùng lời gọi. */
+/** Nút Lưu cài đặt chung gồm cả công tắc tổng: `masterEnabled` là true/false khi người dùng đổi công tắc, null khi không đổi. Lưu cài đặt trước, đạt mới đổi công tắc qua đúng lệnh của `fbmSetMasterSwitch`, rồi trả status mới trong cùng lời gọi. */
 function fbmSaveSyncSettings(settings, masterEnabled) { return runEntryPoint('fbmSaveSyncSettings', 'sidebar', function () {
-  if (typeof FbmSync.syncSettingsSave !== 'function') { throw new Error('Kho tham số phiên chưa được nạp.'); }
+  // Lưu cài đặt trước (hàm lưu tự kiểm và chỉ ghi khi đạt): cài đặt sai thì công tắc tổng giữ nguyên, người dùng không nhận một nửa thay đổi.
+  var saved = fbmPublicResult(FbmSync.syncSettingsSave(settings || {}));
+  if (saved.ok === false) { return Object.assign({}, saved, { status: FbmSync.statusView() }); }
   if (typeof masterEnabled === 'boolean') {
     var master = FbmSync.controlDispatchLocked('set_master_switch', { enabled: masterEnabled });
     if (!master || master.ok === false) { return fbmPublicResult(master); }
   }
-  return Object.assign({}, fbmPublicResult(FbmSync.syncSettingsSave(settings || {})), { status: FbmSync.statusView() });
+  return Object.assign({}, saved, { status: fbmPublicResult(FbmSync.statusView()) });
 }); }
 function fbmSaveAccountSettings(settings) { return runEntryPoint('fbmSaveAccountSettings', 'sidebar', function () { if (typeof FbmSync.accountSettingsSave !== 'function') { throw new Error('Kho cài đặt tài khoản FBM chưa được nạp.'); } return fbmPublicResult(FbmSync.accountSettingsSave(settings || {})); }); }
 function fbmSaveExtensionConfig(config) { return runEntryPoint('fbmSaveExtensionConfig', 'sidebar', function () { var result = FbmSync.extensionConfigSave(config || {}); return fbmPublicResult(result); }); }
 function fbmSaveBackgroundSchedule(schedule) { return runEntryPoint('fbmSaveBackgroundSchedule', 'sidebar', function () { var result = FbmSync.backgroundScheduleSave(schedule || {}); return fbmPublicResult(result); }); }
-function fbmSetMasterSwitch(enabled) { return runEntryPoint('fbmSetMasterSwitch', 'sidebar', function () { return FbmSync.controlDispatchLocked('set_master_switch', { enabled: enabled === true }); }); }
-function fbmSetBackgroundSwitch(enabled) { return runEntryPoint('fbmSetBackgroundSwitch', 'sidebar', function () { return FbmSync.controlDispatchLocked('set_background_switch', { enabled: enabled === true }); }); }
-function fbmSaveLoginPolicy(policy) { return runEntryPoint('fbmSaveLoginPolicy', 'sidebar', function () { return FbmSync.loginConfigPolicySave(policy || {}); }); }
+function fbmSetMasterSwitch(enabled) { return runEntryPoint('fbmSetMasterSwitch', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('set_master_switch', { enabled: enabled === true })); }); }
+function fbmSetBackgroundSwitch(enabled) { return runEntryPoint('fbmSetBackgroundSwitch', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('set_background_switch', { enabled: enabled === true })); }); }
+function fbmSaveLoginPolicy(policy) { return runEntryPoint('fbmSaveLoginPolicy', 'sidebar', function () { return fbmPublicResult(FbmSync.loginConfigPolicySave(policy || {})); }); }
 function fbmSaveConnection(config) { return runEntryPoint('fbmSaveConnection', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('save_connection', config || {})); }); }
-function fbmRepairLoginUsername(input) { return runEntryPoint('fbmRepairLoginUsername', 'sidebar', function () { return FbmSync.loginConfigRepairUsername(input || {}); }); }
-function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', function () { return FbmSync.controlDispatchLocked('retry_push_failures', {}); }); }
-function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', function () { return fbmSyncRelayConfig(); }); }
-function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return runEntryPoint('fbmLogRelaySwitchDecision', 'sidebar', function () { return FbmSync.relaySwitchDecisionLog(decision === 'switch' ? 'switch' : 'keep', fromSpreadsheetId); }); }
-function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', function () { return fbmSyncRotateRelayKey(); }); }
-function fbmOpenConflict() { return runEntryPoint('fbmOpenConflict', 'sidebar', function () { return FbmSync.controlDispatchLocked('open_conflict', {}); }); }
-function fbmConflictOpened(response) { return runEntryPoint('fbmConflictOpened', 'sidebar', function () { return FbmSync.controlDispatchLocked('conflict_opened', { response: response }); }); }
-function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, snapshot) { return runEntryPoint('fbmConfirmConflict', 'sidebar', function () { return FbmSync.controlDispatchLocked('confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, fbmValues: fbmValues, shinValues: shinValues, snapshot: snapshot }); }); }
+function fbmRepairLoginUsername(input) { return runEntryPoint('fbmRepairLoginUsername', 'sidebar', function () { return fbmPublicResult(FbmSync.loginConfigRepairUsername(input || {})); }); }
+function fbmRetryPushFailures() { return runEntryPoint('fbmRetryPushFailures', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('retry_push_failures', {})); }); }
+function fbmGetRelayConfig() { return runEntryPoint('fbmGetRelayConfig', 'sidebar', function () { return fbmPublicResult(fbmSyncRelayConfig()); }); }
+function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return runEntryPoint('fbmLogRelaySwitchDecision', 'sidebar', function () { return fbmPublicResult(FbmSync.relaySwitchDecisionLog(decision === 'switch' ? 'switch' : 'keep', fromSpreadsheetId)); }); }
+function fbmRotateRelayKey() { return runEntryPoint('fbmRotateRelayKey', 'sidebar', function () { return fbmPublicResult(fbmSyncRotateRelayKey()); }); }
+function fbmOpenConflict() { return runEntryPoint('fbmOpenConflict', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('open_conflict', {})); }); }
+function fbmConflictOpened(response) { return runEntryPoint('fbmConflictOpened', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('conflict_opened', { response: response })); }); }
+function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, snapshot) { return runEntryPoint('fbmConfirmConflict', 'sidebar', function () { return fbmPublicResult(FbmSync.controlDispatchLocked('confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, fbmValues: fbmValues, shinValues: shinValues, snapshot: snapshot })); }); }

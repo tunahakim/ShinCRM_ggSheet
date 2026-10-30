@@ -2,14 +2,14 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.VERSION = '1.0.0';
-FbmSync.DEFAULT_APPROVAL_THRESHOLD = 10;
+/** Ngưỡng đọc qua kho cài đặt (kho đã điền mặc định và ném lỗi khi dữ liệu hỏng); giá trị không phải số nguyên không âm ở đây là lỗi chương trình, ném ra chứ không rơi về mặc định, vì ngưỡng sai lặng lẽ có thể cho đẩy hàng loạt mà không hỏi. */
 FbmSync.approvalThreshold = function () {
-  var raw = '';
-  try { raw = typeof FbmSync.syncSettingsRead === 'function' ? FbmSync.syncSettingsRead().approvalThreshold : ''; } catch (ignore) { raw = ''; }
-  // Ô cấu hình trống nghĩa là chưa đặt ngưỡng; 0 vẫn là một giá trị hợp lệ nếu người dùng chủ động chọn.
-  if (raw === undefined || raw === null || String(raw).trim() === '') { return FbmSync.DEFAULT_APPROVAL_THRESHOLD; }
-  var value = Number(raw);
-  return isFinite(value) && value >= 0 ? Math.floor(value) : FbmSync.DEFAULT_APPROVAL_THRESHOLD;
+  var value = FbmSync.syncSettingsRead().approvalThreshold;
+  if (typeof value !== 'number' || !isFinite(value) || value < 0 || Math.floor(value) !== value) {
+    var invalid = new Error('Ngưỡng yêu cầu chấp thuận không hợp lệ: ' + String(value) + '.');
+    invalid.code = 'FBM_APPROVAL_THRESHOLD_INVALID'; throw invalid;
+  }
+  return value;
 };
 FbmSync.CONTROLLERS = { customer: 'zccrAccount', activity: 'zccrAccountTask', user: 'User' };
 FbmSync.ENDPOINTS = {

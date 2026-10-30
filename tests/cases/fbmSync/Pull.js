@@ -28,7 +28,7 @@ async function chay(so) {
   const realPullWrite = builders.FbmSync.pullWrite;
   builders.FbmSync.stateRead = () => readModeState;
   builders.FbmSync.stateWrite = (next) => { readModeState = next; return next; };
-  builders.FbmSync.pullWrite = (entity, records) => { readModeSheetWrites += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0 }; };
+  builders.FbmSync.pullWrite = (entity, records) => { readModeSheetWrites += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
   const readModeResult = builders.FbmSync.pullRecords('customer', [{ id: 'CUS-000001' }], 'read');
   check(so, 'mode read ghi ket qua pull vao ShinCRM nhung khong co quyen ghi FBM', [readModeResult.written, readModeSheetWrites, readModeState.counts.succeeded, builders.FbmSync.canWriteFbm('read')], [1, 1, 1, false]);
   builders.FbmSync.pullWrite = realPullWrite;
@@ -329,7 +329,14 @@ async function chay(so) {
   builders.FbmSync.readLocal = () => [{ id: 'CUS-MST-1', taxNumber: '0100123456' }, { id: 'CUS-MST-2', taxNumber: '0100123456' }];
   builders.writeGateSave = () => { ambiguousWrite = true; return { ok: true }; };
   const ambiguousResult = builders.FbmSync.pullWrite('customer', [taxIncoming]);
-  check(so, 'Customer trùng MST nhiều dòng thì fail-closed không tạo bản ghi', [ambiguousResult.written, ambiguousResult.skipped, ambiguousWrite, taxState.metadata.identityBlocks[0].reason], [0, 1, false, 'duplicate_tax_number']);
+  check(so, 'Customer trùng MST nhiều dòng thì fail-closed không tạo bản ghi', [ambiguousResult.written, ambiguousResult.skipped, ambiguousWrite, ambiguousResult.identityBlocks[0].reason], [0, 1, false, 'duplicate_tax_number']);
+  check(so, 'pullWrite không tự ghi ô lượt; khách bị chặn danh tính chỉ trả về cho người điều phối', taxState.metadata.identityBlocks, undefined);
+  // Kho thật trả bản sao mỗi lần đọc: pullWrite từng ghi bản riêng rồi pullRecords ghi bản cũ của nó đè lên, nên khách chặn danh tính biến mất.
+  let storedState = JSON.stringify({ mode: 'read', counts: { completed: 0, total: 0, succeeded: 0, conflict: 0, skipped: 0 }, metadata: { identityBlocks: [{ fbmCustomerCode: 'CU' }] } });
+  builders.FbmSync.stateRead = () => JSON.parse(storedState);
+  builders.FbmSync.stateWrite = (next) => { storedState = JSON.stringify(next); };
+  builders.FbmSync.pullRecords('customer', [taxIncoming], 'read');
+  check(so, 'Lượt kéo giữ khách bị chặn danh tính trong ô lượt, nối sau các mục cũ', JSON.parse(storedState).metadata.identityBlocks.map((item) => item.fbmCustomerCode), ['CU', 'ALT00011']);
   let newPullWrite, newPullCalls = 0, dirtyMarkCalls = 0;
   builders.FbmSync.stateRead = () => ({ metadata: {} });
   builders.FbmSync.readLocal = () => [];
