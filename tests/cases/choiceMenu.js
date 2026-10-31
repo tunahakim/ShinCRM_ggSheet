@@ -1,5 +1,6 @@
 /** Kiểm tra control menu chọn: không dùng input combo và giữ popup dùng chung. */
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -10,8 +11,7 @@ function chay(so) {
   body.id = 'sidebar-body';
   body.rect = { top: 0, bottom: 700, left: 0, right: 300 };
   dom.root.appendChild(body);
-  const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
-    'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/popupList.html', 'client/ui/choiceMenu.html');
+  const hop = napTheoSidebar(['client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/popupList.html', 'client/ui/choiceMenu.html'], taoHopCat({ document: dom.document, window: dom.window }));
   hop.RENDER_REGIONS = { body: 'sidebar-body' };
 
   const html = hop.renderNode(hop.StandaloneControl({

@@ -1,7 +1,8 @@
 /** Kiểm thử offline cổng cảnh báo thay đổi chưa lưu của Sidebar. */
 const fs = require('fs');
 const path = require('path');
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
 const { section, check } = require('../lib/assert');
 
@@ -16,7 +17,7 @@ function taoBoTest() {
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
     alert: (message) => { calls.push({ name: 'alert', message }); }
   });
-  napClient(hop, 'client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html');
+  napTheoSidebar(['client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html'], hop);
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
   dom.root.appendChild(dialog);
   const wrapper = dom.document.createElement('div'); wrapper.className = 'shin-form-field';
@@ -522,7 +523,7 @@ async function testUiDecisionChoose(so) {
 /** Dựng luồng Lưu với GAS giả: lần gọi đầu trả `firstRes`, các lần sau lưu được. */
 function taoLuongLuu(firstRes) {
   const bo = taoBoTest(), hop = bo.hop;
-  napClient(hop, 'client/ui/fieldInvalid.html');
+  napTheoSidebar(['client/ui/fieldInvalid.html'], hop);
   ['ten', 'ghiChu'].forEach((name) => {
     const el = bo.dom.document.createElement('input');
     el.id = 'f-' + name;
@@ -630,7 +631,7 @@ async function testSaveFlowPopup(so) {
   check(so, 'chọn quay lại form: không gửi thêm, form vẫn mở với chữ đang nhập', [e3.x.ghi.gui.length, e3.x.ghi.dongHuy, e3.x.ghi.dong, e3.x.bo.dom.document.getElementById('f-ghiChu').value], [1, 0, 0, 'của tôi']);
 
   const xoa = taoBoTest();
-  napClient(xoa.hop, 'client/save/pendingDelete.html');
+  napTheoSidebar(['client/save/pendingDelete.html'], xoa.hop);
   const ram = [];
   Object.assign(xoa.hop, {
     Store: { removeRecord: (e, id) => ram.push('bỏ ' + id), upsertRecord: (e, r) => ram.push('ghi ' + r.id) },
@@ -665,7 +666,7 @@ async function testSaveFlowPopup(so) {
 
   const banXoa = (choice) => {
     const t = taoBoTest(), gui = [];
-    napClient(t.hop, 'client/save/pendingDelete.html');
+    napTheoSidebar(['client/save/pendingDelete.html'], t.hop);
     Object.assign(t.hop, {
       Store: { removeRecord: () => {}, upsertRecord: () => {} },
       sidebarBusyRun: (label, fn) => Promise.resolve().then(fn),

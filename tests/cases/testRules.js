@@ -88,26 +88,12 @@ const RULES = [
 /** Chỗ đang có lúc dựng luật. Chỉ được hạ số hoặc xóa dòng. */
 const EXCEPTIONS = {
   tenKhung: {
-    'cases/entryPoint.js': 1,
-    'cases/fbmSync/StaticRules.js': 2,
-    'cases/loadService.js': 3,
-    'cases/logGate.js': 1,
-    'cases/noticeGate.js': 1,
-    'cases/ramStore.js': 2,
-    'cases/sheetReadCopy.js': 1,
-    'cases/sheetTiers.js': 1,
-    'cases/writeGateAudit.js': 1
+    'cases/fbmSync/StaticRules.js': 2
   },
   dungHop: {
-    'cases/actions.js': 1,
     'cases/bindWatcher.js': 3,
-    'cases/blockKeys.js': 1,
     'cases/book.js': 1,
-    'cases/bootstrap.js': 1,
-    'cases/callTiming.js': 1,
-    'cases/choiceMenu.js': 1,
     'cases/dirtyState.js': 1,
-    'cases/domUi.js': 1,
     'cases/extensionBridge.js': 35,
     'cases/fbmSync/ActivityScan.js': 3,
     'cases/fbmSync/Audit.js': 1,
@@ -125,24 +111,9 @@ const EXCEPTIONS = {
     'cases/fbmSync/Settings.js': 4,
     'cases/fbmSync/Sidebar.js': 1,
     'cases/fbmSync/Workflow.js': 8,
-    'cases/fieldLogic.js': 1,
-    'cases/formScreen.js': 1,
-    'cases/listPicker.js': 1,
     'cases/liveModelReader.js': 2,
-    'cases/prefs.js': 1,
     'cases/recordGate.js': 2,
-    'cases/refresh.js': 9,
-    'cases/renderEngine.js': 3,
-    'cases/schemaCheck.js': 2,
-    'cases/screenSchemaAudit.js': 1,
-    'cases/screenState.js': 1,
-    'cases/selectionPoll.js': 2,
-    'cases/slots.js': 1,
-    'cases/uiBuilder.js': 1,
-    'cases/uiSchema.js': 1,
-    'cases/unsavedChanges.js': 4,
-    'cases/userPrefs.js': 1,
-    'cases/viewScreen.js': 1
+    'cases/userPrefs.js': 1
   },
   requireCa: {
     'cases/fbmSync/ActivityScan.js': 1,

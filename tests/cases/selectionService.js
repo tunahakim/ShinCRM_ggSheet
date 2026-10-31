@@ -3,7 +3,7 @@
  */
 
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { trongLanChay } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function ganLuaChon(nen, state) {
@@ -76,7 +76,7 @@ function chay(so) {
     [rendered, viewReport.some((line) => line.indexOf('customerId="CUS-000007"') >= 0)],
     [['!Lead'], true]);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ allViews: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ allViews: true }));
   const staleOn = hop.probeSelectionAndReload({}).view;
   hop.userPrefsWrite('autoRenderView', false);
   const staleOff = hop.probeSelectionAndReload({}).view;
@@ -141,7 +141,7 @@ function chay(so) {
   const maKhach = (part) => part.customer.rows.map((row) => row[0]);
 
   // Không chờ theo thời gian và không hoãn theo lượt đồng bộ: lời hỏi ngay sau thay đổi nhận payload trong cùng phản hồi, kể cả khi Sidebar còn gửi cờ đồng bộ cũ.
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
   const ready = hoi({ requestId: 'r11-ready', syncRunning: true }, movedProbe);
   check(so, 'lời hỏi ngay sau sửa nhận gói một phần records, không defer, không waitMs; processedRevision là revision sổ',
     [ready.requestId, ready.decision.ram.action, ready.payload.parts.map((part) => part.mode), ready.payload.parts[0].customer.rows.length, ready.processedRevision, ready.reload.revision, 'waitMs' in ready],
@@ -149,28 +149,28 @@ function chay(so) {
   check(so, 'lời hỏi lại cùng revision không nhận gói nào: sổ không bị tiêu, Sidebar tự biết đã thấy',
     hoi({}, ready).payload, null);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ core: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ core: true }));
   const fullCore = hoi({ requestId: 'r11-core' }, ready);
   check(so, 'R11 full core mang Activity trong cùng payload',
     [fullCore.requestId, fullCore.payload.parts.map((part) => part.mode), Array.isArray(fullCore.payload.parts[0].core.activity.rows), fullCore.payload.parts[0].core.activity.fields.length > 0],
     ['r11-core', ['fullCore'], true, true]);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ category: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ category: true }));
   const categoryPayload = hoi({ requestId: 'r11-category' }, fullCore);
   check(so, 'R11 Category trả đúng một phần Category',
     [categoryPayload.requestId, categoryPayload.payload.parts.map((part) => part.mode), categoryPayload.decision.ram.mode],
     ['r11-category', ['category'], 'parts']);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ config: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ config: true }));
   const configPayload = hoi({ requestId: 'r11-config' }, categoryPayload);
   check(so, 'R11 Config trả đúng một phần Config trong cùng request',
     [configPayload.requestId, configPayload.payload.parts.map((part) => part.mode), !!configPayload.payload.parts[0].config],
     ['r11-config', ['config'], true]);
 
   // Sidebar tụt lại nhiều lượt: Config, Category và mã khách gộp trong một lời gọi, mỗi phần một mức, không nạp lõi (V29).
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ config: true }));
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ category: true }));
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ config: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ category: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['CUS-000004'] }));
   const gop = hoi({}, configPayload);
   check(so, 'R11 ba dòng sổ khác loại gộp thành một gói ba phần, Config trước dữ liệu',
     [gop.payload.parts.map((part) => part.mode), gop.processedRevision], [['config', 'category', 'records'], hop.reloadStateRead().revision]);
@@ -179,7 +179,7 @@ function chay(so) {
   const burstIds = ['KH-A', 'KH-B', 'KH-C', 'KH-D', 'KH-E'];
   burstIds.forEach((id, i) => { ghiO(nen, 'Customer', 10 + i, '@CUS_MA_KH', id); ghiO(nen, 'Customer', 10 + i, '@CUS_TEN_CTY', id); });
   const burstRevision = hop.reloadStateRead().revision;
-  trongLanChay(hop, () => { burstIds.forEach((id) => { hop.dirtyStateMarkSignal({ customer: [id] }); }); });
+  trongLanGoi(hop, () => { burstIds.forEach((id) => { hop.dirtyStateMarkSignal({ customer: [id] }); }); });
   const burstReady = hoi({}, gop);
   check(so, 'R11 A-E năm lần ghi trong một lần chạy: một revision, một payload gồm toàn bộ mã',
     [burstReady.processedRevision - burstRevision, burstReady.payload.parts.map((part) => part.mode), maKhach(burstReady.payload.parts[0]).filter((id) => burstIds.indexOf(id) >= 0).sort()],
@@ -190,7 +190,7 @@ function chay(so) {
   ghiO(nen, 'Customer', 20, '@CUS_TEN_CTY', 'KH-F');
   ghiO(nen, 'Customer', 21, '@CUS_MA_KH', 'KH-NEW');
   ghiO(nen, 'Customer', 21, '@CUS_TEN_CTY', 'KH-NEW');
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH-F'] }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH-F'] }));
   const duringRevision = hop.reloadStateRead().revision;
   const readRows = hop.entityReadRowsAt;
   let injected = false;
@@ -239,11 +239,13 @@ function chay(so) {
     (ghiO(nen, 'Customer', 9, '@CUS_MA_KH', 'CUS-000009'), nen.dem.setValues > JSON.parse(demTruoc).setValues), true);
 
   const calls = [];
+  const realRun = hop.runEntryPoint;
   hop.runEntryPoint = function (name, source, fn) {
     calls.push([name, source]);
-    return fn();
+    return realRun(name, source, fn);
   };
   const finalViewReport = hop.viewProbeSelection();
+  hop.runEntryPoint = realRun;
   check(so, 'chỉ giữ một cổng selection/reload và cửa nghiệm thu view',
     [typeof hop.probeSelectionFull, typeof hop.probeSelectionCheap, calls, typeof finalViewReport[finalViewReport.length - 1]],
     ['undefined', 'undefined', [['viewProbeSelection', 'sidebar']], 'string']);
@@ -281,7 +283,7 @@ function chay(so) {
 
   section('SelectionService — signal entities nạp trọn đúng một thực thể trong cùng lời hỏi');
   const truocEntity = hop.reloadStateRead().revision;
-  trongLanChay(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
+  trongLanGoi(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
   const traEntity = hop.probeSelectionAndReload({ lastSeenRevision: truocEntity });
   const entityPart = traEntity.payload ? traEntity.payload.parts[0] : {};
   const payloadIds = entityPart.customer ? entityPart.customer.rows.map((row) => row[entityPart.customer.fields.indexOf('id')]) : [];
@@ -289,7 +291,7 @@ function chay(so) {
     [traEntity.decision.ram.mode, traEntity.payload.parts.length, entityPart.mode, entityPart.entity, payloadIds.indexOf('CUS-000004') >= 0, entityPart.activity],
     ['parts', 1, 'entity', 'customer', true, undefined]);
   const truocDraft = hop.reloadStateRead().revision;
-  trongLanChay(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
+  trongLanGoi(hop, () => hop.dirtyStateMarkDecision(hop.reloadDecisionForChange({ source: 'change', surface: 'entity', entities: ['customer'] })));
   check(so, 'nạp trọn thực thể bị chặn khi Sidebar giữ bản nháp, như full core',
     hop.probeSelectionAndReload({ lastSeenRevision: truocDraft, localDraft: { recordIds: ['CUS-000004'] } }).decision.ram.action, 'defer');
 

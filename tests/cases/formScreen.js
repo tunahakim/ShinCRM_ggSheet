@@ -4,7 +4,8 @@
  * Những chỗ hỏng-trong-im-lặng đáng kiểm nhất: tiêu đề suy sai nên form sửa đề chữ "Thêm"; ô kế tục không có dấu nên người dùng tưởng mình vừa gõ giá trị đó; form giao dịch thiếu bản ghi khách nên hàng `customer.note` trống trơn; và đóng form lồng thì rơi thẳng về màn xem thay vì về form dưới.
  */
 
-const { napClient, taoHopCat, catRuotScript, docTep } = require('../lib/load-gas');
+const { catRuotScript, docTep } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { khungGia } = require('../lib/khung-gia');
 const { stripComments } = require('../lib/strip-comments');
@@ -16,14 +17,13 @@ const KHACH = { id: 'CUS-000001', companyName: 'Công ty Thép Hòa Phát', phon
 const GIAO_DICH = { id: 'ACT-000001', customerId: 'CUS-000001', workDate: '2026-09-01', taskType: 'Gọi điện', content: 'Chào hàng lần đầu', priority: 'Cao', dueAt: '2026-09-10 09:00', recordStatus: 'active' };
 
 function dungCanh() {
-  const hop = napClient(taoHopCat(),
-    'client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
+  const hop = napTheoSidebar(['client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
     'client/ram/prefs.html', 'client/ram/screenState.html', 'client/util/valueText.html',
     'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
     'client/ui/renderEngine.html', 'client/ui/slots.html', 'client/schema/screens/formHeader.html',
     'client/schema/screens/view.html', 'client/schema/screens/customerForm.html', 'client/schema/screens/activityForm.html',
     'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',
-    'client/schema/fieldLogic.html', 'client/screen/viewScreen.html', 'client/screen/formScreen.html');
+    'client/schema/fieldLogic.html', 'client/screen/viewScreen.html', 'client/screen/formScreen.html']);
 
   hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   hop.document = khungGia();

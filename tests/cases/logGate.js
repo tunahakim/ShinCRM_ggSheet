@@ -7,6 +7,7 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { docLog } = require('../lib/gas/doc-log');
 const { napServer } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, ghiLoiNap } = require('../lib/assert');
@@ -23,14 +24,6 @@ function dungLog(vanHanh, props) {
     caiDat: vanHanh ? { core_ops: vanHanh } : {},
     props: Object.assign({ LOG_LAST_CLEANUP: homNay() }, props || {})
   });
-}
-
-/** Đọc các dòng dữ liệu của sheet `Log` giả, mỗi dòng là mảng chín ô. */
-function docLog(nen) {
-  const sheet = nen.Log.sheet;
-  const dau = nen.hop.SHEET_LAYOUT.Log.firstDataRow;
-  if (sheet.getLastRow() < dau) { return []; }
-  return sheet.getRange(dau, 1, sheet.getLastRow() - dau + 1, 9).getValues();
 }
 
 /** Nhồi sẵn dòng vào cuối sheet `Log`. Mỗi phần tử là cặp `[ô Lúc, ô Lý do]` — hai ô duy nhất mà luật cắt log đọc tới. */
@@ -200,7 +193,6 @@ function chay(so) {
   check(so, 'tệp giả từ chối xóa hết các hàng không đóng băng, đúng như Google',
     (() => { try { chanLuoi.Log.sheet.deleteRows(1, 5); return 'KHÔNG NÉM LỖI'; } catch (err) { return String(err.message).indexOf('không thể xóa tất cả các hàng không được cố định') !== -1; } })(),
     true);
-
 
   // FBM-018: lượt bị Google cắt ở 6 phút không chạy `finally`, nên dòng "Bắt đầu bước" phải tự lên sheet ngay khi chế độ vết bật.
   // Kiểm bằng Trace.js thật nạp chung với LogGate thật, và KHÔNG gọi flushLog — giả lập đúng lượt chết giữa đường.

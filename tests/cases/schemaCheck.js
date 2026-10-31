@@ -4,7 +4,8 @@
  * Hai phần, và phần thứ hai mới là phần đáng giá. Phần một: bảng khai thật phải sạch. Phần hai: mỗi luật phải thật sự bắt được lỗi khi cố tình làm hỏng một chỗ — vì một hàm kiểm chưa từng báo lỗi lần nào là một hàm chưa ai biết nó có chạy hay không.
  */
 
-const { napServer, napClient, taoHopCat } = require('../lib/load-gas');
+const { napServer, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, checkThrows, checkContains, ghiLoiNap } = require('../lib/assert');
 
 /** Bản sao sâu của bảng khai, để làm hỏng một chỗ mà không đụng bản thật. Schema là dữ liệu thuần nên đi qua JSON là đủ. */
@@ -19,7 +20,7 @@ function chay(so) {
   let maCategory = null;
   try {
     hop = napServer(taoHopCat(), 'server/data/DataSchema.js', 'server/data/SheetLayout.js', 'fbm_sync/SyncSchema.js');
-    napClient(hop, 'client/schema/schemaCheck.html');
+    napTheoSidebar(['client/schema/schemaCheck.html'], hop);
     maCategory = hop.CATEGORY_COLUMNS.map((cot) => cot[0]);
   } catch (err) {
     return ghiLoiNap(so, 'nạp bảng khai và schemaCheck', err);
@@ -113,12 +114,11 @@ function chay(so) {
 
   let hopUi = null;
   try {
-    hopUi = napClient(taoHopCat(),
-      'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
+    hopUi = napTheoSidebar(['client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
       'client/util/valueText.html', 'client/ui/renderEngine.html', 'client/ui/slots.html',
       'client/schema/screens/formHeader.html', 'client/schema/screens/view.html', 'client/schema/screens/customerForm.html',
       'client/schema/screens/activityForm.html', 'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',
-      'client/ui/actions.html', 'client/schema/schemaCheck.html');
+      'client/ui/actions.html', 'client/schema/schemaCheck.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp bản khai bố cục cùng bảng hành động và bảng slot', err);
   }

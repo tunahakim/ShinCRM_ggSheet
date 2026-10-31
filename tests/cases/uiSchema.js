@@ -4,7 +4,7 @@
  * Tệp khai chỉ có dữ liệu nên không có hành vi để kiểm; điều đáng kiểm là **bản khai khớp hợp đồng**: mọi tên trường có thật trong `DATA_SCHEMA`, mọi tên hành động nằm trong bảng tên, mọi mục menu tuân hai luật của tài liệu 03 Phần 9, và cả bốn màn dịch được qua `screenBuild` mà không nổ. Sai một chuỗi ở đây thì lỗi hiện ra lúc vẽ, cách xa dòng khai gây ra nó.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { TEN_HANH_DONG } = require('../lib/sidebar/ten-hanh-dong');
 const { moiNode } = require('../lib/sidebar/schema-node');
@@ -12,8 +12,6 @@ const { section, check, ghiDat, ghiTruot, ghiLoiNap } = require('../lib/assert')
 
 /** Bốn màn, để duyệt chứ không gõ lại tên ở từng phép kiểm. */
 const MAN = ['view', 'customerForm', 'activityForm', 'noteForm'];
-
-
 
 /** Mọi ô trường của một màn, ở cả hai lối khai: cây Block của màn view, và cụm `{ group, rows }` của ba màn form. */
 function moiTruong(man) {
@@ -90,9 +88,9 @@ function chay(so) {
   let DATA;
   try {
     DATA = dungHop().hop.DATA_SCHEMA;
-    hop = napClient(taoHopCat(), 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
+    hop = napTheoSidebar(['client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
       'client/schema/screens/formHeader.html', 'client/schema/screens/view.html', 'client/schema/screens/customerForm.html',
-      'client/schema/screens/activityForm.html', 'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html');
+      'client/schema/screens/activityForm.html', 'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp uiSchema cùng bộ dựng Block', err);
   }

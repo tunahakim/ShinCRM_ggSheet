@@ -4,7 +4,8 @@
  * Trọng tâm là ba điều dễ lệch: ngầm định phía client phải khớp ngầm định phía máy chủ (lệch thì lần mở đầu tiên hiện một nấc, bấm một cái là nhảy sang nấc khác mà không ai bấm gì), gói cũ thiếu khối núm không được làm sập lượt mở, và `activityView` ba nấc không được lật như công tắc.
  */
 
-const { napClient, taoHopCat, docTep, catRuotScript } = require('../lib/load-gas');
+const { docTep, catRuotScript } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { stripComments } = require('../lib/strip-comments');
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
@@ -15,7 +16,7 @@ function chay(so) {
   let hop;
   let mayChu;
   try {
-    hop = napClient(taoHopCat(), 'client/ram/prefs.html');
+    hop = napTheoSidebar(['client/ram/prefs.html']);
     mayChu = dungHop().hop.USER_PREFS;
   } catch (err) {
     return ghiLoiNap(so, 'nạp prefs', err);

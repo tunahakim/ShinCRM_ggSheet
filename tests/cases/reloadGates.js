@@ -1,5 +1,6 @@
 const { dungHop, ghiO } = require('../lib/dung-hop');
-const { napServer, trongLanChay, dongSoCuoi } = require('../lib/load-gas');
+const { napServer, dongSoCuoi } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function taoHop() {
@@ -19,7 +20,7 @@ function chay(so) {
   let env;
   try { env = taoHop(); } catch (err) { return ghiLoiNap(so, 'dựng hộp cát reload gate', err); }
 
-  const saved = trongLanChay(env.hop, () => env.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
+  const saved = trongLanGoi(env.hop, () => env.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
   check(so, 'writeGateSave pull phát signal bản ghi, làm mọi view cũ và không gọi bộ vẽ',
     [saved.ok, saved.recordIds, saved.reloadDecision.kind, dongSoCuoi(env.hop).customer, (env.hop.reloadStateRead().viewsStaleRevision === env.hop.reloadStateRead().revision), env.hop.rendered],
     [true, ['KH000001'], 'records', ['KH000001'], true, 0]);
@@ -28,14 +29,14 @@ function chay(so) {
     [1, false]);
 
   const userEnv = taoHop();
-  const userSaved = trongLanChay(userEnv.hop, () => userEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000112' }], source: 'user', old: [{ phone: '' }] }));
+  const userSaved = trongLanGoi(userEnv.hop, () => userEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000112' }], source: 'user', old: [{ phone: '' }] }));
   check(so, 'writeGateSave user cũng dùng signal chung',
     [userSaved.ok, userSaved.reloadDecision.kind, dongSoCuoi(userEnv.hop).customer, (userEnv.hop.reloadStateRead().viewsStaleRevision === userEnv.hop.reloadStateRead().revision)],
     [true, 'records', ['KH000001'], true]);
 
   const batchEnv = taoHop();
   ghiO(batchEnv.nen, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
-  const batchSaved = trongLanChay(batchEnv.hop, () => batchEnv.hop.writeGateSave({ entity: 'customer', records: [
+  const batchSaved = trongLanGoi(batchEnv.hop, () => batchEnv.hop.writeGateSave({ entity: 'customer', records: [
     { id: 'KH000001', phone: '0987000113' },
     { id: 'KH000002', phone: '0987000114' }
   ], source: 'pull' }));
@@ -44,31 +45,31 @@ function chay(so) {
     [['KH000001', 'KH000002'], ['KH000001', 'KH000002'], 1]);
 
   const newEnv = taoHop();
-  const newSaved = trongLanChay(newEnv.hop, () => newEnv.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
+  const newSaved = trongLanGoi(newEnv.hop, () => newEnv.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
   check(so, 'cấp mã mới chỉ phát signal bản ghi đó, không nâng config và allCore; phản hồi mang bộ đếm mới',
     [newSaved.reloadDecision.ram.mode, dongSoCuoi(newEnv.hop).config, dongSoCuoi(newEnv.hop).core, dongSoCuoi(newEnv.hop).customer, newSaved.counters],
     ['records', undefined, undefined, newSaved.recordIds, newEnv.hop.idGateCounterValues()]);
   check(so, 'lưu chỉ sửa bản ghi cũ không gửi bộ đếm', batchSaved.counters, undefined);
 
   const pushedEnv = taoHop();
-  const pushed = trongLanChay(pushedEnv.hop, () => pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' }));
+  const pushed = trongLanGoi(pushedEnv.hop, () => pushedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000222' }], source: 'push' }));
   check(so, 'writeGateSave push dùng cùng cổng signal với pull',
     [pushed.ok, pushed.reloadDecision.kind, dongSoCuoi(pushedEnv.hop).customer, (pushedEnv.hop.reloadStateRead().viewsStaleRevision === pushedEnv.hop.reloadStateRead().revision), pushedEnv.hop.rendered],
     [true, 'records', ['KH000001'], true, 0]);
 
   const backgroundEnv = taoHop();
-  const background = trongLanChay(backgroundEnv.hop, () => backgroundEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000333' }], source: 'background' }));
+  const background = trongLanGoi(backgroundEnv.hop, () => backgroundEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000333' }], source: 'background' }));
   check(so, 'writeGateSave background không cần Sidebar vẫn phát signal, không vẽ',
     [background.ok, background.reloadDecision.kind, dongSoCuoi(backgroundEnv.hop).customer, (backgroundEnv.hop.reloadStateRead().viewsStaleRevision === backgroundEnv.hop.reloadStateRead().revision), backgroundEnv.hop.rendered],
     [true, 'records', ['KH000001'], true, 0]);
 
   const statusEnv = taoHop();
   napServer(statusEnv.hop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
-  trongLanChay(statusEnv.hop, () => statusEnv.hop.fbmEnsureSyncColumns('background'));
+  trongLanGoi(statusEnv.hop, () => statusEnv.hop.fbmEnsureSyncColumns('background'));
   const statusRevision = statusEnv.hop.reloadStateRead().revision;
   const statusNames = ['pending', 'notApplied', 'conflict', 'missing', 'error'];
   const statusResults = statusNames.map((statusName) => {
-    const savedStatus = trongLanChay(statusEnv.hop, () => statusEnv.hop.writeGateSave({
+    const savedStatus = trongLanGoi(statusEnv.hop, () => statusEnv.hop.writeGateSave({
       entity: 'customer',
       records: [{ id: 'KH000001', syncStatus: statusEnv.hop.FbmSync.SYNC_STATUS[statusName] }],
       source: 'push',
@@ -82,13 +83,13 @@ function chay(so) {
 
   const sameEnv = taoHop();
   ghiO(sameEnv.nen, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
-  trongLanChay(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }, { id: 'KH000002', phone: '0987000445' }], source: 'pull' }));
+  trongLanGoi(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }, { id: 'KH000002', phone: '0987000445' }], source: 'pull' }));
   const revisionTruoc = sameEnv.hop.reloadStateRead().revision;
-  const same = trongLanChay(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }, { id: 'KH000002', phone: '0987000999' }], source: 'pull' }));
+  const same = trongLanGoi(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }, { id: 'KH000002', phone: '0987000999' }], source: 'pull' }));
   check(so, 'lượt kéo ghi lại y hệt một bản ghi và đổi một bản ghi: chỉ bản ghi đổi vào tín hiệu, một revision',
     [same.recordIds, same.changedIds, dongSoCuoi(sameEnv.hop).customer, sameEnv.hop.reloadStateRead().revision - revisionTruoc],
     [['KH000001', 'KH000002'], ['KH000002'], ['KH000002'], 1]);
-  const unchanged = trongLanChay(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }], source: 'pull' }));
+  const unchanged = trongLanGoi(sameEnv.hop, () => sameEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000444' }], source: 'pull' }));
   check(so, 'lượt kéo không đổi giá trị nào thì revision giữ nguyên, Sidebar không nạp',
     [unchanged.ok, unchanged.changedIds, unchanged.reloadDecision, sameEnv.hop.reloadStateRead().revision - revisionTruoc],
     [true, [], undefined, 1]);
@@ -97,7 +98,7 @@ function chay(so) {
   napServer(schemaEnv.hop, 'fbm_sync/SyncSchema.js', 'server/sheet/SyncColumnSetup.js');
   schemaEnv.hop.shinViewSheetNames = () => ['!Lead'];
   schemaEnv.hop.rendered = 0;
-  const schema = trongLanChay(schemaEnv.hop, () => schemaEnv.hop.fbmEnsureSyncColumns('background'));
+  const schema = trongLanGoi(schemaEnv.hop, () => schemaEnv.hop.fbmEnsureSyncColumns('background'));
   const schemaState = schemaEnv.hop.reloadStateRead();
   const schemaEntry = dongSoCuoi(schemaEnv.hop);
   check(so, 'bổ sung cột sync bằng GAS phát signal schema/allCore và làm view cũ qua cổng schema, không vẽ',
@@ -105,14 +106,14 @@ function chay(so) {
     [true, true, 'schema', true, true, true, 0]);
 
   const deletedEnv = taoHop();
-  const deleted = trongLanChay(deletedEnv.hop, () => deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
+  const deleted = trongLanGoi(deletedEnv.hop, () => deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất, không vẽ',
     [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, dongSoCuoi(deletedEnv.hop).customer, (deletedEnv.hop.reloadStateRead().viewsStaleRevision === deletedEnv.hop.reloadStateRead().revision), deletedEnv.hop.rendered],
     [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 0]);
 
   const softEnv = taoHop();
   softEnv.hop.beforeHardDelete = (entity, ids) => ({ soft: { [ids[0]]: 'FBM còn giữ bản ghi' } });
-  const softDeleted = trongLanChay(softEnv.hop, () => softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
+  const softDeleted = trongLanGoi(softEnv.hop, () => softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate soft delete cũng phát signal cho mã bị đổi trạng thái',
     [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, dongSoCuoi(softEnv.hop).customer, (softEnv.hop.reloadStateRead().viewsStaleRevision === softEnv.hop.reloadStateRead().revision)],
     [true, 1, ['KH000001'], 'records', ['KH000001'], true]);
@@ -120,7 +121,7 @@ function chay(so) {
   const failedEnv = taoHop();
   let invalid;
   try {
-    invalid = trongLanChay(failedEnv.hop, () => failedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH-MISSING', phone: '1' }], source: 'pull' }));
+    invalid = trongLanGoi(failedEnv.hop, () => failedEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH-MISSING', phone: '1' }], source: 'pull' }));
   } catch (err) {
     invalid = { ok: false, error: err.message };
   }
@@ -133,7 +134,7 @@ function chay(so) {
   check(so, 'thiếu hậu xử lý reload thì cửa ghi dừng trước khi chạm Sheet',
     (function () {
       try {
-        trongLanChay(missingCommitEnv.hop, () => missingCommitEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'background' }));
+        trongLanGoi(missingCommitEnv.hop, () => missingCommitEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'background' }));
         return { threw: false, value: missingCommitEnv.nen.Customer.sheet.getRange(4, 5).getValue(), locked: missingCommitEnv.nen.stubs._khoa.dangGiu };
       } catch (error) {
         return { threw: true, value: missingCommitEnv.nen.Customer.sheet.getRange(4, 5).getValue(), locked: missingCommitEnv.nen.stubs._khoa.dangGiu };

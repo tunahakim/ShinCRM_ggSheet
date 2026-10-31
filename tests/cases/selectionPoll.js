@@ -1,6 +1,7 @@
 /** Kiểm thử fallback selection khi không có Extension và các kênh đánh thức reload. */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function syncValue(value) {
@@ -74,7 +75,7 @@ function dungHopPoll() {
     hop._options.push(options || {});
     return syncValue({ ok: true, spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '', reload: { revision: 0 } });
   };
-  napClient(hop, 'client/ram/refresh.html', 'client/ui/notices.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html');
+  napTheoSidebar(['client/ram/refresh.html', 'client/ui/notices.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html'], hop);
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
   hop.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
@@ -743,7 +744,7 @@ async function chayView(so) {
     syncing._busy.map((item) => [item.block, item.progress]), [[false, true], [false, true]]);
 
   const fbm = taoHopCat({ console });
-  napClient(fbm, 'client/sync/fbmSync.html');
+  napTheoSidebar(['client/sync/fbmSync.html'], fbm);
   fbm.fbmSyncSetRunning(true); fbm.fbmSyncSetRunning(false);
   const fbmSource = fs.readFileSync(path.join(GAS_DIR, 'client', 'sync', 'fbmSync.html'), 'utf8');
   const sidebarSources = ['client/link/sheetLink.html', 'client/ram/refresh.html', 'client/sync/fbmSync.html'].map((rel) => fs.readFileSync(path.join(GAS_DIR, rel), 'utf8')).join(' ');

@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { napClient, taoHopCat, GAS_DIR } = require('../lib/load-gas');
+const { taoHopCat, GAS_DIR } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -21,8 +22,7 @@ function dungCanh() {
   notice.rect = { left: 0, top: 53, bottom: 81, right: 300 };
   dom.root.appendChild(notice);
   dom.document.body.appendChild(overlay);
-  const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
-    'client/ui/progress.html', 'client/ui/popupList.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
+  const hop = napTheoSidebar(['client/ui/progress.html', 'client/ui/popupList.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html'], taoHopCat({ document: dom.document, window: dom.window }));
   hop._alerts = [];
   hop.alert = (message) => { hop._alerts.push(String(message)); };
   hop.console = { error: () => {} };

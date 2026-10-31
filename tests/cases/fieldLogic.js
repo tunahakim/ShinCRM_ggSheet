@@ -4,7 +4,7 @@
  * Ba chỗ đáng kiểm nhất đều là chỗ hỏng-trong-im-lặng: mã xem trước sinh ra từ bộ đếm mà bộ đếm là **chuỗi** trong `Store.config`, ba ngầm định kế tục phải đi qua `Store.getLatestActivity` chứ không phải phần tử đầu mảng — phần tử đầu có thể là một giao dịch đã xóa mềm, và riêng sản phẩm còn phải rơi tiếp về hồ sơ khách khi khách chưa có lần làm việc nào.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
@@ -13,7 +13,7 @@ function chay(so) {
 
   let hop;
   try {
-    hop = napClient(taoHopCat(), 'client/schema/schemaAccess.html', 'client/ram/store.html', 'client/schema/fieldLogic.html');
+    hop = napTheoSidebar(['client/schema/schemaAccess.html', 'client/ram/store.html', 'client/schema/fieldLogic.html']);
     hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   } catch (err) {
     return ghiLoiNap(so, 'nạp fieldLogic cùng bảng khai trường thật', err);

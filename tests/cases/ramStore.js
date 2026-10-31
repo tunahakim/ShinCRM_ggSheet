@@ -8,8 +8,9 @@
  *   - `getActivities` trả **mảng rỗng** — khách chưa có giao dịch nào là chuyện thường.
  */
 
-const { dungHop, ghiO } = require('../lib/dung-hop');
+const { dungHop } = require('../lib/dung-hop');
 const { dungClient } = require('../lib/dung-client');
+const { ghiKhach, ghiGiaoDich } = require('../lib/gas/mau-ban-ghi');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
@@ -19,23 +20,6 @@ function dungMayChu() {
     sheets: ['Customer', 'Activity', 'Category', 'Log'],
     props: { LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }
   });
-}
-
-/** Ghi một khách. `tim` là ô từ khóa tìm kiếm, để phép kiểm chỉ mục có thứ khác tên công ty mà khớp. */
-function ghiKhach(nen, hang, ma, ten, mst, tinhTrang, tim) {
-  ghiO(nen, 'Customer', hang, '@CUS_MA_KH', ma);
-  ghiO(nen, 'Customer', hang, '@CUS_TEN_CTY', ten);
-  ghiO(nen, 'Customer', hang, '@CUS_MST', mst || '');
-  ghiO(nen, 'Customer', hang, '@CUS_TT_BAN_GHI', tinhTrang || 'active');
-  if (tim) { ghiO(nen, 'Customer', hang, '@CUS_TIM_KIEM', tim); }
-}
-
-/** Ghi một giao dịch. `ngay` là ô ngày làm việc, nhận cả `Date` để chứng minh nó không đi qua cầu dưới dạng `Date`. */
-function ghiGiaoDich(nen, hang, ma, maKhach, ngay, tinhTrang) {
-  ghiO(nen, 'Activity', hang, '@ACT_MA_GD', ma);
-  ghiO(nen, 'Activity', hang, '@ACT_MA_KH', maKhach);
-  ghiO(nen, 'Activity', hang, '@ACT_NGAY_LAM_VIEC', ngay);
-  ghiO(nen, 'Activity', hang, '@ACT_TT_BAN_GHI', tinhTrang || 'active');
 }
 
 /** Cho một gói đi qua cầu `google.script.run`. Đây là chỗ `Date` chết, nên phép kiểm phải đi qua nó thật. */
@@ -58,16 +42,16 @@ function chay(so) {
   const hangDau = nen.hop.SHEET_FIRST_DATA_ROW;
 
   // Ba khách: một thường, một đã xóa mềm, một trùng mã số thuế với khách đã xóa.
-  ghiKhach(nen, hangDau, 'KH0001', 'Công ty Xây dựng Đông Á', '0101234567', 'active', 'dong a xd');
-  ghiKhach(nen, hangDau + 1, 'KH0002', 'Công ty Đông Á Cũ', '0109999999', 'deleted');
-  ghiKhach(nen, hangDau + 3, 'KH0003', 'Thương mại Hải Phòng', '', 'active');
+  ghiKhach(nen, hangDau, { ma: 'KH0001', ten: 'Công ty Xây dựng Đông Á', mst: '0101234567', tinhTrang: 'active', tim: 'dong a xd' });
+  ghiKhach(nen, hangDau + 1, { ma: 'KH0002', ten: 'Công ty Đông Á Cũ', mst: '0109999999', tinhTrang: 'deleted' });
+  ghiKhach(nen, hangDau + 3, { ma: 'KH0003', ten: 'Thương mại Hải Phòng', mst: '', tinhTrang: 'active' });
 
   // Bốn giao dịch của KH0001, cố tình ghi lộn xộn về thời gian, và giao dịch mới nhất bị xóa mềm.
-  ghiGiaoDich(nen, hangDau, 'GD0001', 'KH0001', new Date(2026, 8, 1));
-  ghiGiaoDich(nen, hangDau + 1, 'GD0002', 'KH0001', new Date(2026, 8, 4));
-  ghiGiaoDich(nen, hangDau + 2, 'GD0003', 'KH0001', new Date(2026, 8, 4));
-  ghiGiaoDich(nen, hangDau + 3, 'GD0004', 'KH0001', new Date(2026, 8, 5), 'deleted');
-  ghiGiaoDich(nen, hangDau + 4, 'GD0005', 'KH0003', new Date(2026, 7, 20));
+  ghiGiaoDich(nen, hangDau, { ma: 'GD0001', maKhach: 'KH0001', ngay: new Date(2026, 8, 1) });
+  ghiGiaoDich(nen, hangDau + 1, { ma: 'GD0002', maKhach: 'KH0001', ngay: new Date(2026, 8, 4) });
+  ghiGiaoDich(nen, hangDau + 2, { ma: 'GD0003', maKhach: 'KH0001', ngay: new Date(2026, 8, 4) });
+  ghiGiaoDich(nen, hangDau + 3, { ma: 'GD0004', maKhach: 'KH0001', ngay: new Date(2026, 8, 5), tinhTrang: 'deleted' });
+  ghiGiaoDich(nen, hangDau + 4, { ma: 'GD0005', maKhach: 'KH0003', ngay: new Date(2026, 7, 20) });
 
   const goiGoc = nen.hop.loadCore();
   check(so, 'phía máy chủ: KHÔNG một ô nào còn là Date trước khi qua cầu',

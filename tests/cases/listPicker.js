@@ -1,5 +1,6 @@
 /** Hành vi chung của danh sách gợi ý nổi: hộp tìm khách và ô gõ-để-lọc cùng đi qua `ListPicker`. */
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -10,8 +11,7 @@ function dungKhung(tep, stubs) {
   const dom = domGia();
   const proto = Object.getPrototypeOf(dom.root);
   proto.click = function () { this.ownerDocument.body.listeners.__root.click({ target: this }); };
-  const hop = napClient(taoHopCat(Object.assign({ document: dom.document, window: dom.window, setTimeout, clearTimeout, Event: function Event() {} }, stubs)),
-    'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', ...tep);
+  const hop = napTheoSidebar(['client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', ...tep], taoHopCat(Object.assign({ document: dom.document, window: dom.window, setTimeout, clearTimeout, Event: function Event() {} }, stubs)));
   hop.DISPATCH_ROOT_ID = 'sidebar-root';
   hop.RENDER_REGIONS = { body: 'sidebar-body' };
   dom.document.body.listeners.__root = dom.root.listeners;

@@ -1,7 +1,8 @@
 /** Kiểm hợp đồng kiến trúc màn: mỗi màn có schema riêng và màn không tự ghép HTML/DOM. */
 const fs = require('fs');
 const path = require('path');
-const { GAS_DIR, docTep, taoHopCat, napClient } = require('../lib/load-gas');
+const { GAS_DIR, docTep } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check } = require('../lib/assert');
 const { liet } = require('../lib/quet/liet-tep');
 const { lopCoLuat } = require('../lib/quet/lop-css');
@@ -83,7 +84,7 @@ function chay(so) {
     /function uiSyncClass\(/.test(catalogSource),
     /function uiSyncClasses\(/.test(catalogSource)
   ], [true, true, true, true, true]);
-  const presentationHop = napClient(taoHopCat(), 'client/ui/uiClassMap.html');
+  const presentationHop = napTheoSidebar(['client/ui/uiClassMap.html']);
   const requiredActions = ['save', 'edit', 'start', 'approve', 'cancel', 'reloadAll', 'retry', 'deleteActivity'];
   check(so, 'action cần presentation đều có mapping button trong catalog', requiredActions.filter((action) => !presentationHop.uiResolveActionClass(action, 'button')), []);
 

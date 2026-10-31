@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { section, check } = require('../lib/assert');
 
-const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
+const { GAS_DIR } = require('../lib/load-gas');
 
 const LAYER1_FILES = ['server/sheet/SheetCellWrite.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetReadCopy.js', 'server/sheet/SheetStructure.js'];
 const NAMED_EXCEPTIONS = [];

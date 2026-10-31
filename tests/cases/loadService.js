@@ -12,9 +12,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { trongLanChay } = require('../lib/load-gas');
+const { GAS_DIR } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
+const { ghiKhach, ghiGiaoDich } = require('../lib/gas/mau-ban-ghi');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
@@ -27,20 +28,6 @@ function dungNap(vanHanh, dirtyProps) {
     caiDat: vanHanh ? { core_ops: vanHanh } : {},
     props: Object.assign({ LOG_LAST_CLEANUP: formatDateGia(new Date(), 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') }, dirtyProps || {})
   });
-}
-
-/** Ghi một khách vào sheet giả. */
-function ghiKhach(nen, hang, ma, ten, tinhTrang) {
-  ghiO(nen, 'Customer', hang, '@CUS_MA_KH', ma);
-  ghiO(nen, 'Customer', hang, '@CUS_TEN_CTY', ten);
-  ghiO(nen, 'Customer', hang, '@CUS_TT_BAN_GHI', tinhTrang || 'active');
-}
-
-/** Ghi một giao dịch vào sheet giả. */
-function ghiGiaoDich(nen, hang, ma, maKhach, ngay) {
-  ghiO(nen, 'Activity', hang, '@ACT_MA_GD', ma);
-  ghiO(nen, 'Activity', hang, '@ACT_MA_KH', maKhach);
-  ghiO(nen, 'Activity', hang, '@ACT_NGAY_LAM_VIEC', ngay);
 }
 
 function chay(so) {
@@ -106,8 +93,8 @@ function chay(so) {
     [daChen, goiChen.processedRevision, chenLoi.hop.reloadStateRead().revision], [true, 0, 1]);
 
   // Bản ghi được nhận dạng bằng mã; hàng trắng giữa vùng dữ liệu không lọt vào RAM.
-  ghiKhach(nen, hangDau, 'KH0001', 'Công ty Một');
-  ghiKhach(nen, hangDau + 2, 'KH0003', 'Công ty Ba', 'deleted');
+  ghiKhach(nen, hangDau, { ma: 'KH0001', ten: 'Công ty Một' });
+  ghiKhach(nen, hangDau + 2, { ma: 'KH0003', ten: 'Công ty Ba', tinhTrang: 'deleted' });
 
   const co = hop.loadCore();
   check(so, 'hai khách đọc ra, hàng trắng ở giữa không thành bản ghi', co.customer.rows.length, 2);
@@ -138,11 +125,11 @@ function chay(so) {
   const scope = dungNap();
   const scopeHop = scope.hop;
   const scopeFirstRow = scopeHop.SHEET_FIRST_DATA_ROW;
-  ghiKhach(scope, scopeFirstRow, 'KH-SCOPE-1', 'Khách scope 1');
-  ghiKhach(scope, scopeFirstRow + 1, 'KH-SCOPE-2', 'Khách scope 2');
-  ghiGiaoDich(scope, scopeFirstRow, 'GD-SCOPE-1', 'KH-SCOPE-1', '2026-09-01');
-  ghiGiaoDich(scope, scopeFirstRow + 1, 'GD-SCOPE-2', 'KH-SCOPE-1', '2026-09-02');
-  ghiGiaoDich(scope, scopeFirstRow + 2, 'GD-OTHER', 'KH-SCOPE-2', '2026-09-03');
+  ghiKhach(scope, scopeFirstRow, { ma: 'KH-SCOPE-1', ten: 'Khách scope 1' });
+  ghiKhach(scope, scopeFirstRow + 1, { ma: 'KH-SCOPE-2', ten: 'Khách scope 2' });
+  ghiGiaoDich(scope, scopeFirstRow, { ma: 'GD-SCOPE-1', maKhach: 'KH-SCOPE-1', ngay: '2026-09-01' });
+  ghiGiaoDich(scope, scopeFirstRow + 1, { ma: 'GD-SCOPE-2', maKhach: 'KH-SCOPE-1', ngay: '2026-09-02' });
+  ghiGiaoDich(scope, scopeFirstRow + 2, { ma: 'GD-OTHER', maKhach: 'KH-SCOPE-2', ngay: '2026-09-03' });
 
   const scoped = scopeHop.reloadRecords([' GD-SCOPE-2 ', 'KH-SCOPE-1', 'KH-SCOPE-1', 'KH-MISSING']);
   check(so, 'reloadRecords chỉ trả Customer liên quan và mọi Activity của Customer bị ảnh hưởng',
@@ -171,8 +158,8 @@ function chay(so) {
   check(so, 'các hàm nạp chỉ đọc, không ghi sổ', category.hop._props.reloadJournal, truocNap);
 
   const manual = dungNap();
-  ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'KH-MANUAL', 'Khách thủ công');
-  ghiGiaoDich(manual, manual.hop.SHEET_FIRST_DATA_ROW, 'GD-MANUAL', 'KH-MANUAL', '2026-09-10');
+  ghiKhach(manual, manual.hop.SHEET_FIRST_DATA_ROW, { ma: 'KH-MANUAL', ten: 'Khách thủ công' });
+  ghiGiaoDich(manual, manual.hop.SHEET_FIRST_DATA_ROW, { ma: 'GD-MANUAL', maKhach: 'KH-MANUAL', ngay: '2026-09-10' });
   const manualCustomer = manual.hop.reloadCustomer();
   const manualActivity = manual.hop.reloadActivity();
   check(so, 'nạp thủ công Customer và Activity trả đúng scope riêng, không fallback full core',
@@ -193,8 +180,8 @@ function chay(so) {
   [managedLead, managedCare].forEach((sheet) => {
     sheet.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   });
-  ghiKhach(managed, managed.hop.SHEET_FIRST_DATA_ROW, 'KH-MANAGED', 'Khách quản trị');
-  trongLanChay(managed.hop, () => managed.hop.dirtyStateMarkSignal({ allViews: true }));
+  ghiKhach(managed, managed.hop.SHEET_FIRST_DATA_ROW, { ma: 'KH-MANAGED', ten: 'Khách quản trị' });
+  trongLanGoi(managed.hop, () => managed.hop.dirtyStateMarkSignal({ allViews: true }));
   managed.book.setActiveSheet(managedLead);
   const managedCurrent = managed.hop.reloadCurrentSheet();
   check(so, 'reloadCurrentSheet ở view quản trị chỉ vẽ view active, view khác vẫn cũ chờ người xem',
@@ -219,7 +206,7 @@ function chayGoi(so, nen, hop, hangDau) {
 
   // Năm giao dịch, cỡ gói vặn xuống 2 để chứng minh con trỏ đi đúng đường mà không phải dựng 1.000 hàng.
   for (let i = 0; i < 5; i++) {
-    ghiGiaoDich(nen, hangDau + i, 'GD000' + (i + 1), 'KH0001', '2026-09-0' + (i + 1));
+    ghiGiaoDich(nen, hangDau + i, { ma: 'GD000' + (i + 1), maKhach: 'KH0001', ngay: '2026-09-0' + (i + 1) });
   }
   hop.SETTINGS.CHUNK_ROWS = 2;
 

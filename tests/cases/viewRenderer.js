@@ -1,5 +1,5 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { trongLanChay } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const TEP_VIEW = TEP_NEN.concat([
@@ -45,7 +45,7 @@ function gieoHaiGiaoDich(nen) {
 
 /** Trigger gắn cờ ô điều khiển cho một sheet `!` như khi người dùng sửa ô điều khiển. */
 function gắnCờ(hop, name) {
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ viewSheets: [name] }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ viewSheets: [name] }));
 }
 
 function tieuDe(result) {
@@ -96,7 +96,7 @@ function chay(so) {
   hop.renderViewSheet('!Lead');
   hop.renderViewSheet('!Chăm sóc');
   check(so, 'không còn đường vẽ mọi sheet quản trị một lượt', [typeof hop.renderAllManagedViews, typeof hop.inspectViewState], ['undefined', 'undefined']);
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   check(so, 'signal dữ liệu kho làm mọi view thành cũ', [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')], [true, true]);
   hop.renderViewSheet('!Lead');
   check(so, '(a) vẽ sheet A sau signal: A mới, B vẫn cũ', [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')], [false, true]);
@@ -284,7 +284,7 @@ function chaySoTrangThai(so) {
   check(so, 'đánh thức lại với cùng dữ liệu: không thử, không Log, không ghi Sheet; trả lại khối lỗi để Sidebar hiện',
     [again.ok, again.skipped, again.problems.length, loiDau(), t.nen.dem.setValues - writes], [false, true, 1, 1, 0]);
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   check(so, 'dữ liệu kho đổi thì thử lại; lỗi y hệt không thêm dòng Log', [hop.renderViewIfDirty('!Lead').skipped, loiDau()], [undefined, 1]);
 
   const entry = hop.viewLedgerEntry('!Lead');
@@ -329,7 +329,7 @@ function chayTabCam(so) {
   const vẽHết = () => { hop.renderViewSheet('!Lead'); hop.renderViewSheet('!Chăm sóc'); };
   vẽHết();
   care.setTabColor('#00ff00');
-  const ghi = () => trongLanChay(hop, () => hop.writeCommitAfterSuccess({ source: 'sidebar', surface: 'record', entity: 'customer', recordIds: ['KH0001'] }));
+  const ghi = () => trongLanGoi(hop, () => hop.writeCommitAfterSuccess({ source: 'sidebar', surface: 'record', entity: 'customer', recordIds: ['KH0001'] }));
 
   ghi();
   check(so, 'chuyển sạch sang cũ: mọi sheet ! tô cam một lần, sheet kho không bị chạm',
@@ -343,18 +343,18 @@ function chayTabCam(so) {
     [base.view.getTabColor(), base.view._tabColors.length, care.getTabColor()], [null, 2, '#ff9900']);
 
   const realPlan = hop.viewRenderPlan;
-  hop.viewRenderPlan = function () { trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0002'], allViews: true })); return realPlan.apply(this, arguments); };
+  hop.viewRenderPlan = function () { trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0002'], allViews: true })); return realPlan.apply(this, arguments); };
   hop.renderViewSheet('!Chăm sóc');
   hop.viewRenderPlan = realPlan;
   check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor()], [true, '#ff9900']);
   hop.renderViewSheet('!Chăm sóc');
   check(so, 'vẽ lại xong trả đúng màu người dùng tự đặt', care.getTabColor(), '#00ff00');
 
-  trongLanChay(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
+  trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
   check(so, 'ghi nhận thay đổi cuối lần chạy (tự lấy khóa) tô lại sheet vừa thành cũ sau khi đã trả màu và nhả khóa',
     [base.view.getTabColor(), care.getTabColor(), base.nen.stubs._khoa.dangGiu], ['#ff9900', '#ff9900', false]);
   const before = base.nen.book.getSheets().map((sheet) => sheet._tabColors.length);
-  trongLanChay(hop, () => {});
+  trongLanGoi(hop, () => {});
   check(so, 'lần chạy không có thay đổi không quét sheet nào để tô',
     base.nen.book.getSheets().map((sheet) => sheet._tabColors.length), before);
 
@@ -392,7 +392,7 @@ function chayTabCam(so) {
   // Lưu từ Sidebar khi đứng ở sheet ! và công tắc bật: sheet đang xem sẽ được vẽ ngay nên không tô.
   vẽHết();
   base.nen.book.setActiveSheet(base.view);
-  const luuSidebar = (source) => trongLanChay(hop, () => hop.writeCommitAfterSuccess({ source: source, surface: 'record', entity: 'customer', recordIds: ['KH0001'] }));
+  const luuSidebar = (source) => trongLanGoi(hop, () => hop.writeCommitAfterSuccess({ source: source, surface: 'record', entity: 'customer', recordIds: ['KH0001'] }));
   luuSidebar('user');
   check(so, 'lưu từ Sidebar, công tắc bật: không tô sheet ! đang xem, vẫn tô sheet ! khác', [base.view.getTabColor(), care.getTabColor()], [null, '#ff9900']);
   vẽHết();

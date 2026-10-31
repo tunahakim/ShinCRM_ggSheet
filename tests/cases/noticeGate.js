@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { dungHop } = require('../lib/dung-hop');
+const { docLog } = require('../lib/gas/doc-log');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 const GAS = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
@@ -15,14 +16,6 @@ function cacTep(thuMuc, goc) {
     if (muc.isDirectory()) { return cacTep(day, goc); }
     return /\.(js|html)$/.test(muc.name) ? [path.relative(goc, day).split(path.sep).join('/')] : [];
   });
-}
-
-function docLog(nen) {
-  nen.hop.flushLog();
-  const sheet = nen.Log.sheet;
-  const dau = nen.hop.SHEET_LAYOUT.Log.firstDataRow;
-  if (sheet.getLastRow() < dau) { return []; }
-  return sheet.getRange(dau, 1, sheet.getLastRow() - dau + 1, 9).getValues().map((row) => row.join('|'));
 }
 
 function chay(so) {
@@ -55,7 +48,7 @@ function chay(so) {
   check(so, 'lỗi cửa vào thành thông báo entry_failure theo tên cửa vào', [khoa('entry_failure:shinRenderCurrentView') !== undefined, hop.noticeList().filter((n) => n.scope === 'shinRenderCurrentView')[0].title], [true, 'lỗi vẽ']);
   hop.runEntryPoint('shinRenderCurrentView', 'core', () => true);
   check(so, 'chạy lại thành công thì thông báo tự hết', khoa('entry_failure:shinRenderCurrentView'), undefined);
-  check(so, 'tự hết ghi một dòng Log "Đã hết lỗi"', docLog(nen).filter((r) => r.indexOf('Đã hết lỗi: lỗi vẽ') >= 0).length, 1);
+  check(so, 'tự hết ghi một dòng Log "Đã hết lỗi"', docLog(nen, { flush: true, noi: '|' }).filter((r) => r.indexOf('Đã hết lỗi: lỗi vẽ') >= 0).length, 1);
 
   section('Cổng thông báo — kho hỏng, loại lạ, trần, che bí mật');
   nen.props['NOTICE:entry_failure:hong'] = '{không phải JSON';
@@ -65,7 +58,7 @@ function chay(so) {
   hop.noticeDismiss('notice_corrupt:entry_failure:hong');
 
   check(so, 'loại lạ vẫn lưu (mức lỗi, bấm ✕ mới hết) và ghi Log để lộ chỗ gọi sai',
-    [hop.noticeRaise({ topic: 'loai_la', scope: 'x', title: 't' }), hop.noticeList().filter((n) => n.topic === 'loai_la').map((n) => [n.level, n.clear])[0], docLog(nen).some((r) => r.indexOf('NOTICE_TOPIC_UNKNOWN') >= 0)],
+    [hop.noticeRaise({ topic: 'loai_la', scope: 'x', title: 't' }), hop.noticeList().filter((n) => n.topic === 'loai_la').map((n) => [n.level, n.clear])[0], docLog(nen, { flush: true, noi: '|' }).some((r) => r.indexOf('NOTICE_TOPIC_UNKNOWN') >= 0)],
     [true, ['error', 'dismiss'], true]);
   hop.noticeDismiss('loai_la:x');
 

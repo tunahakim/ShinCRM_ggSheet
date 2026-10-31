@@ -6,6 +6,7 @@
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { napServer } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 
 /** Đếm số lần hỏi `getLastColumn`/`getLastRow` trên một sheet giả: mỗi lần là một lần đọc thật từ Sheet. */
 function demLenh(sheet) {
@@ -15,13 +16,6 @@ function demLenh(sheet) {
   sheet.getLastColumn = () => { dem.cot += 1; return lastColumn(); };
   sheet.getLastRow = () => { dem.dong += 1; return lastRow(); };
   return dem;
-}
-
-/** Mở hai phạm vi mà `runEntryPoint` mở cho một lần gọi: bản đọc kho (kèm bản đọc Sheet) và danh sách thay đổi chờ ghi nhận. */
-function trongLanGoi(hop, fn) {
-  hop.documentStoreBegin();
-  hop.pendingChangesBegin();
-  try { return fn(); } finally { hop.pendingChangesEnd(); hop.documentStoreEnd(); }
 }
 
 function taoHop() {
@@ -189,7 +183,6 @@ function chay(so) {
     return [String(phone).replace(/^'/, ''), docKhach.n - truoc];
   }));
   check(so, 'cửa ghi FBM: đọc lại sau khi ghi thấy giá trị mới mà không đọc lại sheet', sauGhiFbm, ['0987000555', 0]);
-
 
   ghiO(fbm, 'Customer', 5, hf.SYNC_SCHEMA.customer.syncStatus.code, '');
   docKhach.n = 0;

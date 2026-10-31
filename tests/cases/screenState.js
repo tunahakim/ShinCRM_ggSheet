@@ -4,7 +4,7 @@
  * Trọng tâm là ngăn xếp form, vì nó là chỗ duy nhất có thể lệch: `screen` là một trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp nhau. Kiểm luôn cái bẫy `window.screen` — nếu ai đó đổi `ScreenState.screen` thành một biến toàn cục rời thì phép kiểm này đỏ.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -12,7 +12,7 @@ function chay(so) {
 
   let hop;
   try {
-    hop = napClient(taoHopCat(), 'client/ram/screenState.html');
+    hop = napTheoSidebar(['client/ram/screenState.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp screenState', err);
   }

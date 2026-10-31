@@ -1,5 +1,5 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
-const { trongLanChay, dongSoCuoi } = require('../lib/load-gas');
+const { dongSoCuoi } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 const fs = require('fs');
 const path = require('path');
@@ -44,7 +44,6 @@ function chay(so) {
   const rendered = [];
   const realMarkControls = hop.viewLedgerMarkControls;
   hop.viewLedgerMarkControls = (names) => { rendered.push(names.join(',')); return realMarkControls(names); };
-  hop.runEntryPoint = (name, source, fn) => trongLanChay(hop, fn);
   hop.userPrefsRead = () => { throw new Error('Trigger không được đọc núm người dùng'); };
   // Xóa cả mốc cũ của view để `viewsStaleRevision > 0` nghĩa là signal sau lần xóa đã làm view cũ.
   const clearState = () => { hop.documentProps().deleteProperty('reloadJournal'); hop.documentProps().deleteProperty('viewsStaleRevision'); };
@@ -210,7 +209,6 @@ function chay(so) {
   hop.runEntryPoint = realRun;
   hop.shinOpenBook = realOpen;
   hop.documentProps = realProps;
-
 
   const doiCauTruc = (sheetName, changeType) => {
     clearState();

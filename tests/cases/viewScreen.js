@@ -4,7 +4,8 @@
  * Bốn thứ đáng kiểm nhất, cả bốn đều là loại hỏng-trong-im-lặng: mã card lịch sử ở hai tệp lệch nhau nên nút đổi nấc xem không vẽ lại gì; đổi khách mà chỉ vẽ lại một trong ba vùng nên hai vùng kia đứng ở khách cũ; đổi khách lúc đang mở form nên bản nháp bay mất; và tệp màn tự chạm DOM thay vì đi qua engine.
  */
 
-const { napClient, taoHopCat, catRuotScript, docTep } = require('../lib/load-gas');
+const { catRuotScript, docTep } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { khungGia } = require('../lib/khung-gia');
 const { stripComments } = require('../lib/strip-comments');
@@ -22,14 +23,13 @@ const GIAO_DICH = [
 
 /** Hộp cát đủ cả tầng dữ liệu, bộ máy vẽ, bảng khai bố cục và khung giả — đúng những gì màn xem cần và không hơn. */
 function dungCanh() {
-  const hop = napClient(taoHopCat(),
-    'client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
+  const hop = napTheoSidebar(['client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
     'client/ram/prefs.html', 'client/ram/screenState.html', 'client/util/valueText.html',
     'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
     'client/ui/renderEngine.html', 'client/ui/slots.html', 'client/schema/screens/formHeader.html',
     'client/schema/screens/view.html', 'client/schema/screens/customerForm.html', 'client/schema/screens/activityForm.html',
     'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',
-    'client/screen/viewScreen.html');
+    'client/screen/viewScreen.html']);
 
   hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   hop.document = khungGia([hop.SCREEN_VIEW_HISTORY_ID]);

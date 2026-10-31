@@ -5,12 +5,7 @@
  */
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { section, check, ghiLoiNap } = require('../lib/assert');
-
-function trongLanGoi(hop, fn) {
-  hop.documentStoreBegin();
-  hop.pendingChangesBegin();
-  try { return fn(); } finally { hop.pendingChangesEnd(); hop.documentStoreEnd(); }
-}
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 
 function loiCua(fn) {
   try { fn(); return ''; } catch (err) { return String(err && err.message || err); }

@@ -4,7 +4,8 @@
  * Kiểm được offline vì engine cố ý tách hai nửa: nửa dựng chuỗi không chạm DOM, nửa gán thì chỉ có ba hàm. Bốn thứ đáng kiểm nhất, và cả bốn đều là loại hỏng-trong-im-lặng: ký tự đặc biệt trong tên công ty, `spatialConfig` khai rồi mà bố cục không đổi, `data-field` thiếu đường dẫn đầy đủ nên bộ thu thập lúc lưu bỏ sót ô, và luật chỉ-đọc bị dòng `UI_SCHEMA` mở khóa.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 const { khungGia } = require('../lib/khung-gia');
@@ -14,9 +15,8 @@ function chay(so) {
 
   let hop;
   try {
-    hop = napClient(taoHopCat(),
-      'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/icons.html',
-      'client/util/valueText.html', 'client/schema/schemaAccess.html', 'client/ui/renderEngine.html');
+    hop = napTheoSidebar(['client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/icons.html',
+      'client/util/valueText.html', 'client/schema/schemaAccess.html', 'client/ui/renderEngine.html']);
     hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   } catch (err) {
     return ghiLoiNap(so, 'nạp renderEngine cùng bảng khai trường thật', err);
@@ -332,7 +332,7 @@ function chay(so) {
     Store: { categories: { '@CAT_SAN_PHAM': ['Sản phẩm A', 'Sản phẩm B', 'Sản phẩm C'] } },
     customerPickerIsInput: () => false
   });
-  napClient(comboHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/combo.html');
+  napTheoSidebar(['client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/combo.html'], comboHop);
   const comboInput = (value) => ({
     value: value,
     getAttribute: (name) => name === 'data-field' ? 'customer.product' : null
@@ -354,7 +354,7 @@ function chay(so) {
       { companyName: 'Công ty B', id: 'CUS-2', province: 'HCM' }
     ] }
   });
-  napClient(pickerHop, 'client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/customerPicker.html', 'client/ui/combo.html');
+  napTheoSidebar(['client/util/textNormalize.html', 'client/ui/popupList.html', 'client/ui/listPicker.html', 'client/ui/customerPicker.html', 'client/ui/combo.html'], pickerHop);
   const pickerInput = { value: 'Công ty', getAttribute: (name) => name === 'data-picker' ? 'customer' : null };
   const pickerResult = pickerHop.comboMatches(pickerInput, pickerInput.value, 'search');
   check(so, 'Công ty mẹ dùng luồng tìm khách và bôi xanh khách đầu tiên',

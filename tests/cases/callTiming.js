@@ -6,7 +6,7 @@
  * Đồng hồ truyền vào từng hàm chứ không đọc `Date.now()` bên trong — nhờ vậy ca kiểm dựng được một lượt chạy 40 giây mà chỉ mất một phần nghìn giây.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -14,7 +14,7 @@ function chay(so) {
 
   let hop = null;
   try {
-    hop = napClient(taoHopCat(), 'client/util/callTiming.html');
+    hop = napTheoSidebar(['client/util/callTiming.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp callTiming', err);
   }

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { trongLanChay } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const path = require('path');
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { section, check, ghiLoiNap } = require('../lib/assert');
@@ -32,7 +32,7 @@ function chay(so) {
   // Ghi một khách mới trong một lần gọi: cấp mã + phát tín hiệu reload trước đây đọc kho khoảng 150 lần mỗi lần ghi.
   nen.hop.documentStoreBegin();
   const docTruoc = nen.stubs._khoDem.doc;
-  const saved = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
+  const saved = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
   const soLanDoc = nen.stubs._khoDem.doc - docTruoc;
   nen.hop.documentStoreEnd();
   check(so, 'cửa kho: writeGateSave ghi khách mới trong một lần gọi chỉ đọc kho thật tối đa 3 lần',
@@ -49,7 +49,7 @@ function chay(so) {
     return khoa;
   };
   signalEnv.hop.documentStoreBegin();
-  trongLanChay(signalEnv.hop, () => signalEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
+  trongLanGoi(signalEnv.hop, () => signalEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
   signalEnv.hop.documentStoreEnd();
   check(so, 'cửa kho: tín hiệu reload của lõi đã ở kho thật trước khi nhả khóa tài liệu', revisionLucNha, 1);
 

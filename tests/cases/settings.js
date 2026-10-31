@@ -5,7 +5,8 @@
  */
 
 const { dungHop, ghiO } = require('../lib/dung-hop');
-const { trongLanChay, dongSoCuoi } = require('../lib/load-gas');
+const { dongSoCuoi } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 /** Hộp có sheet Category mang các giá trị Xác thực `xacThuc`, và các phần cài đặt đã lưu `caiDat`. */
@@ -52,23 +53,23 @@ function chay(so) {
     [{ LOG_TRACE: 'off', CELL_BUDGET: '', USER_NAME: '' }, { columnTypes: {}, sort: [] }]);
 
   // Lưu đạt: ghi một khóa, phát tín hiệu nạp lại config qua hậu xử lý chung.
-  const luu = trongLanChay(hop, () => hop.settingsSave('core_ops', { CELL_BUDGET: ' 600.000 ', USER_NAME: '  Lan  ' }));
+  const luu = trongLanGoi(hop, () => hop.settingsSave('core_ops', { CELL_BUDGET: ' 600.000 ', USER_NAME: '  Lan  ' }));
   check(so, 'lưu đạt thì chuẩn hóa số kiểu người Việt gõ, cắt khoảng trắng, giữ trường không đổi',
     [luu.ok, JSON.parse(nen.props['SETTINGS:core_ops'])], [true, { LOG_TRACE: 'off', CELL_BUDGET: 600000, USER_NAME: 'Lan' }]);
   check(so, 'lưu cài đặt phát tín hiệu nạp lại config', dongSoCuoi(hop).config, true);
   check(so, 'đọc một trường qua settingsValue', hop.settingsValue('core_ops', 'USER_NAME'), 'Lan');
 
   const truoc = nen.props['SETTINGS:core_ops'];
-  const sai = trongLanChay(hop, () => hop.settingsSave('core_ops', { LOG_TRACE: 'bat', CELL_BUDGET: '0', THUA: 1 }));
+  const sai = trongLanGoi(hop, () => hop.settingsSave('core_ops', { LOG_TRACE: 'bat', CELL_BUDGET: '0', THUA: 1 }));
   check(so, 'lưu không đạt thì không ghi gì và nêu từng trường hỏng',
     [sai.ok, sai.problems.map((p) => p.field).sort(), nen.props['SETTINGS:core_ops'] === truoc], [false, ['CELL_BUDGET', 'LOG_TRACE', 'THUA'], true]);
 
-  const duLieu = trongLanChay(hop, () => hop.settingsSave('core_data', {
+  const duLieu = trongLanGoi(hop, () => hop.settingsSave('core_data', {
     columnTypes: { '@CUS_RIENG': 'number', '@CUS_MA_KH': 'TEXT', 'sai ma': 'TEXT' },
     sort: [{ col: '@CUS_MA_KH', level: 'Giảm dần' }]
   }));
   check(so, 'kiểu cột tự thêm không được trùng cột của code hay sai mẫu mã', [duLieu.ok, duLieu.problems.map((p) => p.field)], [false, ['columnTypes']]);
-  const duLieuDat = trongLanChay(hop, () => hop.settingsSave('core_data', { columnTypes: { '@CUS_RIENG': 'number' }, sort: [{ col: '@CUS_MA_KH', level: 'desc' }] }));
+  const duLieuDat = trongLanGoi(hop, () => hop.settingsSave('core_data', { columnTypes: { '@CUS_RIENG': 'number' }, sort: [{ col: '@CUS_MA_KH', level: 'desc' }] }));
   check(so, 'kiểu cột và sắp xếp đạt thì lưu đã chuẩn hóa', [duLieuDat.ok, duLieuDat.values], [true, { columnTypes: { '@CUS_RIENG': 'NUMBER' }, sort: [{ col: '@CUS_MA_KH', level: 'desc' }] }]);
   const quaCap = hop.settingsValidate(hop.settingsSection('core_data'), { sort: Array.from({ length: hop.VIEW_SORT_MAX_LEVELS + 1 }, () => ({ col: '@CUS_MA_KH', level: 'asc' })) }, {});
   check(so, 'sắp xếp quá số cấp tối đa thì không đạt', quaCap.ok, false);
@@ -83,7 +84,7 @@ function chay(so) {
     () => hop.settingsValidate(hop.settingsSection('defaults_sidebar'), { values: {} }, {}), 'Category');
 
   // Ngầm định khi nhập trên Sidebar: kiểm bằng đúng bộ kiểm của cửa ghi.
-  const nd = trongLanChay(hop, () => hop.settingsSave('defaults_sidebar', { values: { customer: { verifyStatus: 'Đã xác thực', note: '' } } }));
+  const nd = trongLanGoi(hop, () => hop.settingsSave('defaults_sidebar', { values: { customer: { verifyStatus: 'Đã xác thực', note: '' } } }));
   check(so, 'ngầm định có trong Category thì lưu, giá trị rỗng bỏ qua', [nd.ok, nd.values], [true, { values: { customer: { verifyStatus: 'Đã xác thực' } } }]);
   const ndSai = hop.settingsValidate(hop.settingsSection('defaults_sidebar'), { values: { customer: { verifyStatus: 'Không có', id: 'KH1', bidClosingDate: '2026-01-01', khongCo: 'x' }, la: {} } }, { category: hop.categoryReadAll() });
   check(so, 'ngầm định chặn giá trị ngoài Category, trường máy điền, trường ngày, trường lạ và thực thể lạ',
@@ -97,11 +98,11 @@ function chay(so) {
 
   // Category đổi sau khi lưu: giá trị lệch bị bỏ và có thông báo; khớp lại thì thông báo tự hết.
   const lech = dungCaiDat({ defaults_sidebar: { values: { customer: { verifyStatus: 'Đã xác thực' } } } }, ['Chưa xác thực']);
-  const goiLech = trongLanChay(lech.hop, () => lech.hop.settingsReadAll(lech.hop.categoryReadAll()));
+  const goiLech = trongLanGoi(lech.hop, () => lech.hop.settingsReadAll(lech.hop.categoryReadAll()));
   check(so, 'ngầm định lệch Category thì không điền và phát settings_stale theo tên phần',
     [goiLech.defaults, thongBao(lech.hop, 'settings_stale').map((n) => n.scope)], [{}, ['defaults_sidebar']]);
   ghiO(lech, 'Category', lech.hop.SHEET_LAYOUT.Category.firstDataRow + 1, '@CAT_XAC_THUC', 'Đã xác thực');
-  const goiKhop = trongLanChay(lech.hop, () => lech.hop.settingsReadAll(lech.hop.categoryReadAll()));
+  const goiKhop = trongLanGoi(lech.hop, () => lech.hop.settingsReadAll(lech.hop.categoryReadAll()));
   check(so, 'Category khớp lại thì ngầm định điền lại và thông báo tự hết',
     [goiKhop.defaults, thongBao(lech.hop, 'settings_stale').length], [{ customer: { verifyStatus: 'Đã xác thực' } }, 0]);
   check(so, 'gói config giữ hợp đồng cũ cho Sidebar', Object.keys(goiKhop).sort(), ['counters', 'defaults', 'params', 'sheetSchema', 'sort']);
@@ -111,7 +112,7 @@ function chay(so) {
   check(so, 'LOG_TRACE là danh sách thì phủ đúng các nguồn có tên', ['core', 'sidebar', 'fbm_sync', ''].map((n) => vet.hop.logTraceCoversSource(n)), [true, true, false, false]);
   check(so, 'LOG_TRACE all phủ mọi nguồn', dungCaiDat({ core_ops: { LOG_TRACE: 'all' } }).hop.logTraceCoversSource('nguồn_lạ'), true);
   check(so, 'chưa lưu LOG_TRACE là tắt', dungCaiDat().hop.logTraceCoversSource('core'), false);
-  trongLanChay(vet.hop, () => vet.hop.settingsReadAll(vet.hop.categoryReadAll()));
+  trongLanGoi(vet.hop, () => vet.hop.settingsReadAll(vet.hop.categoryReadAll()));
   check(so, 'LOG_TRACE đang bật thì phát thông báo log_trace_on', thongBao(vet.hop, 'log_trace_on').length, 1);
   vet.hop.shinLogTraceOff();
   check(so, 'shinLogTraceOff tắt qua cổng lưu và gỡ thông báo', [vet.hop.logTraceCoversSource('core'), thongBao(vet.hop, 'log_trace_on').length], [false, 0]);

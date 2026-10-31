@@ -5,14 +5,8 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { docLog } = require('../lib/gas/doc-log');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
-
-function docLog(nen) {
-  const sheet = nen.Log.sheet;
-  const dau = nen.hop.SHEET_LAYOUT.Log.firstDataRow;
-  if (sheet.getLastRow() < dau) { return []; }
-  return sheet.getRange(dau, 1, sheet.getLastRow() - dau + 1, 9).getValues().map((row) => row.join('|'));
-}
 
 function chay(so) {
   section('EntryPoint — cửa vào tự động ghi Log theo chuyển trạng thái');
@@ -21,7 +15,7 @@ function chay(so) {
   const hop = nen.hop;
   const goi = (name, fn) => hop.runEntryPoint(name, 'sidebar', fn);
   const hong = (message) => () => { throw new Error(message); };
-  const dem = (text) => docLog(nen).filter((row) => row.indexOf(text) >= 0).length;
+  const dem = (text) => docLog(nen, { noi: '|' }).filter((row) => row.indexOf(text) >= 0).length;
 
   checkThrows(so, 'lỗi đầu tiên của cửa vào tự động vẫn ném cho Sidebar', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
   checkThrows(so, 'lỗi trùng vẫn ném cho Sidebar', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
