@@ -189,7 +189,11 @@ function gateItemReply(item, ctx) {
   if (batchKey) {
     const ids = batchKey.Name.match(/'([^']+)'/g).map((text) => text.slice(1, -1)), gone = ctx.gone || [];
     const dongKhach = ctx.rows.filter((dong) => ids.indexOf(dong[sttIndex]) >= 0 && gone.indexOf(dong[sttIndex]) < 0);
-    return { body: gridResponse(ctx.fields, dongKhach, dongKhach.length) };
+    // FBM chỉ trả tiêu đề cột khi `type: 0`; `cutColumn` cắt một cột ở trang không tiêu đề để giả FBM đổi cấu trúc.
+    if (ctx.customerItemTypes) { ctx.customerItemTypes.push(item.body.type); }
+    const body = JSON.parse(gridResponse(ctx.fields, item.body.type !== 0 && ctx.cutColumn ? dongKhach.map((dong) => dong.slice(1)) : dongKhach, dongKhach.length));
+    if (item.body.type !== 0) { delete body.d.ViewPage; }
+    return { body: JSON.stringify(body) };
   }
   if (!ownerKey && !existKey) { return null; }
   // `fail`: FBM trả lỗi nghiệp vụ cho request tra mã này.
@@ -988,7 +992,7 @@ async function chay(so) {
     const so2 = (i) => String(i).padStart(2, '0');
     const customerRows = Array.from({ length: soKhach }, (_, k) => k + 1).map((i) => row(fullCustomerFields, { stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Cong ty ' + i, ma_so_thue: '0100' + so2(i), ong_ba: String.fromCharCode(65 + (i - 1) % 26), dc_lh: 'Ha Noi', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ngay_gd: '/Date(' + Date.UTC(2026, 8, 20) + ')/', datetime0: '/Date(' + Date.parse(gio(i, 1) + 'Z') + ')/', xorder: i }));
     const activityRows = Object.fromEntries(customerRows.map((_, k) => k + 1).map((i) => ['FBM-C' + i, [row(fullActivityFields, { id: 'FBM-A' + i, details: 'Goi dien ' + i, end_date: '2026-09-20', owner: 'Owner ' + i, datetime0: gio(i, 3), line_nbr: 1 })]]));
-    const customerPageIndexes = [], activityItemTypes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
+    const customerPageIndexes = [], activityItemTypes = [], customerItemTypes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
     let fullStep = null;
     const fbmTab = executorSession();
     // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm lượt đầu mất tab FBM ngay ở lô giao dịch đầu tiên.
@@ -1034,7 +1038,7 @@ async function chay(so) {
       }
       let raw = kind === 'batch' ? await sendBatchThroughExecutor(request, (item) => {
         if (/GetCompletionList/.test(item.url)) { return { body: JSON.stringify({ d: [['CODE', 'Ten danh muc']] }) }; }
-        const gateReply = gateItemReply(item, { fields: fullCustomerFields, rows: customerRows, gone: options && options.goneCustomers, owners: options && options.owners, exists: options && options.exists });
+        const gateReply = gateItemReply(item, { customerItemTypes, cutColumn: options && options.cutCustomerColumn, fields: fullCustomerFields, rows: customerRows, gone: options && options.goneCustomers, owners: options && options.owners, exists: options && options.exists });
         if (gateReply) { return gateReply; }
         const key = item.body.externalKey[0].Value;
         if (khachLoi[key]) { return { raw: khachLoi[key] }; }
@@ -1070,7 +1074,7 @@ async function chay(so) {
       }
     }
     }
-    return { customerPageIndexes, activityItemTypes, fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
+    return { customerPageIndexes, activityItemTypes, customerItemTypes, fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
   }
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
@@ -1139,6 +1143,13 @@ async function chay(so) {
   check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; cả lượt chỉ một khách lấy kèm tiêu đề cột', [
     nhieuTrang.activityItemTypes.filter((type) => type === 0).length, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
   ], [1, 120, [[-1, -1], [1, 0], [2, 1]], 120, 120, 'done', '']);
+  check(so, 'lô đọc chi tiết: phần đọc khách chỉ lô đầu của lượt lấy kèm tiêu đề cột, các lô sau đọc cột theo danh sách đã lưu và vẫn ghi đủ khách', [
+    nhieuTrang.customerItemTypes.filter((type) => type === 0).length, nhieuTrang.customerItemTypes.length > 1, nhieuTrang.customerItemTypes[0], nhieuTrang.fullLocal.customer.length
+  ], [1, true, 0, 120]);
+  const lechCotKhach = await fullPipeline(false, 'read', { customers: 120, scanCustomerRows: 50, cutCustomerColumn: true });
+  check(so, 'phần đọc khách không tiêu đề có số cột khác tiêu đề đã lưu: dừng phiên FBM_GRID_SHAPE_CHANGED, Log báo, không ghi thêm khách nào sau lô đầu', [
+    lechCotKhach.fullStep.status.phase, lechCotKhach.fullStep.status.lastFailureCode, lechCotKhach.fullLogs.some((event) => event.action === 'activity_batch_mismatch' && event.detail.code === 'FBM_GRID_SHAPE_CHANGED'), lechCotKhach.fullLocal.customer.length < 120
+  ], ['error', 'FBM_GRID_SHAPE_CHANGED', true, true]);
   const tieuDeLoi = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C1': loiHttp } });
   check(so, 'khách giữ tiêu đề cột bị lỗi: các khách còn lại xếp sang lô sau, lô sau có đúng một khách lấy tiêu đề, đủ giao dịch của khách còn lại', [
     tieuDeLoi.fullBatches.map(khoaLo), tieuDeLoi.activityItemTypes, tieuDeLoi.fullLocal.activity.map((item) => item.fbmId).sort(), tieuDeLoi.fullStep.status.phase
