@@ -50,19 +50,6 @@ async function testSoSanhVaLazy(so) {
 async function testModalVaActionCho(so) {
   const bo = taoBoTest(), hop = bo.hop;
   let dirty = true, saveCalls = 0, discardCalls = 0, pendingCalls = 0;
-  check(so, 'modal cảnh báo được dựng bằng component dùng lại, không phải HTML hardcode', [
-    !!bo.dialog.querySelector('.shin-unsaved-panel'),
-    !!bo.dialog.querySelector('#shin-unsaved-title'),
-    !!bo.dialog.querySelector('[data-unsaved-choice="save"]'),
-    !!bo.dialog.querySelector('[data-unsaved-choice="discard"]'),
-    !!bo.dialog.querySelector('[data-unsaved-choice="continue"]')
-  ], [true, true, true, true, true]);
-  check(so, 'modal dùng đúng ba nhãn hành động và lớp phủ component', [
-    bo.dialog.querySelector('[data-unsaved-choice="save"]').textContent,
-    bo.dialog.querySelector('[data-unsaved-choice="discard"]').textContent,
-    bo.dialog.querySelector('.shin-unsaved-continue').textContent,
-    !!bo.dialog.querySelector('.shin-unsaved-backdrop')
-  ], ['Lưu thay đổi', 'Hủy bỏ thay đổi', 'Tiếp tục sửa', true]);
   const provider = {
     read: () => ({ dirty, fieldIds: dirty ? ['field-a', 'field-b'] : [] }),
     save: () => { saveCalls += 1; dirty = false; return Promise.resolve({ ok: true }); },
@@ -70,6 +57,12 @@ async function testModalVaActionCho(so) {
   };
   hop.unsavedChangesReadProvider = () => provider;
   check(so, 'action bị giữ lại và modal tô đúng nhiều trường thay đổi', [hop.unsavedChangesGuard('core', () => { pendingCalls += 1; }), hop.UNSAVED_CHANGES.dialogOpen, bo.wrapper.classList.contains('shin-field-changed'), bo.wrapperB.classList.contains('shin-field-changed')], [true, true, true, true]);
+  check(so, 'cảnh báo hiện qua popup chung với đúng tiêu đề, ba nhãn hành động và lớp phủ', [
+    bo.dialog.hidden,
+    bo.dialog.querySelector('#shin-decision-title').textContent,
+    ['save', 'discard', 'continue'].map((id) => bo.dialog.querySelector('[data-ui-decision-choice="' + id + '"]').textContent),
+    !!bo.dialog.querySelector('.shin-unsaved-backdrop')
+  ], [false, 'Có thay đổi chưa lưu', ['Lưu thay đổi', 'Hủy bỏ thay đổi', 'Tiếp tục sửa'], true]);
   hop.unsavedChangesResolve('continue');
   check(so, 'Tiếp tục sửa đóng modal nhưng giữ màu và không chạy action', [hop.UNSAVED_CHANGES.dialogOpen, bo.wrapper.classList.contains('shin-field-changed'), bo.wrapperB.classList.contains('shin-field-changed'), pendingCalls], [false, true, true, 0]);
 
@@ -98,6 +91,27 @@ async function testModalVaActionCho(so) {
   hop.unsavedChangesResolve('discard');
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'discard thành công vẫn chạy action dù provider còn đọc thấy dirty cũ', [staleDiscardCalls, stalePendingCalls, hop.UNSAVED_CHANGES.provider], [1, 1, null]);
+}
+
+/** Lỗi gặp 2026-10-31: popup vừa hiện câu hỏi khác (Hủy phiên cũ) thì cảnh báo bản nháp hiện lại nội dung cũ, nút thuộc popup đã đóng nên bấm không ăn. */
+async function testCanhBaoSauPopupKhac(so) {
+  const bo = taoBoTest(), hop = bo.hop;
+  let dirty = true, saveCalls = 0, pendingCalls = 0;
+  const huyPhien = hop.uiDecisionOpen({ title: 'Hủy phiên cũ và đăng nhập FBM?', cancelLabel: 'Quay lại', confirmLabel: 'Hủy phiên cũ' });
+  bo.dom.document.listeners.click({ target: bo.dialog.querySelector('[data-ui-decision-choice="cancel"]'), preventDefault() {} });
+  const daHuy = await huyPhien;
+  hop.unsavedChangesReadProvider = () => ({ read: () => ({ dirty, fieldIds: ['field-a'] }), save: () => { saveCalls += 1; dirty = false; return { ok: true }; } });
+  hop.unsavedChangesGuard('fbm', () => { pendingCalls += 1; });
+  const tieuDe = bo.dialog.querySelector('#shin-decision-title').textContent, nutLuu = bo.dialog.querySelector('[data-ui-decision-choice="save"]');
+  bo.dom.document.listeners.click({ target: nutLuu, preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'popup khác vừa đóng thì cảnh báo bản nháp vẫn hiện đúng nội dung của nó, bấm Lưu thay đổi chạy lưu rồi chạy action chờ', [daHuy, tieuDe, !!nutLuu, saveCalls, pendingCalls, bo.dialog.hidden, hop.UNSAVED_CHANGES.dialogOpen], [false, 'Có thay đổi chưa lưu', true, 1, 1, true, false]);
+
+  dirty = true;
+  hop.unsavedChangesGuard('fbm', () => { pendingCalls += 1; });
+  bo.dom.document.listeners.click({ target: bo.dialog.querySelector('.shin-decision-close'), preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'nút X của cảnh báo đóng popup như Tiếp tục sửa, không chạy action', [bo.dialog.hidden, hop.UNSAVED_CHANGES.dialogOpen, pendingCalls, saveCalls], [true, false, 1, 1]);
 }
 
 async function testLoiVaKhoa(so) {
@@ -228,7 +242,7 @@ function testSurfaceAdapterContract(so) {
   check(so, 'Adapter thiếu canRun bị chặn fail-closed thay vì chạy tắt', [invalidBlocked, invalid.calls.filter((item) => item.name === 'alert').length], [true, 1]);
 }
 
-function testCoordinatorUseCaseMatrix(so) {
+async function testCoordinatorUseCaseMatrix(so) {
   const bo = taoBoTest(), hop = bo.hop, target = bo.dom.document.createElement('button');
   bo.dom.root.appendChild(target);
   let editing = false, dirty = false, pendingCalls = 0, allow = false;
@@ -245,22 +259,22 @@ function testCoordinatorUseCaseMatrix(so) {
   target.focus();
   const cleanBlocked = hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; });
   check(so, 'surface đang sửa nhưng sạch vẫn chặn action ngoài và mở modal', [cleanBlocked, hop.UNSAVED_CHANGES.dialogOpen, hop.UNSAVED_CHANGES.highlighted, pendingCalls], [true, true, false, 0]);
-  const continueButton = bo.dialog.querySelector('[data-unsaved-choice="continue"]');
   const backdrop = bo.dialog.querySelector('.shin-unsaved-backdrop');
   let prevented = false;
   bo.dom.document.listeners.click({ target: backdrop, preventDefault: () => { prevented = true; } });
+  await new Promise((resolve) => setImmediate(resolve));
   check(so, 'bấm backdrop là Tiếp tục sửa, giữ focus và bỏ action đang chờ', [prevented, hop.UNSAVED_CHANGES.dialogOpen, bo.dom.document.activeElement === target, hop.UNSAVED_CHANGES.pending, pendingCalls], [true, false, true, null, 0]);
 
   dirty = true;
   const dirtyBlocked = hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; });
   check(so, 'surface dirty mở modal và tô đúng trường thay đổi', [dirtyBlocked, hop.UNSAVED_CHANGES.dialogOpen, bo.wrapper.classList.contains('shin-field-changed')], [true, true, true]);
   bo.dom.document.listeners.keydown({ key: 'Escape', preventDefault: () => { prevented = true; } });
+  await new Promise((resolve) => setImmediate(resolve));
   check(so, 'Escape đóng modal như Tiếp tục sửa nhưng không chạy action', [hop.UNSAVED_CHANGES.dialogOpen, hop.UNSAVED_CHANGES.pending, pendingCalls, bo.wrapper.classList.contains('shin-field-changed')], [false, null, 0, true]);
 
   allow = true;
   check(so, 'action nội bộ được adapter cho phép đi thẳng dù surface đang sửa', [hop.unsavedChangesGuardTransition({ source: 'matrix', target }, () => { pendingCalls += 1; }), hop.UNSAVED_CHANGES.dialogOpen, pendingCalls], [false, false, 0]);
   check(so, 'sau Continue không giữ provider/pending cũ làm giao dịch ma', [hop.UNSAVED_CHANGES.provider, hop.UNSAVED_CHANGES.pending], [null, null]);
-  void continueButton;
 }
 
 function testCoordinatorFailureMatrix(so) {
@@ -680,11 +694,12 @@ async function chay(so) {
   section('Dirty guard Sidebar - compare, modal va scope');
   await testSoSanhVaLazy(so);
   await testModalVaActionCho(so);
+  await testCanhBaoSauPopupKhac(so);
   await testLoiVaKhoa(so);
   await testFormVaFbm(so);
   testCoreDiscardRestoresDom(so);
   testSurfaceAdapterContract(so);
-  testCoordinatorUseCaseMatrix(so);
+  await testCoordinatorUseCaseMatrix(so);
   testCoordinatorFailureMatrix(so);
   testFbmAdapterUseCaseMatrix(so);
   await testAllFbmSurfaceActionMatrix(so);
