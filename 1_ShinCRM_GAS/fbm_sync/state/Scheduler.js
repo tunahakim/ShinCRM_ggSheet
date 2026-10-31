@@ -291,7 +291,8 @@ function fbmSyncHeartbeatRequest(options) {
   var opt = options || {}, source = String(opt.trigger || 'alarm');
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: true, noop: true, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
   // Đọc ô lượt một lần cho cả lần hỏi: kiểm danh tính và ghi hộp đen ở dưới không đổi ô lượt.
-  var state = FbmSync.stateRead(), now = Date.now();
+  // Áp cờ dừng trước mọi việc: lượt bị bấm Dừng mà không còn lát nào chạy (Extension đã tắt) được đóng ở đây.
+  var state = FbmSync.stopPendingApply().state, now = Date.now();
   if (FbmSync.pickupAwaits(state, opt.machineId, now)) {
     FbmSync.requestWatchTrail(opt.trail);
     return FbmSync.runSlice(function () { return FbmSync.envelopeReissue(state, ''); });

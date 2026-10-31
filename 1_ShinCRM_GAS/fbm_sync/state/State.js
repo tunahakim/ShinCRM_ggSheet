@@ -53,9 +53,9 @@ FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertySet = function (key, value, context) {
   var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
-  // State cũ chỉ để ghi chi tiết Log khi ghi hỏng, nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties.
+  // State lượt chỉ để ghi chi tiết Log khi ghi hỏng (khóa nào hỏng cũng cần biết lượt nào), nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties.
   var previous = null, loadPrevious = function () {
-    try { previous = key === FbmSync.STATE_KEY ? FbmSync.documentPropertyJson(key, 'state đồng bộ') : null; } catch (previousFailed) { previous = { runId: '', phase: 'không đọc được state cũ: ' + (previousFailed.code || previousFailed.message) }; }
+    try { previous = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ'); } catch (previousFailed) { previous = { runId: '', phase: 'không đọc được state cũ: ' + (previousFailed.code || previousFailed.message) }; }
   };
   bytes = Utilities.newBlob(text).getBytes().length;
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
@@ -83,8 +83,10 @@ FbmSync.documentPropertyJson = function (key, context) {
 
 /** Khóa duy nhất của state/cursor đồng bộ (khóa script); không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. Không có khóa thay thế: thiếu khóa script thì lỗi to, không chạy không khóa. */
 FbmSync.orchestrationLock = function () { return LockService.getScriptLock(); };
-FbmSync.withOrchestrationLock = function (work) {
-  var lock = FbmSync.orchestrationLock(), waitMs = typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000;
+/** `waitMs` bỏ trống là hạn chờ chung; lệnh Dừng truyền 0 để không bao giờ chờ lát đang chạy. */
+FbmSync.withOrchestrationLock = function (work, waitMs) {
+  var lock = FbmSync.orchestrationLock();
+  if (waitMs === undefined) { waitMs = SETTINGS.LOCK_WAIT_MS; }
   if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: FbmSync.statusView() }; }
   // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
@@ -96,11 +98,20 @@ FbmSync.withOrchestrationLock = function (work) {
  */
 FbmSync.runSlice = function (work) {
   var failure = null, result;
-  try { result = work(); } catch (error) { failure = error; throw error; } finally {
+  // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
+  try {
+    result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() } : FbmSync.stopBeforeIssue(work());
+  } catch (error) { failure = error; throw error; } finally {
     if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(); }
     if (failure) { FbmSync.controlFailRun(failure); }
   }
   return FbmSync.runLeftOpenClose(result);
+};
+/** Lệnh Dừng ghi cờ trong lúc lát này đang chạy: không phát request vừa dựng, đóng lượt luôn. Đọc cờ từ kho thật, một lần đọc mỗi lát có request. */
+FbmSync.stopBeforeIssue = function (result) {
+  if (!result || !result.request) { return result; }
+  if (!FbmSync.stopPendingApply(true).stopped) { return result; }
+  return Object.assign({}, result, { code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() });
 };
 /**
  * Lát trả lời không kèm request trong khi lượt còn ở phase đang chạy và không request nào đang chờ: không ai còn đẩy lượt đi tiếp (Extension hết việc, Sidebar không có gì để gửi).

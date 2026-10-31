@@ -17,17 +17,6 @@ function fbmSyncApprovePush() {
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 }
-/**
- * Dừng lượt ngay và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận, kể cả khi còn request đang bay: response về sau bị `requestAnswered` loại. Không chờ response đang bay rồi mới dừng, vì Extension nhận lệnh Dừng thì cắt lô giữa chừng; xử lý lô cắt dở như lô thường là báo lỗi lệch lô cho một lần dừng hợp lệ.
- * Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng".
- */
-function fbmSyncCancel() {
-  var state = FbmSync.stateRead(), failed = String(state.phase || '') === 'error';
-  FbmSync.stateWrite(FbmSync.runCloseNow(state, failed ? null : { phase: 'paused', message: 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.' }));
-  // Trả status công khai, không trả ô lượt: ô lượt mang cookie và token phiên FBM.
-  return { ok: true, status: FbmSync.statusView() };
-}
-
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
 function fbmSyncRetryPushFailures() {
   var state = FbmSync.stateRead(), failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures);

@@ -183,6 +183,20 @@ function documentPropertyJson(props, key, context, shape) {
   return parsed;
 }
 
+/**
+ * Kho chỉ đọc, đọc thẳng kho thật bỏ qua bản đọc, cho tín hiệu mà tiến trình khác ghi không qua khóa (cờ dừng lượt đồng bộ): trong khóa, bản đọc chụp lúc lấy khóa nên không thấy tín hiệu ghi sau đó. Khóa đang chờ ghi gộp thì trả giá trị chờ ghi, vì đó là bản mới nhất của chính lần gọi này.
+ */
+function documentPropsFresh() {
+  return {
+    getProperty: function (key) {
+      if (Object.prototype.hasOwnProperty.call(DOCUMENT_STORE.dirty, key)) { return DOCUMENT_STORE.values[key]; }
+      var raw = documentStoreReal().getProperty(key);
+      if (documentStoreActive()) { DOCUMENT_STORE.values[key] = raw; }
+      return raw;
+    }
+  };
+}
+
 /** Kho cho mọi code: trong một lần gọi là kho có bản đọc (ghi chờ trong khóa tài liệu, ghi thẳng ngoài khóa), ngoài đó là kho thật. */
 function documentProps() { return documentStoreActive() ? DOCUMENT_STORE_THROUGH : documentStoreReal(); }
 

@@ -14,8 +14,8 @@ FbmSync.COMMANDS = {
   start: { lock: true, drives: true, run: function (input) { return FbmSync.commandStart(input); } },
   continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input, state) { return FbmSync.commandContinue(input, state); } },
   heartbeat: { lock: true, relay: true, run: function (input) { return fbmSyncHeartbeatRequest(input); } },
-  cancel: { lock: true, run: function () { return fbmSyncCancel(); } },
-  stop_background: { lock: true, run: function () { return FbmSync.stopBackground(); } },
+  cancel: { run: function () { return FbmSync.runStopCommand('any'); } },
+  stop_background: { run: function () { return FbmSync.runStopCommand('background'); } },
   approve_push: { lock: true, slice: true, drives: true, run: function () { return fbmSyncApprovePush(); } },
   open_conflict: { lock: true, drives: true, run: function () { return FbmSync.openConflict(); } },
   confirm_conflict: { lock: true, run: function (input) { return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.fbmValues, input.shinValues, input.snapshot); } },
@@ -70,9 +70,8 @@ FbmSync.controlDispatch = function (command, payload, channel) {
     FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };
     try { return body(); } finally { FbmSync.issueContext = null; }
   };
-  if (!spec.lock) { return finish(FbmSync.channelResult(run(), via)); }
   try {
-    result = FbmSync.withOrchestrationLock(run);
+    result = spec.lock ? FbmSync.withOrchestrationLock(run) : run();
   } catch (error) {
     if (!FbmSync.stateStorageError(error)) { throw error; }
     result = FbmSync.storageFailureResult(error);
@@ -161,6 +160,8 @@ FbmSync.commandStart = function (input) {
     throw unknown;
   }
   FbmSync.traceImport(input.clientTrace);
+  // Lượt nền bị Dừng khi khóa bận còn chờ đóng: đóng trước, ngoài lát, để lát của lượt mới không áp nhầm cờ rồi trả "đã dừng" thay cho mở lượt.
+  FbmSync.stopPendingApply();
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };
   var result = spec.slice ? FbmSync.runSlice(run) : run();
   if (kind === 'sync' && result && result.status) { FbmSync.logStatus(result.status, 'start'); }

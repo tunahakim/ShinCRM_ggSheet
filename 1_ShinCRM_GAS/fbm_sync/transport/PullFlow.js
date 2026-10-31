@@ -7,17 +7,6 @@ FbmSync.backgroundRunningResult = function () {
   return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.', status: FbmSync.statusView() };
 };
 
-/**
- * Nơi duy nhất dừng lượt nền, chỉ gọi khi người dùng chọn "Dừng đồng bộ nền" ở popup. Đóng lượt NGAY trong khóa: response FBM đang bay của lượt này đến muộn sẽ bị loại `STALE_RESPONSE` và không ghi gì, nên Sidebar chạy lệnh gốc được ngay khi nhận `status.running: false`.
- * Lượt đang chạy là lượt tay, hoặc không có lượt nào, thì không đóng gì: lượt tay chỉ người dùng tự dừng bằng nút Dừng.
- */
-FbmSync.stopBackground = function () {
-  var current = FbmSync.stateRead();
-  if (!FbmSync.runInProgress(current) || String(current.origin || '') !== 'background') { return { ok: true, code: 'SYNC_BACKGROUND_IDLE', status: FbmSync.statusView() }; }
-  FbmSync.stateWrite(FbmSync.runCloseNow(current, { phase: 'idle', origin: 'manual', message: 'Đã dừng đồng bộ nền theo yêu cầu; có thể chạy phiên thủ công.' }));
-  return { ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: FbmSync.statusView() };
-};
-
 FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
 FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
