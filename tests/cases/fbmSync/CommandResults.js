@@ -1,5 +1,5 @@
 /**
- * Mọi lệnh trong bảng lệnh chạy qua đúng cửa lệnh `controlDispatch` như Sidebar và relay gọi thật, và kết quả không có trường nào bị cửa ra bỏ. Các ca khác gọi thẳng hàm bên trong nên không thấy cửa ra; thiếu ca này thì nơi tạo kết quả thêm trường mới không ai biết cho tới khi người dùng bấm nút.
+ * Mọi lệnh trong bảng lệnh chạy qua đúng cửa lệnh `controlDispatch` như Sidebar và relay gọi thật, không ném và không để lọt bí mật phiên ngoài phong bì request. Các ca khác gọi thẳng hàm bên trong nên không thấy cửa ra; thiếu ca này thì nơi tạo kết quả thêm trường mới không ai biết cho tới khi người dùng bấm nút.
  * Bảng ca phải phủ đủ bảng lệnh, mọi loại lượt của `start` và mọi mục của `save_settings`: thêm lệnh, loại lượt hay mục cài đặt mà quên ca thì test đỏ.
  */
 const { section, check } = require('../../lib/assert');
@@ -16,6 +16,9 @@ function luotDangCho(FbmSync) {
 
 /** Mỗi ca: `ten` hiện trong báo cáo, `lenh`, `payload` (hoặc hàm dựng payload từ FbmSync), `kenh`, `chuan` chuẩn bị state trước. */
 const dangNhapDaLuu = (F) => { F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234', username: 'nguoi-thu' }); };
+
+/** Giá trị bí mật phiên đặt vào ô lượt trước mỗi lệnh; ngoài `request` (body gửi FBM cần chúng) không được xuất hiện ở đâu trong kết quả. */
+const BI_MAT = { cookie: 'bi-mat-cookie-7f3a', customerAuthorized: 'bi-mat-customer-9c1d', activityAuthorized: 'bi-mat-activity-2b8e' };
 
 const CA = [
   { lenh: 'start', ten: 'start sync', payload: { kind: 'sync', mode: 'check', machineId: 'may-A' } },
@@ -68,7 +71,7 @@ async function chay(so) {
     .concat(Object.keys(mau.SETTINGS_SAVERS).filter((muc) => !CA.some((ca) => ca.muc === muc)).map((muc) => 'save_settings ' + muc));
   check(so, 'bảng ca phủ đủ mọi lệnh, mọi loại lượt của start và mọi mục cài đặt', thieu, []);
 
-  const boTruong = [], nem = [];
+  const lo = [], nem = [];
   CA.forEach((ca) => {
     const { hop } = workflowGas(HOP);
     const F = hop.FbmSync, logs = [];
@@ -77,15 +80,18 @@ async function chay(so) {
     try {
       if (ca.chuan) { ca.chuan(F); }
       const payload = typeof ca.payload === 'function' ? ca.payload(F) : (ca.payload || {});
+      F.statePatch({ session: Object.assign({}, F.stateRead().session, BI_MAT) });
       logs.length = 0;
-      F.controlDispatch(ca.lenh, payload, ca.kenh);
+      const ketQua = Object.assign({}, F.controlDispatch(ca.lenh, payload, ca.kenh));
+      delete ketQua.request;
+      const chu = JSON.stringify(ketQua);
+      Object.keys(BI_MAT).forEach((khoa) => { if (chu.indexOf(BI_MAT[khoa]) >= 0) { lo.push(ca.ten + ': ' + khoa); } });
     } catch (error) {
       nem.push(ca.ten + ': ' + String(error && (error.code || error.message)));
     }
-    logs.filter((line) => line.action === 'public_result_field_dropped').forEach((line) => { boTruong.push(ca.ten + ': ' + line.detail.fields.join(', ')); });
   });
   check(so, 'không lệnh nào ném lỗi khi chạy qua cửa lệnh', nem, []);
-  check(so, 'không lệnh nào trả trường bị cửa ra bỏ', boTruong, []);
+  check(so, 'không lệnh nào để lọt bí mật phiên FBM ra ngoài phong bì request', lo, []);
 }
 
 module.exports = { chay };

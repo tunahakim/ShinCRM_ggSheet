@@ -54,14 +54,14 @@ async function chay(so) {
   documentProperties.setProperty = realSet; documentProperties.deleteProperty = realDelete;
   check(so, 'status trả đủ gói một lần đọc và không ghi DocumentProperties', [status.ok, !!status.status, !!status.identity, !!status.settings, !!status.login, writes, JSON.stringify(documentProperties.data) === snapshot], [true, true, true, true, true, 0, true]);
 
-  // Kết quả ra ngoài chỉ gồm trường đã khai: trường lạ bị bỏ và có dòng Log lỗi, nhưng lệnh đã ghi xong không bị báo hỏng; không lọt khóa phiên FBM.
-  check(so, 'cửa ra bỏ trường ngoài danh sách', FbmSync.publicResult({ ok: true, session: { cookie: 'c' } }), { ok: true });
+  // Cửa ra không lọc theo tên trường: trường lệnh trả về tới Sidebar nguyên vẹn; ô phiên lọt vào kết quả ở bất kỳ tên nào vẫn mất khóa bí mật, không có dòng Log bỏ trường.
+  check(so, 'cửa ra giữ nguyên mọi trường lệnh trả về', FbmSync.publicResult({ ok: false, code: 'CONFLICT_RECORD_BUSY', busy: { id: 'CUS-1', reason: 'r' }, conflicts: [{ field: 'phone' }] }), { ok: false, code: 'CONFLICT_RECORD_BUSY', busy: { id: 'CUS-1', reason: 'r' }, conflicts: [{ field: 'phone' }] });
   logs.length = 0;
   const realStatus = FbmSync.statusRead;
-  FbmSync.statusRead = () => ({ ok: true, session: { cookie: 'c' } });
+  FbmSync.statusRead = () => ({ ok: true, oLuot: { session: { customerAuthorized: 'x', activityAuthorized: 'y', cookie: 'c', userId: 'u1' } } });
   const leaked = FbmSync.controlDispatch('status', {});
   FbmSync.statusRead = realStatus;
-  check(so, 'lệnh trả trường lạ: cửa lệnh trả kết quả đã bỏ trường đó, ghi một dòng Log lỗi nêu tên lệnh và tên trường', [leaked, logs.map((line) => [line.action, line.outcome, line.detail.command, line.detail.fields])], [{ ok: true }, [['public_result_field_dropped', 'error', 'status', ['session']]]]);
+  check(so, 'lệnh lỡ trả ô phiên dưới tên lạ: cửa lệnh vẫn gỡ khóa bí mật, không ghi Log', [leaked, logs.length], [{ ok: true, oLuot: { session: { userId: 'u1' } } }, 0]);
   check(so, 'kết quả gỡ khóa phiên FBM theo hình dạng ô phiên', FbmSync.publicResult({ ok: true, status: { session: { customerAuthorized: 'x', activityAuthorized: 'y', cookie: 'c', userId: 'u1' } } }).status.session, { userId: 'u1' });
 }
 

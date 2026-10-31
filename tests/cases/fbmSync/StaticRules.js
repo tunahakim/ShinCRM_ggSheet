@@ -32,6 +32,16 @@ const PHASE_OWNER = '1_ShinCRM_GAS/fbm_sync/state/State.js';
 /** Tệp cổng kho DocumentProperties của luồng FBM: chỉ nó được `setProperty`/`deleteProperty` trực tiếp. */
 const PROPERTY_GATE_FILES = ['1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js'];
 
+/**
+ * Tệp được nhắc tới bí mật phiên FBM (`cookie`, `customerAuthorized`, `activityAuthorized`): nơi đọc duy nhất (`scriptSettings`), các bộ dựng request đặt chúng vào body gửi FBM, các nơi ghi phiên và lớp gỡ cuối ở cửa ra.
+ * Cửa ra không lọc theo tên trường nên đây là chỗ chặn bí mật lọt vào kết quả, Log hay thông báo: tệp mới cần biết phiên đã có chưa thì hỏi `sessionAuthorized`.
+ */
+const SESSION_SECRET_FILES = [
+  '1_ShinCRM_GAS/fbm_sync/read/GridRead.js', '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js', '1_ShinCRM_GAS/fbm_sync/state/State.js',
+  '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js', '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js', '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js',
+  '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
+];
+
 /** Tệp được đọc/ghi state: chưa có người điều phối sạch nên để trống, mọi chỗ gọi hiện nay là ngoại lệ. */
 const STATE_ORCHESTRATORS = [];
 
@@ -116,6 +126,10 @@ const RULES = [
   {
     id: 'propertyWrite', title: 'ghi DocumentProperties chỉ qua cổng kho', scope: ['gas', 'client', 'ext'], allow: PROPERTY_GATE_FILES,
     find: (file, src) => matchAll(src, /\.(?:setProperty|setProperties|deleteProperty|deleteAllProperties)\s*\(/)
+  },
+  {
+    id: 'sessionSecret', title: 'bí mật phiên FBM chỉ nhắc ở các tệp được phép', scope: ['gas', 'client', 'ext'], allow: SESSION_SECRET_FILES,
+    find: (file, src) => matchAll(src, /\b(?:customerAuthorized|activityAuthorized)\b|\.cookie\b|\bcookie\s*:/)
   },
   {
     id: 'popup', title: 'không popup trình duyệt', scope: ['client', 'ext'], allow: [],
@@ -211,7 +225,6 @@ const EXCEPTIONS = {
   },
   phaseList: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 2,
-    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/schema/FbmFields.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
@@ -337,7 +350,7 @@ function chay(so) {
   check(so, 'phạm vi quét có tệp để quét', files.length > 0, true);
   const readSource = (file) => fs.readFileSync(path.join(REPO, file), 'utf8');
 
-  [PHASE_OWNER].concat(PROPERTY_GATE_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
+  [PHASE_OWNER].concat(PROPERTY_GATE_FILES, SESSION_SECRET_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
     check(so, 'tệp được phép ' + file + ' có trong phạm vi quét', files.some((item) => item.file === file), true);
   });
 

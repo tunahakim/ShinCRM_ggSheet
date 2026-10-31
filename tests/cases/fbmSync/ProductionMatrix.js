@@ -42,7 +42,7 @@ function makeSync() {
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js',
     'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
-    'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+    'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/control/ControlPort.js');
   hop.FbmSync.readLocal = (entity) => local[entity].map(clone);
   hop.writeGateSave = (request) => {
     writes.push(request);
@@ -522,7 +522,9 @@ async function chay(so) {
 
   const cfOpenedNewer = cfReopen([fbmRow('F-1', 'ALT00001', 'Tên FBM mới hơn 1')]);
   cf.local.customer[0].companyName = 'Tên Shin sửa 1';
-  const cfLocalChanged = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), shinValuesOf(cfOpenedNewer.conflict), cfOpenedNewer.conflict.snapshot);
+  // Hai nhánh trả về cho Sidebar (`conflicts`, `busy`) đi qua đúng cửa lệnh như Sidebar gọi, để cửa ra không cắt mất trường Sidebar cần.
+  const chotQuaCua = (id, choice, opened, snapshot) => CF.controlDispatch('confirm_conflict', { entity: 'customer', id: id, choice: choice, merged: null, fbmValues: fbmValuesOf(opened.conflict), shinValues: shinValuesOf(opened.conflict), snapshot: snapshot });
+  const cfLocalChanged = chotQuaCua('CUS-000001', 'fbm', cfOpenedNewer, cfOpenedNewer.conflict.snapshot);
   const cfChangedField = (cfLocalChanged.conflicts || [])[0] || {};
   check(so, 'ShinCRM đổi trường đang quyết giữa lúc mở và lúc chốt thì không ghi gì, trả xung đột đủ ba giá trị như lưu form',
     [cfLocalChanged.code, cfChangedField.field, cfChangedField.old, cfChangedField.current, cfChangedField.mine, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus],
@@ -533,7 +535,7 @@ async function chay(so) {
   const cfNewSession = CF.stateStart('', 'checking_session', 0); cfNewSession.phase = 'done'; CF.stateWrite(cfNewSession);
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   giuBanGhi(cf.hop, 'khac', 'customer', 'CUS-000001', 'Tiến trình khác đang giữ.');
-  const cfBusy = CF.confirmConflict('customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), shinValuesOf(cfOpenedNewer.conflict), cfShotNew);
+  const cfBusy = chotQuaCua('CUS-000001', 'fbm', cfOpenedNewer, cfShotNew);
   check(so, 'Bản ghi đang bị tiến trình khác giữ lúc chốt thì báo bận kèm lý do, không ghi gì',
     [cfBusy.code, cfBusy.busy && cfBusy.busy.reason, cf.local.customer[0].companyName, cf.local.customer[0].syncStatus], ['CONFLICT_RECORD_BUSY', 'Tiến trình khác đang giữ.', 'Tên Shin sửa 1', 'xung đột chờ quyết']);
   cf.hop.recordGateRun({ by: 'khac', decide: () => ({ release: [{ entity: 'customer', ids: ['CUS-000001'] }] }) });
