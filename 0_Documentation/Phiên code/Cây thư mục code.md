@@ -288,7 +288,22 @@ tests\
 │   ├── dung-hop.js               Dựng sẵn hộp cát kèm sheet giả và hàm ghi ô theo mã cột. Nơi duy nhất giữ danh sách đường dẫn tệp máy chủ.
 │   ├── dung-client.js            Hộp cát RIÊNG cho tệp client. Riêng vì server và client có hàm sinh đôi cùng tên, chung hộp thì bản nạp sau đè bản nạp trước.
 │   ├── khung-gia.js              Khung sidebar giả cho bộ máy vẽ: bốn vùng, chỉ ba khả năng getElementById/innerHTML/hidden. Thay innerHTML một vùng thì phần tử con bị xóa nội dung, đúng như trình duyệt.
-│   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
+│   ├── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
+│   ├── gas\                      Mảnh dựng môi trường GAS giả mà mọi tệp ca dùng chung; tệp ca không tự dựng lại.
+│   │   ├── kho-thuoc-tinh.js     Ba kho thuộc tính giả theo đúng hành vi kho thật (khóa chưa có trả null, lưu thành chuỗi), đếm lệnh theo tên, và kho gãy.
+│   │   ├── lan-goi.js            Chạy một đoạn code trong một lần gọi qua cửa vào thật runEntryPoint.
+│   │   ├── doc-log.js            Đọc dòng dữ liệu của sheet Log, có thể nhả bộ đệm trước.
+│   │   └── mau-ban-ghi.js        Ghi khách hoặc giao dịch mẫu theo mã cột, nhận đối tượng chứ không nhận tham số theo vị trí.
+│   ├── sidebar\                  Mảnh nạp tệp client của Sidebar.
+│   │   ├── nap-sidebar.js        Nạp tệp client theo thứ tự include() của client/Sidebar.html; tệp ngoài Sidebar thì nổ.
+│   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
+│   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
+│   ├── ext\
+│   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
+│   └── quet\                     Công cụ quét mã nguồn.
+│       ├── liet-tep.js           Liệt kê tệp GAS theo đuôi, đi cả thư mục con.
+│       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
+│       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
 ├── contracts\
 │   ├── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
 │   └── gasExtensionContract.js    Hợp đồng dữ liệu GAS–Extension và cách tính mã phiên bản hợp đồng.
@@ -380,7 +395,10 @@ tests\
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
-    │   └── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
+    │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
+    │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
+    │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
+    │   └── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
