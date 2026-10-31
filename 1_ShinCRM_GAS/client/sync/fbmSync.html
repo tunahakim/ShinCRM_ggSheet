@@ -53,6 +53,7 @@ function syncPanelToggle() {
   FBM_SYNC_CLIENT.statusReady = false;
   FBM_SYNC_CLIENT.subscreen = 'run'; FBM_SYNC_CLIENT.openedAt = Date.now(); FBM_SYNC_CLIENT.viewEpoch += 1; FBM_SYNC_CLIENT.configEdits = {}; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; FBM_SYNC_CLIENT.loginPasswordMode = 'saved'; FBM_SYNC_CLIENT.loginPasswordFocused = false; FBM_SYNC_CLIENT.loginPasswordTimer = null; FBM_SYNC_CLIENT.accountNotices = { identity: null, accountSettings: null, login: null }; FBM_SYNC_CLIENT.accountSettingsDraft = {}; FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.settingsNotices = { module: null, relay: null, extension: null, background: null, login: null };
   if (typeof fbmSyncRenderInitial === 'function') { fbmSyncRenderInitial(); }
+  fbmSyncRunWaitResume();
   if (typeof callServer !== 'function') { return null; }
   // Một lời gọi trả cả bốn phần; nạp liên kết, cài đặt trước rồi mới vẽ status để màn vẽ một lần với đủ dữ liệu.
   var ticket = fbmSyncStatusTicket();
@@ -664,6 +665,7 @@ function syncScreenClose() {
   FBM_SYNC_CLIENT.active = false;
   FBM_SYNC_CLIENT.statusReady = false;
   FBM_SYNC_CLIENT.navOpen = false;
+  fbmSyncRunWaitPause();
   fbmSyncSetTargetState('sidebar-root', { removeClass: [uiSyncClass('shell', 'active')] });
   fbmSyncSetTargetState('sidebar-body', { removeClass: [uiSyncClass('shell', 'disabled')] });
   var restored = fbmSyncRestoreReturnScreen();
@@ -750,10 +752,13 @@ function fbmSyncRunWait(runId) {
     fbmSyncRunWaitArm();
   });
 }
+/** Màn đồng bộ đóng thì không đặt đồng hồ hỏi GAS: chỗ chờ vẫn nhận status qua relay, mở lại màn thì đặt lại đồng hồ (`fbmSyncRunWaitResume`). */
 function fbmSyncRunWaitArm() {
   var waiter = FBM_SYNC_CLIENT.runWaiter;
   if (!waiter) { return; }
   clearTimeout(waiter.timer);
+  waiter.timer = null;
+  if (!FBM_SYNC_CLIENT.active) { return; }
   waiter.timer = setTimeout(function () {
     if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
     callServer('fbmGetSyncStatus').then(function (bundle) {
@@ -776,6 +781,11 @@ function fbmSyncRunWaitEnd(result, error) {
   fbmSyncRunWaitDrop();
   if (error) { waiter.reject(error); } else { waiter.resolve(result); }
 }
+function fbmSyncRunWaitPause() {
+  var waiter = FBM_SYNC_CLIENT.runWaiter;
+  if (waiter) { clearTimeout(waiter.timer); waiter.timer = null; }
+}
+function fbmSyncRunWaitResume() { if (FBM_SYNC_CLIENT.runWaiter) { fbmSyncRunWaitArm(); } }
 function fbmSyncRunWaitDrop() {
   var waiter = FBM_SYNC_CLIENT.runWaiter;
   if (waiter) { clearTimeout(waiter.timer); }
@@ -1108,8 +1118,6 @@ function fbmSyncCheckIdentityStart(identityTarget) {
     fbmSyncSetAccountNotice('identity', 'error', 'Kiểm tra liên kết không thành công: ' + reason);
     var trace = FBM_SYNC_CLIENT.traceEvents.slice();
     return fbmSyncLogClientError(error, reason, 'identity_check').then(function () {
-      return FBM_SYNC_CLIENT.ownRunId ? fbmSyncCancelAfterError() : null;
-    }).then(function () {
       fbmSyncPaint(fbmSyncClientErrorStatus(reason));
       return null;
     });
@@ -1141,9 +1149,7 @@ function fbmSyncProbeIdentityStart() {
   }).catch(function (error) {
     fbmSyncSetRunning(false); FBM_SYNC_CLIENT.identityAction = '';
     var reason = String(error && error.message || error);
-    return fbmSyncLogClientError(error, reason, 'identity_probe').then(function () {
-      return FBM_SYNC_CLIENT.ownRunId ? fbmSyncCancelAfterError() : null;
-    }).then(function () { fbmSyncPaint(fbmSyncClientErrorStatus(reason)); return null; });
+    return fbmSyncLogClientError(error, reason, 'identity_probe').then(function () { fbmSyncPaint(fbmSyncClientErrorStatus(reason)); return null; });
   });
 }
 function fbmSyncAutoFill() {
@@ -1514,12 +1520,21 @@ function fbmSyncApprovePush() {
   });
 }
 /**
- * Dừng phiên ở GAS rồi kết thúc chỗ chờ lượt tay bằng status GAS trả. GAS đóng lượt ngay nên không chờ Extension: response lô đang bay về sau mang `runId` rỗng, không bao giờ khớp chỗ chờ, chờ nó thì nút kẹt ở "Đang dừng…" tới lần hỏi im lặng.
+ * Cổng duy nhất của lệnh Dừng, cho nút Dừng (`any`) và lựa chọn dừng lượt nền (`background`): báo Extension máy này ngừng gửi phần còn lại của lô (request đang bay không bị cắt), rồi gửi lệnh Dừng cho GAS. GAS ghi cờ dừng không chờ khóa.
+ * GAS trả `SYNC_STOP_PENDING` khi một lát đang giữ khóa: lượt đóng ở lát đó hoặc lát kế (lượt do máy khác chở cũng vậy), status đóng về theo đường relay như mọi lát.
+ */
+function fbmSyncStop(scope) {
+  fbmSyncCancelExtensionBatch();
+  return callServer(scope === 'background' ? 'fbmStopBackground' : 'fbmCancelSync');
+}
+/**
+ * Nút Dừng. GAS đóng được lượt ngay thì kết thúc chỗ chờ lượt tay bằng status GAS trả, không chờ Extension: response lô đang bay về sau không khớp lượt nào, chờ nó thì nút kẹt ở "Đang dừng…".
+ * `SYNC_STOP_PENDING` có chỗ chờ thì giữ "Đang dừng…": status đóng lượt về qua relay sẽ kết thúc chỗ chờ.
  */
 function fbmSyncCancel() {
   FBM_SYNC_CLIENT.cancelRequested = true;
-  fbmSyncCancelExtensionBatch();
-  return callServer('fbmCancelSync').then(function (result) {
+  return fbmSyncStop('any').then(function (result) {
+    if (result && result.code === 'SYNC_STOP_PENDING' && FBM_SYNC_CLIENT.runWaiter) { return fbmSyncPaint(result); }
     FBM_SYNC_CLIENT.cancelRequested = false;
     fbmSyncRunWaitEnd({ ok: true, code: '', error: '', status: result && result.status || {}, conflict: null });
     fbmSyncSetRunning(false);
@@ -1560,7 +1575,7 @@ function fbmSyncForceLogin() {
 }
 /**
  * Lệnh của người dùng gặp lượt nền đang chạy (GAS trả `SYNC_BACKGROUND_RUNNING`): hỏi người dùng dừng nền hay để nền chạy tiếp. Lượt nền không bao giờ bị dừng khi người dùng chưa chọn.
- * Chọn dừng: GAS đóng lượt nền ngay trong lệnh `fbmStopBackground`; `status.running: false` trong kết quả nghĩa là kênh đã rảnh nên gọi lại lệnh gốc `startCall` ngay, không chờ không dò. Còn `running: true` là GAS chưa đóng được: báo lỗi, không chạy lệnh gốc.
+ * Chọn dừng: gửi lệnh Dừng nền qua `fbmSyncStop` (cắt cả lô Extension đang chở) rồi gọi lại lệnh gốc `startCall` ngay. GAS chưa đóng được lượt nền vì lát của nó đang giữ khóa (`SYNC_STOP_PENDING`) thì lệnh mở lượt chờ khóa và tự đóng lượt nền theo cờ dừng trước khi mở lượt mới, nên Sidebar không chờ không dò.
  * Chọn để nền chạy tiếp hoặc nút X: trả mã `SYNC_BACKGROUND_SKIPPED` nghĩa là không làm gì, màn được đưa về như vừa mở (`fbmSyncScreenFresh`) nên bên gọi không báo gì thêm. Kết quả khác mã này đi thẳng qua.
  */
 function fbmSyncAfterBackground(started, task, startCall) {
@@ -1569,10 +1584,9 @@ function fbmSyncAfterBackground(started, task, startCall) {
   return fbmSyncAskBackgroundRunning(started.status || FBM_SYNC_CLIENT.lastStatus || {}, task).then(function (choice) {
     if (choice === 'stop') {
       FBM_SYNC_CLIENT.backgroundStopping = true;
-      return callServer('fbmStopBackground').then(function (stopped) {
+      return fbmSyncStop('background').then(function (stopped) {
         if (!stopped || stopped.ok === false) { throw new Error(stopped && (stopped.message || stopped.code) || 'Không dừng được đồng bộ nền.'); }
         if (stopped.status) { fbmSyncPaint(stopped.status); }
-        if (!stopped.status || stopped.status.running !== false) { throw new Error('GAS chưa đóng được lượt đồng bộ nền nên chưa ' + (FBM_SYNC_BACKGROUND_TASKS[task] || task) + '.'); }
         return startCall();
       });
     }
@@ -1616,17 +1630,7 @@ function fbmSyncAskBackgroundRunning(status, task) {
  * Dựng object mới chỉ có `counts: {}` thì renderer xóa pipeline và hiện các số 0 không phải kết quả đồng bộ (FBM-017).
  */
 function fbmSyncClientErrorStatus(reason, extra) {
-  var followUp = (FBM_SYNC_CLIENT.followUpErrors || []).splice(0).join(' ');
-  var text = followUp ? reason + ' ' + followUp : reason;
-  return Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, extra || {}, { running: false, phase: 'error', label: 'Có lỗi', message: text, lastError: text });
-}
-/** Hủy phiên sau một lỗi của Sidebar. Hủy hỏng thì ghi Log và để lại lời nhắn cho lần vẽ lỗi kế tiếp (fbmSyncClientErrorStatus), không nuốt. */
-function fbmSyncCancelAfterError() {
-  return callServer('fbmCancelSync').catch(function (cancelError) {
-    var reason = 'Không hủy được phiên đồng bộ: ' + String(cancelError && cancelError.message || cancelError);
-    FBM_SYNC_CLIENT.followUpErrors = (FBM_SYNC_CLIENT.followUpErrors || []).concat(reason);
-    return fbmSyncLogClientError(cancelError, reason, 'cancel_failed');
-  });
+  return Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, extra || {}, { running: false, phase: 'error', label: 'Có lỗi', message: reason, lastError: reason });
 }
 /** Mở phiên mới; chặn click trùng khi phiên đang chạy. */
 function fbmSyncRun(mode) {
@@ -1665,8 +1669,6 @@ function fbmSyncRunStart(mode) {
     fbmSyncSetRunning(false);
     var reason = err && err.message ? err.message : String(err);
     return fbmSyncLogClientError(err, reason, 'sync_run', FBM_SYNC_CLIENT.ownRunId).then(function () {
-      return FBM_SYNC_CLIENT.ownRunId ? fbmSyncCancelAfterError() : null;
-    }).then(function () {
       fbmSyncPaint(fbmSyncClientErrorStatus(reason));
       return null;
     });
