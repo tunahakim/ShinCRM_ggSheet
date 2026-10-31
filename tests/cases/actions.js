@@ -11,7 +11,7 @@ const { dungHop } = require('../lib/dung-hop');
 const { khungGia } = require('../lib/khung-gia');
 const { stripComments } = require('../lib/strip-comments');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
-const { TEN_HANH_DONG } = require('./uiSchema');
+const { TEN_HANH_DONG } = require('../lib/sidebar/ten-hanh-dong');
 
 const KHACH = [
   { id: 'CUS-000001', companyName: 'Công ty Thép Hòa Phát', phone: '0912345678', contactPerson: 'Anh Tuấn', note: 'Khách quen, gọi buổi sáng', recordStatus: 'active' },

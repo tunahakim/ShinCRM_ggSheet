@@ -376,7 +376,7 @@ function chay(so) {
 function quetDuongGan(so) {
   section('renderEngine — chỉ ba tệp được gán innerHTML, không ai mở đường tắt vào DOM');
 
-  const { liet } = require('./namespace');
+  const { liet } = require('../lib/quet/liet-tep');
   const { docTep, catRuotScript } = require('../lib/load-gas');
   const { stripComments } = require('../lib/strip-comments');
 

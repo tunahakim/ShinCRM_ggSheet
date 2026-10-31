@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { GAS_DIR, docTep, taoHopCat, napClient } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
-const { liet } = require('./namespace');
-const { lopCoLuat } = require('./cssClass');
+const { liet } = require('../lib/quet/liet-tep');
+const { lopCoLuat } = require('../lib/quet/lop-css');
 
 function listHtml(relativeDir) {
   return fs.readdirSync(path.join(GAS_DIR, relativeDir)).filter((name) => name.endsWith('.html')).sort();

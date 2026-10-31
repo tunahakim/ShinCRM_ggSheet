@@ -6,28 +6,14 @@
 
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { dungHop } = require('../lib/dung-hop');
+const { TEN_HANH_DONG } = require('../lib/sidebar/ten-hanh-dong');
+const { moiNode } = require('../lib/sidebar/schema-node');
 const { section, check, ghiDat, ghiTruot, ghiLoiNap } = require('../lib/assert');
 
 /** Bốn màn, để duyệt chứ không gõ lại tên ở từng phép kiểm. */
 const MAN = ['view', 'customerForm', 'activityForm', 'noteForm'];
 
-/** Tên hành động của tài liệu 04 Phần 7, trừ `deleteSelectedActivities` mà chủ dự án bỏ ngày 06/09/2026, cộng `setCurrentCustomer` mà tài liệu 04 Phần 2 khai riêng. */
-const TEN_HANH_DONG = [
-  'toggleFollowSelection', 'toggleAutoRenderView', 'toggleSearchPanel', 'toggleSyncPanel', 'showFbmAutoSyncComingSoon', 'setActivityView',
-  'renderActiveViewSheet', 'toggleNotices', 'noticeDismiss', 'reloadAll', 'reloadCurrentSheet', 'reloadCustomerSheet', 'reloadActivitySheet', 'reloadCategorySheet', 'openCustomerForm', 'openCustomerFormBlank',
-  'openActivityForm', 'openNoteForm', 'saveForm', 'cancelForm',
-  'deleteActivity', 'undoDelete', 'setCurrentCustomer'
-];
 
-/** Mọi node trong một cây Block, kể cả con của con. */
-function moiNode(nodes, ra) {
-  (nodes || []).forEach((n) => {
-    if (!n || !n.role) { return; }
-    ra.push(n);
-    if (Array.isArray(n.elements)) { moiNode(n.elements, ra); }
-  });
-  return ra;
-}
 
 /** Mọi ô trường của một màn, ở cả hai lối khai: cây Block của màn view, và cụm `{ group, rows }` của ba màn form. */
 function moiTruong(man) {
@@ -235,4 +221,4 @@ function chay(so) {
 }
 
 // `TEN_HANH_DONG` xuất ra ngoài để `cases/actions.js` soi cùng một danh sách. Hai bản chép tay thì lệch được mà không ai đỏ.
-module.exports = { chay, TEN_HANH_DONG };
+module.exports = { chay };

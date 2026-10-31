@@ -6,6 +6,7 @@
 
 const { napClient, taoHopCat } = require('../lib/load-gas');
 const { dungHop } = require('../lib/dung-hop');
+const { moiNode } = require('../lib/sidebar/schema-node');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 /** Ba khách và ba giao dịch dùng cho cả nhóm ca. Giao dịch ở giữa theo thứ tự thời gian là bản ghi đã xóa mềm, để chứng minh nó không bị dồn xuống cuối. */
@@ -22,15 +23,6 @@ const GIAO_DICH = [
   { id: 'ACT-000003', customerId: 'CUS-000001', workDate: '2026-09-02', taskType: 'Gửi báo giá', product: 'Thép tấm', content: 'Gửi bản chào\nkèm chiết khấu', contractValue: 0, recordStatus: 'deleted' }
 ];
 
-/** Mọi node trong một mảng Block, kể cả con của con. */
-function moiNode(nodes, ra) {
-  (nodes || []).forEach((n) => {
-    if (!n || !n.role) { return; }
-    ra.push(n);
-    if (Array.isArray(n.elements)) { moiNode(n.elements, ra); }
-  });
-  return ra;
-}
 
 /** Chữ của mọi node có chữ, ghép lại theo thứ tự — dùng để đọc một dòng như người dùng thấy. */
 function chuCua(nodes) {

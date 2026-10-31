@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GAS_DIR } = require('../lib/load-gas');
-const { liet } = require('./namespace');
+const { liet } = require('../lib/quet/liet-tep');
 const { section, check } = require('../lib/assert');
 
 const MOJIBAKE = /[ÃÄáÆ][\u0080-¿‘-›ŒœŠšŸŽžƒˆ˜]/;

@@ -13,26 +13,12 @@ const fs = require('fs');
 const path = require('path');
 const { GAS_DIR, catRuotScript } = require('../lib/load-gas');
 const { stripComments } = require('../lib/strip-comments');
+const { liet } = require('../lib/quet/liet-tep');
 const { section, check, ghiTruot, ghiDat } = require('../lib/assert');
 
 /** Khai báo ở cột 0: `var TÊN` hoặc `function TÊN(`. */
 const MO_KHAI_BAO = /^(?:var|let|const)\s+([A-Za-z_$][\w$]*)|^function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
 
-/** Liệt kê tệp theo đuôi trong một thư mục con của dự án GAS. Thư mục không có thì trả về mảng rỗng, vì có thư mục chưa dựng là chuyện bình thường. */
-function liet(thuMuc, duoi) {
-  const goc = path.join(GAS_DIR, thuMuc);
-  if (!fs.existsSync(goc)) { return []; }
-
-  const ra = [];
-  (function di(hienTai) {
-    fs.readdirSync(hienTai, { withFileTypes: true }).forEach((muc) => {
-      const day = path.join(hienTai, muc.name);
-      if (muc.isDirectory()) { di(day); }
-      else if (muc.name.endsWith(duoi)) { ra.push(path.relative(GAS_DIR, day).split(path.sep).join('/')); }
-    });
-  })(goc);
-  return ra.sort();
-}
 
 /** Bảng khai mở `var X = typeof X !== 'undefined' ? X : {};`: lõi và module cùng khai để không phụ thuộc thứ tự nạp tệp, mỗi bên chỉ thêm khóa của mình nên không tranh nhau. */
 const BANG_KHAI_MO = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*typeof\s+\1\s*!==\s*'undefined'\s*\?\s*\1\s*:\s*\{\};/;
@@ -158,4 +144,4 @@ function kiemDuDuongNhung(so, tepClient) {
   check(so, 'không dòng include nào mang đuôi tệp', daNhung.filter((d) => /\.html$|\.js$/.test(d)), []);
 }
 
-module.exports = { chay, liet, tenKhaiBao };
+module.exports = { chay, tenKhaiBao };
