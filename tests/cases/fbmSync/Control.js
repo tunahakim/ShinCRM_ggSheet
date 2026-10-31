@@ -54,8 +54,14 @@ async function chay(so) {
   documentProperties.setProperty = realSet; documentProperties.deleteProperty = realDelete;
   check(so, 'status trả đủ gói một lần đọc và không ghi DocumentProperties', [status.ok, !!status.status, !!status.identity, !!status.settings, !!status.login, writes, JSON.stringify(documentProperties.data) === snapshot], [true, true, true, true, true, 0, true]);
 
-  // Kết quả ra ngoài chỉ gồm trường đã khai: thêm trường lạ là lỗi to, không lọt khóa phiên FBM.
-  check(so, 'kết quả có trường ngoài danh sách thì ném PUBLIC_RESULT_FIELD_UNKNOWN', loi(() => FbmSync.publicResult({ ok: true, session: {} })), 'PUBLIC_RESULT_FIELD_UNKNOWN');
+  // Kết quả ra ngoài chỉ gồm trường đã khai: trường lạ bị bỏ và có dòng Log lỗi, nhưng lệnh đã ghi xong không bị báo hỏng; không lọt khóa phiên FBM.
+  check(so, 'cửa ra bỏ trường ngoài danh sách', FbmSync.publicResult({ ok: true, session: { cookie: 'c' } }), { ok: true });
+  logs.length = 0;
+  const realStatus = FbmSync.statusRead;
+  FbmSync.statusRead = () => ({ ok: true, session: { cookie: 'c' } });
+  const leaked = FbmSync.controlDispatch('status', {});
+  FbmSync.statusRead = realStatus;
+  check(so, 'lệnh trả trường lạ: cửa lệnh trả kết quả đã bỏ trường đó, ghi một dòng Log lỗi nêu tên lệnh và tên trường', [leaked, logs.map((line) => [line.action, line.outcome, line.detail.command, line.detail.fields])], [{ ok: true }, [['public_result_field_dropped', 'error', 'status', ['session']]]]);
   check(so, 'kết quả gỡ khóa phiên FBM theo hình dạng ô phiên', FbmSync.publicResult({ ok: true, status: { session: { customerAuthorized: 'x', activityAuthorized: 'y', cookie: 'c', userId: 'u1' } } }).status.session, { userId: 'u1' });
 }
 

@@ -354,8 +354,8 @@ async function chay(so) {
   ], [true, true, true]);
   check(so, 'GAS chuan hoa toan bo ket qua truoc callback Sidebar', [
     fbmServiceSource.indexOf("return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.controlDispatch(command, payload); }, payload)") >= 0,
-    (controlPortSource.match(/return FbmSync\.publicResult\(/g) || []).length,
-    controlPortSource.indexOf('FbmSync.PUBLIC_RESULT_FIELDS.indexOf(key) >= 0') >= 0 && controlPortSource.indexOf("leak.code = 'PUBLIC_RESULT_FIELD_UNKNOWN'") >= 0,
+    (controlPortSource.match(/return finish\(/g) || []).length,
+    controlPortSource.indexOf('return FbmSync.publicResult(raw);') >= 0 && controlPortSource.indexOf('FbmSync.PUBLIC_RESULT_FIELDS.indexOf(key) >= 0') >= 0 && controlPortSource.indexOf("FbmSync.dispatchLog('public_result_field_dropped'") >= 0,
     (fbmServiceSource.match(/^function fbm\w+\(.*\{ return fbmCommandRun\(/gm) || []).length >= 15 && fbmServiceSource.indexOf('function fbmPublicResult') < 0
   ], [true, 3, true, true]);
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
