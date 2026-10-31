@@ -1,9 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
-
-const WATCHER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'model', 'bind_watcher.js');
+const { napExtension } = require('../lib/ext/nap-extension');
 
 /** XHR giả: `responseText` lớn dần như kênh đẩy thật; `day()` bơm thêm khung rồi bắn `progress`. */
 function napWatcher() {
@@ -15,13 +11,8 @@ function napWatcher() {
   FakeXHR.prototype.addEventListener = function (name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); };
   FakeXHR.prototype.fire = function (name) { (this.listeners[name] || []).forEach((fn) => fn()); };
   FakeXHR.prototype.day = function (frame) { this.responseText += frame; this.readyState = 3; this.fire('progress'); };
-  const hop = {
-    location: { origin: 'https://docs.google.com' },
-    window: null
-  };
-  hop.window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
-  vm.createContext(hop);
-  vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), hop, { filename: WATCHER_FILE });
+  const window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
+  const hop = napExtension('bindWatcher', { location: { origin: 'https://docs.google.com' }, window: window });
   return { FakeXHR, posted, facts, hop };
 }
 
@@ -87,7 +78,7 @@ async function chay(so) {
   check(so, 'SID khác hoặc không có SID thì sameSession false', n.facts.map((f) => f.sameSession), [false, false]);
 
   const lai = w.FakeXHR.prototype.send;
-  vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), w.hop, { filename: WATCHER_FILE });
+  napExtension('bindWatcher', null, w.hop);
   check(so, 'nạp lại tệp không vá chồng lần hai', w.FakeXHR.prototype.send === lai, true);
 }
 
