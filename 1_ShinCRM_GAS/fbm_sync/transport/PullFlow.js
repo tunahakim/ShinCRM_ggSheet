@@ -39,9 +39,9 @@ FbmSync.startRun = function (options) {
     if (!initialRequest) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
-  var state = FbmSync.stateStart('', 'checking_session', 0, {
-    origin: opt.origin === 'background' ? 'background' : 'manual',
-    mode: FbmSync.modeOf(opt.mode),
+  var state = FbmSync.runOpen({
+    origin: opt.origin,
+    mode: opt.mode,
     scan: opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : opt.scan === 'keepalive' ? 'keepalive' : 'full'
   });
   if (typeof FbmSync.businessStepStart === 'function') {

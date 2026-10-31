@@ -244,7 +244,7 @@ FbmSync.businessFailingStep = function (state) {
 
 /**
  * Đóng mọi bước còn mở khi phiên tới phase kết thúc. Chỉ `stateWrite` gọi hàm này cho phiên đang ghi, nên mọi đường kết thúc
- * (xong, lỗi, hủy, thu hồi phiên treo) đều đóng đúng một lần; `stateStart` gọi thêm cho phiên cũ bị phiên mới thay.
+ * (xong, lỗi, hủy, thu hồi phiên treo) đều đóng đúng một lần; `runOpen` gọi thêm cho phiên cũ bị phiên mới thay.
  */
 FbmSync.businessFinishOpenSteps = function (state, phase, result) {
   // Vấn đề theo bản ghi của lát cuối nhả trước khi đóng bước, nếu không chúng rơi xuống dưới dòng "Hoàn thành phiên đồng bộ".
@@ -269,17 +269,13 @@ FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
   if (!FbmSync._logContextRegistered && typeof logRegisterContext === 'function') { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
-/** Lượt đang chạy thì nguồn theo lượt; không có lượt thì chuỗi nền đang mở (Giữ phiên) là Nền. Quét nhanh do bước đếm của Giữ phiên gọi hiện thành "Giữ phiên FBM · Quét nhanh". */
+/** Lượt đang chạy thì lấy nhãn chốt lúc mở lượt (`runLabel`), không suy lại từ ô lượt. Ngoài lượt thì chọn theo kênh của lời gọi: chuỗi nền đang mở hoặc Extension chuyển hộ (relay) là Nền, còn lại là Tay. */
 FbmSync.logContextText = function () {
   var state = FbmSync._logContextState;
   if (!state) { return ''; }
-  var labels = FbmSync.SCHEDULE_LABELS || {}, chain = state.chain || {}, running = FbmSync.runInProgress(state);
-  var background = running ? state.origin === 'background' : !!chain.current || state.origin === 'background';
-  var parts = [background ? 'Nền' : 'Tay'];
-  if (background && chain.current) { parts.push(labels[chain.current] || chain.current); }
-  var scans = FbmSync.SCHEDULE_SCANS || {}, runKind = '';
-  if (running) { Object.keys(scans).forEach(function (kind) { if (scans[kind] === state.scan && !runKind) { runKind = kind; } }); }
-  if (running && runKind !== chain.current) { parts.push(labels[runKind] || String(state.scan || '')); }
-  return parts.join(' · ');
+  if (FbmSync.runInProgress(state)) { return state.runLabel || FbmSync.runLabelOf(state); }
+  var labels = FbmSync.SCHEDULE_LABELS || {}, chain = state.chain || {}, relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
+  if (chain.current) { return 'Nền · ' + (labels[chain.current] || chain.current); }
+  return relay ? 'Nền' : 'Tay';
 };
 

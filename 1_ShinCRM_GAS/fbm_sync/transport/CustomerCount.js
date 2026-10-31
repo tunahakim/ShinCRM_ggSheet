@@ -7,7 +7,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.CUSTOMER_BASELINE_KEY = 'FBM_SYNC_CUSTOMER_BASELINE_V1';
 FbmSync.RECOUNT_MESSAGE = 'Số khách FBM vừa đổi, quét thêm một lần...';
 
-/** Số khách mốc, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Nằm ngoài state vì `stateStart` xóa `session` mỗi lượt. */
+/** Số khách mốc, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Nằm ngoài state vì `runOpen` xóa `session` mỗi lượt. */
 FbmSync.customerBaselineRead = function () {
   var parsed = documentMemoRead(FbmSync.props(), FbmSync.CUSTOMER_BASELINE_KEY, 'số khách mốc FBM', 'object'), total = parsed ? Number(parsed.total) : NaN;
   return isFinite(total) && total >= 0 ? total : null;

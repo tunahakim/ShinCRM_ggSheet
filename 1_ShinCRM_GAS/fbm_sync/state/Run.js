@@ -2,6 +2,50 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
+ * Kho làm việc chỉ sống trong một lượt: bản ghi giữ trong sổ bận, tập "đã thấy", danh sách đọc, bản xem trước. Dọn khi mở lượt để lượt trước hỏng giữa chừng không để lại gì cho lượt này.
+ */
+FbmSync.workStoreClear = function () {
+  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
+  ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
+  FbmSync.readListClear();
+  FbmSync.previewClear();
+};
+
+/**
+ * Nhãn của lượt, chốt một lần lúc mở: ai chạy (Tay/Nền) và tiến trình nào. Dòng Log của lượt lấy nhãn này, không suy lại từ ô lượt lúc ghi (ô lượt có thể đã sang lượt khác).
+ * `kindLabel` đặt thẳng tên tiến trình (đăng nhập, giữ phiên); bỏ trống thì suy từ kiểu quét và chuỗi nền đang mở.
+ */
+FbmSync.runLabelOf = function (state, kindLabel) {
+  var labels = FbmSync.SCHEDULE_LABELS || {}, scans = FbmSync.SCHEDULE_SCANS || {}, chain = state.chain || {}, background = state.origin === 'background';
+  var parts = [background ? 'Nền' : 'Tay'];
+  if (kindLabel) { parts.push(kindLabel); return parts.join(' · '); }
+  if (background && chain.current) { parts.push(labels[chain.current] || chain.current); }
+  var runKind = Object.keys(scans).filter(function (kind) { return scans[kind] === state.scan; })[0] || '';
+  if (runKind !== chain.current) { parts.push(labels[runKind] || String(state.scan || '')); }
+  return parts.join(' · ');
+};
+
+/**
+ * Nơi duy nhất mở lượt: dọn kho làm việc của lượt trước, dựng ô lượt mới từ ô hiện tại, ghi và trả về ô đã ghi.
+ * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `kindLabel` (xem `runLabelOf`).
+ * Ô cũ còn lượt chưa đóng (lượt treo bị thay) thì các bước của nó được đóng trước khi metadata bị bỏ. Mỗi lượt xác nhận phiên FBM lại từ đầu nên phiên cũ không được mang sang; số xung đột đang chờ quyết thì mang sang vì nó phản ánh Sheet.
+ */
+FbmSync.runOpen = function (spec) {
+  var opt = spec || {}, old = FbmSync.stateRead(), now = Date.now();
+  FbmSync.workStoreClear();
+  FbmSync.businessFinishOpenSteps(old, 'paused', { error: 'Phiên mới đã bắt đầu thay phiên này.' });
+  var state = Object.assign(FbmSync.stateDefault(), {
+    runId: Number(now).toString(36), entity: String(opt.entity || ''), phase: opt.phase || 'checking_session', cursor: {},
+    counts: Object.assign(FbmSync.countsDefault(), { total: Number(opt.total) || 0 }),
+    metadata: Object.assign(FbmSync.stateDefault().metadata, { conflictCount: Number(old.metadata && old.metadata.conflictCount || 0), conflictLogged: Number(old.metadata && old.metadata.conflictLogged || 0) }),
+    chain: old.chain || null, origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'),
+    startedAt: Number(now), updatedAt: Number(now)
+  });
+  state.runLabel = FbmSync.runLabelOf(state, opt.kindLabel);
+  return FbmSync.stateWrite(state);
+};
+
+/**
  * Kết luận đóng lượt → trạng thái cuối. Kết luận lạ là lỗi lập trình, ném ngay; không có kết luận "mặc định".
  * `cancelled` (nút Dừng) và `stopped` (dừng lượt nền để chạy lượt tay) không phải lỗi nên không tăng giãn cách thử lại.
  */
