@@ -619,9 +619,11 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.cancelRequested = false;
   const cancelPaint = hop.fbmSyncPaint;
   hop.fbmSyncPaint = () => {};
-  hop.callServer = (name) => name === 'fbmCancelSync' ? Promise.resolve({ ok: true, code: 'SYNC_CANCEL_PENDING', status: { running: true, phase: 'pull_customer', message: 'Đang chờ response để dừng.' } }) : Promise.resolve({});
+  let cancellingDuringCall = null, waitedResult = null; hop.clearTimeout = clearTimeout;
+  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-dang-chay', resolve: (value) => { waitedResult = value; }, reject: () => {}, timer: null };
+  hop.callServer = (name) => { if (name === 'fbmCancelSync') { cancellingDuringCall = hop.FBM_SYNC_CLIENT.cancelRequested; return Promise.resolve({ ok: true, status: { running: false, phase: 'paused', runId: '', message: 'Đã dừng phiên đồng bộ.' } }); } return Promise.resolve({}); };
   await hop.fbmSyncCancel();
-  check(so, 'Cancel khi request đang bay giữ relay đến response cuối thay vì bỏ dở state', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, true]);
+  check(so, 'Dừng khi lượt tay đang chạy: hiện "Đang dừng…" trong lúc gọi GAS, GAS trả xong thì kết thúc chỗ chờ lượt bằng status đã dừng, không chờ response lô đang bay', [cancellingDuringCall, hop.FBM_SYNC_CLIENT.runWaiter, waitedResult && waitedResult.ok, waitedResult && waitedResult.status.phase, hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, null, true, 'paused', false, false]);
   const stopPaints = [], stopDrive = hop.fbmSyncDrive;
   hop.fbmSyncPaint = (status) => { stopPaints.push({ phase: status && (status.status || status).phase, cancelling: hop.FBM_SYNC_CLIENT.cancelRequested }); };
   hop.fbmSyncDrive = () => { hop.FBM_SYNC_CLIENT.cancelRequested = true; return Promise.resolve({ ok: true, status: { phase: 'paused', counts: {} } }); };

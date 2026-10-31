@@ -159,11 +159,11 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 47,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 35,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 34,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 2,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },

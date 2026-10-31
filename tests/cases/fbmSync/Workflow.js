@@ -1246,14 +1246,15 @@ async function chay(so) {
   stopAfterResponse.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
-  const stopPending = stopAfterResponse.hop.fbmSyncCancel();
+  const stopNow = stopAfterResponse.hop.fbmSyncCancel();
+  const stopState = stopAfterResponse.hop.FbmSync.stateRead();
   const stopped = stopAfterResponse.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
   });
-  check(so, 'cancel request doc dang bay: nhan response de dong lat roi dung, khong cap authorize Activity', [
-    stopPending.code, stopped.ok, stopped.request || null, stopped.status.phase, stopAfterResponse.hop.FbmSync.stateRead().cursor.kind
-  ], ['SYNC_CANCEL_PENDING', true, null, 'paused', 'authorize_customer']);
+  check(so, 'Dừng khi request đọc đang bay: đóng lượt ngay, response về sau (kể cả lô bị Extension cắt dở) bị loại, không cấp request, không ghi gì vào state', [
+    stopNow.code || '', stopNow.status.phase, stopState.runId, JSON.stringify(stopState.cursor), stopped.ok, stopped.code, stopped.request || null, JSON.stringify(stopAfterResponse.hop.FbmSync.stateRead()) === JSON.stringify(stopState)
+  ], ['', 'paused', '', '{}', false, 'STALE_RESPONSE', null, true]);
 
   const masterOff = workflowGas();
   masterOff.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
@@ -1316,16 +1317,16 @@ async function chay(so) {
 
   const cancelling = workflowGas();
   const cancellingStarted = cancelling.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
-  const cancelPending = cancelling.hop.fbmSyncCancel();
+  const cancelNow = cancelling.hop.fbmSyncCancel();
   const cancelState = cancelling.hop.FbmSync.stateRead();
-  check(so, 'dung khi request dang bay: chi danh dau cho response, khong xoa reservation hay cursor', [
-    cancelPending.code, cancelState.activeRequestId === cancellingStarted.request.id, cancelState.cursor.kind, cancelState.metadata.cancelPending
-  ], ['SYNC_CANCEL_PENDING', true, 'identity_user_grid', true]);
+  check(so, 'Dừng khi request dò danh tính đang bay: xóa reservation và cursor ngay, nhớ mã request vừa đóng', [
+    cancelNow.status.phase, cancelState.activeRequestId, JSON.stringify(cancelState.cursor), cancelState.closedRequestId === cancellingStarted.request.id
+  ], ['paused', '', '{}', true]);
 
   const reloaded = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
   const orphan = reloaded.hop.FbmSync.stateRead();
   orphan.runId = 'cancelled-orphan'; orphan.phase = 'checking_session'; orphan.cursor = { kind: 'identity_user_grid' };
-  orphan.activeRequestId = 'orphan-request'; orphan.metadata.cancelPending = true;
+  orphan.activeRequestId = 'orphan-request';
   orphan.updatedAt = Date.now() - reloaded.hop.FbmSync.STALE_RUN_MS - 1;
   orphan.lastProgressAt = orphan.updatedAt;
   reloaded.hop.FbmSync.stateWrite(orphan);

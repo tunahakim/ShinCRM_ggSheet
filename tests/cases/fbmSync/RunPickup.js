@@ -88,10 +88,10 @@ async function chay(so) {
   const lateOwner = hoi('may-A');
   check(so, 'máy được giao đánh thức muộn sau khi lượt đã đóng thì không nhận gì', [lateOwner.code, lateOwner.request || null], ['NO_RUN_AWAITING', null]);
 
-  // Dừng khi lượt còn giữ chỗ: chưa có request nào sang FBM nên đóng ngay, không chờ response.
+  // Dừng khi lượt còn giữ chỗ: đóng ngay như mọi lần Dừng.
   FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
   const stopped = hop.fbmSyncCancel();
-  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay (không SYNC_CANCEL_PENDING), lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['', 'paused', '', 'NO_RUN_AWAITING']);
+  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['', 'paused', '', 'NO_RUN_AWAITING']);
 
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
   check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);

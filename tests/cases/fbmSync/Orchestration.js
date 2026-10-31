@@ -474,12 +474,20 @@ async function chay(so) {
   check(so, 'tắt công tắc tổng giữ cursor va reservation đang bay', [blockedByMaster, keptAfterMasterOff.cursor.kind, keptAfterMasterOff.activeRequestId, keptAfterMasterOff.phase], [null, 'customer_grid', 'preserve-request', 'paused']);
   heartbeat.FbmSync.setMasterEnabled(true);
   const cancelledState = heartbeat.FbmSync.stateRead();
-  cancelledState.runId = 'cancel-run'; cancelledState.phase = 'checking_session'; cancelledState.cursor = { kind: 'authorize_customer' }; cancelledState.activeRequestId = 'cancel-request';
+  cancelledState.runId = 'cancel-run'; cancelledState.phase = 'checking_session'; cancelledState.cursor = { kind: 'authorize_customer' }; cancelledState.activeRequestId = 'cancel-request'; cancelledState.deadlineAt = Date.now() + 60000;
   heartbeat.FbmSync.stateWrite(cancelledState);
-  const pendingCancel = heartbeat.fbmSyncCancel();
-  check(so, 'dung phien khi request dang bay giu reservation', [pendingCancel.code, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().metadata.cancelPending], ['SYNC_CANCEL_PENDING', 'cancel-request', true]);
-  const stoppedAfterResponse = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'cancel-request' }] } });
-  check(so, 'response hien tai duoc dong nhung khong cap request tiep', [stoppedAfterResponse.ok, stoppedAfterResponse.request, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [true, null, 'paused', '']);
+  const cancelLogs = [];
+  heartbeat.logEvent = (entry) => cancelLogs.push(entry);
+  const cancelInFlight = heartbeat.fbmSyncCancel();
+  const afterCancel = heartbeat.FbmSync.stateRead();
+  check(so, 'Dừng khi request đang bay thì đóng lượt ngay, nhớ mã request đang bay để nhận diện response về muộn', [cancelInFlight.code || '', afterCancel.phase, afterCancel.runId, afterCancel.activeRequestId, afterCancel.closedRequestId], ['', 'paused', '', '', 'cancel-request']);
+  const lateCancelled = heartbeat.FbmSync.continue({ d: { Authorized: 'auth-customer' }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'cancel-request' }] } });
+  check(so, 'response về muộn của lượt đã Dừng bị loại, không cấp request và không đổi state', [lateCancelled.ok, lateCancelled.code, lateCancelled.request, JSON.stringify(heartbeat.FbmSync.stateRead()) === JSON.stringify(afterCancel)], [false, 'STALE_RESPONSE', null, true]);
+  check(so, 'response về muộn của lượt đã Dừng ghi Log mức ok, không báo lỗi STALE_RESPONSE', cancelLogs.map((entry) => [entry.action, entry.outcome, entry.detail && entry.detail.code || '']), [['closed_run_response_dropped', 'ok', '']]);
+  cancelLogs.length = 0;
+  heartbeat.FbmSync.continue({ d: {}, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'foreign-request' }] } });
+  check(so, 'response lạ không thuộc lượt vừa Dừng vẫn là lỗi STALE_RESPONSE', cancelLogs.map((entry) => [entry.action, entry.outcome, entry.detail && entry.detail.code || '']), [['stale_response', 'error', 'STALE_RESPONSE']]);
+  delete heartbeat.logEvent;
   const cancelWithoutFlight = heartbeat.fbmSyncCancel().status;
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', '', true]);
 
