@@ -17,18 +17,12 @@ function fbmSyncApprovePush() {
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 }
-/** Dừng phiên lỗi và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận. */
+/**
+ * Dừng lượt ngay và nhả mọi bản ghi đồng bộ đang giữ trong sổ bận, kể cả khi còn request đang bay: response về sau bị `requestAnswered` loại. Không chờ response đang bay rồi mới dừng, vì Extension nhận lệnh Dừng thì cắt lô giữa chừng; xử lý lô cắt dở như lô thường là báo lỗi lệch lô cho một lần dừng hợp lệ.
+ * Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng".
+ */
 function fbmSyncCancel() {
   var state = FbmSync.stateRead(), failed = String(state.phase || '') === 'error';
-  // Client luôn gọi hủy sau khi báo lỗi; phiên đã lỗi phải giữ nguyên lỗi để Sidebar và Log không đổi thành "Đã dừng". Lượt còn giữ chỗ chờ Extension nhận thì chưa có request nào sang FBM nên đóng ngay.
-  if (state.activeRequestId && !failed && !FbmSync.pickupHeld(state)) {
-    state.metadata = state.metadata || {};
-    state.metadata.cancelPending = true;
-    state.message = 'Đang chờ response FBM hiện tại để dừng an toàn; sẽ không cấp request kế tiếp.';
-    state.lastError = '';
-    FbmSync.stateWrite(state);
-    return { ok: true, code: 'SYNC_CANCEL_PENDING', pending: true, status: FbmSync.statusView() };
-  }
   FbmSync.stateWrite(FbmSync.runCloseNow(state, failed ? null : { phase: 'paused', message: 'Đã dừng phiên đồng bộ; kết quả và log của lượt này vẫn được giữ để xem lại.' }));
   // Trả status công khai, không trả ô lượt: ô lượt mang cookie và token phiên FBM.
   return { ok: true, status: FbmSync.statusView() };

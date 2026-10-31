@@ -408,15 +408,6 @@ FbmSync.nextEnvelope = function (request) {
   }
   var pendingState = FbmSync.stateRead ? FbmSync.stateRead() : {};
   if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(pendingState); }
-  if (pendingState.metadata && pendingState.metadata.cancelPending === true) {
-    pendingState.phase = 'paused';
-    pendingState.activeRequestId = '';
-    pendingState.deadlineAt = 0;
-    pendingState.message = 'Đã nhận xong response đang bay và dừng phiên; không cấp request FBM kế tiếp.';
-    pendingState.metadata.cancelPending = false;
-    if (FbmSync.stateWrite) { FbmSync.stateWrite(pendingState); }
-    return null;
-  }
   try {
     var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
     // Login test cũng phải nhận token do cổng cấp; không dùng cờ trong request

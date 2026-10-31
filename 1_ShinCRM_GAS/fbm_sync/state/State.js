@@ -10,14 +10,13 @@ FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 /** Lượt còn dở (đang chạy hoặc chờ chấp thuận). Lượt đã kết thúc ở bất kỳ trạng thái cuối nào, kể cả tạm dừng vì tự đăng nhập bị từ chối, không chặn lịch nền mở lượt mới. */
 FbmSync.runInProgress = function (state) { return !!(state && state.runId) && ['idle'].concat(FbmSync.TERMINAL_PHASES).indexOf(String(state.phase || '')) < 0; };
 /**
- * Nơi duy nhất đóng lượt ngay (không chờ response đang bay): nhả bản ghi đang giữ và xóa con trỏ lượt trên state truyền vào, trả chính state đó; người điều phối gọi nó rồi tự ghi. Response đến muộn của lượt đã đóng bị loại ở `requestAnswered` (`STALE_RESPONSE`) vì `activeRequestId` đã rỗng.
+ * Nơi duy nhất đóng lượt ngay (không chờ response đang bay): nhả bản ghi đang giữ và xóa con trỏ lượt trên state truyền vào, trả chính state đó; người điều phối gọi nó rồi tự ghi. Response đến muộn của lượt đã đóng bị loại ở `requestAnswered` (`STALE_RESPONSE`) vì `activeRequestId` đã rỗng; mã request đang bay lúc đóng giữ ở `closedRequestId` để Log ghi response đó là chuyện thường của lượt đã đóng, không phải response lạ.
  * `closing` = { phase, message } đặt trạng thái cuối; bỏ trống thì giữ nguyên phase và lỗi hiện có (lượt đã lỗi phải giữ nguyên lỗi).
  */
 FbmSync.runCloseNow = function (state, closing) {
   recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
+  state.closedRequestId = String(state.activeRequestId || '');
   state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0;
-  state.metadata = state.metadata || {};
-  state.metadata.cancelPending = false;
   if (closing) { state.phase = closing.phase; state.message = closing.message; state.lastError = ''; if (closing.origin) { state.origin = closing.origin; } }
   return state;
 };
@@ -209,7 +208,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
+  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', scheduledScan: '', chain: null, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', closedRequestId: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, conflictRefresh: null, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */

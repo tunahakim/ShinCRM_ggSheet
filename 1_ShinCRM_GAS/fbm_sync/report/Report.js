@@ -165,12 +165,16 @@ FbmSync.shouldLogStatus = function (before, after) {
 };
 /**
  * Response bị bỏ vì không thuộc request đang chờ: không đổi state (lượt đang chạy vẫn là của request khác) nhưng phải có dòng Log, vì response bị bỏ lặp lại là lượt kẹt không ai thấy.
+ * Response của request đang bay lúc người dùng dừng lượt (`closedRequestId`) là chuyện thường, ghi mức ok để Log không báo lỗi giả cho một lần dừng hợp lệ.
  * Chỉ ghi mã request, không ghi nội dung response.
  */
 FbmSync.logStaleResponse = function (state, responseRequestId, action) {
   if (typeof logEvent !== 'function') { return; }
   var current = state || {};
-  logEvent({ source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
+  var closed = !!responseRequestId && String(responseRequestId) === String(current.closedRequestId || '');
+  logEvent(closed
+    ? { source: 'fbm_sync', action: 'closed_run_response_dropped', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Bỏ response FBM của lượt đã dừng; không ghi gì vào dữ liệu.', detail: { responseRequestId: String(responseRequestId) } }
+    : { source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
 };
 /**
  * Sidebar báo một lỗi. Chỉ dừng phiên khi Sidebar nêu đúng mã của phiên đang chạy (`runId`) — tức phiên do chính Sidebar đang chạy hỏng. Lỗi không kèm mã hoặc mã không khớp (lỗi lưu cài đặt, kiểm tra liên kết, phiên nền Extension đang chạy) chỉ ghi Log nguồn `sidebar` với đúng tên thao tác, không đụng phiên: một nút bấm hỏng không được giết phiên nền nó không sở hữu.
