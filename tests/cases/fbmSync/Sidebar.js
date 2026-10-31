@@ -256,6 +256,17 @@ async function chay(so) {
   const pausedTransport = { phase: 'paused', runId: 'r4', lastError: 'Cầu nối FBM không phản hồi.', label: 'Tạm dừng', counts: {} };
   const pausedRun = render(hop, content, hop.fbmSyncRenderRun, pausedTransport);
   check(so, 'Run render giữ pipeline và lỗi khi phiên tạm dừng', [!!pausedRun.querySelector('.shin-sync-pipeline'), pausedRun.textContent.indexOf('Pipeline đã tạm dừng') >= 0], [true, true]);
+  // Dừng lượt tay: GAS đã báo hết chạy nhưng cờ RAM còn bật (Extension không gửi tin xong lượt cho lượt bị dừng); hai ô chọn phải mở ngay theo status, cả trên đường vẽ lại một phần.
+  const oChon = (node) => ['fbm-sync-mode', 'fbm-sync-pack'].map((id) => { const el = node.querySelector('#' + id); return !!el && el.disabled === true; });
+  hop.FBM_SYNC_CLIENT.running = true;
+  hop.FBM_SYNC_CLIENT.mode = 'read';
+  const dangChay = render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, active, { origin: 'manual' }));
+  check(so, 'lượt tay đang chạy theo status GAS: khóa cả Loại đồng bộ và Mức quét', oChon(dangChay), [true, true]);
+  hop.fbmSyncPatchRun(content, idle);
+  check(so, 'GAS báo đã dừng mà cờ RAM còn bật: vẽ lại một phần mở cả hai ô chọn', oChon(content), [false, false]);
+  check(so, 'GAS báo đã dừng mà cờ RAM còn bật: vẽ cả màn mở cả hai ô chọn', oChon(render(hop, content, hop.fbmSyncRenderRun, idle)), [false, false]);
+  check(so, 'lượt nền đang chạy không khóa ô chọn (bấm chạy thì Sidebar hỏi dừng nền)', oChon(render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, active, { origin: 'background' }))), [false, false]);
+  hop.FBM_SYNC_CLIENT.running = false;
 
   const statusButton = dom.document.createElement('button');
   statusButton.id = 'fbm-sync-module-menu';
