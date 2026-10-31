@@ -41,6 +41,12 @@ const LOG_WRITERS = [];
 /** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
 const BASELINE_WRITERS = [];
 
+/** Nơi khai danh sách trường kết quả được ra khỏi GAS; luật `resultField` đọc thẳng từ đây để không có bản chép thứ hai. */
+const RESULT_FIELDS_OWNER = '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js';
+
+/** Hàm dựng thân HTTP cho Extension sau khi kết quả đã qua `publicResult`: thân đó không phải kết quả lệnh nên không xét theo danh sách trường. */
+const POST_GATE_SHAPERS = ['relayCompact'];
+
 /** Bỏ comment `//` và `/* *\/`, thay bằng khoảng trắng để số dòng không lệch; không coi `//` trong chuỗi '…', "…", `…` là comment. */
 function stripComments(source) {
   let out = '';
@@ -92,6 +98,74 @@ const SWALLOW_BODY = '\\{\\s*(?:return\\s*(?:' + EMPTY_VALUE + ')?\\s*;?\\s*)?\\
 const SWALLOW_FN = 'function\\s*\\w*\\s*\\([^)]*\\)\\s*' + SWALLOW_BODY;
 const SWALLOW_ARROW = '(?:\\([^)]*\\)|\\w+)\\s*=>\\s*(?:' + SWALLOW_BODY + '|\\(?\\s*' + EMPTY_VALUE + '\\s*\\)?)';
 
+/** Danh sách `FbmSync.PUBLIC_RESULT_FIELDS` đọc từ mã nguồn tệp sở hữu; không thấy thì trả null để test báo đỏ thay vì quét với danh sách rỗng. */
+function publicResultFields(source) {
+  const found = /PUBLIC_RESULT_FIELDS\s*=\s*\[([^\]]*)\]/.exec(source);
+  return found ? (found[1].match(/'[^']*'/g) || []).map((item) => item.slice(1, -1)) : null;
+}
+
+/** Khóa tầng ngoài của literal bắt đầu ở `open` (dấu `{`) và vị trí dấu đóng; bỏ qua chuỗi và mọi cặp ngoặc lồng bên trong. */
+function literalKeys(src, open) {
+  const keys = [];
+  let depth = 0;
+  let expectKey = true;
+  for (let i = open; i < src.length; i += 1) {
+    const ch = src[i];
+    if (ch === "'" || ch === '"' || ch === '`') {
+      for (i += 1; i < src.length && src[i] !== ch; i += 1) { if (src[i] === '\\') { i += 1; } }
+      expectKey = false;
+    } else if (ch === '{' || ch === '[' || ch === '(') {
+      depth += 1;
+      if (depth === 1) { expectKey = true; }
+    } else if (ch === '}' || ch === ']' || ch === ')') {
+      depth -= 1;
+      if (depth === 0) { return { keys: keys, end: i }; }
+    } else if (depth === 1 && ch === ',') {
+      expectKey = true;
+    } else if (depth === 1 && expectKey && !/\s/.test(ch)) {
+      const key = /^([A-Za-z_$][\w$]*)\s*:/.exec(src.slice(i, i + 80));
+      if (key) { keys.push(key[1]); i += key[0].length - 1; }
+      expectKey = false;
+    }
+  }
+  return { keys: keys, end: src.length };
+}
+
+/** Khoảng thân của các hàm dựng thân HTTP sau cửa ra trong một tệp. */
+function shaperRanges(src) {
+  const ranges = [];
+  POST_GATE_SHAPERS.forEach((name) => {
+    const at = new RegExp('\\b' + name + '\\s*=\\s*function\\b').exec(src);
+    if (!at) { return; }
+    const open = src.indexOf('{', src.indexOf(')', at.index));
+    ranges.push([open, literalKeys(src, open).end]);
+  });
+  return ranges;
+}
+
+/**
+ * Literal kết quả lệnh (có cả `request` và `status` ở tầng ngoài) mang khóa ngoài `PUBLIC_RESULT_FIELDS`. Cửa ra `publicResult` vẫn chặn lúc chạy, nhưng chỉ khi đúng đường đó chạy và sau khi lượt đã ghi ô; luật này bắt ngay khi chạy test.
+ * Literal dựng động (`Object.assign`, gán thêm trường sau) không đọc được bằng phép quét, chỉ còn phép kiểm lúc chạy ở cửa ra.
+ */
+function resultFieldFind(allowed) {
+  return (file, src) => {
+    if (!allowed) { return [{ line: 0, text: 'không đọc được PUBLIC_RESULT_FIELDS ở ' + RESULT_FIELDS_OWNER }]; }
+    const lines = src.split('\n');
+    const skip = shaperRanges(src);
+    const found = [];
+    for (let i = 0; i < src.length; i += 1) {
+      if (src[i] !== '{' || skip.some((range) => i > range[0] && i < range[1])) { continue; }
+      const keys = literalKeys(src, i).keys;
+      if (keys.indexOf('request') < 0 || keys.indexOf('status') < 0) { continue; }
+      const extra = keys.filter((key) => allowed.indexOf(key) < 0);
+      if (!extra.length) { continue; }
+      const line = lineAt(src, i);
+      found.push({ line: line, text: 'trường ' + extra.join(', ') + ': ' + String(lines[line - 1] || '').trim().slice(0, 100) });
+    }
+    return found;
+  };
+}
+
 const notDefinition = (match, source) => !/function\s+$/.test(source.slice(Math.max(0, match.index - 12), match.index));
 
 const RULES = [
@@ -137,6 +211,10 @@ const RULES = [
     id: 'baselineWrite', title: 'baseline (fbmHash) chỉ được ghi ở ba công cụ áp kết quả', scope: ['gas'], allow: BASELINE_WRITERS,
     // Khóa trong literal `fbmHash: giá_trị` (trừ khai báo schema `fbmHash: {`) và phép gán `.fbmHash = ` (không phải so sánh).
     find: (file, src) => matchAll(src, /\bfbmHash\s*:(?!\s*\{)|\.fbmHash\s*=(?!=)/)
+  },
+  {
+    id: 'resultField', title: 'kết quả lệnh chỉ mang trường trong PUBLIC_RESULT_FIELDS', scope: ['gas'], allow: [],
+    find: resultFieldFind(publicResultFields(fs.readFileSync(path.join(REPO, RESULT_FIELDS_OWNER), 'utf8')))
   }
 ];
 
@@ -337,7 +415,7 @@ function chay(so) {
   check(so, 'phạm vi quét có tệp để quét', files.length > 0, true);
   const readSource = (file) => fs.readFileSync(path.join(REPO, file), 'utf8');
 
-  [PHASE_OWNER].concat(PROPERTY_GATE_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
+  [PHASE_OWNER, RESULT_FIELDS_OWNER].concat(PROPERTY_GATE_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
     check(so, 'tệp được phép ' + file + ' có trong phạm vi quét', files.some((item) => item.file === file), true);
   });
 
@@ -365,6 +443,10 @@ function chay(so) {
   check(so, 'ghi baseline bằng khóa literal và phép gán bị bắt, đọc, so sánh và khai báo schema thì không', hits('baselineWrite', 'f.js', "w.push({ fbmHash: h }); r.fbmHash = h; if (r.fbmHash === h) {} var x = r.fbmHash || ''; var s = { fbmHash: { code: 'A' } };"), 2);
   check(so, 'stateWrite bị bắt, khai báo hàm thì không', hits('stateReadWrite', 'f.js', 'FbmSync.stateWrite({}); var s = stateRead(); function stateWrite(x) {}'), 2);
   check(so, 'logEvent bị bắt', hits('logEvent', 'f.js', "logEvent({ a: 1 });"), 1);
+  check(so, 'danh sách trường kết quả đọc được từ ControlPort.js và có request, status', ['request', 'status'].every((key) => (publicResultFields(readSource(RESULT_FIELDS_OWNER)) || []).indexOf(key) >= 0), true);
+  check(so, 'kết quả lệnh mang trường lạ bị bắt, kể cả nhánh ba ngôi', hits('resultField', 'f.js', "return { ok: true, request: e, status: v(), autoLogin: true };\nreturn x ? { ok: true, request: e, status: v(), continued: true } : { ok: false, code: 'A' };"), 2);
+  check(so, 'kết quả đúng danh sách, trường lồng bên trong và literal không phải kết quả thì không bị bắt', hits('resultField', 'f.js', "return { ok: true, request: { url: u, meta: { keep: 1 } }, status: v({ x: 'a, b: 1' }) };\nvar o = { request: e, other: 1 };"), 0);
+  check(so, 'thân HTTP dựng sau cửa ra (relayCompact) không bị bắt', hits('resultField', 'f.js', "FbmSync.relayCompact = function (r) { return { ok: true, request: r.request, status: r.status, trailAck: 1 }; };"), 0);
 
   section('Quét quy tắc kiến trúc FBM — phép so ngoại lệ chỉ cho co lại');
   const fakeLines = (n) => Array.from({ length: n }, (v, i) => ({ line: i + 1, text: 'x' }));

@@ -213,7 +213,7 @@ async function chay(so) {
   pushErrorProps.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_edit_save', candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(pushErrorProps);
   const continuedPush = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Owner sai');
-  check(so, 'push loi mot record van tiep tuc record ke', [continuedPush.continued, continuedPush.request.meta.kind, push.FbmSync.stateRead().cursor.candidate.id, push.FbmSync.stateRead().counts.error], [true, 'customer_edit_open', 'C-NEXT', 1]);
+  check(so, 'push loi mot record van tiep tuc record ke', [continuedPush.ok, continuedPush.request.meta.kind, push.FbmSync.stateRead().cursor.candidate.id, push.FbmSync.stateRead().counts.error], [true, 'customer_edit_open', 'C-NEXT', 1]);
   push.FbmSync.pushEligibilityErrors = pushEligibilityErrors;
   push.FbmSync.stateWrite(pushedState);
   giuBanGhiDongBo(push, 'customer', 'C-2');
@@ -257,7 +257,7 @@ async function chay(so) {
   bugState.mode = 'push'; bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } });
-  check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.continued, push.FbmSync.stateRead().counts.error, push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'] !== undefined], [true, 1, true]);
+  check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.ok, push.FbmSync.stateRead().counts.error, push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'] !== undefined], [true, 1, true]);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
     : [];
@@ -501,7 +501,7 @@ async function chay(so) {
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.stateStart('', 'push', 0); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });
-  check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.recovering, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
+  check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.ok, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();
   const customerRow = []; customerRow[0] = 'FBM-CREATE'; customerRow[1] = 'ALT00020'; customerRow[2] = 'Khach tao lai'; customerRow[3] = '0100123456'; customerRow[4] = 'Nguoi lien he'; customerRow[5] = 'Ha Noi'; customerRow[6] = '0900000000'; customerRow[7] = 'a@example.com'; customerRow[9] = ''; customerRow[12] = 'HNI'; customerRow[18] = 'Source'; customerRow[21] = '';
   push.writeGateSave = (request) => { push._recoveryPatch = request.records[0]; return { ok: true }; };
@@ -517,7 +517,7 @@ async function chay(so) {
   let lostPatch;
   push.writeGateSave = (request) => { lostPatch = request.records[0]; return { ok: true }; };
   const lost = push.FbmSync.continueAfterPushError(push.FbmSync.stateRead(), push.FbmSync.stateRead().cursor, 'Mất phản hồi');
-  check(so, 'Activity mat phan hoi giu dang day va khoa cho marker', [lost.continued, lost.request, lostPatch.syncStatus, push.FbmSync.stateRead().counts.error, !!push.FbmSync.pushFailuresRead().hashes['activity:ACT-NEW'], soBan(push)['activity:ACT-NEW'].by], [true, null, push.FbmSync.SYNC_STATUS.pushing, 1, true, 'fbm']);
+  check(so, 'Activity mat phan hoi giu dang day va khoa cho marker', [lost.ok, lost.request, lostPatch.syncStatus, push.FbmSync.stateRead().counts.error, !!push.FbmSync.pushFailuresRead().hashes['activity:ACT-NEW'], soBan(push)['activity:ACT-NEW'].by], [true, null, push.FbmSync.SYNC_STATUS.pushing, 1, true, 'fbm']);
 }
 
 module.exports = { chay };
