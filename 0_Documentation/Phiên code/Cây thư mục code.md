@@ -302,7 +302,7 @@ tests\
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
 │   └── quet\                     Công cụ quét mã nguồn.
-│       ├── liet-tep.js           Liệt kê tệp GAS theo đuôi, đi cả thư mục con.
+│       ├── liet-tep.js           Liệt kê tệp trong dự án GAS hoặc thư mục bất kỳ của repo, đi cả thư mục con, bỏ node_modules và thư mục chấm.
 │       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
 │       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
 ├── tools\
@@ -402,6 +402,7 @@ tests\
     │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
     │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
+    │   ├── fileSize.js            Cỡ tệp toàn repo (GAS, Extension, tests): vượt 20 KB hoặc 200 dòng phải có tên trong danh sách kèm trần, nhóm sẽ xử lý và lý do; trần chỉ co lại.
     │   ├── wrapChecks.js          Kiểm công cụ tests/tools/wrapChecks.js: chỉ cắt lệnh check dài bốn đối số, không cắt nhầm dấu phẩy trong chuỗi hay ngoặc.
     │   ├── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
     │   ├── view.js                Điều phối ba tệp kiểm của server/view.
