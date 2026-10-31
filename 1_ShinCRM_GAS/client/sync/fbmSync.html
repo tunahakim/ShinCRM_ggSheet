@@ -1513,17 +1513,16 @@ function fbmSyncApprovePush() {
     return null;
   });
 }
-/** Dừng phiên ở GAS và hủy vòng chạy phía Sidebar. */
+/**
+ * Dừng phiên ở GAS rồi kết thúc chỗ chờ lượt tay bằng status GAS trả. GAS đóng lượt ngay nên không chờ Extension: response lô đang bay về sau mang `runId` rỗng, không bao giờ khớp chỗ chờ, chờ nó thì nút kẹt ở "Đang dừng…" tới lần hỏi im lặng.
+ */
 function fbmSyncCancel() {
-  var keepRelay = FBM_SYNC_CLIENT.running === true;
-  FBM_SYNC_CLIENT.cancelRequested = keepRelay;
-  if (!keepRelay) { fbmSyncSetRunning(false); }
+  FBM_SYNC_CLIENT.cancelRequested = true;
   fbmSyncCancelExtensionBatch();
   return callServer('fbmCancelSync').then(function (result) {
-    var pending = result && result.code === 'SYNC_CANCEL_PENDING';
-    if (!pending) {
-      FBM_SYNC_CLIENT.cancelRequested = false;
-    }
+    FBM_SYNC_CLIENT.cancelRequested = false;
+    fbmSyncRunWaitEnd({ ok: true, code: '', error: '', status: result && result.status || {}, conflict: null });
+    fbmSyncSetRunning(false);
     return fbmSyncPaint(result);
   }).catch(function (error) {
     FBM_SYNC_CLIENT.cancelRequested = false;
