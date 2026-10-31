@@ -92,8 +92,6 @@ const EXCEPTIONS = {
   },
   dungHop: {
     'cases/bindWatcher.js': 3,
-    'cases/book.js': 1,
-    'cases/dirtyState.js': 1,
     'cases/extensionBridge.js': 35,
     'cases/fbmSync/ActivityScan.js': 3,
     'cases/fbmSync/Audit.js': 1,
@@ -111,9 +109,7 @@ const EXCEPTIONS = {
     'cases/fbmSync/Settings.js': 4,
     'cases/fbmSync/Sidebar.js': 1,
     'cases/fbmSync/Workflow.js': 8,
-    'cases/liveModelReader.js': 2,
-    'cases/recordGate.js': 2,
-    'cases/userPrefs.js': 1
+    'cases/liveModelReader.js': 2
   },
   requireCa: {
     'cases/fbmSync/ActivityScan.js': 1,

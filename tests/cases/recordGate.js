@@ -4,30 +4,21 @@
  * Nhánh dễ hỏng âm thầm: đọc sổ ngoài khóa, nhả bản ghi của chủ khác, coi sổ hỏng là rỗng, ghi kho trong phiên ngắn, ghi đè mã đang bận, đổi sổ khi lần ghi không đạt.
  */
 
-const vm = require('vm');
 const { section, check } = require('../lib/assert');
-const { taoHopCat, docTep } = require('../lib/load-gas');
+const { dungHop } = require('../lib/dung-hop');
 
-/** Hộp cát cho hai tệp lõi: `kho` là DocumentProperties giả, `ghiKho` đếm lần setProperty/deleteProperty, `ghi`/`xoa` ghi lại lời gọi cửa ghi/cửa xóa. */
+/** Hộp chung với kho tài liệu và khóa tài liệu thật; chỉ thay tầng đọc dòng và cửa ghi/cửa xóa để kiểm riêng hai tệp lõi. `kho` là DocumentProperties giả, `dem.ghi` đếm lệnh ghi kho, `ghi`/`xoa` ghi lại lời gọi cửa ghi/cửa xóa. */
 function taoCua(opts) {
   const o = opts || {};
-  const kho = Object.assign({}, o.kho || {}), dem = { ghiKho: 0 }, ghi = [], xoa = [];
-  const hop = taoHopCat({
-    DOCUMENT_STORE: { docLockDepth: 0 },
-    documentProps: () => ({
-      getProperty: (k) => (k in kho ? kho[k] : null),
-      setProperty: (k, v) => { dem.ghiKho += 1; kho[k] = v; },
-      deleteProperty: (k) => { dem.ghiKho += 1; delete kho[k]; }
-    }),
+  const nen = dungHop({ props: o.kho }), ghi = [], xoa = [];
+  const hop = nen.hop, kho = nen.props, dem = nen.stubs._khoDem;
+  Object.assign(hop, {
     entityReadAllCombined: (entity) => ({ entity, rows: (o.dong || {})[entity] || [] }),
     entityReadRecordById: (entity, schemas, id) => ({ entity, rows: ((o.dong || {})[entity] || []).filter((r) => r.id === id) }),
     entityBlockRecords: (block) => block.rows.slice(),
     writeGateSave: (req) => { ghi.push(req.records.map((r) => r.id)); return o.ghiHong ? { ok: false, code: 'OLD_CHANGED' } : { ok: true }; },
     deleteGateRemove: (req) => { xoa.push(req.ids.slice()); return { ok: true }; }
   });
-  hop.documentLockRun = (fn) => { hop.DOCUMENT_STORE.docLockDepth += 1; try { return fn(); } finally { hop.DOCUMENT_STORE.docLockDepth -= 1; } };
-  vm.runInContext(docTep('server/state/DocumentStore.js').match(/function documentPropertyJson[\s\S]*?\n}\n/)[0], hop);
-  ['server/state/RecordHolds.js', 'server/gate/RecordGate.js'].forEach((tep) => vm.runInContext(docTep(tep), hop, { filename: tep }));
   return { hop, kho, dem, ghi, xoa };
 }
 
@@ -50,7 +41,7 @@ function testSoBan(so) {
   const loiNha = nem(() => b.hop.recordGateRun({ by: 'sidebar', decide: () => ({ release: [{ entity: 'customer', ids: ['C1'] }] }) }));
   const loiGiu = nem(() => b.hop.recordGateRun({ by: 'sidebar', decide: () => ({ hold: [{ entity: 'customer', ids: ['C1'], reason: 'thử' }] }) }));
   check(so, 'nhả hoặc giữ đè bản ghi của chủ khác thì ném lỗi, sổ và kho không đổi', [
-    /Chủ nào giữ thì chủ đó nhả/.test(loiNha), /đang do "fbm" giữ/.test(loiGiu), b.dem.ghiKho, soCua(b)['customer:C1'].by
+    /Chủ nào giữ thì chủ đó nhả/.test(loiNha), /đang do "fbm" giữ/.test(loiGiu), b.dem.ghi, soCua(b)['customer:C1'].by
   ], [true, true, 0, 'fbm']);
   check(so, 'giữ bản ghi mà thiếu lý do thì ném lỗi', /cần lý do/.test(nem(() => taoCua().hop.recordGateRun({ by: 'fbm', decide: () => ({ hold: [{ entity: 'customer', ids: ['C1'] }] }) }))), true);
 
@@ -59,12 +50,12 @@ function testSoBan(so) {
   c.hop.recordGateRun({ by: 'sidebar', decide: () => ({ release: [{ entity: 'customer', ids: ['C1'] }] }) });
   const d = taoCua();
   d.hop.recordGateRun({ by: 'sidebar', decide: () => ({ save: [{ entity: 'customer', records: [{ id: 'C1' }] }] }) });
-  check(so, 'phiên ngắn không giữ gì thì không chạm kho; giữ rồi nhả thì sổ về rỗng và xóa khóa kho', [d.dem.ghiKho, kq.ok, 'SHIN_RECORD_HOLDS_V1' in c.kho], [0, true, false]);
+  check(so, 'phiên ngắn không giữ gì thì không chạm kho; giữ rồi nhả thì sổ về rỗng và xóa khóa kho', [d.dem.ghi, kq.ok, 'SHIN_RECORD_HOLDS_V1' in c.kho], [0, true, false]);
 
   const e = taoCua({ kho: { SHIN_RECORD_HOLDS_V1: JSON.stringify({ 'customer:C1': { by: 'fbm', reason: 'đẩy' }, 'activity:A1': { by: 'khac', reason: 'x' } }) } });
   const f = taoCua();
   check(so, 'nhả theo chủ chỉ bỏ mục của chủ đó; sổ không có mục của chủ thì không lấy khóa, không ghi kho', [
-    e.hop.recordGateReleaseOwner('fbm'), Object.keys(soCua(e)), f.hop.recordGateReleaseOwner('fbm'), f.dem.ghiKho
+    e.hop.recordGateReleaseOwner('fbm'), Object.keys(soCua(e)), f.hop.recordGateReleaseOwner('fbm'), f.dem.ghi
   ], [true, ['activity:A1'], false, 0]);
 }
 
@@ -88,7 +79,7 @@ function testCua(so) {
 
   const c = taoCua({ ghiHong: true });
   const kqC = c.hop.recordGateRun({ by: 'fbm', decide: () => ({ save: [{ entity: 'customer', records: [{ id: 'C1' }] }, { entity: 'activity', records: [{ id: 'A1' }] }], remove: [{ entity: 'customer', ids: ['C9'] }], hold: [{ entity: 'customer', ids: ['C1'], reason: 'đẩy' }] }) });
-  check(so, 'lần ghi không đạt thì dừng: không ghi phần sau, không xóa, sổ và kho không đổi', [kqC.ok, c.ghi, c.xoa, c.dem.ghiKho], [false, [['C1']], [], 0]);
+  check(so, 'lần ghi không đạt thì dừng: không ghi phần sau, không xóa, sổ và kho không đổi', [kqC.ok, c.ghi, c.xoa, c.dem.ghi], [false, [['C1']], [], 0]);
 
   const d = taoCua({ dong: { customer: [{ id: 'C1', ten: 'An' }] } });
   let thuTu = [];

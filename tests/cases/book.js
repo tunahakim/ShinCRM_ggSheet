@@ -6,10 +6,12 @@
 
 const { taoHopCat, napServer } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
+const { taoKhoThuocTinh, taoPropertiesService } = require('../lib/gas/kho-thuoc-tinh');
 
 function dungKho(initial) {
   const data = Object.assign({}, initial || {});
-  return { data, writes: 0, getProperty(key) { return data[key] === undefined ? null : data[key]; }, setProperty(key, value) { this.writes++; data[key] = value; } };
+  const dem = { doc: 0, ghi: 0 };
+  return Object.assign(taoKhoThuocTinh(data, dem), { data, dem });
 }
 
 function dungHopBook(options) {
@@ -21,7 +23,7 @@ function dungHopBook(options) {
     LOG_OK: 'ok',
     logEvent: (entry) => events.push(entry.action),
     ScriptApp: { getScriptId: () => opts.scriptId || 'script-A' },
-    PropertiesService: { getScriptProperties: () => props },
+    PropertiesService: taoPropertiesService({ script: props.data, demScript: props.dem }),
     SpreadsheetApp: {
       getActiveSpreadsheet: () => { if (opts.active) { return opts.active; } throw new Error('reading from storage NOT_FOUND'); },
       openById: (id) => { opened.push(id); return { getId: () => id, getName: () => 'Sheet ' + id }; }
@@ -42,7 +44,7 @@ function chay(so) {
   const ghi = dungHopBook({ active: banSao, props: kho });
   const lan1 = ghi.hop.shinBookBindingRecord(banSao, kho);
   const lan2 = ghi.hop.shinBookBindingRecord(banSao, kho);
-  check(so, 'mở Sidebar ghi cặp mã Sheet và mã script một lần, lần sau giống thì không ghi lại', [lan1.changed, lan2.changed, kho.writes, ghi.events], [true, false, 1, ['bookBindingRecorded']]);
+  check(so, 'mở Sidebar ghi cặp mã Sheet và mã script một lần, lần sau giống thì không ghi lại', [lan1.changed, lan2.changed, kho.dem.ghi, ghi.events], [true, false, 1, ['bookBindingRecorded']]);
 
   const ngoai = dungHopBook({ props: kho });
   const a = ngoai.hop.shinOpenBook();

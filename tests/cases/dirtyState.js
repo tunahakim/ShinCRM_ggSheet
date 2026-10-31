@@ -8,18 +8,6 @@ const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows } = require('../lib/assert');
 const { trongLanGoi } = require('../lib/gas/lan-goi');
 
-/** Bọc kho thuộc tính tài liệu để đếm từng loại lệnh. */
-function demLenhKho(hop) {
-  const dem = {};
-  const goc = hop.PropertiesService.getDocumentProperties;
-  hop.PropertiesService.getDocumentProperties = () => {
-    const that = goc();
-    const boc = {};
-    Object.keys(that).forEach((ten) => { boc[ten] = function () { dem[ten] = (dem[ten] || 0) + 1; return that[ten].apply(that, arguments); }; });
-    return boc;
-  };
-  return dem;
-}
 
 function chay(so) {
   section('Sổ nhật ký nạp lại — đọc và chuyển đổi từ cờ đời cũ');
@@ -44,7 +32,9 @@ function chay(so) {
 
   const gio = dungHop({ sheets: ['Log'] });
   trongLanGoi(gio.hop, () => gio.hop.dirtyStateMarkSignal({ customer: ['KH0000'] }));
-  const dem = demLenhKho(gio.hop);
+  // Đếm lệnh kho từ đây: lấy số của kho chung trừ mốc lúc này.
+  const lenhMoc = Object.assign({}, gio.stubs._khoDem.lenh);
+  const dem = new Proxy({}, { get: (_, ten) => (gio.stubs._khoDem.lenh[ten] || 0) - (lenhMoc[ten] || 0) });
   trongLanGoi(gio.hop, () => {
     gio.hop.dirtyStateMarkSignal({ customer: ['KH0001', 'KH0001', ''] });
     gio.hop.dirtyStateMarkSignal({ customer: ['KH0002'], activity: ['GD0001'] });
