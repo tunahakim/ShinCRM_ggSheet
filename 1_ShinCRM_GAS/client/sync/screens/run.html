@@ -18,11 +18,15 @@ function fbmSyncPipelineBlock(status, id) {
     return FBM_SYNC_RUN_UI.layout.pipelineStep(uiClassJoin(classes.pipelineStep, state === 'done' ? classes.stateDone : '', state === 'current' || state === 'paused' ? classes.stateCurrent : '', state === 'error' ? classes.stateError : ''), marker, String(item && item.label || ''));
   }));
 }
+/** Lượt tay đang chạy theo status GAS: một câu trả lời cho cả nút chạy và hai ô chọn. Không đọc cờ RAM `running`, vì cờ đó chỉ tắt khi Extension báo xong lượt, lượt bị Dừng thì phải chờ hết hạn im lặng nên ô chọn bị khóa lệch với nút. */
+function fbmSyncRunManualActive(status) {
+  return !!status && status.running === true && String(status.origin || '') !== 'background';
+}
 function fbmSyncRunActionBlock(status) {
   status = status || {};
   var statusReady = typeof fbmSyncStatusReady === 'function' ? fbmSyncStatusReady() : FBM_SYNC_CLIENT.statusReady === true;
   // Chỉ lượt tay mới có nút dừng ở đây; lượt nền đang chạy vẫn hiện nút chạy, bấm vào thì GAS trả mã để Sidebar hỏi dừng hay chờ, không có đường hủy nền mà không hỏi.
-  var active = status.running === true && String(status.origin || '') !== 'background', awaiting = status.phase === 'awaiting_approval', cancelling = FBM_SYNC_CLIENT.cancelRequested === true, backgroundStopping = FBM_SYNC_CLIENT.backgroundStopping === true;
+  var active = fbmSyncRunManualActive(status), awaiting = status.phase === 'awaiting_approval', cancelling = FBM_SYNC_CLIENT.cancelRequested === true, backgroundStopping = FBM_SYNC_CLIENT.backgroundStopping === true;
   return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (backgroundStopping ? FBM_SYNC_RUN_SCHEMA.action.backgroundStopping : cancelling ? 'Đang dừng…' : active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(cancelling ? 'cancel' : active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false || cancelling || backgroundStopping });
 }
 function fbmSyncRunBackgroundSettingsBlock(status) {
@@ -42,12 +46,12 @@ function fbmSyncRunForceLoginBlocks(status) {
   return [FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('cancel', 'button'), disabled: !!FBM_SYNC_CLIENT.running }))];
 }
 /** Mức quét chỉ hiện với chiều có đọc FBM; dòng mô tả theo lựa chọn để người dùng biết gói đó bắt được gì và bỏ sót gì. */
-function fbmSyncRunPackBlocks() {
+function fbmSyncRunPackBlocks(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.pack;
   if (schema.modes.indexOf(String(FBM_SYNC_CLIENT.mode || '')) < 0) { return []; }
   var chosen = schema.options.filter(function (option) { return option.value === FBM_SYNC_CLIENT.pack; })[0] || schema.options[0];
   return [
-    StandaloneField(schema.label, { id: schema.id, kind: schema.kind, options: schema.options.map(function (option) { return { value: option.value, label: option.label }; }), value: chosen.value, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: schema.label }),
+    StandaloneField(schema.label, { id: schema.id, kind: schema.kind, options: schema.options.map(function (option) { return { value: option.value, label: option.label }; }), value: chosen.value, disabled: fbmSyncRunManualActive(status), ariaLabel: schema.label }),
     Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: chosen.hint })
   ];
 }
@@ -55,9 +59,14 @@ function fbmSyncRunPackBlocks() {
 function fbmSyncRunPack(mode) {
   return FBM_SYNC_RUN_SCHEMA.pack.modes.indexOf(String(mode || '')) >= 0 ? String(FBM_SYNC_CLIENT.pack || FBM_SYNC_RUN_SCHEMA.pack.defaultValue) : '';
 }
-function fbmSyncPatchRunPack() {
+function fbmSyncRunModeBlock(status) {
+  return StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: fbmSyncRunManualActive(status), ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label });
+}
+/** Đổi ô chọn thì vẽ lại theo status Sidebar đang hiện; cập nhật từ GAS thì truyền status mới. */
+function fbmSyncPatchRunPack(status) {
   if (!RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pack]) { return false; }
-  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.pack, fbmSyncRunPackBlocks());
+  status = status || FBM_SYNC_CLIENT.lastStatus;
+  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.pack, fbmSyncRunPackBlocks(status));
   return true;
 }
 /** Băng cảnh báo phạm vi giới hạn, để người dùng luôn thấy lượt chạy chỉ chạy cho những khách nào. */
@@ -81,8 +90,8 @@ function fbmSyncPatchLivePipeline(panel, status) {
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
   return fbmSyncAppendBox(panel, FBM_SYNC_RUN_UI.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_UI.layout.screen({
-    mode: StandaloneField(FBM_SYNC_RUN_SCHEMA.mode.label, { id: FBM_SYNC_RUN_SCHEMA.mode.id, kind: FBM_SYNC_RUN_SCHEMA.mode.kind, options: FBM_SYNC_UI_SCHEMA.modes, value: FBM_SYNC_CLIENT.mode, disabled: !!FBM_SYNC_CLIENT.running, ariaLabel: FBM_SYNC_RUN_SCHEMA.mode.label }),
-    pack: fbmSyncRunPackBlocks(),
+    mode: fbmSyncRunModeBlock(status),
+    pack: fbmSyncRunPackBlocks(status),
     action: FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)),
     settings: fbmSyncRunBackgroundSettingsBlock(status),
     details: fbmSyncRunDetailsBlocks(status)
@@ -92,7 +101,9 @@ function fbmSyncPatchRun(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.rootId]) { return false; }
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.action, [FBM_SYNC_RUN_UI.layout.actionStack([FBM_SYNC_RUN_UI.layout.actionRow(fbmSyncRunActionBlock(status)), fbmSyncRunBackgroundSettingsBlock(status)])]);
   fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.details, fbmSyncRunDetailsBlocks(status));
-  fbmSyncPatchRunPack();
+  // Ô Loại đồng bộ không dựng lại để giữ node và focus khi người dùng đang chọn; chỉ đổi trạng thái khóa.
+  fbmSyncSetTargetState(FBM_SYNC_RUN_SCHEMA.mode.id, { disabled: fbmSyncRunManualActive(status) });
+  fbmSyncPatchRunPack(status);
   return true;
 }
 function fbmSyncRunHasSnapshot(status) {
