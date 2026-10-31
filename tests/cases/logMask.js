@@ -1,5 +1,5 @@
 /**
- * Ca kiểm luật che bí mật của `server/log/LogGate.js`. Tài liệu 10 Phần 7.
+ * Ca kiểm luật che bí mật của `server/log/LogMask.js`. Tài liệu 10 Phần 7.
  *
  * Đây là nhóm ca đáng có nhất của cả tệp `LogGate`, vì cách nó hỏng là cách hỏng **im lặng và một chiều**: log vẫn ghi, lượt chạy vẫn xanh, chỉ có điều cookie phiên đăng nhập FBM nằm nguyên văn trong một ô sheet — và một bí mật đã ghi ra thì không thu lại được.
  *

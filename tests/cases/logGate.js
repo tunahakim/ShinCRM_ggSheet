@@ -1,5 +1,5 @@
 /**
- * Ca kiểm kỷ luật bộ đệm và số lệnh ghi của `server/log/LogGate.js`. Tài liệu 10 Phần 2 tới Phần 6.
+ * Ca kiểm kỷ luật bộ đệm và số lệnh ghi của `server/log/LogGate.js` và `server/log/LogSheet.js`. Tài liệu 10 Phần 2 tới Phần 6.
  *
  * Nhóm ca này đứng được là nhờ tệp Sheet giả **tự đếm** từng lệnh `setValues` và `deleteRows`. Nhờ vậy luật "cả lượt chỉ tốn một lệnh ghi" không còn là lời hứa đọc từ con số do chính `LogGate` tự báo, mà là con số đếm từ phía tệp Sheet — nghĩa là cách hỏng kinh điển (ghi từng dòng trong vòng lặp) bị bắt tại đây, thay vì bị phát hiện qua hóa đơn hạn mức sau này.
  *

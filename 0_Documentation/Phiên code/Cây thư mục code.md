@@ -100,7 +100,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── FbmSyncService.js     Hàm Sidebar gọi của đồng bộ FBM, mỗi hàm là adapter một dòng vào `FbmSync.controlDispatch`; khai ranh giới ghi vết và mục cài đặt của FBM vào bảng khai mở của lõi.
 │   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
-│   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
+│   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, định dạng dòng, flushLog điều phối việc ghi xuống sheet Log bằng đúng một lệnh.
+│   │   ├── LogSheet.js           Thao tác sheet Log: dựng lại khi mất, ghi một khối dòng bằng một lệnh, cắt log theo hai trần.
+│   │   ├── LogMask.js            Che bí mật, công cụ tính thuần dùng chung cho Log và thông báo.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
 │   ├── notice\
 │   │   └── NoticeGate.js         Cổng thông báo duy nhất: phát, gỡ, bỏ, liệt kê. Mỗi thông báo một khóa NOTICE:<key> trong DocumentProperties; lõi không biết kênh, Sidebar là một adapter.
@@ -417,7 +419,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `server/SheetLayout.gs` | `server/data/SheetLayout.js` |
 | `server/SheetIo.gs` | `server/sheet/SheetIo.js` |
 | `server/TextNormalize.gs` | `server/util/TextNormalize.js` |
-| `server/LogGate.gs` | `server/log/LogGate.js` |
+| `server/LogGate.gs` | `server/log/LogGate.js`, `server/log/LogSheet.js`, `server/log/LogMask.js` |
 | `server/LoadService.gs` | `server/service/LoadService.js` |
 | `server/DirtyState.gs` | `server/state/DirtyState.js` |
 | `client/util/textNormalize.js` | `client/util/textNormalize.html` |
