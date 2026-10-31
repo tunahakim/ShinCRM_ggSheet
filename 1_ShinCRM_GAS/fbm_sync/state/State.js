@@ -368,6 +368,12 @@ FbmSync.requestWatchNote = function (state) {
  * Cổng duy nhất nhận ra response thuộc request đang chờ; đánh dấu đã trả lời để luật request quá hạn không báo nhầm trả lời muộn.
  * Ghi `resubmit.answered` để nhận ra lần nộp lặp của chính request này (relay thử lại khi lần đầu GAS đã xử lý nhưng câu trả lời không về tới Extension). Nơi gọi luôn ghi state ngay sau đó vì còn phải bỏ request đang chờ.
  */
+/** Phiên đã có token của màn `customer` hoặc `activity` chưa. Nơi khác chỉ được hỏi có hay không, không đọc giá trị bí mật (luật tĩnh `sessionSecret`). */
+FbmSync.sessionAuthorized = function (state, entity) {
+  var session = state && state.session || {};
+  return !!(entity === 'customer' ? session.customerAuthorized : session.activityAuthorized);
+};
+
 FbmSync.requestAnswered = function (state, responseRequestId) {
   var id = String(state && state.activeRequestId || '');
   if (!id || !responseRequestId || String(responseRequestId) !== id) { return false; }

@@ -219,26 +219,25 @@ FbmSync.conflictSettle = function (state, read, build, choice, message) {
     record.fbmHash = read.latestHash;
     record.syncStatus = FbmSync.hash(record, entity, read.gate) === read.latestHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
     if (record.syncStatus === FbmSync.SYNC_STATUS.synced) { record.syncedAt = new Date(); }
-    return { save: [{ entity: entity, records: [record], source: 'pull', old: [read.old] }], value: { status: 'ok', record: record } };
+    return { save: [{ entity: entity, records: [record], source: 'pull', old: [read.old] }], value: { status: 'ok' } };
   });
   var done = run.value || {}, saved = run.saves && run.saves[0];
   if (saved && Array.isArray(saved.conflicts) && saved.conflicts.length) {
-    return { ok: false, code: 'CONFLICT_SHEET_CHANGED', entity: entity, id: read.id, conflicts: saved.conflicts, message: 'ShinCRM đã đổi trong lúc xử lý ' + read.id + '; chưa ghi gì.' };
+    return { ok: false, code: 'CONFLICT_SHEET_CHANGED', conflicts: saved.conflicts, message: 'ShinCRM đã đổi trong lúc xử lý ' + read.id + '; chưa ghi gì.' };
   }
   if (done.status === 'gone') {
     state.message = 'Bản ghi ' + read.id + ' không còn ở trạng thái xung đột chờ quyết trên Sheet.'; FbmSync.stateWrite(state);
     return FbmSync.conflictFail('CONFLICT_NOT_FOUND', state.message);
   }
   if (done.status === 'busy') {
-    return { ok: false, code: 'CONFLICT_RECORD_BUSY', entity: entity, busy: { id: read.id, by: done.busy.by, reason: done.busy.reason }, message: 'Bản ghi ' + read.id + ' đang bận (' + done.busy.reason + '); chưa ghi gì.' };
+    return { ok: false, code: 'CONFLICT_RECORD_BUSY', busy: { id: read.id, by: done.busy.by, reason: done.busy.reason }, message: 'Bản ghi ' + read.id + ' đang bận (' + done.busy.reason + '); chưa ghi gì.' };
   }
   if (done.status === 'fbmMismatch') { return FbmSync.conflictReject(state, entity, read.id, 'Giá trị FBM gửi kèm lệnh chốt ' + read.id + ' không khớp bản FBM lúc mở xung đột; chưa ghi gì, mở lại xung đột.'); }
-  var record = done.record;
   var remaining = FbmSync.conflictQueue().length;
   state.metadata.conflictCount = remaining;
   FbmSync.pushFailuresRemove([entity + ':' + read.id]);
   if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = message;
   FbmSync.stateWrite(state);
-  return { ok: true, entity: entity, id: read.id, choice: choice, syncStatus: record.syncStatus, remaining: remaining, status: FbmSync.statusView() };
+  return { ok: true, remaining: remaining, status: FbmSync.statusView() };
 };
