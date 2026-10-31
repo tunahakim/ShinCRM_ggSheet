@@ -319,7 +319,7 @@ async function chay(so) {
   check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
   check(so, 'Sidebar kết thúc chỗ chờ lượt bằng lỗi Extension rõ ràng (tin failure), không gửi lại request FBM', syncSource.indexOf('if (data.retryable)') < 0 && syncSource.indexOf('retryCount: 0') < 0 && syncSource.indexOf('fbmSyncRunWaitEnd(null, error)') >= 0 && syncSource.indexOf("'extension_failure'") >= 0, true);
   check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && /callServer\('fbmGetSyncStatus'\)\.then\(function \(bundle\) \{\s*if \(!bundle \|\| !bundle\.status\)/.test(syncSource), true);
-  check(so, 'kiem tra lien ket dung chung guard Extension va huy cursor khi loi', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf("callServer('fbmCancelSync')") >= 0, true);
+  check(so, 'kiem tra lien ket dung chung guard Extension; loi phia trinh duyet khong tu goi Dung (luot thuoc GAS)', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf('fbmSyncCancelAfterError') < 0 && (syncSource.match(/'fbmCancelSync'/g) || []).length === 1, true);
   const autoFillStart = syncSource.indexOf('function fbmSyncAutoFill()');
   const autoFillEnd = syncSource.indexOf('function fbmSyncConfirmIdentity()');
   const autoFillSource = autoFillStart >= 0 && autoFillEnd > autoFillStart ? syncSource.slice(autoFillStart, autoFillEnd) : '';
@@ -357,7 +357,7 @@ async function chay(so) {
     (controlPortSource.match(/return finish\(/g) || []).length,
     controlPortSource.indexOf('return FbmSync.publicResult(raw);') >= 0 && controlPortSource.indexOf('PUBLIC_RESULT_FIELDS') < 0,
     (fbmServiceSource.match(/^function fbm\w+\(.*\{ return fbmCommandRun\(/gm) || []).length >= 15 && fbmServiceSource.indexOf('function fbmPublicResult') < 0
-  ], [true, 3, true, true]);
+  ], [true, 2, true, true]);
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
   check(so, 'status bat dau truoc phien khong ve de ghi de loading dang chay', syncSource.indexOf('running: FBM_SYNC_CLIENT.running') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.running && !ticket.running') >= 0, true);
   check(so, 'khong hien tieu de chi tiet khi chi co canh bao preflight', syncStatusSource.indexOf('var hasRecordIssues') >= 0 && syncStatusSource.indexOf('if (!hasRecordIssues)') >= 0, true);

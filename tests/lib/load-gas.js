@@ -24,6 +24,10 @@ function taoHopCat(stubs) {
   // `Utilities` có sẵn vì chỉ là hàm thuần (độ dài byte, mã ngẫu nhiên); mã GAS gọi thẳng, không dò sự có mặt của nó.
   const utilities = { newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }), getUuid: () => 'test-uuid-' + (++utilities.seq), seq: 0 };
   const hopCat = Object.assign({ console: console, Utilities: utilities }, stubs || {});
+  // Khóa điều phối giả mặc định (luôn lấy được); ca cần thử nhánh bận tự truyền `LockService`.
+  // Hạn chờ khóa của GAS thật; ca cần số khác tự truyền `SETTINGS`.
+  if (!hopCat.SETTINGS) { hopCat.SETTINGS = { LOCK_WAIT_MS: 15000 }; }
+  if (!hopCat.LockService) { hopCat.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }; }
   vm.createContext(hopCat);
   return hopCat;
 }
@@ -138,8 +142,8 @@ function capCuaBanGhi(hopCat) {
       return kho;
     };
   }
-  if (!hopCat.LockService || typeof hopCat.LockService.getDocumentLock !== 'function' || !hopCat.SETTINGS) {
-    // Như bản thật trừ phần Google: vào lớp ngoài cùng thì bỏ bản đọc, ra lớp ngoài cùng thì gửi kho phần ghi chờ trong khóa.
+  if (!hopCat.LockService || typeof hopCat.LockService.getDocumentLock !== 'function' || !hopCat.SpreadsheetApp) {
+    // Hộp thiếu khóa tài liệu hoặc Sheet giả (bản thật cần cả hai để chốt ghi): như bản thật trừ phần Google: vào lớp ngoài cùng thì bỏ bản đọc, ra lớp ngoài cùng thì gửi kho phần ghi chờ trong khóa.
     vm.runInContext('documentLockRun = function (work) { var outer = DOCUMENT_STORE.docLockDepth === 0; if (outer) { documentStoreRefresh(); } DOCUMENT_STORE.docLockDepth += 1; try { return work(); } finally { DOCUMENT_STORE.docLockDepth -= 1; if (outer) { documentStoreFlush(DOCUMENT_STORE_DIRTY_DOC); if (!documentStoreActive()) { documentStoreClear(); } } } };', hopCat);
   }
   if (typeof hopCat.entityReadAllCombined !== 'function') {

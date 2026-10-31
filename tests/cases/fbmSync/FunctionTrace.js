@@ -43,7 +43,7 @@ function chay(so) {
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
-    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
     // Hủy phiên trả status công khai; ca này chỉ kiểm sổ bước nên status giả là đủ.
     nen.FbmSync.statusView = () => ({ ok: true });
     const st = nen.FbmSync.stateStart('', 'checking_session', 0);
@@ -70,10 +70,10 @@ function chay(so) {
 
   const huy = dungState();
   const runIdHuy = huy.st.runId, truocHuy = huy.dong.length;
-  huy.nen.fbmSyncCancel();
-  check(so, 'hủy phiên: mọi bước mở ghi "Tạm dừng" cùng cycleId của phiên dù runId đã bị xóa',
+  huy.nen.FbmSync.runStopCommand('any');
+  check(so, 'hủy phiên: mọi bước mở ghi "Tạm dừng" cùng cycleId của phiên; runId giữ lại để Sidebar vẽ kết quả lượt vừa đóng',
     [dongDong(huy.dong.slice(truocHuy)), huy.dong.slice(truocHuy).every((e) => e.cycleId === runIdHuy), huy.nen.FbmSync.stateRead().runId],
-    [['pull_customer|warn|Tạm dừng đọc Customer từ FBM', 'reconcile_customer|warn|Tạm dừng đối soát và cập nhật Customer ShinCRM', 'run|warn|Tạm dừng phiên đồng bộ'], true, '']);
+    [['pull_customer|warn|Tạm dừng đọc Customer từ FBM', 'reconcile_customer|warn|Tạm dừng đối soát và cập nhật Customer ShinCRM', 'run|warn|Tạm dừng phiên đồng bộ'], true, runIdHuy]);
 
   const treo = dungState();
   const truocTreo = treo.dong.length;
@@ -112,7 +112,7 @@ function chay(so) {
     vo.dong.slice(truocVo).filter((e) => e.outcome === 'error').map((e) => e.detail.step + '|' + (e.cycleId === runIdVo) + '|' + e.reason.split(' - ')[0]),
     ['pull_customer|true|Kết thúc đọc Customer từ FBM với lỗi', 'run|true|Kết thúc phiên đồng bộ với lỗi']);
   const truocHuyLoi = vo.dong.length;
-  vo.nen.fbmSyncCancel();
+  vo.nen.FbmSync.runStopCommand('any');
   const sauHuyLoi = vo.nen.FbmSync.stateRead();
   check(so, 'client hủy sau lỗi: phiên vẫn là error với lý do cũ, không đổi thành "Đã dừng" và không ghi thêm dòng bước',
     [sauHuyLoi.phase, sauHuyLoi.lastError.indexOf('Cannot read properties') >= 0, vo.dong.length - truocHuyLoi],

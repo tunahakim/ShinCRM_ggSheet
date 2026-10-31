@@ -1,0 +1,86 @@
+/** Kiểm `fbm_sync/state/Run.js`: lệnh Dừng ghi cờ không cần khóa điều phối, lát đang giữ khóa thấy cờ trước khi phát request kế, lệnh mở lượt và lát kế áp cờ còn chờ; mọi đường đóng lượt đi qua `runClose`. */
+const { section, check } = require('../../lib/assert');
+const { workflowGas } = require('./Workflow');
+
+function loi(fn) {
+  try { fn(); return null; } catch (error) { return String(error && error.code || ''); }
+}
+
+/** Hộp có khóa script giả bật/tắt được và Log gom theo thứ tự; lượt tay đọc đã mở sẵn (request đầu đang bay). */
+function hopCoLuot(origin) {
+  const khoa = { ban: false, tryLock() { return !this.ban; }, releaseLock() {} };
+  const logs = [];
+  const { hop, documentProperties } = workflowGas({ LockService: { getScriptLock: () => khoa }, logEvent: (line) => logs.push(line), LOG_WARN: 'warn' });
+  const F = hop.FbmSync;
+  F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  const started = F.start({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' });
+  return { hop, F, khoa, logs, data: documentProperties.data, started };
+}
+
+async function chay(so) {
+  section('FBM sync — Run.js: đóng lượt và lệnh Dừng không chờ khóa');
+
+  // Khóa đang bị lát khác giữ: Dừng vẫn ghi cờ ngay, không đợi, không chạm state.
+  const ban = hopCoLuot();
+  const runId = ban.F.stateRead().runId, truocState = ban.data.FBM_SYNC_STATE_V1;
+  ban.khoa.ban = true;
+  const pending = ban.F.controlDispatch('cancel', {});
+  const co = JSON.parse(ban.data.FBM_SYNC_STOP_V1 || '{}');
+  check(so, 'khóa bận: Dừng trả SYNC_STOP_PENDING ngay, cờ dừng mang mã lượt đã nằm trong kho thật, state chưa bị đổi', [
+    pending.ok, pending.code, co.runId === runId, co.verdict, ban.data.FBM_SYNC_STATE_V1 === truocState, ban.F.statusView().running
+  ], [true, 'SYNC_STOP_PENDING', true, 'cancelled', true, true]);
+
+  // Lát kế lấy được khóa: áp cờ trước khi làm gì, không chạy phần việc, không phát request.
+  ban.khoa.ban = false;
+  let daChay = false;
+  const truocLog = ban.logs.length;
+  const lat = ban.F.withOrchestrationLock(() => ban.F.runSlice(() => { daChay = true; return { ok: true, request: { id: 'khong-duoc-phat' } }; }));
+  const sau = ban.F.stateRead();
+  check(so, 'lát kế áp cờ dừng còn chờ: không chạy phần việc, không trả request, lượt tạm dừng và giữ runId, Log đóng bước ghi "Tạm dừng" của đúng lượt', [
+    daChay, lat.code, lat.request, sau.phase, sau.runId === runId, sau.activeRequestId,
+    ban.logs.slice(truocLog).filter((line) => /_finished$/.test(line.action)).every((line) => line.cycleId === runId && line.outcome === 'warn'),
+    ban.logs.slice(truocLog).some((line) => line.action === 'sync_session_finished')
+  ], [false, 'SYNC_STOPPED', null, 'paused', true, '', true, true]);
+  check(so, 'cờ của lượt đã đóng không chặn lượt mới: lượt sau vẫn phát request đầu', (() => { const lai = ban.F.start({ mode: 'read', origin: 'manual', manual: true }); return [!!lai.request, ban.F.statusView().running]; })(), [true, true]);
+
+  // Lệnh Dừng ghi cờ giữa lúc lát đang chạy (bản chụp trong khóa không thấy): lát vẫn thấy trước khi phát request.
+  const giua = hopCoLuot();
+  const runGiua = giua.F.stateRead().runId;
+  const latGiua = giua.F.withOrchestrationLock(() => giua.F.runSlice(() => {
+    // Như một lần thực thi khác ghi thẳng kho thật trong lúc lát này giữ khóa.
+    giua.data.FBM_SYNC_STOP_V1 = JSON.stringify({ runId: runGiua, verdict: 'cancelled', at: Date.now() });
+    return { ok: true, request: { id: 'request-ke' } };
+  }));
+  check(so, 'Dừng ghi cờ giữa lát: request vừa dựng không được phát, lượt đóng trong cùng lát', [latGiua.code, latGiua.request, giua.F.stateRead().phase, giua.F.stateRead().activeRequestId], ['SYNC_STOPPED', null, 'paused', '']);
+
+  // Dừng nền khi khóa bận, rồi người dùng mở lượt tay: dòng đóng của lượt nền (nhãn Nền, lý do dừng) có trước lượt tay mở.
+  const nen = hopCoLuot('background');
+  const runNen = nen.F.stateRead().runId;
+  nen.khoa.ban = true;
+  const dungNen = nen.F.controlDispatch('stop_background', {});
+  nen.khoa.ban = false;
+  const truocTay = nen.logs.length;
+  const tay = nen.F.controlDispatch('start', { kind: 'sync', mode: 'read', machineId: 'may-A' });
+  const dongNen = nen.logs.slice(truocTay).filter((line) => line.action === 'sync_session_finished')[0] || {};
+  check(so, 'dừng nền khi khóa bận rồi chạy tay: lượt nền đóng trước với lý do dừng nền, lượt tay qua lệnh start của Sidebar mở sau và đang chạy', [
+    dungNen.code, dongNen.cycleId === runNen, dongNen.outcome, /dừng lượt nền/.test(String(dongNen.reason || '')), tay.runId === nen.F.stateRead().runId && tay.runId !== runNen, nen.F.statusView().running, nen.F.stateRead().origin
+  ], ['SYNC_STOP_PENDING', true, 'warn', true, true, true, 'manual']);
+
+  // Cờ hỏng không được coi là "không có cờ": lát ném và lượt sang lỗi.
+  const hong = hopCoLuot();
+  hong.data.FBM_SYNC_STOP_V1 = '{"runId":';
+  check(so, 'cờ dừng hỏng thì lát ném DOCUMENT_PROPERTY_CORRUPT và lượt sang lỗi, không chạy tiếp như chưa bấm Dừng', [
+    loi(() => hong.F.withOrchestrationLock(() => hong.F.runSlice(() => ({ ok: true, request: { id: 'x' } })))), hong.F.stateRead().phase
+  ], ['DOCUMENT_PROPERTY_CORRUPT', 'error']);
+
+  // runClose là cửa duy nhất: kết luận lạ và đóng lượt đã đóng là lỗi lập trình.
+  const cua = hopCoLuot();
+  check(so, 'runClose: kết luận lạ ném RUN_VERDICT_UNKNOWN; đóng lượt không còn chạy ném RUN_NOT_OPEN', [
+    loi(() => cua.F.runClose(cua.F.stateRead(), 'xong')), loi(() => cua.F.runClose(cua.F.runClose(cua.F.stateRead(), 'done'), 'done'))
+  ], ['RUN_VERDICT_UNKNOWN', 'RUN_NOT_OPEN']);
+  const loiLuot = cua.F.runFail(hopCoLuot().F.stateRead(), 'TRANSPORT_ERROR', 'Không gọi được FBM.');
+  check(so, 'runFail: phase lỗi, mã lỗi và chữ lỗi người dùng đọc, request đang bay chuyển sang closedRequestId', [loiLuot.phase, loiLuot.lastFailureCode, loiLuot.lastError, loiLuot.activeRequestId, !!loiLuot.closedRequestId], ['error', 'TRANSPORT_ERROR', 'Không gọi được FBM.', '', true]);
+}
+
+module.exports = { chay };

@@ -42,8 +42,8 @@ const SESSION_SECRET_FILES = [
   '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
 ];
 
-/** Tệp được đọc/ghi state: chưa có người điều phối sạch nên để trống, mọi chỗ gọi hiện nay là ngoại lệ. */
-const STATE_ORCHESTRATORS = [];
+/** Tệp được đọc/ghi state: tệp của người điều phối khung lượt. Chỗ gọi khác hiện nay là ngoại lệ. */
+const STATE_ORCHESTRATORS = ['1_ShinCRM_GAS/fbm_sync/state/Run.js'];
 
 /** Tệp được ghi `logEvent`: tương lai chỉ người điều phối lát ghi Log một lần; hiện để trống. */
 const LOG_WRITERS = [];
@@ -168,13 +168,13 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Probe.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 28,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 27,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 12,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 6,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 47,
+    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 45,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 34,

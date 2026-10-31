@@ -47,7 +47,7 @@ async function chay(so) {
   check(so, 'đánh thức lần hai khi lượt đã được nhận: không phát phong bì trùng, không ghi', [twice.code, twice.request || null, anh() === beforeTwice], ['NO_RUN_AWAITING', null, true]);
 
   // Lượt đóng (dừng) rồi response của request cũ mới về: GAS bỏ, không cấp request mới.
-  FbmSync.stateWrite(FbmSync.runCloseNow(FbmSync.stateRead(), { phase: 'paused', message: 'Dừng để thử response muộn.' }));
+  FbmSync.stateWrite(FbmSync.runClose(FbmSync.stateRead(), 'paused', { message: 'Dừng để thử response muộn.' }));
   const late = FbmSync.controlDispatch('continue', { machineId: 'may-A', response: { ok: true, status: 200, body: '{"d":{}}', trace: [{ stage: 'fbm_tab_replied', requestId: picked.request.id }] } }, 'relay');
   const afterLate = FbmSync.stateRead();
   check(so, 'response đến sau khi lượt đã đóng thì không cấp request mới và lượt vẫn đóng', [late.request || null, afterLate.activeRequestId, afterLate.phase], [null, '', 'paused']);
@@ -90,8 +90,8 @@ async function chay(so) {
 
   // Dừng khi lượt còn giữ chỗ: đóng ngay như mọi lần Dừng.
   FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
-  const stopped = hop.fbmSyncCancel();
-  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['', 'paused', '', 'NO_RUN_AWAITING']);
+  const stopped = hop.FbmSync.runStopCommand('any');
+  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['SYNC_STOPPED', 'paused', '', 'NO_RUN_AWAITING']);
 
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
   check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);
