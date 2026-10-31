@@ -354,11 +354,12 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     return { ok: false, code: state.lastFailureCode, request: null, identity: runtime, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   FbmSync.sessionIdentityVerify(state, identity);
+  // Ghi thành công một lần cho cả ba mục đích (tự động, thử, ép), trước khi rẽ nhánh: đăng nhập được đúng tài khoản là mật khẩu đúng, khóa chờ chống khóa tài khoản không còn lý do giữ.
+  FbmSync.autoLoginMarkSuccess();
   state.lastFailureCode = '';
   state.lastError = '';
   state.retryable = false;
   if (cursor.purpose === 'force') {
-    if (FbmSync.autoLoginMarkSuccess) { FbmSync.autoLoginMarkSuccess(); }
     state.cursor = {}; state.phase = 'done'; state.message = 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.'; FbmSync.stateWrite(state);
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: typeof LOG_OK === 'undefined' ? 'ok' : LOG_OK, reason: state.message, detail: { runId: String(state.runId || '') } }); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
@@ -368,7 +369,6 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
   }
   if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'auto_login', 'ok', {}); }
-  if (FbmSync.autoLoginMarkSuccess) { FbmSync.autoLoginMarkSuccess(); }
   FbmSync.stateWrite(state);
   var resumed = FbmSync.loginResumeRequest(state);
   if (!resumed) {
