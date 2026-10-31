@@ -20,7 +20,7 @@ async function chay(so) {
   const saved = hop.FbmSync.loginConfigSave({ credentialRef: 'cred-test-1234', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
   check(so, 'lưu envelope chỉ trả metadata công khai và username đầy đủ', [saved.ok, saved.public.usernameHint, saved.envelope, JSON.stringify(data.FBM_LOGIN_CONFIG_V1).includes('password')], [true, 'anhlt', undefined, false]);
   check(so, 'đọc cấu hình không trả ciphertext ra Sidebar', [hop.FbmSync.loginConfigPublic().configured, hop.FbmSync.loginConfigPublic().envelope], [true, undefined]);
-  const state = hop.FbmSync.stateStart('', 'pull_customer', 1);
+  const state = hop.FbmSync.runOpen({ phase: 'pull_customer', total: 1 });
   state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'], count: 2000 }; hop.FbmSync.stateWrite(state);
   const login = hop.FbmSync.beginAutoLogin(hop.FbmSync.stateRead(), state.cursor);
   check(so, 'hết phiên tạo request login và giữ cursor cũ', [login.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resumeCursor.pageIndex], ['login', 'login', 2]);
@@ -53,7 +53,7 @@ async function chay(so) {
   heartbeat.FbmSync.readLocal = () => [];
   heartbeat.FbmSync.bindingWrite({ spreadsheetId: 'sheet-test', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
-  heartbeat.FbmSync.stateStart('', 'idle', 0);
+  heartbeat.FbmSync.runOpen({ phase: 'idle' });
   heartbeat.FbmSync.statePatch({ session: { expired: true } });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   // Dấu hết hạn còn từ lượt trước không đủ để đăng nhập (09/06), và phiên chưa xác minh thì Giữ phiên không được dựng request đếm khách (mã người dùng lấy từ phiên đã xác minh): mở bằng probe, probe báo chưa xác thực mới đi cổng đăng nhập.
@@ -458,7 +458,7 @@ async function chay(so) {
   afterWipe.FbmSync.configValue = () => '';
   afterWipe.FbmSync.readLocal = () => [];
   afterWipe.FbmSync.bindingWrite({ spreadsheetId: 'sheet-wipe', userId: '7777', username: 'WIPE', accountName: 'Tai khoan wipe' });
-  afterWipe.FbmSync.stateStart('', 'error', 0);
+  afterWipe.FbmSync.runOpen({ phase: 'error' });
   afterWipe.FbmSync.statePatch({ session: Object.assign(afterWipe.FbmSync.stateRead().session, { cookie: '461099999855cFHN_CRM_App' }) });
   afterWipeData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const wipedSession = afterWipe.FbmSync.stateRead().session;
@@ -472,7 +472,7 @@ async function chay(so) {
 
   // Liên kết phải khớp cả grid User lẫn trang FBM (mã trong payload cookie, tên đầy đủ trong khối menu); hai nơi so với liên kết, không so với nhau.
   const pageRound = (captures) => {
-    afterWipe.FbmSync.stateStart('', 'error', 0);
+    afterWipe.FbmSync.runOpen({ phase: 'error' });
     afterWipeData.FBM_SYNC_DONE_HEARTBEAT = '1';
     const opened = hoiNen(afterWipe);
     return { opened, reply: noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures, trace: [{ requestId: opened.request.id }] } }) };

@@ -30,12 +30,12 @@ async function chay(so) {
   // Danh sách đọc chỉ sống trong một lượt.
   const ds = await sheet3();
   const F = ds.F;
-  F.stateStart('', 'pull_activity', 0);
+  F.runOpen({ phase: 'pull_activity' });
   F.readListAdd(['FBM-C1', 'FBM-MOI']);
   F.readWaitWrite({ 'FBM-C2': ['800001'] });
   F.stateFailRun('Lượt hỏng giả lập', 'FBM_TEST');
   const conLai = [F.readListNext(10), F.readWaitRead()];
-  F.stateStart('', 'pull_activity', 0);
+  F.runOpen({ phase: 'pull_activity' });
   F.readListAdd(['FBM-C1']);
   F.readListDone(['FBM-C1']);
   const themLai = F.readListAdd(['FBM-C1']);

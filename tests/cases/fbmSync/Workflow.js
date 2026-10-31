@@ -503,7 +503,7 @@ async function chay(so) {
     // Sheet giả giữ trạng thái vừa ghi, như Sheet thật: dòng đã đánh dấu chờ sửa thì lần quét lại không chọn lại.
     flow.hop.writeGateSave = (input) => { sheetSaves.push(...input.records); input.records.forEach((saved) => { const row = rows.find((item) => item.id === saved.id); if (row) { Object.assign(row, saved); } }); return { ok: true }; };
     const verified = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
-    const state = F.stateStart('', 'push', 0);
+    const state = F.runOpen({ phase: 'push' });
     state.mode = 'push'; state.phase = 'push'; state.entity = 'customer'; state.session = verified; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     F.stateWrite(state);
     let envelope = F.nextEnvelope(F.nextPushRequest(F.stateRead())), lastStep = null;
@@ -685,7 +685,7 @@ async function chay(so) {
     JSON.stringify(probe).indexOf('ACT-QUOTA') < 0
   ], [true, true, 'push_wait', false, true, true, 2, true, true, true]);
   const orderFlow = workflowGas();
-  const orderState = orderFlow.hop.FbmSync.stateStart('', 'push', 0);
+  const orderState = orderFlow.hop.FbmSync.runOpen({ phase: 'push' });
   orderState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   orderState.mode = 'write'; orderState.phase = 'push'; orderState.entity = 'activity';
   orderState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
@@ -706,7 +706,7 @@ async function chay(so) {
   check(so, 'state push được chốt trước khi đánh dấu Sheet đang đẩy', [orderError && orderError.code, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 0, 'push_scan']);
   // FBM-045: bước nạp Category gọi nextPushRequest rồi tự ghi lại object state của nó; khóa phải đặt trên chính object đó.
   const aliasFlow = workflowGas();
-  const aliasState = aliasFlow.hop.FbmSync.stateStart('', 'push', 0);
+  const aliasState = aliasFlow.hop.FbmSync.runOpen({ phase: 'push' });
   aliasState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   aliasState.mode = 'push'; aliasState.phase = 'push'; aliasState.entity = 'customer'; aliasState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
@@ -722,7 +722,7 @@ async function chay(so) {
     [aliasRequest && aliasRequest.meta.kind, aliasState.cursor.kind, aliasStored.cursor.kind, (soBan(aliasFlow.hop)['customer:CUS-ALIAS'] || {}).by], ['customer_edit_open', 'push_wait', 'push_wait', 'fbm']);
   // FBM-002: không ghi được `đang đẩy` xuống Sheet thì không phát lệnh ghi FBM.
   const pushingFlow = workflowGas();
-  const pushingState = pushingFlow.hop.FbmSync.stateStart('', 'push', 0);
+  const pushingState = pushingFlow.hop.FbmSync.runOpen({ phase: 'push' });
   pushingState.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
   pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity';
   pushingState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
@@ -1376,7 +1376,7 @@ async function chay(so) {
     const luong = workflowGas({ logEvent: ghi, logTrace: ghi });
     // Bộ dựng chung không nạp sổ bước vì các ca khác không xét Log theo bước.
     napServer(luong.hop, 'fbm_sync/diagnostic/Trace.js');
-    const F = luong.hop.FbmSync, st = F.stateStart('', 'pull_customer', 0);
+    const F = luong.hop.FbmSync, st = F.runOpen({ phase: 'pull_customer' });
     st.mode = mode;
     ['run', 'pull_customer', 'reconcile_customer'].forEach((key) => F.businessStepStart(st, key, { mode }));
     return { nhatKy, F, st };

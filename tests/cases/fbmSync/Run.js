@@ -74,6 +74,19 @@ async function chay(so) {
     loi(() => hong.F.withOrchestrationLock(() => hong.F.runSlice(() => ({ ok: true, request: { id: 'x' } })))), hong.F.stateRead().phase
   ], ['DOCUMENT_PROPERTY_CORRUPT', 'error']);
 
+  // Nhãn lượt chốt lúc mở: dòng Log của lượt lấy nhãn trong ô lượt, không suy lại từ kênh hay chuỗi nền lúc ghi.
+  const tayNhan = hopCoLuot(), nenNhan = hopCoLuot('background');
+  tayNhan.F.logContextNote(tayNhan.F.stateRead());
+  const nhanTay = tayNhan.F.logContextText();
+  tayNhan.F.withOrchestrationLock(() => tayNhan.F.stateWrite(tayNhan.F.runClose(tayNhan.F.stateRead(), 'done')));
+  tayNhan.F.issueContext = { channel: 'relay' };
+  tayNhan.F.logContextNote(tayNhan.F.stateRead());
+  const nhanNgoai = tayNhan.F.logContextText();
+  tayNhan.F.issueContext = null;
+  check(so, 'nhãn lượt: lượt tay ghi "Tay", lượt nền ghi "Nền" ngay lúc mở; Log trong lượt dùng nhãn đó; ngoài lượt thì theo kênh gọi (relay là Nền)', [
+    tayNhan.F.stateRead().runLabel.split(' · ')[0], nenNhan.F.stateRead().runLabel.split(' · ')[0], nhanTay === tayNhan.F.stateRead().runLabel, nhanNgoai
+  ], ['Tay', 'Nền', true, 'Nền']);
+
   // runClose là cửa duy nhất: kết luận lạ và đóng lượt đã đóng là lỗi lập trình.
   const cua = hopCoLuot();
   check(so, 'runClose: kết luận lạ ném RUN_VERDICT_UNKNOWN; đóng lượt không còn chạy ném RUN_NOT_OPEN', [

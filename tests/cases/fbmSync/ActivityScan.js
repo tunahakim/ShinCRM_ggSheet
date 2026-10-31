@@ -94,7 +94,7 @@ async function chay(so) {
 
   // Lượt nền lấy toàn bộ giao dịch kết thúc ngay sau lớp 1: thông báo cuối lượt dựng cùng chỗ với lượt thủ công nên không mất ghi chú khách lỗi.
   const nenLoi = scanHarness({ customers: 1 });
-  const nenState = nenLoi.F.stateStart('', 'pull_activity', 0);
+  const nenState = nenLoi.F.runOpen({ phase: 'pull_activity' });
   Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
   nenState.metadata.customerErrors = { total: 2, recent: [] };
   nenLoi.F.finishPullRun(nenState);

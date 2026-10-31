@@ -43,10 +43,10 @@ function chay(so) {
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
-    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
     // Hủy phiên trả status công khai; ca này chỉ kiểm sổ bước nên status giả là đủ.
     nen.FbmSync.statusView = () => ({ ok: true });
-    const st = nen.FbmSync.stateStart('', 'checking_session', 0);
+    const st = nen.FbmSync.runOpen({ phase: 'checking_session' });
     nen.FbmSync.businessStepStart(st, 'run', {});
     nen.FbmSync.businessStepStart(st, 'session', {});
     nen.FbmSync.businessStepFinish(st, 'session', 'ok', {});
@@ -92,7 +92,7 @@ function chay(so) {
 
   const thay = dungState();
   const truocThay = thay.dong.length;
-  thay.nen.FbmSync.stateStart('', 'checking_session', 0);
+  thay.nen.FbmSync.runOpen({ phase: 'checking_session' });
   check(so, 'phiên mới thay phiên đang mở: các bước của phiên cũ được đóng trước khi metadata bị xóa',
     dongDong(thay.dong.slice(truocThay)).map((d) => d.split('|').slice(0, 2).join('|')),
     ['pull_customer|warn', 'reconcile_customer|warn', 'run|warn']);

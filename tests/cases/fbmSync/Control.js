@@ -26,7 +26,7 @@ async function chay(so) {
   check(so, 'phong bì GAS gửi Extension mang mã giao thức', FbmSync.protocol.request('r1', 'https://fbm.test/x', {}, {}).contract, contract);
 
   // Lượt khác đang chạy: Đăng nhập thử bị từ chối với SYNC_BUSY và không đổi ô lượt.
-  const running = FbmSync.stateStart('', 'pull_customer', 1);
+  const running = FbmSync.runOpen({ phase: 'pull_customer', total: 1 });
   running.phase = 'pull_customer'; running.cursor = { kind: 'customer_grid' };
   FbmSync.stateWrite(running);
   FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });

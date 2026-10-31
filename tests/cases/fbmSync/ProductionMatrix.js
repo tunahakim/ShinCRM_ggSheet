@@ -98,7 +98,7 @@ async function chay(so) {
   check(so, 'hai envelope cung mili-giay van co requestId khac nhau', [first.id, second.id, first.id !== second.id], [first.id, second.id, true]);
 
   const sync = makeSync();
-  const state = sync.hop.FbmSync.stateStart('', 'pull_customer', 0);
+  const state = sync.hop.FbmSync.runOpen({ phase: 'pull_customer' });
   state.mode = 'read';
   sync.hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   sync.hop.FbmSync.stateWrite(state);
@@ -177,7 +177,7 @@ async function chay(so) {
   check(so, 'Phạm vi khách chỉ định: khách trong phạm vi vắng ở danh sách FBM vào danh sách đọc, khách ngoài phạm vi không vào, không ghi cờ nào trước cửa ghi', [vaoDanhSach, docTrongLuot(phamVi.local.customer[0]), docTrongLuot(phamVi.local.customer[1]), phamVi.writes.length], [1, true, false, 0]);
 
   const empty = makeSync();
-  const emptyState = empty.hop.FbmSync.stateStart('', 'pull_customer', 0);
+  const emptyState = empty.hop.FbmSync.runOpen({ phase: 'pull_customer' });
   emptyState.mode = 'read';
   empty.hop.FbmSync.stateWrite(emptyState);
   const emptyCustomer = empty.hop.FbmSync.pullWrite('customer', []);
@@ -196,7 +196,7 @@ async function chay(so) {
     F.scriptSettings = () => ({ accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
     F.validatePushCategories = () => [];
     F.nextEnvelope = (request) => request;
-    const st = F.stateStart('', 'push', 0);
+    const st = F.runOpen({ phase: 'push' });
     st.mode = 'write'; st.phase = 'push'; 
     st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     // Lượt đẩy luôn bắt đầu sau lô danh mục vừa đọc.
@@ -432,7 +432,7 @@ async function chay(so) {
   const nameDiff = (dto) => ((dto && dto.fields) || []).filter((item) => /Tên/.test(String(item.left)))[0] || {};
   const cf = makeSync(), CF = cf.hop.FbmSync;
   CF.masterEnabled = () => true;
-  const cfState = CF.stateStart('', 'pull_customer', 0);
+  const cfState = CF.runOpen({ phase: 'pull_customer' });
   const cfGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true } }, warnings: [] };
   cfState.mode = 'read'; CF.readCategoryGate = () => cfGate; CF.stateWrite(cfState);
   const cfIds = [1, 2, 3];
@@ -452,7 +452,7 @@ async function chay(so) {
   // Xung đột không khóa đồng bộ: mỗi kỳ pull so ba chiều lại với baseline cũ. Bốn khách: FBM đổi cho khớp ShinCRM, FBM quay về gốc, ShinCRM quay về gốc, vẫn khác nhau.
   const rv = makeSync(), RV = rv.hop.FbmSync;
   RV.masterEnabled = () => true;
-  const rvState = RV.stateStart('', 'pull_customer', 0);
+  const rvState = RV.runOpen({ phase: 'pull_customer' });
   rvState.mode = 'read'; RV.readCategoryGate = () => cfGate; RV.stateWrite(rvState);
   const rvIds = [1, 2, 3, 4];
   RV.pullWrite('customer', rvIds.map((n) => RV.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
@@ -467,7 +467,7 @@ async function chay(so) {
     [['đã đồng bộ', 'chờ đối soát', 'đã đồng bộ', 'xung đột chờ quyết'], ['Tên Shin 1', 'Tên Shin 2', 'Tên FBM 3', 'Tên Shin 4'], 0, 1, 3, 0]);
   const rvFlow = makeSync(), RVF = rvFlow.hop.FbmSync;
   RVF.pullWrite = () => ({ ok: true, written: 2, conflicts: 1, conflictsKept: 2, conflictsCleared: 3, skipped: 0, identityBlocks: [] });
-  const rvFlowState = RVF.stateStart('', 'pull_customer', 0);
+  const rvFlowState = RVF.runOpen({ phase: 'pull_customer' });
   rvFlowState.mode = 'read'; rvFlowState.metadata.conflictCount = 5; RVF.stateWrite(rvFlowState);
   RVF.pullRecords('customer', [{}], 'write');
   const rvFlowAfter = RVF.stateRead();
@@ -484,7 +484,7 @@ async function chay(so) {
     [rv.local.customer[0].fbmHash !== rvBase[0], rv.local.customer[1].fbmHash === rvBase[1], rv.local.customer[2].fbmHash !== rvBase[2], rv.local.customer[3].fbmHash === rvBase[3]], [true, true, true, true]);
   check(so, 'Dòng xung đột chờ quyết luôn được đọc lại từ FBM, kể cả khi FBM đã quay về gốc nên danh sách không lộ thay đổi', RV.readAgainStatus({ syncStatus: 'xung đột chờ quyết' }), true);
 
-  const cfNewRun = CF.stateStart('', 'checking_session', 0);
+  const cfNewRun = CF.runOpen({ phase: 'checking_session' });
   cfNewRun.phase = 'done'; CF.stateWrite(cfNewRun);
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
@@ -532,7 +532,7 @@ async function chay(so) {
   // Sidebar chọn "Lưu giá trị bạn đang chọn": ảnh chụp nhận giá trị Sheet hiện tại làm mốc mới rồi gửi lại.
   const cfShotNew = JSON.parse(JSON.stringify(cfOpenedNewer.conflict.snapshot));
   cfShotNew.old.companyName = cfChangedField.current;
-  const cfNewSession = CF.stateStart('', 'checking_session', 0); cfNewSession.phase = 'done'; CF.stateWrite(cfNewSession);
+  const cfNewSession = CF.runOpen({ phase: 'checking_session' }); cfNewSession.phase = 'done'; CF.stateWrite(cfNewSession);
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   giuBanGhi(cf.hop, 'khac', 'customer', 'CUS-000001', 'Tiến trình khác đang giữ.');
   const cfBusy = chotQuaCua('CUS-000001', 'fbm', cfOpenedNewer, cfShotNew);
@@ -576,11 +576,11 @@ async function chay(so) {
   // FBM-053: đọc xác nhận lệch nhưng bản đọc lại đã khớp mọi trường thì không còn gì để người dùng chọn.
   const sm = makeSync(), SM = sm.hop.FbmSync;
   SM.masterEnabled = () => true;
-  const smState = SM.stateStart('', 'pull_customer', 0); smState.mode = 'read'; SM.readCategoryGate = () => cfGate; SM.stateWrite(smState);
+  const smState = SM.runOpen({ phase: 'pull_customer' }); smState.mode = 'read'; SM.readCategoryGate = () => cfGate; SM.stateWrite(smState);
   SM.pullWrite('customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên gốc 1'), {})]);
   sm.local.customer[0].companyName = 'Tên Shin 1';
   SM.pullWrite('customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM 1'), {})]);
-  const smDone = SM.stateStart('', 'checking_session', 0); smDone.phase = 'done'; SM.stateWrite(smDone);
+  const smDone = SM.runOpen({ phase: 'checking_session' }); smDone.phase = 'done'; SM.stateWrite(smDone);
   SM.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const smOpen = SM.openConflict();
   const smSame = SM.conflictOpened(gridResponse(smOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên Shin 1')]));
@@ -591,12 +591,12 @@ async function chay(so) {
   // FBM-033: bản ghi đầu hàng đợi không đọc được trên FBM thì rời hàng đợi, không chặn các xung đột phía sau.
   const un = makeSync(), UN = un.hop.FbmSync;
   UN.masterEnabled = () => true;
-  const unState = UN.stateStart('', 'pull_customer', 0); unState.mode = 'read'; UN.readCategoryGate = () => cfGate; UN.stateWrite(unState);
+  const unState = UN.runOpen({ phase: 'pull_customer' }); unState.mode = 'read'; UN.readCategoryGate = () => cfGate; UN.stateWrite(unState);
   const unIds = [1, 2, 3, 4];
   UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
   un.local.customer.forEach((row) => { row.companyName = 'Tên Shin ' + row.fbmCustomerCode.slice(-1); });
   UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên FBM ' + n), {})));
-  const unDone = UN.stateStart('', 'checking_session', 0); unDone.phase = 'done'; UN.stateWrite(unDone);
+  const unDone = UN.runOpen({ phase: 'checking_session' }); unDone.phase = 'done'; UN.stateWrite(unDone);
   UN.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   un.logs.length = 0;
   const unOpen = UN.openConflict();
@@ -615,7 +615,7 @@ async function chay(so) {
   check(so, 'FBM-033: bản ghi xung đột thiếu ID FBM cũng rời hàng đợi ngay, không phát request', [unNoId.code, unNoId.request, un.local.customer[2].syncStatus, UN.openConflict().request.meta.conflictId], ['CONFLICT_RECORD_UNREADABLE', undefined, 'không thấy bên FBM', 'CUS-000004']);
 
   const cfBig = makeSync(), CB = cfBig.hop.FbmSync;
-  const cfBigState = CB.stateStart('', 'pull_customer', 0); cfBigState.mode = 'read'; CB.readCategoryGate = () => cfGate; CB.stateWrite(cfBigState);
+  const cfBigState = CB.runOpen({ phase: 'pull_customer' }); cfBigState.mode = 'read'; CB.readCategoryGate = () => cfGate; CB.stateWrite(cfBigState);
   const cfBigIds = Array.from({ length: 80 }, (_, index) => index + 10);
   const longName = (prefix, n) => prefix + ' ' + n + ' ' + 'x'.repeat(400);
   CB.pullWrite('customer', cfBigIds.map((n) => CB.customerRecord(fbmRow('F-' + n, 'ALT000' + n, longName('Gốc', n)), {})));
@@ -630,7 +630,7 @@ async function chay(so) {
   const thrownCode = (work) => { try { work(); return 'không ném'; } catch (error) { return String(error && error.code || ''); } };
   const dp = makeSync(), DP = dp.hop.FbmSync, dpData = dp.documentProperties.data;
   napServer(dp.hop, 'fbm_sync/auth/AutoLogin.js');
-  const dpStart = DP.stateStart('', 'pull_customer', 0); dpStart.cursor = { pageIndex: 7 }; DP.stateWrite(dpStart);
+  const dpStart = DP.runOpen({ phase: 'pull_customer' }); dpStart.cursor = { pageIndex: 7 }; DP.stateWrite(dpStart);
   dpData.FBM_SYNC_STATE_V1 = '{"runId":"r1","cursor":{"pageIndex":7'; // JSON đứt giữa chừng
   const corruptStateRaw = dpData.FBM_SYNC_STATE_V1;
   dp.logs.length = 0;
@@ -641,7 +641,7 @@ async function chay(so) {
     ['DOCUMENT_PROPERTY_CORRUPT', true, true]);
 
   const dpPending = makeSync(), PP = dpPending.hop.FbmSync, ppData = dpPending.documentProperties.data;
-  const ppStart = PP.stateStart('', 'push', 0); ppStart.mode = 'write'; PP.stateWrite(ppStart);
+  const ppStart = PP.runOpen({ phase: 'push' }); ppStart.mode = 'write'; PP.stateWrite(ppStart);
   ppData.FBM_SYNC_PENDING_PUSHES_V1 = '["không phải object"]';
   const pendingSliceCode = thrownCode(() => PP.runSlice(() => PP.pendingPushSet('customer', 'CUS-000001', { hash: 'mới' })));
   const ppState = PP.stateRead();
@@ -673,7 +673,7 @@ async function chay(so) {
   const ac = makeSync(), AC = ac.hop.FbmSync;
   AC.masterEnabled = () => true;
   AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', userId: '2037', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
-  const acState = AC.stateStart('', 'pull_activity', 0); acState.mode = 'read';
+  const acState = AC.runOpen({ phase: 'pull_activity' }); acState.mode = 'read';
   AC.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   AC.stateWrite(acState);
   const acGate = AC.stateCategoryGate(acState);

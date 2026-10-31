@@ -207,7 +207,7 @@ async function chay(so) {
   // Cả state (không chỉ cursor) của một trang đầy cộng lastError dài nhất phải chừa khoảng trống dưới trần một khóa kho: nhánh lỗi ghi thêm lastError mà chạm trần thì lỗi quota che mất lỗi thật.
   const khoState = {};
   const stateHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => khoState[k] === undefined ? null : khoState[k], setProperty: (k, v) => { khoState[k] = String(v); }, deleteProperty: (k) => { delete khoState[k]; } }) } });
-  napServer(stateHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js');
+  napServer(stateHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js');
   const macDinh = stateHop.FbmSync.stateDefault();
   const loiDaiNhat = 'Đ'.repeat(240);
   stateHop.FbmSync.stateWrite(Object.assign(macDinh, {

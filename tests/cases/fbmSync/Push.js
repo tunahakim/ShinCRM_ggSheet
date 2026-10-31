@@ -42,17 +42,17 @@ async function chay(so) {
   approval.FbmSync.authContinue('customer', {});
   const afterApproval = approval.FbmSync.authContinue('activity', {});
   check(so, 'Sau chấp thuận lượt kiểm lại dữ liệu nhưng không hỏi lại, đi tiếp sang request dữ liệu', [!!afterApproval, localCalls.length, approval.FbmSync.stateRead().phase !== 'awaiting_approval'], [true, 2, true]);
-  approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
+  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
   approval.FbmSync.readLocal = () => [];
   approval.FbmSync.start({ mode: 'read' });
   approval.FbmSync.authContinue('customer', {});
   approval.FbmSync.authContinue('activity', {});
   check(so, 'Chiều Lấy không quét hash Sheet ShinCRM ở bất kỳ bước nào', localCalls.length, 2);
-  approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
+  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
   approval.FbmSync.preflightLocal = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
   const pushOnly = approval.FbmSync.start({ mode: 'push' });
   check(so, 'mode day rieng chi probe truoc khi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'session_probe', 'push']);
-  approval.FbmSync.stateWrite(approval.FbmSync.stateStart('', 'idle', 0));
+  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
   const checkOnly = approval.FbmSync.start({ mode: 'check' });
   check(so, 'bon mode tach dung quyen ghi Sheet va FBM', [
     checkOnly.ok,
@@ -140,7 +140,7 @@ async function chay(so) {
   push.FbmSync.pushEligibilityErrors = () => [];
   push.FbmSync.customerEditOpenRequest = () => ({ url: 'https://fbm.test/edit', body: {}, meta: { kind: 'customer_edit_open' } });
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' }, { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' }, { id: 'C-ERR', companyName: 'Lỗi' }, { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' }] : [{ id: 'ACT-NEW', fbmId: '', content: 'Tạo từ ShinCRM', taskType: 'CV1', workDate: '2026-10-07' }];
-  const pushState = push.FbmSync.stateStart('', 'push', 0);
+  const pushState = push.FbmSync.runOpen({ phase: 'push' });
   pushState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
   pushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(pushState);
@@ -153,7 +153,7 @@ async function chay(so) {
     { kind: 'edit', id: 'C-1', position: 0, record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' }, raw: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1', companyName: 'Bản lúc chọn' } },
     { kind: 'edit', id: 'C-NEXT', position: 3, record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' }, raw: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
   ]);
-  const changedState = push.FbmSync.stateStart('', 'push', 0);
+  const changedState = push.FbmSync.runOpen({ phase: 'push' });
   changedState.session = pushState.session;
   changedState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(changedState);
@@ -162,14 +162,14 @@ async function chay(so) {
     !!changedRequest, push.FbmSync.stateRead().counts.skipped, Object.keys(soBan(push)), push.FbmSync.stateRead().current
   ], [true, 1, ['customer:C-NEXT'], 'C-NEXT']);
   datUngVienDay(push, () => [{ kind: 'edit', id: 'C-1', position: 0, record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }]);
-  const conflictPushState = push.FbmSync.stateStart('', 'push', 0);
+  const conflictPushState = push.FbmSync.runOpen({ phase: 'push' });
   conflictPushState.counts.conflict = 1;
   conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(conflictPushState);
   const conflictPushRequest = push.FbmSync.nextPushRequest(conflictPushState);
   check(so, 'pull phát hiện xung đột giữa lượt không dừng chiều đẩy: bản ghi khác vẫn được phát request đẩy', [!!conflictPushRequest, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().current], [true, 'push', 'C-1']);
   datUngVienDay(push, () => []);
-  const emptyWriteState = push.FbmSync.stateStart('', 'push', 0); emptyWriteState.mode = 'write'; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
+  const emptyWriteState = push.FbmSync.runOpen({ phase: 'push' }); emptyWriteState.mode = 'write'; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
   push.FbmSync.nextPushRequest(emptyWriteState);
   check(so, 'push khong co ung vien hien thong bao khong co ban ghi day', push.FbmSync.stateRead().message, 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.');
   let pushPatch, pushWriteRequest;
@@ -196,7 +196,7 @@ async function chay(so) {
     ? [{ id: 'ACT-FAIL', fbmId: '174813', syncStatus: push.FbmSync.SYNC_STATUS.error, content: 'Nội dung cũ' }]
     : [];
   push.writeGateSave = (request) => { retryPatch = request.records; return { ok: true }; };
-  const retryState = push.FbmSync.stateStart('', 'done', 0);
+  const retryState = push.FbmSync.runOpen({ phase: 'done' });
   push.FbmSync.stateWrite(retryState);
   push.FbmSync.pushFailuresWrite({ hashes: { 'activity:ACT-FAIL': 'failed-hash', 'activity:ACT-GONE': 'gone-hash' }, details: { 'activity:ACT-FAIL': { reason: 'HTTP 500' } } });
   const retryEnabled = push.fbmSyncRetryPushFailures();
@@ -208,7 +208,7 @@ async function chay(so) {
     { kind: 'edit', id: 'C-ERR', position: 0, record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } },
     { kind: 'edit', id: 'C-NEXT', position: 1, record: { id: 'C-NEXT', fbmId: 'A-NEXT', fbmHash: 'h-next' } }
   ]);
-  const pushErrorProps = push.FbmSync.stateStart('', 'push', 0);
+  const pushErrorProps = push.FbmSync.runOpen({ phase: 'push' });
   pushErrorProps.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
   pushErrorProps.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_edit_save', candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(pushErrorProps);
@@ -246,14 +246,14 @@ async function chay(so) {
     push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'X-GIA', fbmId: 'FBM-GIA' }] : [];
     push.writeGateSave = (request) => { sheetRows.push(...request.records); return { ok: true }; };
     push.FbmSync.logPushRecord = (candidate, op, outcome, reason, detail) => { logRows.push([outcome, detail.syncStatus, detail.failureCode]); };
-    const missingState = push.FbmSync.stateStart('', 'push', 0);
+    const missingState = push.FbmSync.runOpen({ phase: 'push' });
     push.FbmSync.markPushError(missingState, { entity: 'customer', id: 'X-GIA', kind: 'edit', record: { id: 'X-GIA', fbmId: 'FBM-GIA' } }, Object.assign(new Error('FBM không trả bản ghi FBM-GIA'), { code: 'FBM_RECORD_NOT_FOUND' }), 'customer_edit_open');
     push.writeGateSave = savedGate; push.FbmSync.readLocal = savedRead; push.FbmSync.logPushRecord = savedLog;
     check(so, 'FBM-048: không thấy bản ghi khi mở form ghi Sheet "không thấy bên FBM" và Log lỗi kèm mã', [sheetRows.map((row) => row.syncStatus), logRows], [[push.FbmSync.SYNC_STATUS.missing], [['error', push.FbmSync.SYNC_STATUS.missing, 'FBM_RECORD_NOT_FOUND']]]);
   }
   // Chỉ còn bản ghi lỗi trong danh sách: sau khi ghi nhận lỗi, lần quét lại không chọn lại nó nên không phát request nào.
   datUngVienDay(push, () => [{ kind: 'edit', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } }]);
-  const bugState = push.FbmSync.stateStart('', 'push', 0);
+  const bugState = push.FbmSync.runOpen({ phase: 'push' });
   bugState.mode = 'push'; bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } });
@@ -312,14 +312,14 @@ async function chay(so) {
       [pushed.FbmSync.pushCandidates('customer').map((c) => c.id), pushed.FbmSync.pushCandidates('activity').map((c) => c.id)],
       [['CUS-OK'], ['ACT-OK']]);
   }
-  const transportState = push.FbmSync.stateStart('', 'read', 0);
+  const transportState = push.FbmSync.runOpen({ phase: 'read' });
   push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-transport-request' }] } });
   check(so, 'HTTP 500 cua request nghiep vu fail-closed va giu cursor', [http500.ok, http500.request, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, null, 'error', 'customer_grid']);
   [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
-    const sessionState = push.FbmSync.stateStart('', 'read', 0);
+    const sessionState = push.FbmSync.runOpen({ phase: 'read' });
     sessionState.phase = 'pull_customer'; sessionState.activeRequestId = 'test-session-request'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
     const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-session-request' }] } });
@@ -347,7 +347,7 @@ async function chay(so) {
     const failure = { code: 'FBM_ERROR', reason: 'FBM từ chối ghi' };
     push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'X-BAN' }, { id: 'X-DOI', ten: 'mới' }] : [];
     giuBanGhi(push, 'nguoidung', 'customer', 'X-BAN', 'Người dùng đang sửa dòng này');
-    const busyState = push.FbmSync.stateStart('', 'push', 0), changedState = push.FbmSync.stateStart('', 'push', 0), goneState = push.FbmSync.stateStart('', 'push', 0);
+    const busyState = push.FbmSync.runOpen({ phase: 'push' }), changedState = push.FbmSync.runOpen({ phase: 'push' }), goneState = push.FbmSync.runOpen({ phase: 'push' });
     const results = [push.FbmSync.markPushError(busyState, errorCandidate('X-BAN'), failure, 'customer_edit_save'), push.FbmSync.markPushError(changedState, errorCandidate('X-DOI', { id: 'X-DOI', ten: 'cũ' }), failure, 'customer_edit_save'), push.FbmSync.markPushError(goneState, errorCandidate('X-MAT'), failure, 'customer_edit_save')];
     push.recordGateRun({ by: 'nguoidung', run: 'run-thu', decide: () => ({ release: [{ entity: 'customer', ids: ['X-BAN'] }] }) });
     const errorLogs = flush();
@@ -396,7 +396,7 @@ async function chay(so) {
     const savedSettings = push.FbmSync.scriptSettings; push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
     push.writeGateSave = (request) => { writes.push(request.records.map((row) => row.id + ':' + row.syncStatus)); return { ok: true }; };
     push.logEvent = (event) => skipLogs.push(event);
-    const batchState = push.FbmSync.stateStart('', 'push', 0);
+    const batchState = push.FbmSync.runOpen({ phase: 'push' });
     batchState.session = pushState.session;
     batchState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     push.FbmSync.stateWrite(batchState);
@@ -444,7 +444,7 @@ async function chay(so) {
   check(so, 'Activity edit comment rong van co NewValue', Object.prototype.hasOwnProperty.call(activityEdit.body.memvars.filter((item) => item.Name === 'comment')[0], 'NewValue'), true);
   check(so, 'Activity edit giu OldValue rong cho field form khong co Row', [activityEdit.body.memvars.filter((item) => item.Name === 'ma_kh')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'fileupload')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'filekey')[0].OldValue], ['', '', '']);
   check(so, 'Activity edit giu null cho field nullable cua fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'ngay_nhac')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'ma_nhom')[0].OldValue], [null, null]);
-  const activityEditState = push.FbmSync.stateStart('', 'push', 0);
+  const activityEditState = push.FbmSync.runOpen({ phase: 'push' });
   push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', activityAuthorized: '1.test' });
   // Mốc là bản FBM đang có (FBM chưa đổi từ lần đồng bộ trước), nên bước mở form được phép lưu.
   const activityEditBase = push.FbmSync.hash({ fbmId: '174813', content: 'Noi dung cu', taskType: 'GD', workDate: '2026-09-09' }, 'activity', {});
@@ -452,7 +452,7 @@ async function chay(so) {
   push.FbmSync.stateWrite(activityEditState);
   const activitySave = push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: (function () { const row = []; row[0] = 174813; row[3] = 'GD'; row[10] = '2026-09-09'; row[15] = 'Noi dung cu'; row[21] = 'Owner'; return row; }()), Showing: "_ticket = 'ticket-1';" } });
   check(so, 'Activity edit tu response mo form tao request type 1', [activitySave.body.type, activitySave.body.memvars.length, push.FbmSync.stateRead().cursor.operation, Object.prototype.hasOwnProperty.call(push.FbmSync.stateRead().cursor, 'oldValues')], [1, 36, 'activity_edit_save', false]);
-  const activityPushState = push.FbmSync.stateStart('', 'push', 0);
+  const activityPushState = push.FbmSync.runOpen({ phase: 'push' });
   activityPushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   push.FbmSync.stateWrite(activityPushState);
   const activityCreate = push.FbmSync.nextPushRequest(activityPushState);
@@ -463,7 +463,7 @@ async function chay(so) {
   push.FbmSync.pendingPushSet('activity', verifyRecord.id, { hSHIN: push.FbmSync.hash(verifyRecord, 'activity', {}), fbmId: '42' });
   push.FbmSync.readLocal = () => [verifyRecord];
   push.writeGateSave = () => ({ ok: true });
-  const verifyState = push.FbmSync.stateStart('', 'push', 0);
+  const verifyState = push.FbmSync.runOpen({ phase: 'push' });
   verifyState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', candidate: { entity: 'activity', kind: 'create', id: verifyRecord.id, record: verifyRecord } };
   push.FbmSync.stateWrite(verifyState);
   const verifyRow = []; verifyRow[0] = 42; verifyRow[3] = 'Goi'; verifyRow[10] = new Date('2026-09-09T00:00:00Z'); verifyRow[15] = 'Noi dung #SC-ACT-VERIFY';
@@ -476,7 +476,7 @@ async function chay(so) {
   push.FbmSync.recordIssues = {};
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: {} });
   check(so, 'G12: lệnh bỏ dấu thành công thì không ghi lại Sheet, không có cảnh báo và đi tiếp', [cleanWrites.length, Object.keys(push.FbmSync.recordIssues).length, push.FbmSync.stateRead().cursor.operation === 'activity_marker_clean'], [0, 0, false]);
-  const cleanFailState = push.FbmSync.stateStart('', 'push', 0);
+  const cleanFailState = push.FbmSync.runOpen({ phase: 'push' });
   cleanFailState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_marker_clean', candidate: { entity: 'activity', kind: 'create', id: verifyRecord.id, record: verifyRecord } };
   push.FbmSync.stateWrite(cleanFailState);
   const truocBoDau = pushLogs.length;
@@ -487,7 +487,7 @@ async function chay(so) {
   const keptRecord = Object.assign({}, verifyRecord, { id: 'ACT-KEPT', syncStatus: push.FbmSync.SYNC_STATUS.pushed });
   push.FbmSync.pendingPushSet('activity', keptRecord.id, { hSHIN: push.FbmSync.hash(keptRecord, 'activity', {}), fbmId: '42' });
   push.FbmSync.readLocal = () => [keptRecord];
-  const keptState = push.FbmSync.stateStart('', 'push', 0);
+  const keptState = push.FbmSync.runOpen({ phase: 'push' });
   keptState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', candidate: { entity: 'activity', kind: 'edit', id: keptRecord.id, record: keptRecord } };
   push.FbmSync.stateWrite(keptState);
   const keptRow = verifyRow.slice(); keptRow[15] = 'Noi dung #SC-ACT-KEPT';
@@ -501,7 +501,7 @@ async function chay(so) {
   boUngVienDay(push);
   push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', userId: '2037', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const createState = push.FbmSync.stateStart('', 'push', 0); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
+  const createState = push.FbmSync.runOpen({ phase: 'push' }); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });
   check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.ok, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();
@@ -511,7 +511,7 @@ async function chay(so) {
   check(so, 'fixture recovery doc dung stt_rec_kh va ma_kh', [recoveryParsed.rows[0].stt_rec_kh, recoveryParsed.rows[0].ma_kh], ['FBM-CREATE', 'ALT00020']);
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Fields: customerFields.map((Name) => ({ AliasName: Name })), Rows: [customerRow], TotalRowCount: 1 } });
   check(so, 'Customer create recovery doi chieu exact va vach ID baseline', [push._recoveryPatch.fbmId, push._recoveryPatch.fbmCustomerCode, push._recoveryPatch.syncStatus, push.FbmSync.stateRead().counts.pushed], ['FBM-CREATE', 'ALT00020', push.FbmSync.SYNC_STATUS.synced, 1]);
-  const lostState = push.FbmSync.stateStart('', 'push', 0);
+  const lostState = push.FbmSync.runOpen({ phase: 'push' });
   lostState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_create', candidate: activityCandidate };
   push.FbmSync.stateWrite(lostState);
   giuBanGhiDongBo(push, 'activity', 'ACT-NEW');

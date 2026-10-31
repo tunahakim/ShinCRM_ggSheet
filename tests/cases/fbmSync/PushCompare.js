@@ -76,7 +76,7 @@ async function chay(so) {
   datUngVienDay({ FbmSync: F }, () => sheet.filter((r) => r.id === 'CUS-B' && r.syncStatus === F.SYNC_STATUS.pending).map((record) => ({ kind: 'edit', id: record.id, record, raw: record, position: 1 })));
   F.customerEditOpenRequest = (fbmId) => ({ url: 'https://fbm.test/edit', body: { values: [fbmId] }, meta: { kind: 'customer_edit_open', id: fbmId } });
   giuBanGhiDongBo(hop, 'customer', 'CUS-A');
-  const xungDot = F.stateStart('', 'push', 0);
+  const xungDot = F.runOpen({ phase: 'push' });
   xungDot.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(xungDot);
   const sauXungDot = F.continuePush(F.stateRead(), formKhach(khachFbm));
@@ -88,7 +88,7 @@ async function chay(so) {
   // 4. FBM đã có đúng dữ liệu ShinCRM: không lưu, ghi mốc mới, đã đồng bộ.
   sheet = [Object.assign({}, khachSheet, { id: 'CUS-A', fbmId: 'A000050753', fbmHash: 'moc-cu', syncStatus: F.SYNC_STATUS.pushing })];
   giuBanGhiDongBo(hop, 'customer', 'CUS-A');
-  const khop = F.stateStart('', 'push', 0);
+  const khop = F.runOpen({ phase: 'push' });
   khop.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(khop);
   F.continuePush(F.stateRead(), formKhach(khachFbm));
@@ -98,7 +98,7 @@ async function chay(so) {
   const fbmDoi = Object.assign({}, khachFbm, { dien_thoai: '0911111111' });
   sheet = [Object.assign({}, khachSheet, { id: 'CUS-A', fbmId: 'A000050753', fbmHash: mocKhach, syncStatus: F.SYNC_STATUS.pushing })];
   giuBanGhiDongBo(hop, 'customer', 'CUS-A');
-  const chiFbm = F.stateStart('', 'push', 0);
+  const chiFbm = F.runOpen({ phase: 'push' });
   chiFbm.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(chiFbm);
   F.continuePush(F.stateRead(), formKhach(fbmDoi));
@@ -106,7 +106,7 @@ async function chay(so) {
 
   // 6. FBM = mốc: lưu như cũ.
   sheet = [Object.assign({}, khachSheet, { id: 'CUS-A', fbmId: 'A000050753', companyName: 'ShinCRM sửa', fbmHash: mocKhach, syncStatus: F.SYNC_STATUS.pushing })];
-  const luu = F.stateStart('', 'push', 0);
+  const luu = F.runOpen({ phase: 'push' });
   luu.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(luu);
   const lenhLuu = F.continuePush(F.stateRead(), formKhach(khachFbm));
@@ -120,7 +120,7 @@ async function chay(so) {
   hop.writeGateSave = (request) => { request.records.forEach((patch) => { gdSheetRows = gdSheetRows.map((r) => r.id === patch.id ? Object.assign({}, r, patch) : r); }); return { ok: true }; };
   datUngVienDay({ FbmSync: F }, () => []);
   giuBanGhiDongBo(hop, 'activity', 'ACT-008600');
-  const gdState = F.stateStart('', 'push', 0);
+  const gdState = F.runOpen({ phase: 'push' });
   gdState.cursor = { kind: 'push_wait', operation: 'activity_edit_open', entity: 'activity', index: 0, candidate: { entity: 'activity', kind: 'edit', id: 'ACT-008600' } };
   F.stateWrite(gdState);
   const gdKetQua = F.continuePush(F.stateRead(), formGiaoDich(Object.assign({}, gdFbm, { details: 'Đồng nghiệp sửa trên FBM' })));
@@ -131,7 +131,7 @@ async function chay(so) {
   gdSheetRows = [daGui];
   F.pendingPushSet('activity', 'ACT-V', { hSHIN: F.hash(daGui, 'activity', GATE), fbmId: '42' });
   giuBanGhiDongBo(hop, 'activity', 'ACT-V');
-  const verify = F.stateStart('', 'push', 0);
+  const verify = F.runOpen({ phase: 'push' });
   verify.cursor = { kind: 'push_wait', operation: 'activity_verify', entity: 'activity', index: 0, candidate: { entity: 'activity', kind: 'edit', id: 'ACT-V' } };
   F.stateWrite(verify);
   const sauVerify = F.continuePush(F.stateRead(), formGiaoDich({ id: 42, ma_cv: 'GD', end_date: new Date('2026-09-09T08:00:00+07:00'), details: 'Người khác sửa ngay sau', owner: 'Owner' }));
