@@ -169,7 +169,7 @@ function chay(so) {
 
   // Lưới sheet hết chỗ. Đây là lỗi đã nổ trên sheet thật, và nó nổ theo cách tệ nhất: `setValues` không tự nới sheet, `getRange`
   // chạm quá hàng cuối là ném lỗi, `flushLog` bắt mọi lỗi rồi đi tiếp — nên log tắt hẳn trong im lặng. Sheet `Log` thật lúc đó
-  // có lưới 7 hàng vì phép đo `measureDeleteRows` đã co lưới xuống, nên hoàn cảnh dựng ở đây là hoàn cảnh có thật, không phải giả định.
+  // có lưới 7 hàng vì một phép đo trên DEV đã co lưới xuống, nên hoàn cảnh dựng ở đây là hoàn cảnh có thật, không phải giả định.
   const chatCho = dungLog();
   nhoiLog(chatCho, [['2026-09-05 08:00:01', 'cũ 1'], ['2026-09-05 08:00:02', 'cũ 2'], ['2026-09-05 08:00:03', 'cũ 3']]);
   chatCho.Log.sheet._datLuoi(chatCho.Log.sheet.getLastRow());

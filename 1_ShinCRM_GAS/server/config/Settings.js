@@ -29,7 +29,7 @@ var SETTINGS = {
   /**
    * Hai dòng cần đọc cách nhau không quá ngần này dòng thì bản đọc Sheet chung đọc chung một lệnh (kể cả các dòng giữa), xa hơn thì đọc riêng. Tài liệu 06 Phần 2 "Bản đọc Sheet của một lần gọi".
    *
-   * Đo trên GAS DEV 2026-10-17 (`measureSheetReadGap`): một lệnh `getValues` lạnh tốn 70–130 ms dù 1 hay 100 dòng, mỗi dòng thêm chỉ 0,2–0,4 ms; hòa vốn khoảng 100 ms / 0,3 ms ≈ 300 dòng.
+   * Đo trên GAS DEV 2026-10-17: một lệnh `getValues` lạnh tốn 70–130 ms dù 1 hay 100 dòng, mỗi dòng thêm chỉ 0,2–0,4 ms; hòa vốn khoảng 100 ms / 0,3 ms ≈ 300 dòng.
    */
   SHEET_READ_MERGE_GAP_ROWS: 300,
   /** Trần số thông báo đang còn trong kho; vượt thì gỡ cái cũ nhất. Tài liệu 10 Phần 8. */

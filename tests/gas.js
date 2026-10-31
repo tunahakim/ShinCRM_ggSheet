@@ -3,7 +3,7 @@
  *
  * Dùng: node tests/gas.js <tênHàm> [--push]
  * Ví dụ: node tests/gas.js verifySheets
- *        node tests/gas.js measureDeleteRows --push
+ *        node tests/gas.js probeLogGate --push
  *
  * Cờ --push đẩy code lên rồi nâng bản triển khai lên phiên bản mới trước khi gọi. Cần nó mỗi khi code vừa đổi,
  * vì bản triển khai ghim vào một phiên bản chứ không tự chạy code mới nhất — đẩy code mà quên nâng bản

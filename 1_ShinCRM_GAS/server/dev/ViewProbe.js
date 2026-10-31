@@ -79,22 +79,4 @@ function viewProbeCreateSheet() {
   }
 }
 
-/** In cờ tô cam đã lưu và màu tab thật của từng sheet quản trị, để nghiệm thu tab cam mà không phải nhìn ảnh. */
-function viewProbeTabTint() {
-  var report = ['viewsStaleRevision: ' + reloadStateRead().viewsStaleRevision + ' · sổ sheet quản trị: ' + JSON.stringify(viewLedgerRead()), 'Màu gốc tab đang bị cam che: ' + JSON.stringify(viewTabTintRead())];
-  shinOpenBook().getSheets().forEach(function (sheet) {
-    if (sheet.getName().charAt(0) !== '!') { return; }
-    report.push(sheet.getName() + ' (id ' + sheet.getSheetId() + '): màu tab ' + (sheet.getTabColor() || 'không màu'));
-  });
-  return report;
-}
 
-/** Dọn khóa DocumentProperties của hai sổ cũ đã thay bằng `viewLedger`; không còn code nào đọc chúng. Chạy lại an toàn. */
-function viewWipeLegacyKeys() {
-  var props = documentProps();
-  var keys = Object.keys(props.getProperties() || {}).filter(function (key) {
-    return key === 'viewRenderedRevisions' || key.indexOf('shinViewInput:') === 0 || key.indexOf('shinViewRevision:') === 0;
-  });
-  keys.forEach(function (key) { props.deleteProperty(key); });
-  return { ok: true, deleted: keys };
-}
