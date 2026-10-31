@@ -247,6 +247,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
     ├── state\State.js            DocumentProperties, cursor và progress.
+    ├── state\Run.js              Đóng Lượt (`runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`) và lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
     ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity.
@@ -371,6 +372,7 @@ tests\
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── RelayResubmit.js        Kiểm nộp lặp qua relay: GAS phát lại request đang chờ, không chạy lại nghiệp vụ; dựng lại lệch bước thì báo lỗi; lượt đã đóng thì trả status
     │   ├── CommandResults.js       Chạy mọi lệnh của bảng lệnh qua controlDispatch như Sidebar và relay gọi thật; bảng ca phải phủ đủ lệnh, loại lượt và mục cài đặt, trường bị cửa ra bỏ là đỏ.
+    │   ├── Run.js                  Kiểm `state/Run.js`: Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
