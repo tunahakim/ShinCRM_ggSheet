@@ -298,6 +298,7 @@ tests\
 │   │   └── mau-ban-ghi.js        Ghi khách hoặc giao dịch mẫu theo mã cột, nhận đối tượng chứ không nhận tham số theo vị trí.
 │   ├── sidebar\                  Mảnh nạp tệp client của Sidebar.
 │   │   ├── nap-sidebar.js        Nạp tệp client theo thứ tự include() của client/Sidebar.html; tệp ngoài Sidebar thì nổ.
+│   │   ├── hop-lien-ket.js       Hộp cho tầng liên kết client/link: đồng hồ, hẹn giờ, DOM giả, callServer trả ngay.
 │   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
@@ -361,7 +362,8 @@ tests\
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
-    ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây, lịch hỏi sau tín hiệu kênh và watchdog.
+    ├── link.js                   Điều phối ba tệp kiểm tầng liên kết của Sidebar.
+    ├── link\                     selectionPoll.js (luật ACK, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây), changeSignal.js (lịch hỏi sau tín hiệu kênh, watchdog kênh im), viewSync.js (đồng bộ sheet quản trị từ Sidebar).
     ├── bindWatcher.js            XHR giả khóa bộ lọc danh sách đen khung /bind, chỉ bắt GET /bind và con trỏ không đọc lại.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.

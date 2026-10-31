@@ -70,7 +70,7 @@ const NHOM_CA = [
   require('./cases/formScreen'),
   require('./cases/actions'),
   require('./cases/extensionBridge'),
-  require('./cases/selectionPoll'),
+  require('./cases/link'),
   require('./cases/viewLanguage'),
   require('./cases/view'),
   require('./cases/triggers'),
