@@ -351,6 +351,19 @@ async function chay(so) {
   check(so, 'Sau đăng nhập: trang FBM lệch thì LOGIN_IDENTITY_MISMATCH; trang thiếu thì đọc lại grid User kèm lệnh tải trang khách hàng, vẫn thiếu thì FBM_PAGE_IDENTITY_MISSING', [
     loginPageWrong.code, loginPageEmpty.ok, loginPageEmpty.request && loginPageEmpty.request.meta.kind, loginPageEmpty.request && loginPageEmpty.request.meta.reloadFbmPage, loginPageEmptyCursor.pageReloaded, loginPageStillEmpty.code
   ], ['LOGIN_IDENTITY_MISMATCH', true, 'identity_user_grid', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', true, 'FBM_PAGE_IDENTITY_MISSING']);
+  // Lần tự đăng nhập vừa hỏng đặt khóa chờ; người dùng bấm "Đăng nhập thử" thành công thì nền phải tự đăng nhập lại được ngay (lời báo khóa chờ hướng dẫn đúng việc này; gặp thật 2026-10-31).
+  const throttledConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  throttledConfig.retryEnabled = true; throttledConfig.lastAttemptAt = Date.now() - 10 * 1000; throttledConfig.lastLoginAt = throttledConfig.lastAttemptAt - 60 * 1000;
+  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(throttledConfig);
+  const throttledBefore = heartbeat.FbmSync.autoLoginCanAttempt().code;
+  heartbeat.FbmSync.statePatch({ runId: 'login-test-run', phase: 'checking_session', cursor: loginPageCursor, activeRequestId: '', deadlineAt: 0 });
+  heartbeat.FbmSync.loginIdentityContinue(heartbeat.FbmSync.stateRead(), loginPageCursor, { ok: true, status: 200, body: loginUserBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2037', pageAccountName: 'Nguoi khac' } } });
+  const throttledAfterMismatch = heartbeat.FbmSync.autoLoginCanAttempt().code;
+  heartbeat.FbmSync.statePatch({ runId: 'login-test-run', phase: 'checking_session', cursor: loginPageCursor, activeRequestId: '', deadlineAt: 0 });
+  const testLoginOk = heartbeat.FbmSync.loginIdentityContinue(heartbeat.FbmSync.stateRead(), loginPageCursor, { ok: true, status: 200, body: loginUserBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2037', pageAccountName: 'Le Tuan Anh' } } });
+  check(so, 'Đăng nhập thử thành công gỡ khóa chờ của lần tự đăng nhập hỏng trước đó; đăng nhập thử lệch tài khoản thì không gỡ', [
+    throttledBefore, throttledAfterMismatch, testLoginOk.code, heartbeat.FbmSync.autoLoginCanAttempt().ok, heartbeat.FbmSync.loginConfigRead().nextRetryAt
+  ], ['AUTO_LOGIN_THROTTLED', 'AUTO_LOGIN_THROTTLED', 'LOGIN_OK', true, 0]);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const policy = heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: true, retryEnabled: false, retryMinutes: 45 });
   check(so, 'chinh sach auto-login chi luu mot noi va cong khai dung metadata', [policy.ok, policy.autoOpenTab, policy.retryEnabled, policy.retryMinutes, heartbeat.FbmSync.loginConfigRead().envelope.ciphertext], [true, true, false, 45, 'ciphertext-long-enough']);
