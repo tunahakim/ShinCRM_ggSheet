@@ -56,6 +56,7 @@ Trước khi gom, mỗi khung được so từng bản chép; bản lệch ghi r
 | `tests/lib/schema-node.js` | `moiNode` (`slots.js`, `uiSchema.js`, giống hệt) | giữ nguyên thân hàm |
 | `tests/lib/khung-chung.js` | `nghi` (`RelayLoop.js`, `SidebarDrive.js`, giống hệt), `loi` (`Control.js`, `RunPickup.js`, giống hệt) | giữ nguyên thân hàm |
 
+- Tên thật khi làm (khung xếp vào thư mục con theo trách nhiệm): kho giả `tests/lib/gas/kho-thuoc-tinh.js`, một lần gọi `tests/lib/gas/lan-goi.js`, đọc Log `tests/lib/gas/doc-log.js`, bản ghi mẫu `tests/lib/gas/mau-ban-ghi.js`, nạp Sidebar `tests/lib/sidebar/nap-sidebar.js`, `schema-node.js` ở `tests/lib/sidebar/`, nạp Extension `tests/lib/ext/nap-extension.js`. Chưa dựng vì chỉ tệp ca FBM dùng: `ext/chrome-gia.js`, `fbm/tra-loi.js`, `khung-chung.js` (`nghi`, `loi`); B4 dựng khi tách tệp của mình (dòng việc ở checklist refactor FBM).
 - Trùng tên nhưng là việc khác, không gộp, chỉ ghi lại: `dungCanh` (7 tệp dựng 7 cảnh khác nhau; phần nạp client đi qua `sidebar-gia.js`), `taoHop` (4 bản, 3 bản chung khuôn "Sheet giả 4 bảng + một khách" nhưng khác dữ liệu), `banSao`, `dem`, `dungDay`, `giaoDich`, `quaCau`, `taoBoTest`. `noiNen` hai bản khác có chủ ý: bản ở `AutoLogin.js` đi qua `publicResult` để kiểm cửa ra; thuộc hộp GAS FBM nên để B4.
 - Mỗi khung có tệp test riêng ở `tests/cases/lib/` (ví dụ kho giả trả `null` cho khóa chưa có, Chrome giả trả đúng phiên bản manifest, `sidebar-gia` nạp đúng thứ tự `include()`).
 - Chưa xóa bản chép trong các tệp test B4 đang sửa. Các tệp test không thuộc B4 (danh sách ở mục 4.3) chuyển sang khung chung ngay trong phiên này.
@@ -84,9 +85,13 @@ Ca kiểm chính các luật: mã mẫu vi phạm trong bộ nhớ phải đỏ.
 - Xóa 38 hàm đo một lần đã ghi số đo (31 tên bỏ khỏi `DEV_RUNNER_ALLOWED`), trong đó xóa trọn 7 tệp: `MeasureChunk.js`, `MeasureLog.js`, `ReloadJournalProbe.js`, `ReloadRefactorProbe.js`, `SaveBreakdownProbe.js`, `SheetReadGapProbe.js`, `ViewRenderProbe.js`. Bỏ 2 tên mất định nghĩa khỏi `DEV_RUNNER_ALLOWED`. Sửa các chú thích còn nhắc tên đã xóa (`tests/gas.js`, `tests/cases/logGate.js`, `server/config/Settings.js`).
 - `FbmPerfProbe.js` tách thành `FbmPerfProbe.js` (bộ bọc đo, bật/tắt, báo cáo) và `FbmPerfScope.js` (dựng và gỡ dữ liệu đo); `fbmPerfWrap` gặp tên hàm không có thì ném lỗi thay vì bỏ qua, bỏ 3 tên đã mất và các mốc client không còn nơi phát.
 - `FbmSyncFixture.js` tách phần chạy nền thử sang `FbmSyncBackgroundProbe.js`; xóa phần sửa dữ liệu một lần (`fbmRepairFalseMissing*`).
-- `ReloadMatrixProbe.js`: tách `reloadPayloadProbe` sang tệp riêng; chạy `node tests/gas.js reloadMatrixProbe --push` để xem hai phép so còn đối chiếu `renderAllManagedViews` đúng hay sai, sai thì sửa theo thiết kế hiện tại.
+- `ReloadMatrixProbe.js`: tách thành `server/dev/reload/` (`ReloadProbeKit.js` đồ dùng chung, `ReloadMatrixProbe.js`, `ReloadPayloadProbe.js`). Hai phép so cũ chờ `shinOnEdit` vẽ ngay và trả `rendered`; thiết kế hiện tại chỉ gắn cờ `controls` trong sổ vẽ cho đúng sheet bị sửa, lượt vẽ chạy sau. Đã đổi hai ca sang kiểm quyết định `view-control` đúng một sheet và cờ `controls` bật từ tắt; còn chạy `node tests/gas.js reloadMatrixProbe --push` trên DEV.
 - Các tệp FBM ở `server/dev/` có thể B4 đang sửa (đổi tên `stateStart`...): hỏi phiên B4 trước khi chạm; B4 đang sửa tệp nào thì để B4 làm phần của tệp đó.
-- 18 hàm dò còn trong `DEV_RUNNER_ALLOWED` mà không tài liệu nào nhắc (`fbmPrepareAltTest`, `fbmSeedActivityConflict`, `dumpSheetGrid`, `seedFake*`...): trình chủ dự án từng nhóm có còn dùng không, không tự xóa.
+- Hàm dò còn trong `DEV_RUNNER_ALLOWED` mà không tài liệu nào nhắc (đếm lại khi làm: 24), trình chủ dự án từng nhóm có còn dùng không, không tự xóa:
+  - Đọc và dọn Sheet DEV: `dumpSheetGrid`, `dumpCoreSheetHead`, `dumpNamedRanges`, `wipeNamedRanges`, `smokeDiag`, `probeBookBinding`.
+  - Dữ liệu giả: `seedFakeData`, `seedFakeCategory`, `seedFakeCategoryMappings`.
+  - Sheet quản trị tạm: `viewProbeCreateSheet`, `viewProbeCreateRender`.
+  - FBM (chờ B4): `fbmPrepareAltTest`, `fbmDevResetApprovalThreshold`, `fbmSeedActivityConflict`, `fbmDevMarkConflict`, `fbmDevClearConflict`, `fbmProbeCreateCustomer`, `fbmAllowTestCreateCustomer`, `fbmRequeueCreateCustomerPush`, `fbmRequeueCreateCustomerConflict`, `fbmProbePendingPushes`, `fbmDevReleaseUnsentRequest`, `fbmProbeCustomerActivities`, `fbmProbeConflicts`.
 - Phát hiện ngoài `server/dev/`: `runEntryPoint` (`server/entry/EntryPoint.js`, mã chạy thật) dò `typeof devPerfBegin === 'function'`, tức mã chạy thật biết tên hàm dev. Ghi vào danh mục dọn trước production; không sửa ở phiên này vì là cửa vào lõi.
 
 ### 4.5 Công cụ xuống dòng `check`
@@ -230,15 +235,18 @@ Cột cuối là các trách nhiệm đang lẫn trong tệp; bước B hoặc p
 ## 7. Checklist
 
 - [x] Đo kích thước, xem cấu trúc 94 tệp, xếp nhóm; so các bản chép khung test; kiểm kê `server/dev/`.
-- [ ] Chủ dự án duyệt kế hoạch.
+- [x] Chủ dự án duyệt kế hoạch.
 - [ ] Hàm dò DEV đo `PropertiesService` thật với chuỗi rỗng và khóa chưa có; ghi số đo vào mục 4.1.
-- [ ] Khung `tests/lib/` (mục 4.1) và test của từng khung ở `tests/cases/lib/`; test; commit.
-- [ ] `tests/cases/testRules.js` (mục 4.2) với danh sách ngoại lệ hiện có; test; commit.
-- [ ] Chuyển các tệp test ngoài vùng B4 sang khung chung, hạ ngoại lệ; mọi ca lộ đỏ thì dừng trình gốc lỗi; commit.
-- [ ] Tách `LogGate.js`; test; đẩy DEV chạy `probeLogGate`; commit.
-- [ ] Tách `viewRenderer.js`, `selectionPoll.js`; test; commit.
-- [ ] Hỏi B4 về các tệp FBM ở `server/dev/`; dọn và tách `server/dev/` (mục 4.4); chạy `reloadMatrixProbe` trên DEV; commit.
-- [ ] Trình chủ dự án 18 hàm dò không có tài liệu nhắc.
-- [ ] `tests/tools/wrapChecks.js`; chạy trên tệp test của phiên này; commit.
-- [ ] `tests/cases/fileSize.js`; test; commit.
-- [ ] Ghi dòng việc vào checklist refactor FBM và Todo mục 3, mục 4 (mục 4.7); cập nhật `Cây thư mục code.md`; đổi tiền tố tệp này.
+- [x] Khung `tests/lib/` (mục 4.1) và test của từng khung ở `tests/cases/lib/`; test; commit.
+- [x] `tests/cases/testRules.js` (mục 4.2) với danh sách ngoại lệ hiện có; test; commit.
+- [x] Chuyển các tệp test ngoài vùng B4 sang khung chung, hạ ngoại lệ; mọi ca lộ đỏ thì dừng trình gốc lỗi; commit.
+- [x] Tách `LogGate.js`; test; commit.
+- [ ] Đẩy DEV chạy `probeLogGate` (chờ phiên điều phối cho đẩy DEV).
+- [x] Tách `viewRenderer.js`, `selectionPoll.js`; test; commit.
+- [x] Dọn phần không FBM của `server/dev/` (7 tệp, 2 hàm ở `ViewProbe.js`, 22 tên ở `DEV_RUNNER_ALLOWED`); tách `ReloadMatrixProbe.js`, sửa hai phép so; commit.
+- [ ] Chạy `reloadMatrixProbe` trên DEV (chờ phiên điều phối cho đẩy DEV).
+- [ ] Tệp FBM ở `server/dev/` (mục 4.4: xóa 11 hàm đo một lần, tách `FbmPerfProbe.js` và `FbmSyncFixture.js`, `fbmPerfWrap` ném lỗi khi tên mất): đã hỏi phiên điều phối, chờ trả lời.
+- [ ] Trình chủ dự án 24 hàm dò không có tài liệu nhắc (danh sách ở mục 4.4); chờ chủ dự án trả lời.
+- [x] `tests/tools/wrapChecks.js`; chạy trên tệp test của phiên này; commit.
+- [x] `tests/cases/fileSize.js`; test; commit.
+- [x] Ghi dòng việc vào checklist refactor FBM và Todo mục 3, mục 4 (mục 4.7); cập nhật `Cây thư mục code.md`; đổi tiền tố tệp này.
