@@ -376,7 +376,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_resume_failure'); }
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
-  return { ok: true, code: cursor.resumeHeartbeat ? 'AUTO_LOGIN_OK' : '', request: resumed, status: FbmSync.statusView(), autoLogin: true };
+  return { ok: true, code: cursor.resumeHeartbeat ? 'AUTO_LOGIN_OK' : '', request: resumed, status: FbmSync.statusView() };
 };
 
 /** Đặt cursor login trước request đọc thất bại; request ghi không được tự lặp. */

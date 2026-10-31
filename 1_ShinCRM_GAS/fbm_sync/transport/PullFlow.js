@@ -442,7 +442,7 @@ FbmSync.continueStep = function (rawResponse) {
     state.message = 'Phiên nền đã dừng sau response hiện tại; có thể chạy phiên thủ công.';
     state.metadata.manualPending = null;
     FbmSync.stateWrite(state);
-    return { ok: true, request: null, status: FbmSync.statusView(), manualReady: true };
+    return { ok: true, request: null, status: FbmSync.statusView() };
   }
   if (FbmSync.applyTransportSession && FbmSync.applyTransportSession(state, rawResponse)) { FbmSync.stateWrite(state); }
   if (typeof FbmSync.continueSessionGate === 'function') {
@@ -471,7 +471,7 @@ FbmSync.continueStep = function (rawResponse) {
       }
       if (cursor.operation === 'customer_create_save' && cursor.candidate.kind === 'create' && typeof FbmSync.customerCreateRecoveryRequest === 'function') {
         var recovery = FbmSync.customerCreateRecoveryRequest(state, cursor);
-        if (recovery) { return { ok: true, request: FbmSync.nextEnvelope(recovery), status: FbmSync.statusView(), recovering: true }; }
+        if (recovery) { return { ok: true, request: FbmSync.nextEnvelope(recovery), status: FbmSync.statusView() }; }
       }
       return FbmSync.continueAfterPushError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
     }

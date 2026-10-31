@@ -338,7 +338,7 @@ FbmSync.markPushSkippedBatch = function (state, candidates) {
 FbmSync.continueAfterPushError = function (state, cursor, failure) {
   if (cursor && cursor.operation === 'activity_marker_clean') {
     var cleanNext = FbmSync.finishMarkerClean(state, cursor, typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate || {}) : cursor.candidate, failure || 'Lỗi không rõ.');
-    return { ok: true, request: cleanNext ? FbmSync.nextEnvelope(cleanNext) : null, status: FbmSync.statusView(), continued: true };
+    return { ok: true, request: cleanNext ? FbmSync.nextEnvelope(cleanNext) : null, status: FbmSync.statusView() };
   }
   var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate;
   if (candidate) { FbmSync.markPushError(state, candidate, failure, cursor.operation); }
@@ -349,7 +349,7 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
   state.message = 'Đã ghi nhận lỗi đẩy ' + String(cursor.entity || '') + ' ' + String(candidate && candidate.id || '') + '; đang xử lý bản ghi tiếp theo.';
   FbmSync.stateWrite(state);
   var next = FbmSync.nextPushRequest(state);
-  return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView(), continued: true };
+  return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView() };
 };
 
 /** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. */

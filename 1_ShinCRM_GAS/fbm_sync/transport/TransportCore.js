@@ -255,7 +255,7 @@ FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
   if (!request) { return { ok: false, code: String(state.lastFailureCode || 'SESSION_EXPIRED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
   try { envelope = FbmSync.nextEnvelope(request); } catch (envelopeError) { return FbmSync.sessionGateFailClosed(state, envelopeError); }
   if (!envelope) { return { ok: false, code: String(state.lastFailureCode || 'FBM_SESSION_GATE_FAILED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
-  return { ok: true, request: envelope, status: FbmSync.statusView(), autoLogin: true };
+  return { ok: true, request: envelope, status: FbmSync.statusView() };
 };
 /**
  * Chuyển state sang bước probe phiên và ghi lại chỗ quay về: cursor, phase và entity luôn đi cùng nhau.
@@ -345,7 +345,7 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   var request = FbmSync.sessionGateStart(current, cursor), envelope;
   if (!request) { return { ok: false, code: String(current.lastFailureCode || 'SESSION_PROBE_FAILED'), request: null, status: FbmSync.statusView(), error: current.lastError }; }
   envelope = FbmSync.nextEnvelope(request);
-  return envelope ? { ok: true, request: envelope, status: FbmSync.statusView(), autoLogin: true } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
+  return envelope ? { ok: true, request: envelope, status: FbmSync.statusView() } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
 };
 /** Chỉ thử lại một lần khi Extension báo không có tab; policy vẫn do GAS quyết định. */
 FbmSync.sessionGateTransportRetry = function (state, requestId, code, message) {
