@@ -72,7 +72,7 @@ const NHOM_CA = [
   require('./cases/extensionBridge'),
   require('./cases/selectionPoll'),
   require('./cases/viewLanguage'),
-  require('./cases/viewRenderer'),
+  require('./cases/view'),
   require('./cases/triggers'),
   require('./cases/menu'),
   require('./cases/refresh'),

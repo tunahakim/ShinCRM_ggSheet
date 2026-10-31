@@ -302,6 +302,8 @@ tests\
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
 │   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
+│   ├── view\
+│   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
 │   └── quet\                     Công cụ quét mã nguồn.
 │       ├── liet-tep.js           Liệt kê tệp GAS theo đuôi, đi cả thư mục con.
 │       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
@@ -400,7 +402,9 @@ tests\
     │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
     │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
-    │   └── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
+    │   ├── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
+    │   ├── view.js                Điều phối ba tệp kiểm của server/view.
+    │   └── view\                  viewSheetRenderer.js (vẽ theo giao dịch sống gần nhất, cột động, lọc, sắp), viewLedger.js (lượt vẽ hỏng không tự đánh thức, mỗi lỗi một dòng Log), viewTabTint.js (tab cam khi sheet cũ).
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
