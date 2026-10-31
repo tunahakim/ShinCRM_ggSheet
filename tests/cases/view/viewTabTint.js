@@ -24,7 +24,9 @@ function chay(so) {
     [base.view.getTabColor(), care.getTabColor(), base.view._tabColors.length, care._tabColors.length, base.nen.book.getSheetByName('Customer')._tabColors.length],
     ['#ff9900', '#ff9900', 1, 2, 0]);
   ghi();
-  check(so, 'signal thứ hai khi sheet vẫn cũ không gọi setTabColor', [base.view._tabColors.length, care._tabColors.length], [1, 2]);
+  check(so, 'signal thứ hai khi sheet vẫn cũ không gọi setTabColor',
+    [base.view._tabColors.length, care._tabColors.length],
+    [1, 2]);
 
   hop.renderViewSheet('!Lead');
   check(so, 'vẽ xong trả "không màu" cho sheet vừa vẽ, sheet chưa vẽ giữ cam',
@@ -34,7 +36,9 @@ function chay(so) {
   hop.viewRenderPlan = function () { trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0002'], allViews: true })); return realPlan.apply(this, arguments); };
   hop.renderViewSheet('!Chăm sóc');
   hop.viewRenderPlan = realPlan;
-  check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu', [hop.viewIsStale('!Chăm sóc'), care.getTabColor()], [true, '#ff9900']);
+  check(so, 'signal đến giữa lượt vẽ để sheet vẫn cũ thì không trả màu',
+    [hop.viewIsStale('!Chăm sóc'), care.getTabColor()],
+    [true, '#ff9900']);
   hop.renderViewSheet('!Chăm sóc');
   check(so, 'vẽ lại xong trả đúng màu người dùng tự đặt', care.getTabColor(), '#00ff00');
 
@@ -57,7 +61,9 @@ function chay(so) {
   base.nen.book.getSheets = realGetSheets;
   base.view.getTabColor = realGetTab[0];
   care.getTabColor = realGetTab[1];
-  check(so, 'lần ghi khi không có sheet ! nào đang mới không đọc màu tab, không liệt kê sheet', dem, { getTabColor: 0, getSheets: 0 });
+  check(so, 'lần ghi khi không có sheet ! nào đang mới không đọc màu tab, không liệt kê sheet',
+    dem,
+    { getTabColor: 0, getSheets: 0 });
 
   // Người dùng tự tô tab lúc sheet đang cũ (Google không báo): vẽ xong giữ màu đó làm màu gốc, không đè bằng màu đã cất.
   care.setTabColor('#123456');
@@ -82,7 +88,9 @@ function chay(so) {
   base.nen.book.setActiveSheet(base.view);
   const luuSidebar = (source) => trongLanGoi(hop, () => hop.writeCommitAfterSuccess({ source: source, surface: 'record', entity: 'customer', recordIds: ['KH0001'] }));
   luuSidebar('user');
-  check(so, 'lưu từ Sidebar, công tắc bật: không tô sheet ! đang xem, vẫn tô sheet ! khác', [base.view.getTabColor(), care.getTabColor()], [null, '#ff9900']);
+  check(so, 'lưu từ Sidebar, công tắc bật: không tô sheet ! đang xem, vẫn tô sheet ! khác',
+    [base.view.getTabColor(), care.getTabColor()],
+    [null, '#ff9900']);
   vẽHết();
   hop.userPrefsWrite('autoRenderView', false);
   luuSidebar('user');

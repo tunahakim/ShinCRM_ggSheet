@@ -94,13 +94,17 @@ async function chay(so) {
   check(so, 'bấm lại vào ô khi danh sách đã ẩn thì bung lại', [popup.hidden, hang().length], [false, 3]);
 
   dom.root.listeners.click({ target: hang()[1] });
-  check(so, 'bấm chuột vào một dòng thì chọn khách đó và ẩn danh sách ngay, không đợi rời ô', [chon.slice(), popup.hidden], [['CUS-3', 'CUS-2'], true]);
+  check(so, 'bấm chuột vào một dòng thì chọn khách đó và ẩn danh sách ngay, không đợi rời ô',
+    [chon.slice(), popup.hidden],
+    [['CUS-3', 'CUS-2'], true]);
 
   phim('ArrowDown', 40);
   check(so, 'mũi tên xuống khi danh sách đã ẩn thì bung lại', popup.hidden, false);
 
   phim('Escape', 27);
-  check(so, 'Esc lúc danh sách đang mở chỉ ẩn danh sách, hộp và chữ còn nguyên', [popup.hidden, panel.hidden, input.value], [true, false, 'cong ty']);
+  check(so, 'Esc lúc danh sách đang mở chỉ ẩn danh sách, hộp và chữ còn nguyên',
+    [popup.hidden, panel.hidden, input.value],
+    [true, false, 'cong ty']);
   phim('Escape', 27);
   check(so, 'Esc lúc danh sách đã ẩn thì đóng hộp nhưng giữ chữ', [panel.hidden, input.value], [true, 'cong ty']);
 
@@ -110,7 +114,9 @@ async function chay(so) {
   input.select = () => { daBoiDen += 1; };
   dom.root.listeners.focusin({ target: input });
   await doi(80);
-  check(so, 'mở lại hộp có chữ cũ thì danh sách bung theo và chữ được bôi đen', [popup.hidden, hang().length, daBoiDen], [false, 3, 1]);
+  check(so, 'mở lại hộp có chữ cũ thì danh sách bung theo và chữ được bôi đen',
+    [popup.hidden, hang().length, daBoiDen],
+    [false, 3, 1]);
 
   phim('Escape', 27); phim('Escape', 27);
   dom.root.listeners.focusout({ target: input });
@@ -118,10 +124,14 @@ async function chay(so) {
   input.focus();
   dom.root.listeners.focusin({ target: input });
   await doi(260);
-  check(so, 'đóng hộp rồi mở lại ngay: hẹn giờ rời ô của lần trước không ẩn nhầm danh sách vừa bung', popup.hidden, false);
+  check(so, 'đóng hộp rồi mở lại ngay: hẹn giờ rời ô của lần trước không ẩn nhầm danh sách vừa bung',
+    popup.hidden,
+    false);
 
   go(c, 'zzz');
-  check(so, 'không khách nào khớp thì danh sách vẫn mở (với dòng báo) và không dòng nào sáng', [popup.hidden, hang().length, sang()], [false, 0, []]);
+  check(so, 'không khách nào khớp thì danh sách vẫn mở (với dòng báo) và không dòng nào sáng',
+    [popup.hidden, hang().length, sang()],
+    [false, 0, []]);
   phim('Enter');
   check(so, 'Enter lúc không dòng nào sáng chỉ ẩn danh sách và không chọn ai', [chon.length, popup.hidden], [2, true]);
 
@@ -167,7 +177,9 @@ async function chayCombo(so) {
     [popup.hidden, hang().length, hang().filter((r) => r.classList.contains('is-active')).length, hang().every((r) => r.getAttribute('role') === 'option')], [false, 2, 0, true]);
 
   const enterTrong = phim('Enter');
-  check(so, 'ô danh mục: Enter lúc không dòng nào sáng chỉ ẩn danh sách và nhường phím cho bước nhảy ô', [popup.hidden, enterTrong.chan === true, doiO.length], [true, false, 0]);
+  check(so, 'ô danh mục: Enter lúc không dòng nào sáng chỉ ẩn danh sách và nhường phím cho bước nhảy ô',
+    [popup.hidden, enterTrong.chan === true, doiO.length],
+    [true, false, 0]);
 
   phim('ArrowDown', 40);
   phim('ArrowDown', 40);
@@ -177,7 +189,9 @@ async function chayCombo(so) {
 
   dom.root.listeners.click({ target: input });
   dom.root.listeners.click({ target: hang()[1] });
-  check(so, 'ô danh mục: bấm chuột vào dòng điền giá trị đó và ẩn danh sách', [input.value, popup.hidden], ['Mục B', true]);
+  check(so, 'ô danh mục: bấm chuột vào dòng điền giá trị đó và ẩn danh sách',
+    [input.value, popup.hidden],
+    ['Mục B', true]);
 
   phim('ArrowDown', 40);
   phim('Escape', 27);

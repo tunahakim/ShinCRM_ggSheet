@@ -305,6 +305,8 @@ tests\
 │       ├── liet-tep.js           Liệt kê tệp GAS theo đuôi, đi cả thư mục con.
 │       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
 │       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
+├── tools\
+│   └── wrapChecks.js             Xuống dòng lệnh check( dài thành ba phần (sổ và nhãn, giá trị nhận, giá trị mong đợi); chỉ đụng lệnh một dòng bốn đối số. Ngưỡng độ dài ở đầu tệp.
 ├── contracts\
 │   ├── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
 │   └── gasExtensionContract.js    Hợp đồng dữ liệu GAS–Extension và cách tính mã phiên bản hợp đồng.
@@ -400,6 +402,7 @@ tests\
     │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
     │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
+    │   ├── wrapChecks.js          Kiểm công cụ tests/tools/wrapChecks.js: chỉ cắt lệnh check dài bốn đối số, không cắt nhầm dấu phẩy trong chuỗi hay ngoặc.
     │   ├── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
     │   ├── view.js                Điều phối ba tệp kiểm của server/view.
     │   └── view\                  viewSheetRenderer.js (vẽ theo giao dịch sống gần nhất, cột động, lọc, sắp), viewLedger.js (lượt vẽ hỏng không tự đánh thức, mỗi lỗi một dòng Log), viewTabTint.js (tab cam khi sheet cũ).

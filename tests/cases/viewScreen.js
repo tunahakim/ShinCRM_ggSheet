@@ -153,9 +153,13 @@ function chay(so) {
       els['sidebar-info'].innerHTML.indexOf('shin-notice-warning') > 0,
       els['sidebar-body'].innerHTML],
     ['', true, true, '']);
-  check(so, 'không có khách thì vẽ lại riêng card lịch sử bỏ qua, không ném lỗi thiếu card', hop.screenViewActivityCard(), null);
+  check(so, 'không có khách thì vẽ lại riêng card lịch sử bỏ qua, không ném lỗi thiếu card',
+    hop.screenViewActivityCard(),
+    null);
 
-  check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách', hop.screenViewResolveSelectionMiss(), '');
+  check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách',
+    hop.screenViewResolveSelectionMiss(),
+    '');
   hop.Store.upsertRecord('customer', Object.assign({}, KHACH[0], { id: 'CUS-999999', companyName: 'Khách vừa thêm' }));
   check(so, 'lượt nạp mang khách vừa thêm về thì tự chuyển sang khách đó và bỏ câu báo',
     [hop.screenViewResolveSelectionMiss(), hop.ScreenState.currentCustomerId, hop.ScreenState.selectionMiss],
@@ -166,7 +170,9 @@ function chay(so) {
     [els['sidebar-info'].innerHTML.indexOf('Hàng này không có khách nào.') > 0, els['sidebar-info'].innerHTML.indexOf('shin-notice-pending') > 0, els['sidebar-body'].innerHTML],
     [true, true, '']);
   hop.screenViewSetCustomer('CUS-000001');
-  check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất', [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0], [null, true]);
+  check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất',
+    [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0],
+    [null, true]);
 
   hop.screenStateOpenForm('activityForm', 'activity', {});
   check(so, 'đang mở form thì báo hàng không ra khách bị bỏ qua, khách đang gõ dở giữ nguyên',

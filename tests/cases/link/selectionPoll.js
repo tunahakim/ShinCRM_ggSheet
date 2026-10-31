@@ -14,18 +14,24 @@ async function chay(so) {
   hop._clock.now = 4000; hop.selectionPollClearTimer(); hop.selectionPollTick();
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'fallback không có Extension gọi đúng một request GAS', hop._calls, ['probeSelectionAndReload']);
-  check(so, 'cờ nghiệm thu loading bật: lời hỏi nền fallback cũng hiện loading ngay khi gửi', hop._options[0].silent, false);
+  check(so, 'cờ nghiệm thu loading bật: lời hỏi nền fallback cũng hiện loading ngay khi gửi',
+    hop._options[0].silent,
+    false);
   check(so, 'fallback giữ nhịp nhanh khi vị trí thay đổi', chayHenGio(hop, 2000), 2000);
 
   const chong = dungHopLienKet(); batDauLienKet(chong); chong._clock.now = 4000; chong.selectionPollClearTimer();
   let resolveProbe = null;
   chong.callServer = (name, args, options) => { chong._calls.push({ name, args, options }); return { then: (ok) => { resolveProbe = ok; return { then: () => null }; } }; };
   chong.selectionPollTick(); chong.selectionPollTick();
-  check(so, 'request selection đang bay thì nhịp sau không tạo request chồng', [chong._calls.length, chong.SELECTION_POLL.inFlight, typeof resolveProbe], [1, true, 'function']);
+  check(so, 'request selection đang bay thì nhịp sau không tạo request chồng',
+    [chong._calls.length, chong.SELECTION_POLL.inFlight, typeof resolveProbe],
+    [1, true, 'function']);
 
   const stable = dungHopLienKet(); batDauLienKet(stable); stable._clock.now = 4000;
   for (let i = 0; i < 4; i += 1) { stable.selectionPollClearTimer(); stable.selectionPollTick(); await new Promise((resolve) => setImmediate(resolve)); }
-  check(so, 'vị trí ổn định chuyển fallback sang nhịp nghỉ sáu giây', [stable.SELECTION_POLL.stableCount, stable.SELECTION_POLL.intervalMs], [3, 6000]);
+  check(so, 'vị trí ổn định chuyển fallback sang nhịp nghỉ sáu giây',
+    [stable.SELECTION_POLL.stableCount, stable.SELECTION_POLL.intervalMs],
+    [3, 6000]);
 
   const safety = dungHopLienKet(); batDauLienKet(safety);
   const safetyTimer = Array.from(safety._timers.values()).find((item) => item.delay === 60000);
@@ -33,18 +39,24 @@ async function chay(so) {
   safety._calls = [];
   safety.callServer = (name, args, options) => { safety._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   safetyTimer.fn();
-  check(so, 'cờ nghiệm thu loading bật: safety request hiện loading ngay khi gửi', [safety._calls[0].name, safety._calls[0].options.silent], ['probeSelectionAndReload', false]);
+  check(so, 'cờ nghiệm thu loading bật: safety request hiện loading ngay khi gửi',
+    [safety._calls[0].name, safety._calls[0].options.silent],
+    ['probeSelectionAndReload', false]);
 
   const safetyVisibleProbe = dungHopLienKet(); batDauLienKet(safetyVisibleProbe); safetyVisibleProbe.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = false;
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.callServer = (name, args, options) => { safetyVisibleProbe._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   const visibleSafetyTimer = Array.from(safetyVisibleProbe._timers.values()).find((item) => item.delay === 60000);
   visibleSafetyTimer.fn();
-  check(so, 'cờ nghiệm thu loading tắt: safety request chạy im lặng (tài liệu 05)', safetyVisibleProbe._calls[0].options.silent, true);
+  check(so, 'cờ nghiệm thu loading tắt: safety request chạy im lặng (tài liệu 05)',
+    safetyVisibleProbe._calls[0].options.silent,
+    true);
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.SHEET_LINK_SELECTION_PENDING = null;
   safetyVisibleProbe.sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
-  check(so, 'cờ nghiệm thu loading tắt: lời hỏi đổi vị trí cũng im lặng', [safetyVisibleProbe._calls.length, safetyVisibleProbe._calls[0].options.silent], [1, true]);
+  check(so, 'cờ nghiệm thu loading tắt: lời hỏi đổi vị trí cũng im lặng',
+    [safetyVisibleProbe._calls.length, safetyVisibleProbe._calls[0].options.silent],
+    [1, true]);
 
   const plan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
   const quiet = dungHopLienKet(); batDauLienKet(quiet); quiet._calls = [];
@@ -80,17 +92,23 @@ async function chay(so) {
   check(so, 'rời Customer khi kênh sống và không có tín hiệu chờ: không hỏi GAS', (await roiKho()).calls, 0);
   check(so, 'rời Customer khi còn tín hiệu chờ: hỏi ngay một lượt thay mốc đầu, giữ mốc sau để tự xét',
     await roiKho((h) => h.sheetLinkOnMessage({ origin: h.SHEET_LINK_ORIGIN, data: { action: 'CRM_RELOAD', nonce: h.SHEET_LINK_NONCE, signal: 'channel' } })), { calls: 1, hen: [12000] });
-  check(so, 'rời Customer khi kênh chết: vẫn hỏi ngay', (await roiKho((h) => { h.CHANGE_SIGNAL.dead = true; })).calls, 1);
+  check(so, 'rời Customer khi kênh chết: vẫn hỏi ngay',
+    (await roiKho((h) => { h.CHANGE_SIGNAL.dead = true; })).calls,
+    1);
 
   const appFocus = dungHopLienKet(); batDauLienKet(appFocus); appFocus._calls = [];
   appFocus.SHEET_LINK_LAST_ACK = 5000; appFocus._clock.now = 5001;
   appFocus.selectionPollWake();
   check(so, 'focus/chuyển app không tự gọi GAS khi Extension còn sống', appFocus._calls, []);
   appFocus._documentListeners.visibilitychange();
-  check(so, 'tab hiện lại sinh đúng một lời hỏi qua cổng chung, kể cả khi Extension sống', appFocus._calls, ['probeSelectionAndReload']);
+  check(so, 'tab hiện lại sinh đúng một lời hỏi qua cổng chung, kể cả khi Extension sống',
+    appFocus._calls,
+    ['probeSelectionAndReload']);
   appFocus.SHEET_LINK_SELECTION_PENDING = null;
   appFocus._windowListeners.online();
-  check(so, 'mạng nối lại sinh đúng một lời hỏi qua cổng chung', appFocus._calls, ['probeSelectionAndReload', 'probeSelectionAndReload']);
+  check(so, 'mạng nối lại sinh đúng một lời hỏi qua cổng chung',
+    appFocus._calls,
+    ['probeSelectionAndReload', 'probeSelectionAndReload']);
 
   const gasSelection = (customerId, cellRef) => ({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', cellRef, row: 4, col: 3, rowEnd: 4, colEnd: 3, customerId } });
   const readerDown = dungHopLienKet(); batDauLienKet(readerDown); readerDown._calls = [];
@@ -220,7 +238,9 @@ async function chay(so) {
   };
   queuedWake.sheetLinkProbeSelectionAndReload('first-wake');
   queuedWake.sheetLinkProbeSelectionAndReload('second-wake');
-  check(so, 'wake thứ hai trong lúc request bay chỉ được giữ như tín hiệu vận chuyển', [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED], [1, true]);
+  check(so, 'wake thứ hai trong lúc request bay chỉ được giữ như tín hiệu vận chuyển',
+    [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED],
+    [1, true]);
   releaseFirstProbe({
     ok: true,
     reload: { revision: 1 },
@@ -229,7 +249,9 @@ async function chay(so) {
   });
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'wake thứ hai được gửi thành request mới để GAS đọc ReloadState mới nhất', [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED], [2, false]);
+  check(so, 'wake thứ hai được gửi thành request mới để GAS đọc ReloadState mới nhất',
+    [probeCalls, queuedWake.SHEET_LINK_SELECTION_WAKE_QUEUED],
+    [2, false]);
 
   const staleSelection = dungHopLienKet(); batDauLienKet(staleSelection);
   staleSelection.Store.hasCustomer = () => true;
@@ -256,7 +278,9 @@ async function chay(so) {
   direct.ACTIONS.setCurrentCustomer = ({ pick }) => { direct._picked.push(pick); };
   direct.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!Lead', row: 4, col: 2, reads: [{ status: 'ok', matched: true, value: 'KH000001' }] });
   check(so, 'context Extension gửi reads được Sidebar đối chiếu thành mã khách', direct._picked, ['KH000001']);
-  check(so, 'thiếu reads thì không đoán khách từ tọa độ', direct.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }), '');
+  check(so, 'thiếu reads thì không đoán khách từ tọa độ',
+    direct.sheetLinkCustomerIdFromContext({ sheetName: '!Lead', row: 4, col: 2 }),
+    '');
 
   const immediate = dungHopLienKet(); batDauLienKet(immediate); immediate.SHEET_LINK_LAST_SHEET = 'Customer';
   immediate.Store.hasCustomer = () => true; immediate._picked = [];
@@ -285,19 +309,27 @@ async function chay(so) {
   const codeRead = (status, value) => ({ token: 'Customer:@CUS_MA_KH', status, matched: true, valueAddress: 'A5', value });
   const notFound = missHop('Customer');
   notFound.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'cus-999999')] });
-  check(so, 'nhấp hàng có mã chưa có trong RAM báo không tìm thấy đúng mã, không đổi khách', [notFound._misses, notFound._picked], [[{ kind: 'notFound', code: 'CUS-999999' }], []]);
+  check(so, 'nhấp hàng có mã chưa có trong RAM báo không tìm thấy đúng mã, không đổi khách',
+    [notFound._misses, notFound._picked],
+    [[{ kind: 'notFound', code: 'CUS-999999' }], []]);
   notFound.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A6', row: 6, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
   check(so, 'nhấp lại hàng cùng mã thiếu không vẽ lại lần hai', notFound._misses.length, 1);
 
   const header = missHop('Customer');
   header.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A1', row: 1, col: 1, reads: [codeRead('ok', '@CUS_MA_KH')] });
-  check(so, 'một luật cho mọi hàng: hàng tiêu đề mang giá trị không phải mã có trong RAM thì báo không tìm thấy đúng giá trị đó, không giữ khách cũ', [header._misses, header._picked], [[{ kind: 'notFound', code: '@CUS_MA_KH' }], []]);
+  check(so, 'một luật cho mọi hàng: hàng tiêu đề mang giá trị không phải mã có trong RAM thì báo không tìm thấy đúng giá trị đó, không giữ khách cũ',
+    [header._misses, header._picked],
+    [[{ kind: 'notFound', code: '@CUS_MA_KH' }], []]);
   const viewHeader = missHop('!lead');
   viewHeader.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: '!lead', cellRef: 'I3', row: 3, col: 9, readStatus: 'ok', reads: [codeRead('ok', '')] });
-  check(so, 'ô mã của hàng đang chọn rỗng (hàng lọc sheet quản trị) thì báo rỗng', viewHeader._misses, [{ kind: 'empty' }]);
+  check(so, 'ô mã của hàng đang chọn rỗng (hàng lọc sheet quản trị) thì báo rỗng',
+    viewHeader._misses,
+    [{ kind: 'empty' }]);
   const categoryHeader = missHop('Category');
   categoryHeader.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Category', cellRef: 'A1', row: 1, col: 1, readStatus: 'ok', reads: [] });
-  check(so, 'sheet không có cột mã khách (Category), Extension đọc trọn: giá trị rỗng nên báo rỗng', categoryHeader._misses, [{ kind: 'empty' }]);
+  check(so, 'sheet không có cột mã khách (Category), Extension đọc trọn: giá trị rỗng nên báo rỗng',
+    categoryHeader._misses,
+    [{ kind: 'empty' }]);
   const unread = missHop('Category');
   unread.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Category', cellRef: 'A1', row: 1, col: 1, readStatus: 'unavailable', reads: [] });
   check(so, 'Extension chưa đọc được hàng thì chưa báo gì, chờ GAS đọc thay', unread._misses, []);
@@ -313,30 +345,40 @@ async function chay(so) {
   check(so, 'GAS không đọc ô mã (customerCell rỗng) thì chưa báo gì', gasMiss._misses, []);
   gasMiss._misses = []; gasMiss.ScreenState.selectionMiss = null;
   gasMiss.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 9, col: 1, rowEnd: 9, colEnd: 1, customerId: 'CUS-777777', customerIdChanged: true, customerCell: 'value' }, { fromProbe: true });
-  check(so, 'GAS đọc được mã chưa có trong RAM thì báo không tìm thấy', gasMiss._misses, [{ kind: 'notFound', code: 'CUS-777777' }]);
+  check(so, 'GAS đọc được mã chưa có trong RAM thì báo không tìm thấy',
+    gasMiss._misses,
+    [{ kind: 'notFound', code: 'CUS-777777' }]);
 
   const freeEmpty = missHop('Nháp');
   freeEmpty.SHEET_LINK_READ_PLAN = { Customer: [], '!': [] };
   freeEmpty.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Nháp', cellRef: 'C7', row: 7, col: 3, readStatus: 'unavailable', reads: [codeRead('unavailable', '')] });
-  check(so, 'sheet tự do: ô mã vắng dưới cột mã đúng tiêu đề là hàng không có khách', freeEmpty._misses, [{ kind: 'empty' }]);
+  check(so, 'sheet tự do: ô mã vắng dưới cột mã đúng tiêu đề là hàng không có khách',
+    freeEmpty._misses,
+    [{ kind: 'empty' }]);
 
   const missForm = missHop('Customer'); missForm.ScreenState.screen = 'customerForm';
   missForm.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
   const missSync = missHop('Customer'); missSync.FBM_SYNC_CLIENT = { active: true };
   missSync.sheetLinkApplyContext({ spreadsheetId: 'sheet-1', sheetName: 'Customer', cellRef: 'A5', row: 5, col: 1, reads: [codeRead('ok', 'CUS-999999')] });
-  check(so, 'form đang mở hoặc đang đồng bộ FBM thì nhấp hàng không ra khách không đổi màn', [missForm._misses, missSync._misses], [[], []]);
+  check(so, 'form đang mở hoặc đang đồng bộ FBM thì nhấp hàng không ra khách không đổi màn',
+    [missForm._misses, missSync._misses],
+    [[], []]);
 
   const taiLai = dungHopLienKet(); batDauLienKet(taiLai); taiLai.SHEET_LINK_SEQ = 99;
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_HANDSHAKE_ACK', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi' } });
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-moi', spreadsheetId: 'sheet-1', seq: 1, sheetName: 'Customer', row: 4, col: 1 } });
   const seqSauContextMoi = taiLai.SHEET_LINK_SEQ;
   taiLai.sheetLinkOnMessage({ origin: taiLai.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: taiLai.SHEET_LINK_NONCE, sessionId: 'extension-cu', spreadsheetId: 'sheet-1', seq: 200, sheetName: 'Customer', row: 5, col: 1 } });
-  check(so, 'Extension tải lại đặt lại seq và bỏ context của phiên cũ', [seqSauContextMoi, taiLai.SHEET_LINK_SEQ], [1, 1]);
+  check(so, 'Extension tải lại đặt lại seq và bỏ context của phiên cũ',
+    [seqSauContextMoi, taiLai.SHEET_LINK_SEQ],
+    [1, 1]);
 
   const noPayload = dungHopLienKet(); batDauLienKet(noPayload);
   noPayload.SHEET_LINK_LAST_SEEN_REVISION = 3;
   await noPayload.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer' } }, processedRevision: 0 });
-  check(so, 'không có gói (hoãn vì bản nháp, hoặc không gì mới) thì giữ nguyên revision đã thấy để lời hỏi sau nhận đủ', noPayload.SHEET_LINK_LAST_SEEN_REVISION, 3);
+  check(so, 'không có gói (hoãn vì bản nháp, hoặc không gì mới) thì giữ nguyên revision đã thấy để lời hỏi sau nhận đủ',
+    noPayload.SHEET_LINK_LAST_SEEN_REVISION,
+    3);
 
   {
     // Form đang mở là đang khóa: mã của mọi khung trong ngăn xếp, kể cả form chưa gõ và form thêm mới, chứ không chỉ khung đã cất bản nháp.
@@ -346,7 +388,9 @@ async function chay(so) {
       { record: { id: 'CUS-000001' }, draft: {} },
       { record: { id: 'CUS-000001' }, draft: { note: 'x' } }
     ];
-    check(so, 'mã gửi GAS là mọi form đang mở, không trùng, kể cả form chưa gõ và mã xem trước của form thêm mới', khoa.sheetLinkLocalDraftInput(), { recordIds: ['ACT-000035', 'CUS-000001'] });
+    check(so, 'mã gửi GAS là mọi form đang mở, không trùng, kể cả form chưa gõ và mã xem trước của form thêm mới',
+      khoa.sheetLinkLocalDraftInput(),
+      { recordIds: ['ACT-000035', 'CUS-000001'] });
 
     khoa._calls = [];
     await khoa.sheetLinkApplyDecisionResult({ reload: { revision: 7 }, decision: { ram: { action: 'defer', mode: 'parts', deferKind: 'records', deferredRecordIds: ['CUS-000001'] } }, processedRevision: 0 });
@@ -400,7 +444,9 @@ async function chay(so) {
     origin: failedEvent.SHEET_LINK_ORIGIN,
     data: { action: 'CRM_RELOAD', nonce: failedEvent.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', revision: 9 }
   });
-  check(so, 'CRM_RELOAD không đánh dấu revision trước khi công việc thành công', failedEvent.SHEET_LINK_LAST_SEEN_REVISION, 0);
+  check(so, 'CRM_RELOAD không đánh dấu revision trước khi công việc thành công',
+    failedEvent.SHEET_LINK_LAST_SEEN_REVISION,
+    0);
 }
 
 module.exports = { chay: chay };

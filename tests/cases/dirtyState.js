@@ -67,7 +67,9 @@ function chay(so) {
     check(so, 'cửa vào lồng trong cửa vào không ghi nhận ở lớp trong', long.reloadStateRead().revision, 0);
     long.dirtyStateMarkSignal({ customer: ['KH0002'] });
   });
-  check(so, 'lớp ngoài cùng ghi nhận một lần cho cả hai lớp', [long.reloadStateRead().revision, long.reloadJournalRead().entries[0].customer], [1, ['KH0001', 'KH0002']]);
+  check(so, 'lớp ngoài cùng ghi nhận một lần cho cả hai lớp',
+    [long.reloadStateRead().revision, long.reloadJournalRead().entries[0].customer],
+    [1, ['KH0001', 'KH0002']]);
 
   const rong = dungHop({ sheets: ['Log'] }).hop;
   check(so, 'quyết định không có signal không thêm gì vào danh sách chờ và trả false',
@@ -105,7 +107,9 @@ function chay(so) {
     [nenByte.props.reloadJournal.length <= 200, soByte.floor, soByte.entries[0].r - 1], [true, soByte.floor, soByte.floor]);
   byte.SETTINGS.RELOAD_JOURNAL_MAX_BYTES = 10;
   trongLanGoi(byte, () => byte.dirtyStateMarkSignal({ customer: ['KH-CUOI'] }));
-  check(so, 'dòng mới nhất luôn ở lại dù một mình nó đã quá dung lượng', byte.reloadJournalRead().entries.map((entry) => entry.r), [7]);
+  check(so, 'dòng mới nhất luôn ở lại dù một mình nó đã quá dung lượng',
+    byte.reloadJournalRead().entries.map((entry) => entry.r),
+    [7]);
 
   section('Mốc cũ của sheet quản trị');
 
@@ -116,14 +120,22 @@ function chay(so) {
   check(so, 'signal dữ liệu kho làm mọi sheet đã vẽ trước đó thành cũ',
     [stale.reloadStateRead().viewsStaleRevision, stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')], [1, true, true]);
   stale.viewLedgerWrite('!Lead', { data: 1, ok: true });
-  check(so, 'vẽ một sheet chỉ làm sheet đó mới, sheet khác vẫn cũ', [stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')], [false, true]);
+  check(so, 'vẽ một sheet chỉ làm sheet đó mới, sheet khác vẫn cũ',
+    [stale.viewIsStale('!Lead'), stale.viewIsStale('!Chăm sóc')],
+    [false, true]);
   stale.viewLedgerWrite('!Lead', { data: 1, ok: false, error: 'lỗi lọc', at: 0 });
-  check(so, 'lượt thử hỏng ở đúng dữ liệu mới nhất vẫn là sheet cũ (tab giữ cam, Sidebar báo)', stale.viewIsStale('!Lead'), true);
-  check(so, 'sheet chưa từng vẽ là cũ kể cả khi chưa có signal nào', dungHop({ sheets: ['Log'] }).hop.viewIsStale('!Mới'), true);
+  check(so, 'lượt thử hỏng ở đúng dữ liệu mới nhất vẫn là sheet cũ (tab giữ cam, Sidebar báo)',
+    stale.viewIsStale('!Lead'),
+    true);
+  check(so, 'sheet chưa từng vẽ là cũ kể cả khi chưa có signal nào',
+    dungHop({ sheets: ['Log'] }).hop.viewIsStale('!Mới'),
+    true);
   trongLanGoi(stale, () => stale.dirtyStateMarkSignal({ customer: ['KH0002'] }));
   check(so, 'signal không mang allViews không đụng mốc cũ của view', stale.reloadStateRead().viewsStaleRevision, 1);
 
-  check(so, 'probeDirtyState in được trên tệp mới', dungHop({ sheets: ['Log'] }).hop.probeDirtyState()[0].indexOf('revision: 0') === 0, true);
+  check(so, 'probeDirtyState in được trên tệp mới',
+    dungHop({ sheets: ['Log'] }).hop.probeDirtyState()[0].indexOf('revision: 0') === 0,
+    true);
 
   return so;
 }

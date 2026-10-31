@@ -24,7 +24,9 @@ function chay(so) {
 
   // Bẫy `window.screen`: giữ trong một object thì gán mới ăn. Đây là lý do tệp không dùng ba biến rời.
   hop.ScreenState.screen = 'customerForm';
-  check(so, 'gán màn vào object thì ăn thật, không bị getter của trình duyệt chặn', hop.ScreenState.screen, 'customerForm');
+  check(so, 'gán màn vào object thì ăn thật, không bị getter của trình duyệt chặn',
+    hop.ScreenState.screen,
+    'customerForm');
   hop.screenStateReset();
 
   check(so, 'đổi khách trả về mã đã chuẩn hóa thành chuỗi', hop.screenStateSetCustomer(17), '17');
@@ -41,7 +43,9 @@ function chay(so) {
 
   hop.screenStateSetDraft({ content: 'đang gõ dở' });
   hop.screenStateOpenForm('noteForm', 'customer', { note: 'ghi chú cũ' });
-  check(so, 'form lồng: ngăn xếp hai tầng, màn là tầng trên', [hop.ScreenState.formStack.length, hop.ScreenState.screen], [2, 'noteForm']);
+  check(so, 'form lồng: ngăn xếp hai tầng, màn là tầng trên',
+    [hop.ScreenState.formStack.length, hop.ScreenState.screen],
+    [2, 'noteForm']);
 
   const conLai = hop.screenStateCloseForm();
   check(so, 'đóng form lồng thì đỉnh mới là form cần vẽ lại, mang theo bản nháp của chính nó',

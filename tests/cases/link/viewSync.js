@@ -161,7 +161,9 @@ async function chay(so) {
   cho.callServer = () => syncValue({ ok: true, selection: null, customerId: '', reload: { revision: 0 }, notices: [{ key: 'entry_failure:shinOnEdit', title: 'lỗi nền' }] });
   batDauLienKet(cho);
   await cho.sheetLinkProbeSelectionAndReload('wake');
-  check(so, 'lời hỏi chọn ô và nạp lại mang thông báo thì Sidebar đưa vào cửa noticeServerApply', daHien, [[{ key: 'entry_failure:shinOnEdit', title: 'lỗi nền' }]]);
+  check(so, 'lời hỏi chọn ô và nạp lại mang thông báo thì Sidebar đưa vào cửa noticeServerApply',
+    daHien,
+    [[{ key: 'entry_failure:shinOnEdit', title: 'lỗi nền' }]]);
 }
 
 

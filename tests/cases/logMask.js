@@ -28,7 +28,9 @@ function chay(so) {
 
   // `monkey` chứa `key` nên bị che oan. Ghi hẳn thành phép kiểm chứ không coi là lỗi: danh sách khớp theo chuỗi con là
   // lựa chọn có ý thức, và chiều sai của nó là che oan một ô — chiều sai kia là để lọt một bí mật.
-  check(so, 'khớp theo chuỗi con nên có che oan, và đó là chiều sai chấp nhận được', hop.logIsSecretKey('monkey'), true);
+  check(so, 'khớp theo chuỗi con nên có che oan, và đó là chiều sai chấp nhận được',
+    hop.logIsSecretKey('monkey'),
+    true);
 
   check(so, 'nhãn che giữ độ dài, bốn ký tự đầu và một mã băm bốn chữ số hex',
     /^\[30 ký tự · ASP\. · #[0-9a-f]{4}\]$/.test(hop.logMaskLabel(BI_MAT)), true);
@@ -41,7 +43,9 @@ function chay(so) {
 
   const trongChuoi = hop.logMaskText('cookie=' + BI_MAT + '; ghiChu=không phải bí mật');
   check(so, 'che được bí mật nằm trong chuỗi dạng khóa=giá trị', trongChuoi.indexOf('abc123def456'), -1);
-  check(so, 'khóa thường trong cùng chuỗi đó vẫn nguyên vẹn', trongChuoi.indexOf('ghiChu=không phải bí mật') !== -1, true);
+  check(so, 'khóa thường trong cùng chuỗi đó vẫn nguyên vẹn',
+    trongChuoi.indexOf('ghiChu=không phải bí mật') !== -1,
+    true);
   check(so, 'che được cả dạng có nháy kép bọc giá trị',
     hop.logMaskText('token: "xyz987"').indexOf('xyz987'), -1);
   check(so, 'chuỗi không có tên khóa nào thì để nguyên — giới hạn đã biết của phép che theo chuỗi',
@@ -64,7 +68,9 @@ function chay(so) {
 
   const cheThuong = hop.logDetailToText({ cookie: BI_MAT, ghiChu: 'ô này không phải bí mật' }, 'core');
   check(so, 'chế độ thường: chi tiết ra chuỗi đã che', cheThuong.indexOf('abc123def456'), -1);
-  check(so, 'chế độ thường: khóa thường vẫn đọc được nguyên văn', cheThuong.indexOf('ô này không phải bí mật') !== -1, true);
+  check(so, 'chế độ thường: khóa thường vẫn đọc được nguyên văn',
+    cheThuong.indexOf('ô này không phải bí mật') !== -1,
+    true);
   check(so, 'chi tiết rỗng thì ra chuỗi rỗng, không ra chữ "undefined"',
     [hop.logDetailToText(undefined, 'core'), hop.logDetailToText(null, 'core'), hop.logDetailToText('', 'core')],
     ['', '', '']);

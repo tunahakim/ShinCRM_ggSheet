@@ -84,7 +84,9 @@ function chay(so) {
   check(so, 'bản ghi mới mang cả ba giá trị kế tục và báo tên ba trường đã kế tục',
     [moi.record.priority, moi.record.dueAt, moi.record.product, moi.carried.sort()],
     ['Cao', '2026-09-10', 'Thép hình H', ['dueAt', 'priority', 'product']]);
-  check(so, 'trường khai ngầm định today thì có ngày, không để trống', /^\d{4}-\d{2}-\d{2}$/.test(moi.record.workDate), true);
+  check(so, 'trường khai ngầm định today thì có ngày, không để trống',
+    /^\d{4}-\d{2}-\d{2}$/.test(moi.record.workDate),
+    true);
 
   const rong = hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000404' });
   check(so, 'khách không có giao dịch thì carried rỗng — không báo kế tục một giá trị rỗng', rong.carried.length, 0);
@@ -98,7 +100,9 @@ function chay(so) {
   check(so, 'form khách trống điền ngầm định đã lưu, seed đè được ngầm định gõ tay',
     [hop.fieldLogicNewRecord('customer', { province: 'Đà Nẵng' }).record.verifyStatus, hop.fieldLogicNewRecord('customer', { province: 'Đà Nẵng' }).record.province],
     ['Chưa xác thực', 'Đà Nẵng']);
-  check(so, 'ngầm định của thực thể này không lan sang thực thể khác', hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000001' }).record.verifyStatus, undefined);
+  check(so, 'ngầm định của thực thể này không lan sang thực thể khác',
+    hop.fieldLogicNewRecord('activity', { customerId: 'CUS-000001' }).record.verifyStatus,
+    undefined);
   hop.Store.config = configCu;
 
   // Bảng DEFAULTS thiếu tên là lỗi bảng khai, phải hét lên chứ không im lặng để trống ô.

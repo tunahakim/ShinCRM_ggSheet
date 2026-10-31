@@ -252,7 +252,9 @@ function chayAnVaLoc(so, base) {
 
   const hong = (patch, nhan) => {
     const ket = docLead(trangLead(patch), [4]).ketQua[0];
-    check(so, nhan + ' thì không đọc được, không trả ok', [ket.status, ket.reason], ['unavailable', 'LIVE_AXIS_NOT_FOUND']);
+    check(so, nhan + ' thì không đọc được, không trả ok',
+      [ket.status, ket.reason],
+      ['unavailable', 'LIVE_AXIS_NOT_FOUND']);
   };
   hong({ Ax: { dims: trucDu('9', CUSTOMER) } }, 'không có bảng quy đổi của sheet');
   hong({ Ax: { dims: [truc('7', LEAD.length, AN_HANG), truc('7', LEAD[0].length)] } }, 'bảng cột dài khác số cột của lưới');

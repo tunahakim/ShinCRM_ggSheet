@@ -65,14 +65,18 @@ function chay(so) {
   check(so, 'các phép kiểm chưa có đầu vào thì được KỂ TÊN, không bỏ qua trong im lặng',
     boQua.length > 0, true);
 
-  check(so, 'ba khách vào bộ nhớ, khóa là mã khách', Object.keys(hop.Store.customers).sort(), ['KH0001', 'KH0002', 'KH0003']);
+  check(so, 'ba khách vào bộ nhớ, khóa là mã khách',
+    Object.keys(hop.Store.customers).sort(),
+    ['KH0001', 'KH0002', 'KH0003']);
   check(so, 'bản ghi là object có khóa là TÊN TRƯỜNG — hình dạng đường truyền chỉ tồn tại tới đây',
     hop.Store.getCustomer('KH0001').companyName, 'Công ty Xây dựng Đông Á');
   check(so, 'SETTINGS đi cùng gói nạp và được gán một lần', hop.SETTINGS.CHUNK_ROWS, nen.hop.SETTINGS.CHUNK_ROWS);
   check(so, 'bảy danh mục vào bộ nhớ, và Config bốn khối cộng khối tham số cũng vậy',
     [Object.keys(hop.Store.categories).length, Object.keys(hop.Store.config).sort()],
     [7, ['counters', 'defaults', 'params', 'sheetSchema', 'sort']]);
-  check(so, 'cờ nạp giao dịch bật ở loading ngay sau ingestCore, chưa phải ready', hop.Store.activityState, hop.STORE_LOADING);
+  check(so, 'cờ nạp giao dịch bật ở loading ngay sau ingestCore, chưa phải ready',
+    hop.Store.activityState,
+    hop.STORE_LOADING);
 
   return chayTraCuu(so, nen, hop, hangDau);
 }
@@ -100,11 +104,17 @@ function chayTraCuu(so, nen, hop, hangDau) {
   check(so, 'getActivities của mã không tồn tại cũng trả mảng rỗng, không ném', hop.Store.getActivities('KH9999'), []);
 
   // Chỉ mục tìm kiếm: khách còn sống trước, khách đã xóa sau, và bỏ dấu thì vẫn khớp.
-  check(so, 'tìm không dấu vẫn khớp tên có dấu', hop.Store.searchCustomers('dong a').map((k) => k.id), ['KH0001', 'KH0002']);
+  check(so, 'tìm không dấu vẫn khớp tên có dấu',
+    hop.Store.searchCustomers('dong a').map((k) => k.id),
+    ['KH0001', 'KH0002']);
   check(so, 'khách còn sống đứng trước khách đã xóa, dù khách đã xóa nằm trước trong chỉ mục',
     hop.Store.searchCustomers('dong a')[0].recordStatus, 'active');
-  check(so, 'ô từ khóa tìm kiếm cũng vào chỉ mục, vì nó khai searchable', hop.Store.searchCustomers('xd').map((k) => k.id), ['KH0001']);
-  check(so, 'tra bằng mã số thuế khớp, vì mã số thuế cũng khai searchable', hop.Store.searchCustomers('0101234567').map((k) => k.id), ['KH0001']);
+  check(so, 'ô từ khóa tìm kiếm cũng vào chỉ mục, vì nó khai searchable',
+    hop.Store.searchCustomers('xd').map((k) => k.id),
+    ['KH0001']);
+  check(so, 'tra bằng mã số thuế khớp, vì mã số thuế cũng khai searchable',
+    hop.Store.searchCustomers('0101234567').map((k) => k.id),
+    ['KH0001']);
   check(so, 'chuỗi rỗng trả về rỗng chứ không trả cả danh sách', hop.Store.searchCustomers('  '), []);
   check(so, 'limit cắt đúng số lượng', hop.Store.searchCustomers('dong a', 1).length, 1);
 
@@ -150,7 +160,9 @@ function chayTraCuu(so, nen, hop, hangDau) {
 
   check(so, 'mã số thuế của khách ĐÃ XÓA vẫn tính là đã dùng — cửa ghi đếm cả hàng đó trên sheet',
     hop.Store.isTaxNumberTaken('0109999999'), true);
-  check(so, 'exceptId cho bản ghi khỏi tự báo trùng với chính nó', hop.Store.isTaxNumberTaken('0109999999', 'KH0002'), false);
+  check(so, 'exceptId cho bản ghi khỏi tự báo trùng với chính nó',
+    hop.Store.isTaxNumberTaken('0109999999', 'KH0002'),
+    false);
   check(so, 'mã số thuế để trống không phải mã số thuế bị chiếm', hop.Store.isTaxNumberTaken(''), false);
 
   return chayGiaoDich(so, nen, hop);
@@ -173,10 +185,14 @@ function chayGiaoDich(so, nen, hop) {
   } while (cursor);
 
   check(so, 'nạp đủ 5 giao dịch qua vòng lặp gói', soBanGhi, 5);
-  check(so, 'cờ vẫn ở loading khi chưa gọi ingestActivityDone — vì mảng chưa sắp', hop.Store.activityState, hop.STORE_LOADING);
+  check(so, 'cờ vẫn ở loading khi chưa gọi ingestActivityDone — vì mảng chưa sắp',
+    hop.Store.activityState,
+    hop.STORE_LOADING);
 
   const soMang = hop.ingestActivityDone();
-  check(so, 'sắp xong hai mảng của hai khách rồi mới bật cờ ready', [soMang, hop.Store.activityState], [2, hop.STORE_READY]);
+  check(so, 'sắp xong hai mảng của hai khách rồi mới bật cờ ready',
+    [soMang, hop.Store.activityState],
+    [2, hop.STORE_READY]);
 
   check(so, 'giao dịch xếp ngày giảm dần, hòa ngày thì mã giảm dần — so bằng chuỗi, không đổi sang Date',
     hop.Store.getActivities('KH0001').map((g) => g.id), ['GD0004', 'GD0003', 'GD0002', 'GD0001']);
@@ -198,13 +214,17 @@ function chayGiaoDich(so, nen, hop) {
   check(so, 'và không còn khớp tên cũ', hop.Store.searchCustomers('hai phong'), []);
 
   hop.Store.upsertRecord('activity', { id: 'GD0006', customerId: 'KH0001', workDate: '2026-09-06', recordStatus: 'active' });
-  check(so, 'thêm một giao dịch mới thì nó vào đúng đầu mảng đã sắp', hop.Store.getActivities('KH0001')[0].id, 'GD0006');
+  check(so, 'thêm một giao dịch mới thì nó vào đúng đầu mảng đã sắp',
+    hop.Store.getActivities('KH0001')[0].id,
+    'GD0006');
   check(so, 'và nó thành lần làm việc gần nhất', hop.Store.getLatestActivity('KH0001').id, 'GD0006');
 
   hop.Store.upsertRecord('activity', { id: 'GD0006', customerId: 'KH0001', workDate: '2026-09-06', recordStatus: 'deleted' });
   check(so, 'ghi đè cùng mã thì thay tại chỗ, không sinh bản thứ hai',
     hop.Store.getActivities('KH0001').filter((g) => g.id === 'GD0006').length, 1);
-  check(so, 'xóa mềm bản ghi mới nhất thì lần gần nhất lùi về bản trước', hop.Store.getLatestActivity('KH0001').id, 'GD0003');
+  check(so, 'xóa mềm bản ghi mới nhất thì lần gần nhất lùi về bản trước',
+    hop.Store.getLatestActivity('KH0001').id,
+    'GD0003');
 
   checkThrows(so, 'upsertRecord với thực thể lạ thì ném lỗi kèm danh sách thực thể có thật',
     () => hop.Store.upsertRecord('khach', { id: 'X' }), 'Chỉ có "customer" và "activity"');

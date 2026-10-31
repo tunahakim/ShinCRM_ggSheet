@@ -18,7 +18,9 @@ function chay(so) {
   ], [true, true, true]);
   check(so, 'liet: thư mục không có thì trả mảng rỗng', liet('khongCoThuMucNay', '.js'), []);
 
-  check(so, 'lopCoLuat: lấy mọi lớp trong bộ chọn nhiều mắt, không lặp', lopCoLuat('.a .b, .c:hover { x: 1 }\n.a { y: 2 }').sort(), ['a', 'b', 'c']);
+  check(so, 'lopCoLuat: lấy mọi lớp trong bộ chọn nhiều mắt, không lặp',
+    lopCoLuat('.a .b, .c:hover { x: 1 }\n.a { y: 2 }').sort(),
+    ['a', 'b', 'c']);
 
   const v = (line) => ({ line: line, text: 'x' });
   const thuc = { 'moi.js': [v(1)], 'tang.js': [v(1), v(2)], 'giam.js': [v(3)], 'bang.js': [v(4)] };

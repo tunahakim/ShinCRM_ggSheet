@@ -27,8 +27,12 @@ async function chay(so) {
     activity: { fields: ['id', 'customerId'], rows: [['GD2', 'KH1']] },
     affectedCustomerIds: ['KH1', 'KH2'],
   }, ['GD2']);
-  check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ', [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2], [['KH1'], 'KH1', undefined]);
-  check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt', [hop.Store.activitiesByCustomer.KH1.length, hop.rendered], [1, true]);
+  check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ',
+    [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2],
+    [['KH1'], 'KH1', undefined]);
+  check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt',
+    [hop.Store.activitiesByCustomer.KH1.length, hop.rendered],
+    [1, true]);
 
   hop.Store.categories = { leadSource: ['Cũ'] };
   hop.refreshCategoryApply({ ok: true, categories: { leadSource: ['Mới'] } });

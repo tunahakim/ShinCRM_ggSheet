@@ -81,7 +81,9 @@ function chay(so) {
     const trongKhoa = hop.documentLockRun(() => hop.entityRowCount('customer'));
     return [truoc, vanCu, trongKhoa];
   });
-  check(so, 'vừa cầm khóa thì bỏ bản đọc: số dòng trong khóa thấy dòng tiến trình khác vừa thêm', truocVaSauKhoa, [2, 2, 3]);
+  check(so, 'vừa cầm khóa thì bỏ bản đọc: số dòng trong khóa thấy dòng tiến trình khác vừa thêm',
+    truocVaSauKhoa,
+    [2, 2, 3]);
 
   const sauGhi = trongLanGoi(hop, () => {
     const truoc = hop.entityRowCount('customer');
@@ -95,7 +97,9 @@ function chay(so) {
     const kq = hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001', 'KH000002'] });
     return [kq.ok, kq.hard, kq.soft.rows.length, hop.entityRowCount('customer')];
   });
-  check(so, 'cửa xóa: xóa hẳn một dòng rồi đọc lại dòng xóa mềm đúng, số dòng sau đó giảm một', sauXoa, [true, ['KH000001'], 1, 3]);
+  check(so, 'cửa xóa: xóa hẳn một dòng rồi đọc lại dòng xóa mềm đúng, số dòng sau đó giảm một',
+    sauXoa,
+    [true, ['KH000001'], 1, 3]);
 
   section('Bản đọc Sheet chung — đọc tập dòng, cửa ghi sửa bản đọc, gộp lệnh ghi');
 
@@ -145,7 +149,9 @@ function chay(so) {
     nenGop.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000003' }, { id: 'KH000003', phone: '0987000004' }], source: 'pull' });
     return [lienNhau, nenGop.dem.setValues - truoc - lienNhau];
   });
-  check(so, 'gộp ghi: hai bản ghi dòng liền nhau cùng tập cột ghi một lệnh; hai dòng cách nhau thì mỗi dòng một lệnh, không ghi đè dòng giữa', gop, [1, 2]);
+  check(so, 'gộp ghi: hai bản ghi dòng liền nhau cùng tập cột ghi một lệnh; hai dòng cách nhau thì mỗi dòng một lệnh, không ghi đè dòng giữa',
+    gop,
+    [1, 2]);
   const cotPhoneGop = nenGop.Customer.codes.indexOf(nenGop.hop.DATA_SCHEMA.customer.phone.code) + 1;
   check(so, 'gộp ghi: mỗi dòng nhận đúng giá trị của bản ghi mình, dòng giữa giữ nguyên',
     [4, 5, 6].map((row) => String(nenGop.Customer.sheet.getRange(row, cotPhoneGop).getValue()).replace(/^'/, '')), ['0987000003', '0987000001', '0987000004']);
@@ -167,12 +173,16 @@ function chay(so) {
     hf.FbmSync.readCategoryGate();
     return [lai, docKhach.n, docDanhMuc.n];
   });
-  check(so, 'trong một lần gọi: readLocal và danh mục gọi nhiều lần chỉ đọc mỗi sheet một lần; bên gọi sửa record không làm bẩn lần đọc sau', motLanGoi, ['KH000001', 1, 1]);
+  check(so, 'trong một lần gọi: readLocal và danh mục gọi nhiều lần chỉ đọc mỗi sheet một lần; bên gọi sửa record không làm bẩn lần đọc sau',
+    motLanGoi,
+    ['KH000001', 1, 1]);
 
   docKhach.n = 0;
   const snapshot = hf.FbmSync.withLocalSnapshot(() => { hf.FbmSync.readLocal('customer'); hf.FbmSync.readLocal('customer'); return docKhach.n; });
   hf.FbmSync.readLocal('customer');
-  check(so, 'preflight ngoài lần gọi (withLocalSnapshot) đọc Sheet một lần, hết khối thì lần sau đọc mới', [snapshot, docKhach.n], [1, 2]);
+  check(so, 'preflight ngoài lần gọi (withLocalSnapshot) đọc Sheet một lần, hết khối thì lần sau đọc mới',
+    [snapshot, docKhach.n],
+    [1, 2]);
 
   docKhach.n = 0;
   const sauGhiFbm = trongLanGoi(hf, () => hf.documentLockRun(() => {
@@ -194,7 +204,9 @@ function chay(so) {
     });
     return [ra.ok, fbm.stubs._khoa.dem - khoaTruoc, docKhach.n];
   });
-  check(so, 'Cửa bản ghi: đọc dòng, quyết và ghi trong một lần cầm khóa tài liệu, dòng đọc trong cửa được cửa ghi dùng lại (chỉ thêm một lần đọc lại sau ghi)', luu, [true, 1, 2]);
+  check(so, 'Cửa bản ghi: đọc dòng, quyết và ghi trong một lần cầm khóa tài liệu, dòng đọc trong cửa được cửa ghi dùng lại (chỉ thêm một lần đọc lại sau ghi)',
+    luu,
+    [true, 1, 2]);
 
   const tz = { n: 0 };
   const goc = nen.book.getSpreadsheetTimeZone.bind(nen.book);
@@ -226,7 +238,9 @@ function chay(so) {
       khoi, [5, nb.Customer.codes.length, 1, 'KH000002', cotMa + 1, 'KH000002', [1, 0, 0], 'KH000009', 2]);
 
     const trong = nb.book.insertSheet('Trống');
-    check(so, 'sheet trắng: getDataRange trả ô A1 rỗng nhưng khối là không cột, không dòng', [hb.sheetReadBlock(trong, { data: 'all' }).header, hb.sheetReadBlock(trong, { data: 'all' }).lastRow], [[], 0]);
+    check(so, 'sheet trắng: getDataRange trả ô A1 rỗng nhưng khối là không cột, không dòng',
+      [hb.sheetReadBlock(trong, { data: 'all' }).header, hb.sheetReadBlock(trong, { data: 'all' }).lastRow],
+      [[], 0]);
 
     const xem = nb.book.insertSheet('!Xem');
     xem.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);

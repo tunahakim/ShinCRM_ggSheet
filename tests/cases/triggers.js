@@ -61,7 +61,9 @@ function chay(so) {
   hop.shinOnEdit({ range: eventRange(lead, 3, 5) });
   hop.shinOnEdit({ range: eventRange(lead, 20, 5) });
   hop.shinOnEdit({ range: eventRange(lead, 2, 1) });
-  check(so, 'hàng lọc dưới mã @, cột sắp xếp và ô dữ liệu dưới cột ShinCRM vẽ (thêm công thức, xóa giá trị) gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường và hàng nhãn thì không gắn cờ', rendered, ['!Lead', '!Lead', '!Lead']);
+  check(so, 'hàng lọc dưới mã @, cột sắp xếp và ô dữ liệu dưới cột ShinCRM vẽ (thêm công thức, xóa giá trị) gắn cờ đúng sheet bị sửa, không chạm sheet khác, không đọc núm người dùng; ô dưới cột thường và hàng nhãn thì không gắn cờ',
+    rendered,
+    ['!Lead', '!Lead', '!Lead']);
 
   const defaultSheets = ['Customer', 'Activity', 'Category'];
   const schemaResults = defaultSheets.map((name) => {
@@ -76,7 +78,9 @@ function chay(so) {
   const scratch = nen.book.insertSheet('Nháp');
   scratch.getRange(1, 1).setValue('x');
   hop.shinOnEdit({ range: eventRange(scratch, 1, 1), value: 'x' });
-  check(so, 'gõ hàng 1 của sheet ngoài hệ thống chưa có ảnh chụp hàng 1 không phát signal', trangThai().viewsStaleRevision, 0);
+  check(so, 'gõ hàng 1 của sheet ngoài hệ thống chưa có ảnh chụp hàng 1 không phát signal',
+    trangThai().viewsStaleRevision,
+    0);
 
   clearState();
   defaultSheets.forEach((name) => {
@@ -203,7 +207,9 @@ function chay(so) {
   hop.shinOpenBook = () => { onChangeCalls.push('shinOpenBook'); return realOpen(); };
   hop.documentProps = () => { onChangeCalls.push('documentProps'); return realProps(); };
   ['EDIT', 'FORMAT', 'edit'].forEach((changeType) => hop.shinOnChange({ changeType }));
-  check(so, 'onChange loại EDIT/FORMAT trả về trước runEntryPoint, không mở bảng tính, không đọc DocumentProperties', onChangeCalls, []);
+  check(so, 'onChange loại EDIT/FORMAT trả về trước runEntryPoint, không mở bảng tính, không đọc DocumentProperties',
+    onChangeCalls,
+    []);
   hop.shinOnChange({ changeType: 'OTHER' });
   check(so, 'onChange loại khác vẫn vào runEntryPoint', onChangeCalls, ['runEntryPoint']);
   hop.runEntryPoint = realRun;

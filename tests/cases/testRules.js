@@ -149,7 +149,9 @@ function chay(so) {
   check(so, 'phạm vi quét có tệp ca', files.length > 0, true);
 
   RULES.forEach((rule) => {
-    check(so, 'luật ' + rule.id + ': ' + rule.moTa, compareExceptions(rule.id, quet(rule.id, files, readSource, ctx), EXCEPTIONS[rule.id]), []);
+    check(so, 'luật ' + rule.id + ': ' + rule.moTa,
+      compareExceptions(rule.id, quet(rule.id, files, readSource, ctx), EXCEPTIONS[rule.id]),
+      []);
   });
 
   // Mỗi luật phải bắt được mẫu vi phạm của nó, nếu không danh sách ngoại lệ rỗng chỉ là luật không quét gì.
@@ -160,7 +162,9 @@ function chay(so) {
   };
   const ctxMau = { khung: { check: 'lib/assert.js', docLog: 'lib/gas/doc-log.js' } };
   const demMau = (id) => RULES.filter((r) => r.id === id)[0].find('cases/mau.js', mau[id], ctxMau).length;
-  check(so, 'mỗi luật bắt đủ mẫu vi phạm và bỏ qua mẫu hợp lệ', [demMau('tenKhung'), demMau('dungHop'), demMau('requireCa')], [2, 4, 2]);
+  check(so, 'mỗi luật bắt đủ mẫu vi phạm và bỏ qua mẫu hợp lệ',
+    [demMau('tenKhung'), demMau('dungHop'), demMau('requireCa')],
+    [2, 4, 2]);
 }
 
 module.exports = { chay, RULES, EXCEPTIONS };

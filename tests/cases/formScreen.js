@@ -186,7 +186,9 @@ function chay(so) {
     manHinh = { note: 'chữ của màn khác' };
     els['sidebar-body'].innerHTML = '<div>màn đồng bộ FBM</div>';
     hop.screenFormRender();
-    check(so, 'thân Sidebar đang là màn khác thì không thu chữ của màn đó vào form', hop.screenStateTop().draft.note, 'Ghi chú sidebar 1');
+    check(so, 'thân Sidebar đang là màn khác thì không thu chữ của màn đó vào form',
+      hop.screenStateTop().draft.note,
+      'Ghi chú sidebar 1');
     hop.screenFormClose();
 
     hop.screenFormOpenNew('activityForm', { customerId: 'CUS-000001' });
@@ -201,7 +203,9 @@ function chay(so) {
     hop.screenFormClose();
 
     hop.screenFormOpen('noteForm', khach);
-    check(so, 'mở lại đúng bản ghi vừa đóng là một khung mới: không mang bản nháp hay chữ của khung cũ', hop.screenStateTop().draft, {});
+    check(so, 'mở lại đúng bản ghi vừa đóng là một khung mới: không mang bản nháp hay chữ của khung cũ',
+      hop.screenStateTop().draft,
+      {});
     hop.screenFormClose();
     delete hop.saveFlowStashDraft;
   }

@@ -50,12 +50,20 @@ function chay(so) {
     ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'notices', 'ok', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
-  check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường', [rong.customer.rows.length, rong.customer.fields.length], [0, 20]);
-  check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào', Object.keys(rong.activity).sort(), ['chunkRows', 'total']);
+  check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường',
+    [rong.customer.rows.length, rong.customer.fields.length],
+    [0, 20]);
+  check(so, 'khối activity chỉ báo số hàng và cỡ gói, không mang bản ghi nào',
+    Object.keys(rong.activity).sort(),
+    ['chunkRows', 'total']);
   check(so, 'cỡ gói lấy đúng từ SETTINGS chứ không gõ cứng ở đây', rong.activity.chunkRows, hop.SETTINGS.CHUNK_ROWS);
   check(so, 'bảy danh mục thật đều có khóa dù chưa ai gõ giá trị', Object.keys(rong.categories).length, 7);
-  check(so, 'trạng thái nạp lại có mặt trong MỌI phản hồi, kể cả phản hồi rỗng', Object.keys(rong.reload).sort(), ['changedAt', 'floor', 'revision', 'viewsStaleRevision']);
-  check(so, 'gói lõi mang cả bảng khai để client dựng Schema', Object.keys(rong.schema).sort(), ['activity', 'customer']);
+  check(so, 'trạng thái nạp lại có mặt trong MỌI phản hồi, kể cả phản hồi rỗng',
+    Object.keys(rong.reload).sort(),
+    ['changedAt', 'floor', 'revision', 'viewsStaleRevision']);
+  check(so, 'gói lõi mang cả bảng khai để client dựng Schema',
+    Object.keys(rong.schema).sort(),
+    ['activity', 'customer']);
   check(so, 'gói lõi mang read plan tọa độ do GAS tính',
     rong.selectionHints && Object.keys(rong.selectionHints.readPlan).sort(),
     ['!', 'Activity', 'Category', 'Customer']);
@@ -70,8 +78,12 @@ function chay(so) {
   check(so, 'LOG_TRACE đang bật được báo qua thông báo log_trace_on trong gói nạp',
     batVet.notices.some((item) => item.topic === 'log_trace_on'), true);
   const tatVet = dungNap({ LOG_TRACE: 'off' }).hop.loadCore();
-  check(so, 'LOG_TRACE off không có thông báo bật log', tatVet.notices.some((item) => item.topic === 'log_trace_on'), false);
-  check(so, 'gói nạp báo vết nguồn sidebar có bật không, để Sidebar bỏ lời gọi ghi thời gian khi tắt', [batVet.timingTrace, tatVet.timingTrace], [true, false]);
+  check(so, 'LOG_TRACE off không có thông báo bật log',
+    tatVet.notices.some((item) => item.topic === 'log_trace_on'),
+    false);
+  check(so, 'gói nạp báo vết nguồn sidebar có bật không, để Sidebar bỏ lời gọi ghi thời gian khi tắt',
+    [batVet.timingTrace, tatVet.timingTrace],
+    [true, false]);
   const nguonBoot = fs.readFileSync(path.join(GAS_DIR, 'client', 'ram', 'bootstrap.html'), 'utf8');
   check(so, 'Sidebar chỉ gọi logClientTiming khi vết bật và không chờ lời gọi đó trước khi nhả màn khóa',
     [/await\s+callServer\('logClientTiming'/.test(nguonBoot), /if \(core\.timingTrace === true\) \{\s*callServer\('logClientTiming'/.test(nguonBoot)], [false, true]);
@@ -218,10 +230,14 @@ function chayGoi(so, nen, hop, hangDau) {
   check(so, 'mọi gói đều báo tổng số hàng, để dải tiến trình biết mẫu số', goi1.total, 5);
 
   const goi2 = hop.loadActivityChunk(goi1.nextCursor);
-  check(so, 'gói hai đọc tiếp xuống dưới, không đọc lại hàng nào của gói một', goi2.rows.map((row) => row[0]), ['GD0002', 'GD0003']);
+  check(so, 'gói hai đọc tiếp xuống dưới, không đọc lại hàng nào của gói một',
+    goi2.rows.map((row) => row[0]),
+    ['GD0002', 'GD0003']);
 
   const goi3 = hop.loadActivityChunk(goi2.nextCursor);
-  check(so, 'gói cuối chỉ còn một hàng và tự báo done', [goi3.rows.map((row) => row[0]), goi3.done, goi3.nextCursor], [['GD0001'], true, null]);
+  check(so, 'gói cuối chỉ còn một hàng và tự báo done',
+    [goi3.rows.map((row) => row[0]), goi3.done, goi3.nextCursor],
+    [['GD0001'], true, null]);
 
   // Chạy lại cả vòng lặp thật, đúng như `bootLoadActivities` chạy: đây là phép kiểm cho việc nó DỪNG.
   let cursor = null;

@@ -31,7 +31,9 @@ function chay(so) {
     [again.ok, again.skipped, again.problems.length, loiDau(), t.nen.dem.setValues - writes], [false, true, 1, 1, 0]);
 
   trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
-  check(so, 'dữ liệu kho đổi thì thử lại; lỗi y hệt không thêm dòng Log', [hop.renderViewIfDirty('!Lead').skipped, loiDau()], [undefined, 1]);
+  check(so, 'dữ liệu kho đổi thì thử lại; lỗi y hệt không thêm dòng Log',
+    [hop.renderViewIfDirty('!Lead').skipped, loiDau()],
+    [undefined, 1]);
 
   const entry = hop.viewLedgerEntry('!Lead');
   hop.viewLedgerWrite('!Lead', Object.assign({}, entry, { at: entry.at - hop.SETTINGS.VIEW_FAILED_RETRY_MS }));
@@ -59,7 +61,9 @@ function chay(so) {
   check(so, 'ô lọc kiểu ngày lọc đúng ngày người gõ, được ghi lại thành chữ, hàng lọc có khuôn chữ',
     [dated.ok, dated.rows, t.view.getRange(4, 1).getValue(), t.view.getRange(3, 3).getValue(), t.view.getRange(3, 3).getNumberFormat()],
     [true, 1, 'KH0002', '2026-03-03', hop.COLUMN_FORMAT_TEXT]);
-  check(so, 'ghi lại chữ do chính GAS ghi nên không sinh lượt vẽ thứ hai', hop.renderViewIfDirty('!Lead').skipped, true);
+  check(so, 'ghi lại chữ do chính GAS ghi nên không sinh lượt vẽ thứ hai',
+    hop.renderViewIfDirty('!Lead').skipped,
+    true);
 }
 
 module.exports = { chay: chay };

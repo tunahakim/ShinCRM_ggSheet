@@ -16,8 +16,12 @@ function testKho(so) {
   const duLieu = { rong: '' };
   const dem = { doc: 0, ghi: 0 };
   const kho = taoKhoThuocTinh(duLieu, dem);
-  check(so, 'kho: khóa chưa có trả null, chuỗi rỗng đã lưu vẫn là chuỗi rỗng', [kho.getProperty('khong'), kho.getProperty('rong')], [null, '']);
-  check(so, 'kho: giá trị lưu thành chuỗi, ghi nối được vì trả lại chính kho', [kho.setProperty('so', 5) === kho, duLieu.so], [true, '5']);
+  check(so, 'kho: khóa chưa có trả null, chuỗi rỗng đã lưu vẫn là chuỗi rỗng',
+    [kho.getProperty('khong'), kho.getProperty('rong')],
+    [null, '']);
+  check(so, 'kho: giá trị lưu thành chuỗi, ghi nối được vì trả lại chính kho',
+    [kho.setProperty('so', 5) === kho, duLieu.so],
+    [true, '5']);
   kho.setProperties({ a: 1, b: true });
   check(so, 'kho: setProperties giữ khóa cũ khi không xóa hết', Object.keys(duLieu).sort(), ['a', 'b', 'rong', 'so']);
   kho.setProperties({ c: 'x' }, true);
@@ -26,13 +30,17 @@ function testKho(so) {
   kho.setProperty('d', 'y');
   kho.deleteAllProperties();
   check(so, 'kho: xóa một khóa và xóa hết đều chạm đúng đối tượng truyền vào', Object.keys(duLieu), []);
-  check(so, 'kho: mỗi lệnh đọc/ghi tăng đúng một, đếm riêng theo tên lệnh', [dem.doc, dem.ghi, dem.lenh.setProperties, dem.lenh.deleteProperty, dem.lenh.getProperty], [2, 6, 2, 1, 2]);
+  check(so, 'kho: mỗi lệnh đọc/ghi tăng đúng một, đếm riêng theo tên lệnh',
+    [dem.doc, dem.ghi, dem.lenh.setProperties, dem.lenh.deleteProperty, dem.lenh.getProperty],
+    [2, 6, 2, 1, 2]);
 
   const doc = {}, user = {}, script = {};
   const ps = taoPropertiesService({ doc: doc, user: user, script: script });
   ps.getDocumentProperties().setProperty('k', 'tai lieu');
   ps.getUserProperties().setProperty('k', 'nguoi dung');
-  check(so, 'PropertiesService: ba kho tách rời, cùng khóa không đè nhau', [doc.k, user.k, Object.keys(script).length], ['tai lieu', 'nguoi dung', 0]);
+  check(so, 'PropertiesService: ba kho tách rời, cùng khóa không đè nhau',
+    [doc.k, user.k, Object.keys(script).length],
+    ['tai lieu', 'nguoi dung', 0]);
 
   const gay = khoGay('kho hỏng');
   checkThrows(so, 'khoGay: lấy kho tài liệu thì ném đúng thông báo', () => gay.getDocumentProperties(), 'kho hỏng');
@@ -45,7 +53,9 @@ function testLanGoi(so) {
   const nen = dungHop({ sheets: ['Log'] });
   let trongCua = null;
   const kq = trongLanGoi(nen.hop, () => { trongCua = nen.hop.documentStoreActive(); return 'xong'; });
-  check(so, 'trongLanGoi: chạy qua cửa thật (bản đọc kho mở trong lần gọi, đóng sau đó) và trả kết quả của hàm', [trongCua, nen.hop.documentStoreActive(), kq], [true, false, 'xong']);
+  check(so, 'trongLanGoi: chạy qua cửa thật (bản đọc kho mở trong lần gọi, đóng sau đó) và trả kết quả của hàm',
+    [trongCua, nen.hop.documentStoreActive(), kq],
+    [true, false, 'xong']);
   check(so, 'trongLanGoi: tên lần gọi cố định', TEN_LAN_GOI, 'lanGoiThu');
 }
 
@@ -55,8 +65,12 @@ function testDocLog(so) {
   nen.hop.logEvent({ source: 'core', action: 'thuDocLog', outcome: '✅ ok', reason: 'dòng thử' });
   check(so, 'docLog: chưa nhả bộ đệm thì chưa có dòng', docLog(nen).length, 0);
   const dong = docLog(nen, { flush: true });
-  check(so, 'docLog: flush nhả bộ đệm, mỗi dòng đủ số cột của LOG_HEADERS', [dong.length, dong[0].length], [1, nen.hop.LOG_HEADERS.length]);
-  check(so, 'docLog: noi nối các ô của dòng thành chuỗi', /thuDocLog\|.*dòng thử/.test(docLog(nen, { noi: '|' })[0]), true);
+  check(so, 'docLog: flush nhả bộ đệm, mỗi dòng đủ số cột của LOG_HEADERS',
+    [dong.length, dong[0].length],
+    [1, nen.hop.LOG_HEADERS.length]);
+  check(so, 'docLog: noi nối các ô của dòng thành chuỗi',
+    /thuDocLog\|.*dòng thử/.test(docLog(nen, { noi: '|' })[0]),
+    true);
 }
 
 function testMauBanGhi(so) {

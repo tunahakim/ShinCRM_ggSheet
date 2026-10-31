@@ -29,21 +29,27 @@ function chay(so) {
 
   const nen = dungDay('Lê Tuấn Anh');
   const tao = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] }));
-  check(so, 'giao dịch người dùng tạo mới lấy tên ở Config USER_NAME, bỏ giá trị client gửi', [tao.ok, nguoiTao(tao)], [true, ['Lê Tuấn Anh']]);
+  check(so, 'giao dịch người dùng tạo mới lấy tên ở Config USER_NAME, bỏ giá trị client gửi',
+    [tao.ok, nguoiTao(tao)],
+    [true, ['Lê Tuấn Anh']]);
 
   const ma = tao.recordIds[0];
   const sua = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, content: 'Sửa nội dung', enteredBy: 'Gõ đè' }], old: [{ content: tao.rows[0][tao.fields.indexOf('content')], enteredBy: '' }] }));
   check(so, 'người dùng sửa giao dịch không đổi được người tạo', [sua.ok, nguoiTao(sua)], [true, ['Lê Tuấn Anh']]);
 
   const keo = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Sale Cũ' })], source: 'pull' }));
-  check(so, 'lượt kéo tạo giao dịch giữ đúng người tạo trên FBM, không thay bằng USER_NAME', [keo.ok, nguoiTao(keo)], [true, ['Sale Cũ']]);
+  check(so, 'lượt kéo tạo giao dịch giữ đúng người tạo trên FBM, không thay bằng USER_NAME',
+    [keo.ok, nguoiTao(keo)],
+    [true, ['Sale Cũ']]);
 
   const keoSua = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'activity', records: [{ id: ma, enteredBy: 'Sale Mới' }], source: 'pull' }));
   check(so, 'lượt kéo ghi đè người tạo của giao dịch đã có', [keoSua.ok, nguoiTao(keoSua)], [true, ['Sale Mới']]);
 
   const trong = dungDay('');
   const taoTrong = trongLanGoi(trong.hop, () => trong.hop.writeGateSave({ entity: 'activity', records: [giaoDich({ enteredBy: 'Gõ đè' })] }));
-  check(so, 'Config USER_NAME trống thì cột để trống, không lấy giá trị client', [taoTrong.ok, nguoiTao(taoTrong)], [true, ['']]);
+  check(so, 'Config USER_NAME trống thì cột để trống, không lấy giá trị client',
+    [taoTrong.ok, nguoiTao(taoTrong)],
+    [true, ['']]);
 }
 
 module.exports = { chay };

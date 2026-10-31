@@ -53,7 +53,9 @@ function chay(so) {
     [1, 'entry_failure:shinOnEdit', 'Lỗi trigger thử.', 1]);
 
   state.sheetName = 'Activity';
-  check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer', hop.probeSelectionAndReload({}).customerId, 'CUS-000099');
+  check(so, 'Activity tra @ACT_MA_KH, không lấy khách cùng số hàng bên Customer',
+    hop.probeSelectionAndReload({}).customerId,
+    'CUS-000099');
 
   state.sheetName = 'Customer';
   state.row = 2;
@@ -61,7 +63,9 @@ function chay(so) {
 
   state.sheetName = 'Category';
   state.row = 4;
-  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm dữ liệu Customer', hop.probeSelectionAndReload({}).customerId, '');
+  check(so, 'sheet ngoài kho trả rỗng, không dùng nhầm dữ liệu Customer',
+    hop.probeSelectionAndReload({}).customerId,
+    '');
 
   state.sheetName = 'Customer';
   state.row = 5;
@@ -93,7 +97,9 @@ function chay(so) {
   state.rowEnd = 6;
   state.colEnd = 3;
   const snapshot = hop.selectionSnapshotFromContext(hop.selectionProbeContext());
-  check(so, 'ảnh chụp vị trí chỉ mang tọa độ, không tự mang dirty, ms hay ok', Object.keys(snapshot).sort(), ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
+  check(so, 'ảnh chụp vị trí chỉ mang tọa độ, không tự mang dirty, ms hay ok',
+    Object.keys(snapshot).sort(),
+    ['cellRef', 'col', 'colEnd', 'gid', 'row', 'rowEnd', 'selectionKind', 'sheetName', 'spreadsheetId'].sort());
 
   // Một request duy nhất trả selection + ReloadState + quyết định. GAS chỉ
   // đọc mã khách khi vị trí thay đổi; Sidebar truyền lại context trước đó.
@@ -263,9 +269,13 @@ function chay(so) {
   const demTuDo = JSON.stringify(nen.dem);
   Object.assign(state, { sheetName: 'Bao cao', row: 5, col: 1, rowEnd: 5, colEnd: 1 });
   const baoCao = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do có cả hai mã: đọc @CUS_MA_KH trước, không trả plan (plan sheet tự do do Sidebar dựng)', [baoCao.customerId, baoCao.sheetPlan], ['CUS-000005', undefined]);
+  check(so, 'sheet tự do có cả hai mã: đọc @CUS_MA_KH trước, không trả plan (plan sheet tự do do Sidebar dựng)',
+    [baoCao.customerId, baoCao.sheetPlan],
+    ['CUS-000005', undefined]);
   Object.assign(state, { sheetName: 'Chi giao dich', row: 4, rowEnd: 4 });
-  check(so, 'sheet tự do thiếu @CUS_MA_KH thì đọc @ACT_MA_KH', hop.probeSelectionAndReload({}).customerId, 'CUS-000041');
+  check(so, 'sheet tự do thiếu @CUS_MA_KH thì đọc @ACT_MA_KH',
+    hop.probeSelectionAndReload({}).customerId,
+    'CUS-000041');
   state.sheetName = 'Trung ma';
   const trung = hop.probeSelectionAndReload({});
   check(so, 'sheet tự do có @CUS_MA_KH bị nhân đôi: không đoán cột, dùng @ACT_MA_KH', trung.customerId, 'CUS-000043');
@@ -278,8 +288,12 @@ function chay(so) {
   const canDoc = hop.probeSelectionAndReload({ previousSelectionContext: truoc.selection, previousCustomerId: 'CUS-CU', needsSelection: true });
   check(so, 'vị trí không đổi thì không đọc; Sidebar báo needsSelection (Extension đọc hỏng ở sheet kho) thì GAS đọc thay',
     [dungYen.customerId, canDoc.customerId, canDoc.selection.customerIdChanged], ['CUS-CU', 'CUS-000005', true]);
-  check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do', [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Category'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')], [false, false, false, true]);
-  check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi', JSON.parse(JSON.stringify(nen.dem)), JSON.parse(demTuDo));
+  check(so, 'chỉ sheet ngoài kho và ngoài ! mới là sheet tự do',
+    [hop.selectionIsFreeSheet('Customer'), hop.selectionIsFreeSheet('Category'), hop.selectionIsFreeSheet('!Lead'), hop.selectionIsFreeSheet('Bao cao')],
+    [false, false, false, true]);
+  check(so, 'mọi lời hỏi trên sheet tự do không ghi ô nào: bộ đếm lệnh ghi của tệp giả không đổi',
+    JSON.parse(JSON.stringify(nen.dem)),
+    JSON.parse(demTuDo));
 
   section('SelectionService — signal entities nạp trọn đúng một thực thể trong cùng lời hỏi');
   const truocEntity = hop.reloadStateRead().revision;
@@ -315,7 +329,9 @@ function chay(so) {
   check(so, 'skipPosition: không gọi SpreadsheetApp, giữ mã khách Extension đọc, không trả vị trí, vẫn quyết định sheet theo vị trí Sidebar gửi',
     [cham, re.loi, re.ok, re.customerId, re.selection, !!re.view], [[], undefined, true, 'CUS-EXT', null, true]);
   const reCanDoc = hop.probeSelectionAndReload({ skipPosition: true, needsSelection: true, previousSelectionContext: daBiet, previousCustomerId: 'CUS-EXT' });
-  check(so, 'skipPosition kèm needsSelection (Extension đọc hỏng) thì GAS vẫn mở bảng tính đọc thay', [reCanDoc.customerId, reCanDoc.selection && reCanDoc.selection.customerIdChanged], ['CUS-000005', true]);
+  check(so, 'skipPosition kèm needsSelection (Extension đọc hỏng) thì GAS vẫn mở bảng tính đọc thay',
+    [reCanDoc.customerId, reCanDoc.selection && reCanDoc.selection.customerIdChanged],
+    ['CUS-000005', true]);
 
   // Chụp vị trí tốn 0,1–0,3 giây mỗi lần; Sidebar chỉ đọc vị trí ở probeSelectionAndReload nên phản hồi khác không được chụp.
   const fs = require('fs');

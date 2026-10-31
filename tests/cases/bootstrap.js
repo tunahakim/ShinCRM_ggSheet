@@ -101,7 +101,9 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT = { active: true, lastStatus: { phase: 'idle' } };
   hop.fbmSyncPaint = (status) => paints.push(status);
   hop.sidebarRenderAfterBoot(true);
-  check(so, 'full-core reload khi đang ở Đồng bộ chỉ vá snapshot, không dựng màn chính', [renders, paints], [[], [{ phase: 'idle' }]]);
+  check(so, 'full-core reload khi đang ở Đồng bộ chỉ vá snapshot, không dựng màn chính',
+    [renders, paints],
+    [[], [{ phase: 'idle' }]]);
 
   renders.length = 0;
   hop.FBM_SYNC_CLIENT.active = false;

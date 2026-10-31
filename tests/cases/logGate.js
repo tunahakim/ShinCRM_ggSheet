@@ -69,7 +69,9 @@ function chay(so) {
   check(so, 'bộ đếm lệnh ghi của chính LogGate cũng nói đúng một lệnh', motLuot.hop.logGateWriteCount(), 1);
   check(so, 'lượt chạy trơn thì dòng vết KHÔNG ra sheet',
     bangLuot.some((dong) => String(dong[6]).indexOf('DÒNG VẾT') !== -1), false);
-  check(so, 'nhả bộ đệm rỗng thì không tốn lệnh ghi nào', [motLuot.hop.flushLog(), motLuot.dem.setValues - ghiTruoc], [0, 1]);
+  check(so, 'nhả bộ đệm rỗng thì không tốn lệnh ghi nào',
+    [motLuot.hop.flushLog(), motLuot.dem.setValues - ghiTruoc],
+    [0, 1]);
 
   // Vòng đệm vết ra sheet khi lượt chạy có lỗi. Đây là điểm đáng giá nhất của thiết kế: các bước dẫn tới lỗi có sẵn
   // mà không phải bật gì trước đó, nên một lỗi phía FBM không tái tạo được vẫn còn vết để đọc.

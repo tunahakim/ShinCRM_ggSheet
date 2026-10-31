@@ -43,14 +43,18 @@ function testSoBan(so) {
   check(so, 'nhả hoặc giữ đè bản ghi của chủ khác thì ném lỗi, sổ và kho không đổi', [
     /Chủ nào giữ thì chủ đó nhả/.test(loiNha), /đang do "fbm" giữ/.test(loiGiu), b.dem.ghi, soCua(b)['customer:C1'].by
   ], [true, true, 0, 'fbm']);
-  check(so, 'giữ bản ghi mà thiếu lý do thì ném lỗi', /cần lý do/.test(nem(() => taoCua().hop.recordGateRun({ by: 'fbm', decide: () => ({ hold: [{ entity: 'customer', ids: ['C1'] }] }) }))), true);
+  check(so, 'giữ bản ghi mà thiếu lý do thì ném lỗi',
+    /cần lý do/.test(nem(() => taoCua().hop.recordGateRun({ by: 'fbm', decide: () => ({ hold: [{ entity: 'customer', ids: ['C1'] }] }) }))),
+    true);
 
   const c = taoCua({ dong: { customer: [{ id: 'C1' }] } });
   const kq = c.hop.recordGateRun({ by: 'sidebar', decide: () => ({ hold: [{ entity: 'customer', ids: ['C1'], reason: 'đang lưu' }], release: [], save: [{ entity: 'customer', records: [{ id: 'C1' }] }] }) });
   c.hop.recordGateRun({ by: 'sidebar', decide: () => ({ release: [{ entity: 'customer', ids: ['C1'] }] }) });
   const d = taoCua();
   d.hop.recordGateRun({ by: 'sidebar', decide: () => ({ save: [{ entity: 'customer', records: [{ id: 'C1' }] }] }) });
-  check(so, 'phiên ngắn không giữ gì thì không chạm kho; giữ rồi nhả thì sổ về rỗng và xóa khóa kho', [d.dem.ghi, kq.ok, 'SHIN_RECORD_HOLDS_V1' in c.kho], [0, true, false]);
+  check(so, 'phiên ngắn không giữ gì thì không chạm kho; giữ rồi nhả thì sổ về rỗng và xóa khóa kho',
+    [d.dem.ghi, kq.ok, 'SHIN_RECORD_HOLDS_V1' in c.kho],
+    [0, true, false]);
 
   const e = taoCua({ kho: { SHIN_RECORD_HOLDS_V1: JSON.stringify({ 'customer:C1': { by: 'fbm', reason: 'đẩy' }, 'activity:A1': { by: 'khac', reason: 'x' } }) } });
   const f = taoCua();
@@ -79,13 +83,17 @@ function testCua(so) {
 
   const c = taoCua({ ghiHong: true });
   const kqC = c.hop.recordGateRun({ by: 'fbm', decide: () => ({ save: [{ entity: 'customer', records: [{ id: 'C1' }] }, { entity: 'activity', records: [{ id: 'A1' }] }], remove: [{ entity: 'customer', ids: ['C9'] }], hold: [{ entity: 'customer', ids: ['C1'], reason: 'đẩy' }] }) });
-  check(so, 'lần ghi không đạt thì dừng: không ghi phần sau, không xóa, sổ và kho không đổi', [kqC.ok, c.ghi, c.xoa, c.dem.ghi], [false, [['C1']], [], 0]);
+  check(so, 'lần ghi không đạt thì dừng: không ghi phần sau, không xóa, sổ và kho không đổi',
+    [kqC.ok, c.ghi, c.xoa, c.dem.ghi],
+    [false, [['C1']], [], 0]);
 
   const d = taoCua({ dong: { customer: [{ id: 'C1', ten: 'An' }] } });
   let thuTu = [];
   d.hop.writeGateSave = (req) => { thuTu.push('ghi ' + req.records[0].ten); return { ok: true }; };
   const kqD = d.hop.recordGateRun({ by: 'sidebar', decide: (gate) => { const r = gate.readById('customer', {}, 'C1'); thuTu.push('đọc ' + r.ten); return { save: [{ entity: 'customer', records: [{ id: 'C1', ten: r.ten + ' Mới' }] }], value: d.hop.DOCUMENT_STORE.docLockDepth }; } });
-  check(so, 'hàm quyết đọc và ghi trong cùng một lần cầm khóa, trên dòng đọc mới', [thuTu, kqD.value, kqD.ok], [['đọc An', 'ghi An Mới'], 1, true]);
+  check(so, 'hàm quyết đọc và ghi trong cùng một lần cầm khóa, trên dòng đọc mới',
+    [thuTu, kqD.value, kqD.ok],
+    [['đọc An', 'ghi An Mới'], 1, true]);
 
   check(so, 'cửa thiếu chủ hoặc thiếu hàm quyết thì ném lỗi', [
     /cần `by`/.test(nem(() => taoCua().hop.recordGateRun({ decide: () => ({}) }))), /cần `decide`/.test(nem(() => taoCua().hop.recordGateRun({ by: 'sidebar' })))

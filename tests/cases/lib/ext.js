@@ -16,13 +16,17 @@ function chay(so) {
   checkThrows(so, 'duongDanExt: tên chưa khai thì ném lỗi nêu chỗ phải sửa', () => duongDanExt('khongCo'), 'TEP_EXT');
 
   const manifest = manifestThat();
-  check(so, 'manifestThat: đọc manifest thật, có phiên bản', [manifest.manifest_version, typeof manifest.version], [3, 'string']);
+  check(so, 'manifestThat: đọc manifest thật, có phiên bản',
+    [manifest.manifest_version, typeof manifest.version],
+    [3, 'string']);
 
   const window = { postMessage: () => {}, addEventListener: () => {}, XMLHttpRequest: function () {} };
   window.XMLHttpRequest.prototype.open = function () {};
   window.XMLHttpRequest.prototype.send = function () {};
   const hop = napExtension('bindWatcher', { location: { origin: 'https://docs.google.com' }, window: window });
-  check(so, 'napExtension: hộp luôn có console và giữ biến riêng của cảnh thử', [hop.console === console, typeof hop.window], [true, 'object']);
+  check(so, 'napExtension: hộp luôn có console và giữ biến riêng của cảnh thử',
+    [hop.console === console, typeof hop.window],
+    [true, 'object']);
   const cungHop = napExtension('bindWatcher', null, hop);
   check(so, 'napExtension: truyền hộp đã có thì nạp vào đúng hộp đó', cungHop === hop, true);
 }

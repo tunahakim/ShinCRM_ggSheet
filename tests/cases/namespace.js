@@ -88,9 +88,15 @@ function chay(so) {
 
   // Phép kiểm chiều phụ thuộc bên dưới đứng trên vai `stripComments`, nên kiểm chính nó trước.
   // Ba ca: chú thích dòng, chú thích khối, và chuỗi có chứa thứ trông như chú thích — ca thứ ba là ca dễ làm hỏng nhất.
-  check(so, 'stripComments bỏ chú thích dòng', stripComments('var a = 1; // SYNC_SCHEMA').includes('SYNC_SCHEMA'), false);
-  check(so, 'stripComments bỏ chú thích khối', stripComments('/* SYNC_SCHEMA */ var a = 1;').includes('SYNC_SCHEMA'), false);
-  check(so, 'stripComments giữ nguyên chuỗi trông như chú thích', stripComments('var a = "// SYNC_SCHEMA";').includes('SYNC_SCHEMA'), true);
+  check(so, 'stripComments bỏ chú thích dòng',
+    stripComments('var a = 1; // SYNC_SCHEMA').includes('SYNC_SCHEMA'),
+    false);
+  check(so, 'stripComments bỏ chú thích khối',
+    stripComments('/* SYNC_SCHEMA */ var a = 1;').includes('SYNC_SCHEMA'),
+    false);
+  check(so, 'stripComments giữ nguyên chuỗi trông như chú thích',
+    stripComments('var a = "// SYNC_SCHEMA";').includes('SYNC_SCHEMA'),
+    true);
   check(so, 'stripComments giữ nguyên số dòng', stripComments('a\n/* x\ny */\nb').split('\n').length, 4);
 
   // Chiều phụ thuộc một hướng, tài liệu 09 Phần 13 và tài liệu 03 Phần 1: fbm_sync đọc được DATA_SCHEMA, lõi không đọc được SYNC_SCHEMA.

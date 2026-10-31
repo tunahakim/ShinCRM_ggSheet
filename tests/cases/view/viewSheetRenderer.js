@@ -23,7 +23,9 @@ function chay(so) {
   base.nen.hop.renderViewSheet('!Lead');
   check(so, 'lượt vẽ không đọc ngược hàng 4 trở xuống làm nguồn sự thật',
     [base.view.getRange(4, 1).getValue(), base.view.getRange(5, 1).getValue()].sort(), ['KH0001', 'KH0002']);
-  check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa', [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu], [0, false]);
+  check(so, 'lượt vẽ không bật toast nhỏ ở Sheet và luôn nhả khóa',
+    [base.nen.dem.toast, base.nen.stubs._khoa.dangGiu],
+    [0, false]);
   const docTruoc = Object.assign({}, base.nen.dem.doc);
   base.nen.hop.renderViewSheet('!Lead');
   const doc = base.nen.dem.doc;
@@ -48,11 +50,17 @@ function chay(so) {
   care.getRange(1, 1, 1, 2).setValues([['@CUS_MA_KH', '@CUS_TEN_CTY']]);
   hop.renderViewSheet('!Lead');
   hop.renderViewSheet('!Chăm sóc');
-  check(so, 'không còn đường vẽ mọi sheet quản trị một lượt', [typeof hop.renderAllManagedViews, typeof hop.inspectViewState], ['undefined', 'undefined']);
+  check(so, 'không còn đường vẽ mọi sheet quản trị một lượt',
+    [typeof hop.renderAllManagedViews, typeof hop.inspectViewState],
+    ['undefined', 'undefined']);
   trongLanGoi(hop, () => hop.dirtyStateMarkSignal({ customer: ['KH0001'], allViews: true }));
-  check(so, 'signal dữ liệu kho làm mọi view thành cũ', [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')], [true, true]);
+  check(so, 'signal dữ liệu kho làm mọi view thành cũ',
+    [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')],
+    [true, true]);
   hop.renderViewSheet('!Lead');
-  check(so, '(a) vẽ sheet A sau signal: A mới, B vẫn cũ', [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')], [false, true]);
+  check(so, '(a) vẽ sheet A sau signal: A mới, B vẫn cũ',
+    [hop.viewIsStale('!Lead'), hop.viewIsStale('!Chăm sóc')],
+    [false, true]);
   const realPlan = hop.viewRenderPlan;
   hop.viewRenderPlan = function () {
     hop.reloadJournalAppend({ customer: ['KH0002'], allViews: true });
@@ -74,7 +82,9 @@ function chay(so) {
   ganCoView(hop, '!Mới chưa vẽ');
   check(so, 'cờ cho sheet chưa có mục không thêm mục rỗng vào sổ', hop.viewLedgerEntry('!Mới chưa vẽ'), null);
   hop.documentLockRun(() => hop.viewLedgerPrune(['!Lead']));
-  check(so, 'dọn sổ bỏ tên không còn là sheet quản trị', [!!hop.viewLedgerEntry('!Lead'), hop.viewLedgerEntry('!Chăm sóc')], [true, null]);
+  check(so, 'dọn sổ bỏ tên không còn là sheet quản trị',
+    [!!hop.viewLedgerEntry('!Lead'), hop.viewLedgerEntry('!Chăm sóc')],
+    [true, null]);
 
   // Lỗi chặn vẽ: không chạm sheet, báo bằng khối, không note.
   const formula = taoNenView(['@CUS_MA_KH', '@CUS_TEN_CTY', 'Ghi chú thường', '@CUS_SDT']);
@@ -101,10 +111,14 @@ function chay(so) {
   formula.view.getRange(5, 2).setValue('');
   formula.view.getRange(6, 4).setValue('');
   formula.view.getRange(3, 1).setValue('');
-  check(so, 'gỡ lỗi mà chưa có cờ (trigger chưa chạy) thì đường Sidebar vẫn bỏ qua', formula.nen.hop.renderViewIfDirty('!Lead').skipped, true);
+  check(so, 'gỡ lỗi mà chưa có cờ (trigger chưa chạy) thì đường Sidebar vẫn bỏ qua',
+    formula.nen.hop.renderViewIfDirty('!Lead').skipped,
+    true);
   ganCoView(formula.nen.hop, '!Lead');
   const fixed = formula.nen.hop.renderViewIfDirty('!Lead');
-  check(so, 'trigger gắn cờ sau khi gỡ lỗi thì vẽ lại, sheet mới', [fixed.ok, fixed.problems, formula.nen.hop.viewIsStale('!Lead')], [true, [], false]);
+  check(so, 'trigger gắn cờ sau khi gỡ lỗi thì vẽ lại, sheet mới',
+    [fixed.ok, fixed.problems, formula.nen.hop.viewIsStale('!Lead')],
+    [true, [], false]);
 
   base.view.getRange(3, 5).setValue('60..50');
   base.view.getRange(3, 5).setNote('ghi chú riêng');
@@ -113,7 +127,9 @@ function chay(so) {
   check(so, 'cú pháp lọc sai dừng trước khi đụng sheet, chỉ đúng ô và nội dung lỗi',
     [badFilter.ok, badFilter.problems[0].lines[0].indexOf('Ô E3 (@ACT_GIA_TRI_HD)') === 0, badFilter.problems[0].lines[0].indexOf('Giá trị đầu lớn hơn') >= 0, base.view.getRange(4, 5).getValue()],
     [false, true, true, 'giữ nguyên']);
-  check(so, 'lỗi lọc không đụng note người dùng và khóa được nhả', [base.view.getRange(3, 5).getNote(), base.nen.stubs._khoa.dangGiu], ['ghi chú riêng', false]);
+  check(so, 'lỗi lọc không đụng note người dùng và khóa được nhả',
+    [base.view.getRange(3, 5).getNote(), base.nen.stubs._khoa.dangGiu],
+    ['ghi chú riêng', false]);
   base.view.getRange(3, 5).setValue('');
   base.view.getRange(3, 3).setNote('⛔ ShinCRM: lỗi cũ\n\nGhi chú trước đó:\nghi chú của tôi');
   base.view.getRange(3, 4).setNote('⛔ ShinCRM: lỗi cũ không có ghi chú');
@@ -137,7 +153,9 @@ function chay(so) {
     [3, 4, 5, 1].map((column) => fresh.view.getRange(3, column).getNumberFormat() === fresh.nen.hop.COLUMN_FORMAT_TEXT), [true, false, true, false]);
 
   base.view.getRange(14, 1, 1, 2).setValues([['@CUS_TEN_CTY', 'Tăng dần (A → Z)']]);
-  check(so, 'chỉ đọc 10 cặp sắp xếp từ hàng 4 đến 13, bỏ qua hàng 14', base.nen.hop.viewReadInputs(base.view, base.view.getName()).sortPairs.length, 10);
+  check(so, 'chỉ đọc 10 cặp sắp xếp từ hàng 4 đến 13, bỏ qua hàng 14',
+    base.nen.hop.viewReadInputs(base.view, base.view.getName()).sortPairs.length,
+    10);
 
   const leadingZero = taoNenView(['@CUS_MST']);
   ghiO(leadingZero.nen, 'Customer', 4, '@CUS_MA_KH', 'KH0001');
@@ -165,12 +183,18 @@ function chay(so) {
   gieoHaiGiaoDich(sort.nen);
   sort.nen.props['SETTINGS:core_data'] = JSON.stringify({ columnTypes: {}, sort: [{ col: '@CUS_TEN_CTY', level: 'asc' }] });
   sort.nen.hop.renderViewSheet('!Lead');
-  check(so, 'sắp xếp chung trong Cài đặt được dùng khi sheet không có cặp riêng', sort.view.getRange(4, 1).getValue(), 'KH0002');
+  check(so, 'sắp xếp chung trong Cài đặt được dùng khi sheet không có cặp riêng',
+    sort.view.getRange(4, 1).getValue(),
+    'KH0002');
   sort.view.getRange(4, 3, 1, 2).setValues([['@ACT_NGAY_LAM_VIEC', 'Tăng dần (A → Z)']]);
   sort.nen.hop.renderViewSheet('!Lead');
-  check(so, 'sort riêng đè sắp xếp chung và dùng được cột kho không hiển thị', sort.view.getRange(4, 1).getValue(), 'KH0001');
+  check(so, 'sort riêng đè sắp xếp chung và dùng được cột kho không hiển thị',
+    sort.view.getRange(4, 1).getValue(),
+    'KH0001');
   sort.view.getRange(5, 3).setValue('@CUS_TEN_CTY');
-  check(so, 'hàng sắp xếp thiếu một vế mà vế còn lại hợp lệ thì không phải lỗi', sort.nen.hop.renderViewSheet('!Lead').ok, true);
+  check(so, 'hàng sắp xếp thiếu một vế mà vế còn lại hợp lệ thì không phải lỗi',
+    sort.nen.hop.renderViewSheet('!Lead').ok,
+    true);
   sort.view.getRange(5, 3).setValue('@CUS_KHONG_CO');
   const halfBad = sort.nen.hop.renderViewSheet('!Lead');
   check(so, 'hàng sắp xếp thiếu một vế mà vế còn lại sai thì là lỗi sắp xếp của sheet',

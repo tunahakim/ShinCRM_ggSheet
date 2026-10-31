@@ -22,10 +22,14 @@ async function chay(so) {
     [lichKenh().map((item) => item.delay).sort(), lichKenh().find((item) => item.delay === 4000) === moc4000, burst._calls.length], [[12000, 4000], true, 0]);
   chayHenGio(burst, 4000);
   tinHieu();
-  check(so, 'tín hiệu đến lúc lời hỏi mốc đầu đang bay thì mở lại mốc đầu, không gọi GAS song song', [burst._calls.length, lichKenh().length], [1, 2]);
+  check(so, 'tín hiệu đến lúc lời hỏi mốc đầu đang bay thì mở lại mốc đầu, không gọi GAS song song',
+    [burst._calls.length, lichKenh().length],
+    [1, 2]);
   chayHenGio(burst, 4000);
   chayHenGio(burst, 12000);
-  check(so, 'các mốc chín trong lúc lời hỏi đang bay chỉ gộp thành tín hiệu chờ', [burst._calls.length, burst.SHEET_LINK_SELECTION_WAKE_QUEUED], [1, true]);
+  check(so, 'các mốc chín trong lúc lời hỏi đang bay chỉ gộp thành tín hiệu chờ',
+    [burst._calls.length, burst.SHEET_LINK_SELECTION_WAKE_QUEUED],
+    [1, true]);
   traLoi.shift()();
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -48,7 +52,9 @@ async function chay(so) {
     await new Promise((resolve) => setImmediate(resolve));
     return h._calls.length;
   };
-  check(so, 'lời hỏi mốc đầu đã thấy revision tăng và không có tín hiệu mới: mốc 12 giây không gọi GAS', await mocSau(11, false), 1);
+  check(so, 'lời hỏi mốc đầu đã thấy revision tăng và không có tín hiệu mới: mốc 12 giây không gọi GAS',
+    await mocSau(11, false),
+    1);
   check(so, 'lời hỏi mốc đầu chưa thấy revision tăng (trigger chậm): mốc 12 giây vẫn hỏi', await mocSau(10, false), 2);
   check(so, 'có tín hiệu mới sau khi lời hỏi mốc đầu bắt đầu: mốc 12 giây vẫn hỏi', await mocSau(11, true), 2);
 
@@ -107,7 +113,9 @@ async function chay(so) {
   an.navigator = { onLine: true }; nhipAn(901000);
   an._clock.now = 2000000; an.SHEET_LINK_LAST_ACK = 0; an.changeSignalWatchdog(2000000);
   an.SHEET_LINK_LAST_ACK = 2001000; an.changeSignalWatchdog(2001000);
-  check(so, 'thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im', an.changeSignalChannelDead(), false);
+  check(so, 'thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im',
+    an.changeSignalChannelDead(),
+    false);
 }
 
 

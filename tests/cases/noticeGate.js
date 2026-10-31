@@ -26,29 +26,47 @@ function chay(so) {
   const khoa = (k) => nen.props['NOTICE:' + k];
   const loi = { topic: 'entry_failure', scope: 'shinOnEdit', source: 'core', title: 'Lỗi A', lines: ['Việc gây ra: shinOnEdit'] };
 
-  check(so, 'phát lần đầu trả true và ghi một khóa riêng NOTICE:<topic>:<scope>', [hop.noticeRaise(loi), typeof khoa('entry_failure:shinOnEdit')], [true, 'string']);
+  check(so, 'phát lần đầu trả true và ghi một khóa riêng NOTICE:<topic>:<scope>',
+    [hop.noticeRaise(loi), typeof khoa('entry_failure:shinOnEdit')],
+    [true, 'string']);
   const ghiTruoc = nen.stubs._khoDem.ghi;
-  check(so, 'phát lại đúng nội dung trả false và không ghi kho', [hop.noticeRaise(loi), nen.stubs._khoDem.ghi - ghiTruoc], [false, 0]);
+  check(so, 'phát lại đúng nội dung trả false và không ghi kho',
+    [hop.noticeRaise(loi), nen.stubs._khoDem.ghi - ghiTruoc],
+    [false, 0]);
   hop.noticeRaise(Object.assign({}, loi, { title: 'Lỗi B' }));
-  check(so, 'cùng việc phát nội dung mới thì ghi đè, không thêm thông báo', [hop.noticeList().length, hop.noticeList()[0].title], [1, 'Lỗi B']);
-  check(so, 'mức độ và cách hết lấy từ NOTICE_TOPICS, bên phát không tự chọn', [hop.noticeList()[0].level, hop.noticeList()[0].clear], ['error', 'on_success']);
+  check(so, 'cùng việc phát nội dung mới thì ghi đè, không thêm thông báo',
+    [hop.noticeList().length, hop.noticeList()[0].title],
+    [1, 'Lỗi B']);
+  check(so, 'mức độ và cách hết lấy từ NOTICE_TOPICS, bên phát không tự chọn',
+    [hop.noticeList()[0].level, hop.noticeList()[0].clear],
+    ['error', 'on_success']);
 
   hop.noticeRaise({ topic: 'filter_reference', scope: '', source: 'core', title: 'Bảng tra' });
   hop.noticeRaise({ topic: 'memo_corrupt', scope: 'viewLedger', source: 'document_store', title: 'Bộ nhớ hỏng' });
-  check(so, 'danh sách xếp lỗi trước, cảnh báo, rồi thông tin', hop.noticeList().map((n) => n.level), ['error', 'warning', 'info']);
+  check(so, 'danh sách xếp lỗi trước, cảnh báo, rồi thông tin',
+    hop.noticeList().map((n) => n.level),
+    ['error', 'warning', 'info']);
   check(so, 'liệt kê không xóa thông báo', hop.noticeList().length, 3);
 
-  check(so, 'giải đúng việc trả thông báo cũ rồi xóa khóa', [hop.noticeResolve('entry_failure', 'shinOnEdit').title, khoa('entry_failure:shinOnEdit')], ['Lỗi B', undefined]);
+  check(so, 'giải đúng việc trả thông báo cũ rồi xóa khóa',
+    [hop.noticeResolve('entry_failure', 'shinOnEdit').title, khoa('entry_failure:shinOnEdit')],
+    ['Lỗi B', undefined]);
   check(so, 'giải việc không có thông báo trả null', hop.noticeResolve('entry_failure', 'shinOnEdit'), null);
   hop.noticeRaise(loi);
-  check(so, 'bấm ✕ được cho mọi thông báo, cả loại tự hết', [hop.noticeDismiss('entry_failure:shinOnEdit'), hop.noticeDismiss('filter_reference:'), hop.noticeDismiss('khong:co'), hop.noticeDismiss('')], [true, true, false, false]);
+  check(so, 'bấm ✕ được cho mọi thông báo, cả loại tự hết',
+    [hop.noticeDismiss('entry_failure:shinOnEdit'), hop.noticeDismiss('filter_reference:'), hop.noticeDismiss('khong:co'), hop.noticeDismiss('')],
+    [true, true, false, false]);
 
   section('Cổng thông báo — runEntryPoint phát khi lỗi, tự gỡ khi chạy lại thành công');
   checkThrows(so, 'cửa vào lỗi vẫn ném lại cho bên gọi', () => hop.runEntryPoint('shinRenderCurrentView', 'core', () => { throw new Error('lỗi vẽ'); }), 'lỗi vẽ');
-  check(so, 'lỗi cửa vào thành thông báo entry_failure theo tên cửa vào', [khoa('entry_failure:shinRenderCurrentView') !== undefined, hop.noticeList().filter((n) => n.scope === 'shinRenderCurrentView')[0].title], [true, 'lỗi vẽ']);
+  check(so, 'lỗi cửa vào thành thông báo entry_failure theo tên cửa vào',
+    [khoa('entry_failure:shinRenderCurrentView') !== undefined, hop.noticeList().filter((n) => n.scope === 'shinRenderCurrentView')[0].title],
+    [true, 'lỗi vẽ']);
   hop.runEntryPoint('shinRenderCurrentView', 'core', () => true);
   check(so, 'chạy lại thành công thì thông báo tự hết', khoa('entry_failure:shinRenderCurrentView'), undefined);
-  check(so, 'tự hết ghi một dòng Log "Đã hết lỗi"', docLog(nen, { flush: true, noi: '|' }).filter((r) => r.indexOf('Đã hết lỗi: lỗi vẽ') >= 0).length, 1);
+  check(so, 'tự hết ghi một dòng Log "Đã hết lỗi"',
+    docLog(nen, { flush: true, noi: '|' }).filter((r) => r.indexOf('Đã hết lỗi: lỗi vẽ') >= 0).length,
+    1);
 
   section('Cổng thông báo — kho hỏng, loại lạ, trần, che bí mật');
   nen.props['NOTICE:entry_failure:hong'] = '{không phải JSON';
@@ -66,7 +84,9 @@ function chay(so) {
   hop.noticeRaise({ topic: 'entry_failure', scope: 'dai', title: 'token=abc123 hết hạn', lines: [dai, 'dòng sau'] });
   const thongBaoDai = hop.noticeList().filter((n) => n.scope === 'dai')[0];
   const tongChu = thongBaoDai.title.length + thongBaoDai.lines.slice(0, -1).join('').length + thongBaoDai.hint.length;
-  check(so, 'chữ được che bí mật và cắt theo trần ký tự chung', [thongBaoDai.title.indexOf('abc123'), tongChu <= hop.SETTINGS.NOTICE_CHARS_MAX, /cắt bớt/.test(thongBaoDai.lines[thongBaoDai.lines.length - 1])], [-1, true, true]);
+  check(so, 'chữ được che bí mật và cắt theo trần ký tự chung',
+    [thongBaoDai.title.indexOf('abc123'), tongChu <= hop.SETTINGS.NOTICE_CHARS_MAX, /cắt bớt/.test(thongBaoDai.lines[thongBaoDai.lines.length - 1])],
+    [-1, true, true]);
   hop.noticeDismiss('entry_failure:dai');
 
   for (let i = 0; i < hop.SETTINGS.NOTICE_MAX + 2; i += 1) { hop.noticeRaise({ topic: 'memo_corrupt', scope: 'k' + i, title: 't' + i }); }
