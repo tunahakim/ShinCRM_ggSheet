@@ -92,11 +92,14 @@ FbmSync.ownerLookupParse = function (item) {
   return { ok: true, sttRecs: grid.rows.map(function (row) { return String(Array.isArray(row) ? row[column] || '' : '').trim(); }).filter(Boolean) };
 };
 
-/** Phần tử đọc khách của một lô cửa ghi: lọc theo quyền như danh sách khách và theo đúng các mã của lô. Mã sai định dạng không vào câu lọc; lô không còn mã nào thì không dựng. */
-FbmSync.customerBatchRequest = function (sttRecs) {
+/**
+ * Phần tử đọc khách của một lô cửa ghi: lọc theo quyền như danh sách khách và theo đúng các mã của lô. Mã sai định dạng không vào câu lọc; lô không còn mã nào thì không dựng.
+ * `withHeader` chỉ bật khi lượt chưa có danh sách cột khách, vì tiêu đề nặng hơn dữ liệu cả lô (09/01 Kiến trúc và giao thức).
+ */
+FbmSync.customerBatchRequest = function (sttRecs, withHeader) {
   var list = (sttRecs || []).map(function (value) { return String(value || '').trim(); }).filter(function (value) { return FbmSync.STT_REC_PATTERN.test(value); });
   if (!list.length) { return null; }
-  var request = FbmSync.customerGridRequest({ type: 0, count: Math.max(20, list.length), gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'stt_rec_kh in (' + list.map(function (value) { return "'" + value + "'"; }).join(',') + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false }] });
+  var request = FbmSync.customerGridRequest({ type: withHeader ? 0 : 1, count: Math.max(20, list.length), gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, externalKey: [{ Name: 'stt_rec_kh in (' + list.map(function (value) { return "'" + value + "'"; }).join(',') + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false }] });
   request.meta.kind = 'customer_batch';
   return request;
 };

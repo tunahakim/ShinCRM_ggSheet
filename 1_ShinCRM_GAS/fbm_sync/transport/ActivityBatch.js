@@ -38,16 +38,16 @@ FbmSync.gateLookupChunk = function (cursor) {
 
 /**
  * Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
- * Chỉ khi lượt chưa có danh sách cột giao dịch thì phần tử giao dịch đầu lấy kèm tiêu đề; các phần tử khác đọc cột theo danh sách đó.
+ * Mỗi bảng (khách, giao dịch) chỉ lấy tiêu đề khi lượt chưa có danh sách cột của bảng đó: phần tử khách và phần tử giao dịch đầu lấy kèm tiêu đề, các phần tử khác đọc cột theo danh sách đã lưu.
  */
 FbmSync.activityBatchRequest = function (state) {
-  var cursor = state.cursor || {};
+  var cursor = state.cursor || {}, metadata = state.metadata || {};
   if (cursor.lookup) {
     var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2)); });
     return lookups.length ? { items: lookups, meta: { kind: 'batch', entity: 'customer' } } : null;
   }
-  var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), needHeader = !(state.metadata && Array.isArray(state.metadata.activityFields) && state.metadata.activityFields.length);
-  var customerItem = FbmSync.customerBatchRequest(customers);
+  var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), needHeader = !(Array.isArray(metadata.activityFields) && metadata.activityFields.length);
+  var customerItem = FbmSync.customerBatchRequest(customers, !(Array.isArray(metadata.customerFields) && metadata.customerFields.length));
   if (!customerItem) { return null; }
   return { items: [customerItem].concat(customers.map(function (sttRec) {
     var options = needHeader ? { type: 0, count: count, gridPageIndex: -1, gridRefresh: false } : { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false };
@@ -151,7 +151,9 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
     customers.forEach(function (sttRec) { failed.push({ customer: sttRec, code: String(customerCheck.check.code || 'FBM_ERROR'), status: Number(customerCheck.check.status || 0), reason: reason }); outcomes.push({ sttRec: sttRec, fresh: null }); });
   } else {
     try {
-      FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item)).rows.forEach(function (row) {
+      var customerGrid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item), state.metadata.customerFields);
+      state.metadata.customerFields = customerGrid.fields;
+      customerGrid.rows.forEach(function (row) {
         var sttRec = String(row.stt_rec_kh || '').trim();
         if (customers.indexOf(sttRec) >= 0 && !FbmSync.isTemporaryRecord('customer', row)) { returned[sttRec] = row; }
       });
@@ -213,12 +215,13 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
     });
   }
   // Cursor chỉ tiến sau khi ghi xong: ghi lỗi giữa chừng thì state còn cursor cũ, lần sau dựng lại đúng lô này (ghi lại là idempotent).
-  var activityFields = state.metadata.activityFields, mode = state.mode;
+  var activityFields = state.metadata.activityFields, customerFields = state.metadata.customerFields, mode = state.mode;
   if (customerRecords.length) { FbmSync.pullRecords('customer', customerRecords, mode); FbmSync.previewRecords('customer', customerRecords); }
   if (activityRecords.length) { FbmSync.pullRecords('activity', activityRecords, mode); FbmSync.previewRecords('activity', activityRecords); }
   state = FbmSync.stateRead();
   state.metadata = state.metadata || {};
   if ((activityFields || []).length) { state.metadata.activityFields = activityFields; }
+  if ((customerFields || []).length) { state.metadata.customerFields = customerFields; }
   state.cursor.customers = retry;
   FbmSync.activityCustomerErrors(state, failed);
   if (write) {
