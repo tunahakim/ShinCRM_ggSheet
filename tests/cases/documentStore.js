@@ -5,8 +5,8 @@ const { dungHop, ghiO } = require('../lib/dung-hop');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const GAS = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
-// Cửa kho chính nó, và bộ đo DEV bọc khóa giả để đếm thời gian.
-const NGOAI_LE = ['server/state/DocumentStore.js', 'server/dev/FbmPerfProbe.js'];
+// Cửa kho chính nó, bộ đo DEV bọc khóa giả để đếm thời gian, và hàm dò DEV đo hành vi kho thật (đi qua cửa kho là đo lớp đệm, không đo Google).
+const NGOAI_LE = ['server/state/DocumentStore.js', 'server/dev/FbmPerfProbe.js', 'server/dev/PropertiesProbe.js'];
 
 function taoHop() {
   const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });

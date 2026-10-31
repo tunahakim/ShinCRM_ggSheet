@@ -26,7 +26,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeEntityRead', 'probeCategoryRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig',
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeCreateSheet', 'viewProbeAutoRender',
-  'probeTriggerState', 'triggersEnsure', 'reloadMatrixProbe', 'reloadPayloadProbe',
+  'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmDriveCommand', 'fbmGetSyncStatus', 'fbmCancelSync', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmSaveSettings'
 ];
 
