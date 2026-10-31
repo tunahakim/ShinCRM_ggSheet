@@ -54,14 +54,14 @@ function fbmSyncSettingsValidate(input) {
   normalized.approvalThreshold = threshold;
   var gapMin = normalized.requestGapMinSeconds, gapMax = normalized.requestGapMaxSeconds, gapCap = FbmSync.BUDGET.requestGapMaxSeconds;
   if (!isFinite(gapMin) || !isFinite(gapMax) || gapMin < 0 || gapMax < gapMin || gapMax > gapCap) {
-    return { ok: false, code: 'FBM_REQUEST_GAP_INVALID', field: 'requestGap', message: 'Khoảng cách giữa hai request tới FBM: tối thiểu từ 0, tối đa không nhỏ hơn tối thiểu và không quá ' + gapCap + ' giây.' };
+    return { ok: false, code: 'FBM_REQUEST_GAP_INVALID', message: 'Khoảng cách giữa hai request tới FBM: tối thiểu từ 0, tối đa không nhỏ hơn tối thiểu và không quá ' + gapCap + ' giây.' };
   }
   var badCodes = normalized.scopeCodes.filter(function (code) { return !FbmSync.SCOPE_CODE_PATTERN.test(code); });
   if (badCodes.length) {
-    return { ok: false, code: 'FBM_SCOPE_CODE_INVALID', field: 'scopeCodes', message: 'Danh sách khách chỉ định: mỗi mã chỉ gồm chữ không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới, dài tối đa 32 ký tự. Mã sai: ' + badCodes.join(', ') + '.' };
+    return { ok: false, code: 'FBM_SCOPE_CODE_INVALID', message: 'Danh sách khách chỉ định: mỗi mã chỉ gồm chữ không dấu, số, dấu chấm, gạch ngang hoặc gạch dưới, dài tối đa 32 ký tự. Mã sai: ' + badCodes.join(', ') + '.' };
   }
   if (normalized.scopeCodes.length > FbmSync.SCOPE_CODES_MAX) {
-    return { ok: false, code: 'FBM_SCOPE_CODES_TOO_MANY', field: 'scopeCodes', message: 'Danh sách khách chỉ định tối đa ' + FbmSync.SCOPE_CODES_MAX + ' mã; muốn chạy rộng hơn thì tắt giới hạn phạm vi.' };
+    return { ok: false, code: 'FBM_SCOPE_CODES_TOO_MANY', message: 'Danh sách khách chỉ định tối đa ' + FbmSync.SCOPE_CODES_MAX + ' mã; muốn chạy rộng hơn thì tắt giới hạn phạm vi.' };
   }
   return { ok: true, settings: normalized };
 }
@@ -94,7 +94,7 @@ FbmSync.syncSettingsSave = function (input) {
   if (check.ok && input && input.scopeCodes !== undefined) {
     scopeLines = FbmSync.scopeLengthMark(FbmSync.scopeResolve(check.settings.scopeCodes).lines, FbmSync.accountSettingsRead());
     var notFound = scopeLines.filter(function (line) { return line.status === 'not_found'; }).map(function (line) { return line.code; });
-    if (notFound.length) { check = { ok: false, code: 'FBM_SCOPE_CODE_NOT_FOUND', field: 'scopeCodes', message: 'Không tìm thấy mã khách ShinCRM trên Sheet Customer: ' + notFound.join(', ') + '. Danh sách đang lưu giữ nguyên.', scopeLines: scopeLines }; }
+    if (notFound.length) { check = { ok: false, code: 'FBM_SCOPE_CODE_NOT_FOUND', message: 'Không tìm thấy mã khách ShinCRM trên Sheet Customer: ' + notFound.join(', ') + '. Danh sách đang lưu giữ nguyên.', scopeLines: scopeLines }; }
   }
   if (!check.ok) {
     // Từ chối phải để lại dấu ở Log, không chỉ hiện ở Sidebar.
@@ -109,7 +109,7 @@ FbmSync.syncSettingsSave = function (input) {
   if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
   var oddLength = (scopeLines || []).filter(function (line) { return line.lengthExpected; }).map(function (line) { return line.code; });
   if (oddLength.length && typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'sync_settings_save', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Mã khách chỉ định đúng tiền tố mã FBM nhưng khác độ dài đã cài: ' + oddLength.join(', ') + '. Vẫn lưu; kiểm tra lại nếu gõ thiếu hoặc thừa ký tự.', detail: { codes: oddLength } }); }
-  return { ok: true, settings: check.settings, previous: previous, scopeLines: scopeLines };
+  return { ok: true, settings: check.settings, scopeLines: scopeLines };
 };
 
 /**

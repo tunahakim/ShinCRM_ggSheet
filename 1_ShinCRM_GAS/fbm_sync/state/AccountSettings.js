@@ -62,13 +62,13 @@ FbmSync.accountSettingsRead = function () {
 FbmSync.accountSettingsSave = function (input) {
   var check = fbmAccountSettingsValidate(input || {});
   if (!check.ok) { return check; }
-  var props = fbmAccountSettingsProps(), previous = FbmSync.accountSettingsRead();
+  var props = fbmAccountSettingsProps();
   if (!props) { return { ok: false, code: 'FBM_ACCOUNT_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
   var saved;
   if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings), 'account_settings'); }
   else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
   if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
-  return { ok: true, settings: check.settings, previous: previous };
+  return { ok: true, settings: check.settings };
 };
 
 FbmSync.accountSettingsPublic = function () {

@@ -36,11 +36,11 @@ FbmSync.extensionConfigRead = function () {
   return fallback;
 };
 FbmSync.extensionConfigSave = function (input) {
-  var value = input || {}, minutes = Number(value.pollMinutes), current = FbmSync.extensionConfigRead();
+  var value = input || {}, minutes = Number(value.pollMinutes);
   if (!isFinite(minutes) || minutes < 1 || minutes > 60) { return { ok: false, code: 'EXTENSION_POLL_INVALID', message: 'Nhịp hỏi GAS phải từ 1 đến 60 phút.' }; }
   var saved = { pollMinutes: Math.round(minutes), runOnStartup: value.runOnStartup !== false };
   FbmSync.props().setProperty(FbmSync.EXTENSION_CONFIG_KEY, JSON.stringify(saved));
-  return { ok: true, pollMinutes: saved.pollMinutes, runOnStartup: saved.runOnStartup, previous: current };
+  return { ok: true, pollMinutes: saved.pollMinutes, runOnStartup: saved.runOnStartup };
 };
 FbmSync.backgroundScheduleDefault = function () {
   return {

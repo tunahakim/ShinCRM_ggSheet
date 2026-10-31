@@ -59,7 +59,12 @@ FbmSync.relayCommandAllowed = function (name) {
  */
 FbmSync.controlDispatch = function (command, payload, channel) {
   var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' ? 'relay' : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;
-  if (spec.drives && !String(input.machineId || '')) { return FbmSync.publicResult({ ok: false, code: 'SYNC_MACHINE_ID_REQUIRED', message: 'Sidebar chưa lấy được mã máy của Extension nên chưa mở lượt được; tải lại Sidebar rồi thử lại.' }); }
+  var finish = function (raw) {
+    var unknown = FbmSync.publicFieldsUnknown(raw);
+    if (unknown.length) { FbmSync.dispatchLog('public_result_field_dropped', 'Kết quả lệnh "' + name + '" có trường ngoài danh sách được phép ra khỏi GAS (' + unknown.join(', ') + '); đã bỏ trước khi gửi về. Đây là lỗi lập trình: thêm trường vào PUBLIC_RESULT_FIELDS nếu Sidebar cần, không thì xóa ở nơi tạo kết quả.', { command: name, fields: unknown }); }
+    return FbmSync.publicResult(raw);
+  };
+  if (spec.drives && !String(input.machineId || '')) { return finish({ ok: false, code: 'SYNC_MACHINE_ID_REQUIRED', message: 'Sidebar chưa lấy được mã máy của Extension nên chưa mở lượt được; tải lại Sidebar rồi thử lại.' }); }
   var body = function () {
     var state = spec.guard ? FbmSync.stateRead() : null, refused = spec.guard ? spec.guard(input, state) : null;
     if (refused) { return refused; }
@@ -69,7 +74,7 @@ FbmSync.controlDispatch = function (command, payload, channel) {
     FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };
     try { return body(); } finally { FbmSync.issueContext = null; }
   };
-  if (!spec.lock) { return FbmSync.publicResult(FbmSync.channelResult(run(), via)); }
+  if (!spec.lock) { return finish(FbmSync.channelResult(run(), via)); }
   try {
     result = FbmSync.withOrchestrationLock(run);
   } catch (error) {
@@ -77,7 +82,7 @@ FbmSync.controlDispatch = function (command, payload, channel) {
     result = FbmSync.storageFailureResult(error);
   }
   if (result && result.code === 'BUSY' && spec.reply) { FbmSync.busyDropLog(name, input); }
-  return FbmSync.publicResult(FbmSync.channelResult(result, via));
+  return finish(FbmSync.channelResult(result, via));
 };
 /** Kênh Sidebar: dấu giữ chỗ thành `runId` kèm giãn cách thử lại relay cho Extension; phong bì thật lọt ra kênh Sidebar là lỗi lập trình nên ném. */
 FbmSync.channelResult = function (result, via) {
@@ -113,11 +118,15 @@ FbmSync.storageFailureResult = function (error) {
  */
 FbmSync.busyDropLog = function (name, input) {
   var waitSeconds = Math.round((typeof SETTINGS !== 'undefined' && SETTINGS && SETTINGS.LOCK_WAIT_MS ? SETTINGS.LOCK_WAIT_MS : 10000) / 1000);
-  logEvent({ source: 'fbm_sync', action: 'busy_reply_dropped', outcome: LOG_ERROR, reason: 'GAS đang bận việc khác quá ' + waitSeconds + ' giây nên không nhận được ' + (name === 'client_error' ? 'lỗi Sidebar báo về: ' + String(input.message || '').slice(0, 200) : 'kết quả FBM vừa gửi về; lượt này sẽ chờ tới hạn rồi bị đóng.'), detail: { command: name, source: String(input.source || ''), hop: Number(input.hop || 0) } });
+  FbmSync.dispatchLog('busy_reply_dropped', 'GAS đang bận việc khác quá ' + waitSeconds + ' giây nên không nhận được ' + (name === 'client_error' ? 'lỗi Sidebar báo về: ' + String(input.message || '').slice(0, 200) : 'kết quả FBM vừa gửi về; lượt này sẽ chờ tới hạn rồi bị đóng.'), { command: name, source: String(input.source || ''), hop: Number(input.hop || 0) });
+};
+/** Dòng Log lỗi của cửa lệnh: việc cửa lệnh bỏ đi (kết quả FBM khi bận, trường lạ ở cửa ra) không có lượt nào ghi hộ. */
+FbmSync.dispatchLog = function (action, reason, detail) {
+  logEvent({ source: 'fbm_sync', action: action, outcome: LOG_ERROR, reason: reason, detail: detail });
 };
 
 /**
- * Trường được phép ra khỏi GAS ở mức trên cùng của kết quả. Trường lạ là lỗi lập trình (có thể là ô lượt mang cookie lọt ra), nên ném chứ không bỏ im lặng.
+ * Trường được phép ra khỏi GAS ở mức trên cùng của kết quả. Trường lạ là lỗi lập trình (có thể là ô lượt mang cookie lọt ra): `publicResult` bỏ, cửa lệnh ghi một dòng Log lỗi, không ném. Cửa ra chạy sau khi người điều phối đã ghi state, ném ở đây khiến người dùng nhận báo hỏng cho việc đã làm xong. Ném lại được khi kết quả chỉ còn dựng ở một chỗ.
  * Bên trong vẫn gỡ khóa của ô phiên theo hình dạng: object có `customerAuthorized` hoặc `activityAuthorized` mất cả ba khóa bí mật (kèm `cookie`). Không gỡ `cookie`/`authorized` ở object khác: body request FBM gửi cho Extension cần chính các khóa đó.
  */
 FbmSync.PUBLIC_RESULT_FIELDS = [
@@ -125,8 +134,11 @@ FbmSync.PUBLIC_RESULT_FIELDS = [
   'binding', 'identityStatus', 'identity', 'login', 'credentialMode', 'settings', 'total', 'reset', 'missing', 'enabled', 'trace',
   'url', 'key', 'spreadsheetId', 'extension', 'masterEnabled', 'backgroundEnabled', 'configured', 'credentialRef', 'public',
   'autoOpenTab', 'retryEnabled', 'retryMinutes', 'lastAttemptAt', 'lastLoginAt', 'nextRetryAt', 'lastError', 'config', 'schedule', 'sessionVerified', 'restarted', 'probing', 'imported', 'marked', 'approvalRequired',
-  'runId', 'relayRetryMs'
+  'runId', 'relayRetryMs', 'scopeLines', 'pollMinutes', 'runOnStartup', 'invalid'
 ];
+FbmSync.publicFieldsUnknown = function (result) {
+  return result && typeof result === 'object' && !Array.isArray(result) ? Object.keys(result).filter(function (key) { return FbmSync.PUBLIC_RESULT_FIELDS.indexOf(key) < 0; }) : [];
+};
 FbmSync.publicResult = function (result) {
   var value = FbmSync.transportValue(result);
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -134,13 +146,9 @@ FbmSync.publicResult = function (result) {
     shape.code = 'PUBLIC_RESULT_INVALID';
     throw shape;
   }
-  Object.keys(value).forEach(function (key) {
-    if (FbmSync.PUBLIC_RESULT_FIELDS.indexOf(key) >= 0) { return; }
-    var leak = new Error('Kết quả lệnh đồng bộ FBM có trường "' + key + '" ngoài danh sách được phép ra khỏi GAS.');
-    leak.code = 'PUBLIC_RESULT_FIELD_UNKNOWN';
-    throw leak;
-  });
-  return FbmSync.publicStrip(value);
+  var kept = {};
+  Object.keys(value).forEach(function (key) { if (FbmSync.PUBLIC_RESULT_FIELDS.indexOf(key) >= 0) { kept[key] = value[key]; } });
+  return FbmSync.publicStrip(kept);
 };
 FbmSync.publicStrip = function (value) {
   if (Array.isArray(value)) { return value.map(FbmSync.publicStrip); }
