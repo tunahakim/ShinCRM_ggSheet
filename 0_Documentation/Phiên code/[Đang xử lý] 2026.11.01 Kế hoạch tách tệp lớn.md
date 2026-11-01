@@ -58,6 +58,7 @@ Trước khi gom, mỗi khung được so từng bản chép; bản lệch ghi r
 
 - Tên thật khi làm (khung xếp vào thư mục con theo trách nhiệm): kho giả `tests/lib/gas/kho-thuoc-tinh.js`, một lần gọi `tests/lib/gas/lan-goi.js`, đọc Log `tests/lib/gas/doc-log.js`, bản ghi mẫu `tests/lib/gas/mau-ban-ghi.js`, nạp Sidebar `tests/lib/sidebar/nap-sidebar.js`, `schema-node.js` ở `tests/lib/sidebar/`, nạp Extension `tests/lib/ext/nap-extension.js`. Chưa dựng vì chỉ tệp ca FBM dùng: `ext/chrome-gia.js`, `fbm/tra-loi.js`, `khung-chung.js` (`nghi`, `loi`); B4 dựng khi tách tệp của mình (dòng việc ở checklist refactor FBM).
 - Trùng tên nhưng là việc khác, không gộp, chỉ ghi lại: `dungCanh` (7 tệp dựng 7 cảnh khác nhau; phần nạp client đi qua `sidebar-gia.js`), `taoHop` (4 bản, 3 bản chung khuôn "Sheet giả 4 bảng + một khách" nhưng khác dữ liệu), `banSao`, `dem`, `dungDay`, `giaoDich`, `quaCau`, `taoBoTest`. `noiNen` hai bản khác có chủ ý: bản ở `AutoLogin.js` đi qua `publicResult` để kiểm cửa ra; thuộc hộp GAS FBM nên để B4.
+- Số đo DEV 2026-11-01 (`probePropertiesBehavior`): khóa chưa có trả `null` và không có trong `getProperties`; chuỗi rỗng đã lưu đọc lại là `""` (cả `getProperty` lẫn `getProperties`); số `5` đọc lại là chuỗi `"5.0"`. Kho giả `gas/kho-thuoc-tinh.js` theo đúng ba điều này; số chưa đo (số lẻ, số từ 1e7) thì kho giả ném lỗi chứ không đoán.
 - Mỗi khung có tệp test riêng ở `tests/cases/lib/` (ví dụ kho giả trả `null` cho khóa chưa có, Chrome giả trả đúng phiên bản manifest, `sidebar-gia` nạp đúng thứ tự `include()`).
 - Chưa xóa bản chép trong các tệp test B4 đang sửa. Các tệp test không thuộc B4 (danh sách ở mục 4.3) chuyển sang khung chung ngay trong phiên này.
 - Ranh giới với B4: `tests/lib/load-gas.js` và hộp GAS FBM (`workflowGas`, `noiNen`, `capPhienThu`, `giuBanGhi`, `datUngVienDay`...) vẫn do B4 tách như đã định; phiên này không sửa `load-gas.js`. Khung mới không phụ thuộc hộp GAS FBM, B4 dùng chúng khi dựng hộp của mình: kho giả từ `fake-properties.js`, response giả từ `fbm/tra-loi.js`, Extension từ `ext/`.
@@ -232,15 +233,15 @@ Cột cuối là các trách nhiệm đang lẫn trong tệp; bước B hoặc p
 
 - [x] Đo kích thước, xem cấu trúc 94 tệp, xếp nhóm; so các bản chép khung test; kiểm kê `server/dev/`.
 - [x] Chủ dự án duyệt kế hoạch.
-- [ ] Chạy hàm dò `probePropertiesBehavior` trên DEV (đã viết, commit 746a83ec) sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép; ghi số đo vào mục 4.1.
+- [x] Chạy hàm dò `probePropertiesBehavior` trên DEV (đã viết, commit 746a83ec) sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép; ghi số đo vào mục 4.1.
 - [x] Khung `tests/lib/` (mục 4.1) và test của từng khung ở `tests/cases/lib/`; test; commit.
 - [x] `tests/cases/testRules.js` (mục 4.2) với danh sách ngoại lệ hiện có; test; commit.
 - [x] Chuyển các tệp test ngoài vùng B4 sang khung chung, hạ ngoại lệ; mọi ca lộ đỏ thì dừng trình gốc lỗi; commit.
 - [x] Tách `LogGate.js`; test; commit.
-- [ ] Chạy `probeLogGate` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép.
+- [x] Chạy `probeLogGate` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép. Kết quả 2026-11-01: 8 phép đạt (nhả 3 dòng bằng 1 lệnh ghi, che bí mật, lượt lỗi nhả kèm vết, dọn sạch).
 - [x] Tách `viewRenderer.js`, `selectionPoll.js`; test; commit.
 - [x] Dọn phần không FBM của `server/dev/` (7 tệp, 2 hàm ở `ViewProbe.js`, 22 tên ở `DEV_RUNNER_ALLOWED`); tách `ReloadMatrixProbe.js`, sửa hai phép so; commit.
-- [ ] Chạy `reloadMatrixProbe` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép.
+- [x] Chạy `reloadMatrixProbe` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép. Kết quả 2026-11-01: lần đầu hỏng ở "Sheet quản trị hàng 1 cột thường không vẽ" (revision tăng), bốn lần sau đạt đủ 15 phép; phép này đã không đổi khi tách nên không do tách. Chưa rõ gốc; thông báo lỗi nay mang mục sổ vẽ của sheet để lần hỏng sau đọc ra sheet có đang ở trạng thái lỗi không (sheet lỗi thì sửa ô nào cũng gắn cờ ô điều khiển).
 - [x] Tệp FBM ở `server/dev/` (mục 4.4: xóa 11 hàm đo một lần, tách `FbmPerfProbe.js` và `FbmSyncFixture.js`, bộ bọc đo ném lỗi khi tên mất); test; commit.
 - [x] Bảng `2026.11.01 Hàm dò DEV.md` cho mọi tên trong `DEV_RUNNER_ALLOWED`, công cụ `tests/lib/quet/bang-md.js`, luật `tests/cases/devProbes.js`; test; commit.
 - [x] `tests/tools/wrapChecks.js`; chạy trên tệp test của phiên này; commit.
