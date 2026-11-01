@@ -106,6 +106,11 @@ const notDefinition = (match, source) => !/function\s+$/.test(source.slice(Math.
 
 const RULES = [
   {
+    // Đọc hay ghi thẳng kho ô lượt là đường tạo ra bản thứ hai bên cạnh bản của lát; chỉ cửa đọc/ghi trong State.js được dùng.
+    id: 'stateStoreDirect', title: 'chỉ State.js đọc/ghi thẳng kho ô lượt', scope: ['gas'], allow: [PHASE_OWNER],
+    find: (file, src) => matchAll(src, /\bstate(?:Load|Store)\s*\(/, notDefinition)
+  },
+  {
     id: 'stateReadWrite', title: 'đọc/ghi state chỉ ở người điều phối', scope: ['gas', 'client', 'ext'], allow: STATE_ORCHESTRATORS,
     find: (file, src) => matchAll(src, /\bstate(?:Read|Write)\s*\(/, notDefinition)
   },
@@ -295,7 +300,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 6
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
