@@ -254,9 +254,10 @@ FbmSync.finishMarkerClean = function (state, cursor, candidate, failure) {
 /** Xử lý lỗi đọc xác nhận mà không lặp lại request ghi. */
 FbmSync.continueAfterPushVerificationError = function (state, cursor, failure) {
   var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate, entity = String(cursor && cursor.entity || ''), id = String(candidate && candidate.id || '');
-  state.counts.error += 1; state.phase = 'error'; state.lastFailureCode = 'FBM_VERIFY_FAILED'; state.retryable = false;
-  state.message = 'Đã ghi FBM nhưng chưa xác nhận được ' + entity + ' ' + id + ': ' + String(failure && failure.message || failure || 'Lỗi đọc xác nhận.') + '. Không tự ghi lại.';
+  state.counts.error += 1;
+  var verifyMessage = 'Đã ghi FBM nhưng chưa xác nhận được ' + entity + ' ' + id + ': ' + String(failure && failure.message || failure || 'Lỗi đọc xác nhận.') + '. Không tự ghi lại.';
   if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, 'push_' + entity, { errors: 1 }); }
+  FbmSync.runFail(state, 'FBM_VERIFY_FAILED', verifyMessage, { keepRecords: true });
   FbmSync.stateWrite(state);
   if (typeof FbmSync.logPushRecord === 'function') { FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', state.message, { failureCode: 'FBM_VERIFY_FAILED' }); }
   return { ok: false, status: FbmSync.statusView(), error: state.message };
@@ -373,8 +374,7 @@ FbmSync.pushFailuresGuard = function (state) {
   var count = Object.keys(FbmSync.pushFailuresRead().hashes).length;
   if (count < FbmSync.BUDGET.pushFailuresMax) { return false; }
   var message = 'Đã có ' + count + ' bản ghi đẩy lỗi chưa xử lý; dừng chiều đẩy để không tốn thêm lượt gọi FBM. Xem tab Lỗi và Log, sửa nguyên nhân rồi bấm "Mở lại bản ghi lỗi".';
-  state.phase = 'paused'; state.entity = ''; state.current = ''; state.cursor = {}; state.retryable = false;
-  state.lastFailureCode = 'PUSH_FAILURES_LIMIT'; state.lastError = message; state.message = message;
+  FbmSync.runClose(state, 'paused', { code: 'PUSH_FAILURES_LIMIT', message: message, error: message });
   FbmSync.stateWrite(state);
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_failures_limit', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { count: count, max: FbmSync.BUDGET.pushFailuresMax } }); }
   return true;
@@ -442,12 +442,11 @@ FbmSync.pushPassNext = function (state) {
   return found.slice(0, size).map(function (item) { return { entity: item.entity, id: item.id }; });
 };
 
-/** Kết thúc chặng đẩy (sạch hoặc dừng không sạch): xóa danh sách, chốt lượt. `mark` chỉ có khi lần quét vừa rồi không còn ứng viên: ghi làm dấu lần đẩy sạch. */
+/** Kết thúc chặng đẩy (sạch hoặc dừng không sạch): xóa danh sách, chốt lượt. Bản ghi còn giữ trong sổ bận lúc này là bản ghi mất phản hồi khi ghi (bản ghi xong đã nhả cùng lần ghi), nên giữ tới lượt mở sau. `mark` chỉ có khi lần quét vừa rồi không còn ứng viên: ghi làm dấu lần đẩy sạch. */
 FbmSync.pushStageEnd = function (state, remaining, mark) {
   FbmSync.pushListClear();
   if (mark) { FbmSync.pushCleanWrite(mark); }
-  state.phase = 'done'; state.entity = ''; state.current = ''; state.cursor = {};
-  state.message = FbmSync.runDoneMessage(state) + (remaining ? ' Còn ' + remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '');
+  FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) + (remaining ? ' Còn ' + remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : ''), keepRecords: true });
   FbmSync.stateWrite(state);
   return null;
 };
@@ -455,7 +454,7 @@ FbmSync.pushStageEnd = function (state, remaining, mark) {
 /** Tạm dừng chiều đẩy giữa chặng: danh sách bỏ đi, lượt sau quét lại từ đầu. */
 FbmSync.pushStagePause = function (state, message) {
   FbmSync.pushListClear();
-  state.phase = 'paused'; state.message = message; FbmSync.stateWrite(state);
+  FbmSync.runClose(state, 'paused', { message: message }); FbmSync.stateWrite(state);
   return null;
 };
 

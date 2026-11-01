@@ -356,12 +356,12 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   state.lastError = '';
   state.retryable = false;
   if (cursor.purpose === 'force') {
-    state.cursor = {}; state.phase = 'done'; state.message = 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.'; FbmSync.stateWrite(state);
+    FbmSync.runClose(state, 'done', { message: 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' }); FbmSync.stateWrite(state);
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: typeof LOG_OK === 'undefined' ? 'ok' : LOG_OK, reason: state.message, detail: { runId: String(state.runId || '') } }); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
   }
   if (cursor.testOnly || cursor.purpose === 'test') {
-    state.cursor = {}; state.phase = 'done'; state.message = 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.'; FbmSync.stateWrite(state);
+    FbmSync.runClose(state, 'done', { message: 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' }); FbmSync.stateWrite(state);
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
   }
   if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'auto_login', 'ok', {}); }

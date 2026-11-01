@@ -63,7 +63,7 @@ FbmSync.RUN_VERDICTS = {
  * - Dòng Log kết thúc các bước được ghi ngay lúc đóng, khi state còn là lượt đang chạy, nên mang đúng mã và nhãn của lượt đó.
  * - Request đang bay bị bỏ: `activeRequestId` rỗng thì response về muộn bị `requestAnswered` loại; mã của nó giữ ở `closedRequestId` để Log ghi đó là response của lượt đã đóng.
  * - `runId` giữ lại để Sidebar còn vẽ kết quả lượt vừa xong; lượt coi là đã đóng nhờ phase cuối. Lượt lỗi giữ cursor.
- * `detail`: `message`, `code` (mã lỗi hoặc mã tạm dừng), `error` (chữ lỗi; lỗi thì mặc định là `message`), `retryable`, `keepRecords` (giữ bản ghi trong sổ bận khi lệnh ghi FBM chưa rõ kết quả).
+ * `detail`: `message`, `code` (mã lỗi hoặc mã tạm dừng), `error` (chữ lỗi; lỗi thì mặc định là `message`), `retryable`, `keepRecords` (giữ bản ghi trong sổ bận khi lệnh ghi FBM chưa rõ kết quả), `cursor` (cursor giữ lại cho lần chạy sau, ví dụ lệnh ghi đang chờ xác nhận).
  */
 FbmSync.runClose = function (state, verdict, detail) {
   var spec = FbmSync.RUN_VERDICTS[String(verdict || '')], extra = detail || {};
@@ -75,9 +75,10 @@ FbmSync.runClose = function (state, verdict, detail) {
   if (extra.keepRecords !== true) { recordGateReleaseOwner(FbmSync.RECORD_HOLDER); }
   FbmSync.readListClear();
   state.closedRequestId = String(state.activeRequestId || '');
-  state.activeRequestId = ''; state.deadlineAt = 0; state.current = ''; state.scheduledScan = '';
+  state.activeRequestId = ''; state.deadlineAt = 0; state.current = '';
   // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.
   if (!failed) { state.cursor = {}; state.entity = ''; }
+  if (extra.cursor) { state.cursor = extra.cursor; }
   state.phase = spec.phase;
   state.message = message;
   state.lastError = error;
@@ -101,6 +102,49 @@ FbmSync.runFailCurrent = function (reason, code) {
   var step = FbmSync.businessFailingStep(state), label = step ? FbmSync.businessStepDefinition(step).label : 'phiên đồng bộ';
   FbmSync.runFail(state, code, 'Lỗi khi ' + label + ': ' + String(reason || 'không rõ nguyên nhân'), { keepRecords: true });
   return { state: FbmSync.stateWrite(state), failed: true };
+};
+
+/**
+ * Lượt đang chạy có còn sống không, chỉ đọc ô lượt truyền vào và không ghi gì: `null` là còn sống, ngược lại là kết luận đóng lượt (`code`, `message`, `keepRecords`).
+ * Lượt chết khi không còn request trong hạn và quá `STALE_RUN_MS` không có tiến triển. Request đang bay còn trong hạn ngân sách (một lô có thể chạy lâu hơn mốc chung) thì chưa chết.
+ * Lượt dở do bản cũ tạo (thiếu `schemaVersion` hiện hành) luôn chết: cursor cũ không được chạy tiếp mù; dấu chờ đẩy và hash nằm ở khóa riêng nên còn nguyên cho lượt chạy lại.
+ * `abandoned`: lần hỏi nền gặp lượt dở không còn request chờ trong hạn thì kết luận ngay, không đợi mốc, vì lượt nền không bao giờ được nối lại qua lần hỏi.
+ * Lượt chờ lệnh ghi FBM (`push_wait`) giữ bản ghi trong sổ bận để người dùng kiểm tra trên FBM trước.
+ */
+FbmSync.staleRunCheck = function (state, now, options) {
+  var current = state || {}, at = Number(now), abandoned = !!(options && options.abandoned);
+  if (!FbmSync.runInProgress(current)) { return null; }
+  var legacy = Number(current.schemaVersion || 1) < FbmSync.STATE_SCHEMA_VERSION;
+  if (!legacy && FbmSync.ACTIVE_PHASES.indexOf(String(current.phase || '')) < 0) { return null; }
+  var updated = Number(current.updatedAt || current.startedAt || 0), age = updated ? at - updated : FbmSync.STALE_RUN_MS + 1;
+  var inFlight = !!current.activeRequestId && at < Number(current.deadlineAt || 0);
+  if (!legacy && (inFlight || (!abandoned && age <= FbmSync.STALE_RUN_MS))) { return null; }
+  var waitingWrite = (current.cursor || {}).kind === 'push_wait', unclaimed = !legacy && FbmSync.pickupHeld(current);
+  var message = legacy
+    ? (waitingWrite ? 'Phiên ghi FBM đang dở được tạo bởi bản cũ; đã dừng và không tự ghi lại để tránh trùng dữ liệu. Hãy chạy lại lượt.' : 'Phiên đồng bộ đang dở được tạo bởi bản cũ; đã dừng, hãy chạy lại lượt.')
+    : waitingWrite
+    ? 'Phiên ghi FBM không nhận được phản hồi quá thời gian an toàn; không tự ghi lại để tránh trùng dữ liệu.'
+    : unclaimed
+    ? 'Lượt tay chờ Extension máy được giao đến nhận nhưng Extension máy đó không hỏi GAS lần nào trong hạn (Extension tắt, máy tắt hoặc mất mạng); đã đóng lượt, chưa có request nào sang FBM.'
+    : abandoned
+    ? 'Lượt đồng bộ trước bị bỏ dở (không còn request nào chờ phản hồi); đã kết thúc, lượt mới chạy lại từ đầu.'
+    : 'Phiên đồng bộ không nhận được phản hồi quá thời gian an toàn; đã tự dừng, có thể chạy lại.';
+  var code = legacy ? 'SYNC_STATE_MIGRATED' : waitingWrite ? 'SYNC_STALE_WRITE' : unclaimed ? 'RUN_PICKUP_EXPIRED' : abandoned ? 'SYNC_ABANDONED_RUN' : 'SYNC_STALE_RUN';
+  return { code: code, message: message, keepRecords: waitingWrite };
+};
+
+/**
+ * Người điều phối thu hồi lượt chết: `staleRunCheck` kết luận thì đóng qua `runFail`, ghi, và ghi riêng một dòng Log (lượt bị thu hồi có thể không còn bước nào mở để tự ghi dòng kết thúc). Không gửi lại lệnh ghi đang mở.
+ */
+FbmSync.recoverStaleRun = function (state, now, options) {
+  var current = state || FbmSync.stateRead(), verdict = FbmSync.staleRunCheck(current, Number(now || Date.now()), options);
+  if (!verdict) { return { state: current, recovered: false }; }
+  var cursorKind = String((current.cursor || {}).kind || '');
+  current.schemaVersion = FbmSync.STATE_SCHEMA_VERSION;
+  FbmSync.runFail(current, verdict.code, verdict.message, { keepRecords: verdict.keepRecords });
+  var written = FbmSync.stateWrite(current);
+  logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: LOG_ERROR, cycleId: String(current.runId || ''), reason: verdict.message, detail: { code: verdict.code, runId: String(current.runId || ''), cursor: cursorKind } });
+  return { state: written, recovered: true, waitingWrite: verdict.keepRecords };
 };
 
 /**
@@ -162,5 +206,8 @@ FbmSync.runStopCommand = function (scope) {
 FbmSync.stopPendingApply = function (fresh) {
   var state = FbmSync.stateRead(), flag = FbmSync.stopFlagRead(fresh);
   if (!FbmSync.stopFlagFor(state, flag)) { return { state: state, stopped: false }; }
-  return { state: FbmSync.stateWrite(FbmSync.runClose(state, flag.verdict)), stopped: true };
+  FbmSync.runClose(state, flag.verdict);
+  // Người dùng dừng thì tiến trình nền đang đến hạn cũng bỏ, không để nhịp kế mở lại đúng lượt vừa dừng; lượt chết bị thu hồi thì giữ để lịch nền chạy lại.
+  state.scheduledScan = '';
+  return { state: FbmSync.stateWrite(state), stopped: true };
 };

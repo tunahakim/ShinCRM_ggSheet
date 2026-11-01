@@ -72,14 +72,13 @@ FbmSync.customerCountContinue = function (state, rawResponse) {
   var total = FbmSync.customerCountTotal(rawResponse), tail = state.metadata && state.metadata.countTail || {};
   if (total === null) {
     var reason = 'FBM không trả số khách ở bước đếm cuối lượt; dữ liệu của lượt đã ghi, lượt sau sẽ đếm lại.';
-    state.phase = 'error'; state.cursor = {}; state.entity = ''; state.lastFailureCode = 'FBM_CUSTOMER_COUNT_INVALID'; state.lastError = reason; state.message = reason;
+    FbmSync.runFail(state, 'FBM_CUSTOMER_COUNT_INVALID', reason);
     FbmSync.stateWrite(state);
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'customer_count_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: reason, detail: { code: state.lastFailureCode } }); }
     return { ok: false, code: state.lastFailureCode, request: null, error: reason, status: FbmSync.statusView() };
   }
   var baseline = FbmSync.customerBaselineRead(), changed = FbmSync.customerCountChanged(total);
-  state.phase = 'done'; state.cursor = {}; state.entity = '';
-  state.message = tail.message || FbmSync.runDoneMessage(state);
+  FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
   if (!changed) { return { ok: true, request: null, status: FbmSync.statusView() }; }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'customer_count_changed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }); }

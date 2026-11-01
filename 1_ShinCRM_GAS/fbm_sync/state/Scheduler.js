@@ -377,7 +377,7 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   state.cursor = {};
   FbmSync.stateWrite(state);
   state = FbmSync.stateRead();
-  if (result.ok && FbmSync.runInProgress(state) && !(state.metadata && state.metadata.manualPending)) {
+  if (result.ok && FbmSync.runInProgress(state)) {
     request = FbmSync.requestForCursor(state);
   } else if (result.ok && state.scheduledScan === 'recount') {
     state.scheduledScan = ''; FbmSync.stateWrite(state);

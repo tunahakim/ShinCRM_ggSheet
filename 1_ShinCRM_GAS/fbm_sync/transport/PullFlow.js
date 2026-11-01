@@ -119,9 +119,7 @@ FbmSync.preflightApply = function (state, preflight) {
   if (typeof preflight.conflictPending === 'number') { FbmSync.conflictPendingNote(state, preflight.conflictPending); }
   if (!preflight.ok) {
     var first = preflight.blocking[0] || {};
-    state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = 'SYNC_PREFLIGHT_FAILED';
-    state.lastError = 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.');
-    state.message = state.lastError;
+    FbmSync.runFail(state, 'SYNC_PREFLIGHT_FAILED', 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.'));
     FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
   }
@@ -259,10 +257,7 @@ FbmSync.progressCustomersDone = function (state, count) {
 
 /** Kết thúc lượt đọc: cờ vắng mặt đã do cửa ghi gắn theo từng lô nên ở đây chỉ chốt lượt và xóa danh sách đọc của lượt. */
 FbmSync.finishPullRun = function (state) {
-  state.cursor = {}; state.entity = '';
-  FbmSync.readListClear();
-  state.phase = 'done';
-  state.message = FbmSync.runDoneMessage(state);
+  FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
   return true;
 };
@@ -274,9 +269,7 @@ FbmSync.finishPullRun = function (state) {
 FbmSync.customerScanEnd = function (state) {
   var scan = state.metadata && state.metadata.customerScan || {}, total = Number(scan.total || 0), seen = Number(scan.seen || 0);
   if (seen < total || (!total && seen > 0)) {
-    state.phase = 'error'; state.lastFailureCode = 'FBM_SCAN_INCOMPLETE';
-    state.lastError = 'Lượt quét chỉ nhận ' + seen + '/' + (total || '?') + ' khách FBM nên đã dừng trước khi đọc chi tiết và chưa ghi gì. Báo người phụ trách kỹ thuật kiểm tra phân trang Customer.';
-    state.message = state.lastError;
+    FbmSync.runFail(state, 'FBM_SCAN_INCOMPLETE', 'Lượt quét chỉ nhận ' + seen + '/' + (total || '?') + ' khách FBM nên đã dừng trước khi đọc chi tiết và chưa ghi gì. Báo người phụ trách kỹ thuật kiểm tra phân trang Customer.');
     FbmSync.stateWrite(state);
     return { ok: false, code: 'FBM_SCAN_INCOMPLETE', request: null, status: FbmSync.statusView(), error: state.lastError };
   }
@@ -426,13 +419,6 @@ FbmSync.continueStep = function (rawResponse) {
   if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
   FbmSync.stateWrite(state);
   response = FbmSync.protocol.parse(rawResponse);
-  if (state.origin === 'background' && state.metadata && state.metadata.manualPending) {
-    state.runId = ''; state.origin = 'manual'; state.phase = 'idle'; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = '';
-    state.message = 'Phiên nền đã dừng sau response hiện tại; có thể chạy phiên thủ công.';
-    state.metadata.manualPending = null;
-    FbmSync.stateWrite(state);
-    return { ok: true, request: null, status: FbmSync.statusView() };
-  }
   if (FbmSync.applyTransportSession && FbmSync.applyTransportSession(state, rawResponse)) { FbmSync.stateWrite(state); }
   if (typeof FbmSync.continueSessionGate === 'function') {
     var gateResponse = FbmSync.continueSessionGate(state, cursor, rawResponse);
@@ -534,8 +520,7 @@ FbmSync.continueStep = function (rawResponse) {
     if (state.scan === 'identity_probe') {
       state.metadata = state.metadata || {};
       state.metadata.identityProbe = probedRuntime;
-      state.cursor = {}; state.phase = 'done'; state.entity = '';
-      state.message = 'Đã đọc và xác minh nhận diện phiên FBM; chờ người dùng xác nhận lưu.';
+      FbmSync.runClose(state, 'done', { message: 'Đã đọc và xác minh nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
       FbmSync.stateWrite(state);
       return { ok: true, request: null, status: FbmSync.statusView() };
     }
@@ -587,8 +572,7 @@ FbmSync.continueStep = function (rawResponse) {
   if (cursor.kind === 'identity_user_grid') {
     var identityUser = FbmSync.identityUser(response);
     if (!identityUser.ok) {
-      state.phase = 'error'; state.entity = ''; state.cursor = {}; state.lastFailureCode = identityUser.code;
-      state.lastError = identityUser.message; state.message = identityUser.message; FbmSync.stateWrite(state);
+      FbmSync.runFail(state, identityUser.code, identityUser.message); FbmSync.stateWrite(state);
       return { ok: false, code: identityUser.code, status: FbmSync.statusView(), error: identityUser.message };
     }
     FbmSync.sessionIdentityRecord(state, identityUser);
@@ -599,8 +583,7 @@ FbmSync.continueStep = function (rawResponse) {
       username: identityUser.username,
       accountName: identityUser.accountName
     };
-    state.cursor = {}; state.phase = 'done'; state.entity = '';
-    state.message = 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.';
+    FbmSync.runClose(state, 'done', { message: 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
     FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView() };
   }
@@ -636,7 +619,7 @@ FbmSync.continueStep = function (rawResponse) {
       return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityCursor.count, gridPageIndex: identityCursor.pageIndex, gridPageValue: identityCursor.pageValue, pageItems: identityCursor.pageItems, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
     }
     FbmSync.identityCheckFinish(state);
-    state.cursor = {}; state.phase = 'done'; state.entity = ''; state.message = 'Đã kiểm tra liên kết Customer FBM.'; FbmSync.stateWrite(state);
+    FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' }); FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
   }
   // Cửa ghi: một lô đọc chi tiết hoặc một lô tra mã; hết khách của chặng thì sang chặng kế.
