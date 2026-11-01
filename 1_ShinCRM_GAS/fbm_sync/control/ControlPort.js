@@ -64,7 +64,7 @@ FbmSync.controlDispatch = function (command, payload, channel) {
   var body = function () {
     var state = spec.guard ? FbmSync.stateRead() : null, refused = spec.guard ? spec.guard(input, state) : null;
     if (refused) { return refused; }
-    return spec.slice ? FbmSync.runSlice(function () { return spec.run(input, state); }) : spec.run(input, state);
+    return spec.slice ? FbmSync.runSlice(function () { return spec.run(input, state); }, state) : spec.run(input, state);
   };
   var run = function () {
     FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };

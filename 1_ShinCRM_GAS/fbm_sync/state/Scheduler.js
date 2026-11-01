@@ -295,7 +295,7 @@ function fbmSyncHeartbeatRequest(options) {
   var state = FbmSync.stopPendingApply().state, now = Date.now();
   if (FbmSync.pickupAwaits(state, opt.machineId, now)) {
     FbmSync.requestWatchTrail(opt.trail);
-    return FbmSync.runSlice(function () { return FbmSync.envelopeReissue(state, ''); });
+    return FbmSync.runSlice(function () { return FbmSync.envelopeReissue(state, ''); }, state);
   }
   // Chỗ giữ quá hạn đóng ở lần hỏi của bất kỳ máy nào, kể cả khi nền tắt: không thì Sidebar thấy lượt "đang chạy" mãi.
   if (FbmSync.pickupHeld(state) && now >= Number(state.deadlineAt || 0)) { state = FbmSync.recoverStaleRun(state, now, { abandoned: true }).state; }

@@ -256,8 +256,50 @@ FbmSync.pushCleanWrite = function (mark) {
   if (!write.ok) { throw write.error; }
 };
 FbmSync.pushCleanClear = function () { FbmSync.props().deleteProperty(FbmSync.PUSH_CLEAN_KEY); };
-/** Đọc state và tự bù field thiếu từ mặc định. */
+/**
+ * Bản ô lượt của lát đang chạy: `runSlice` mở, đóng và ghi xuống kho một lần ở cuối lát. Trong lát mọi lần `stateRead` trả cùng một bản, nên hai hàm sửa hai trường khác nhau không đè mất thay đổi của nhau; `stateWrite` một bản khác bản của lát thì ném `SLICE_FOREIGN_STATE` trước khi kịp đè.
+ * `null` khi không có lát nào mở: đọc và ghi đi thẳng xuống kho như cũ.
+ */
+FbmSync.sliceStore = null;
+/** Đọc state; trong lát trả bản của lát (lần đầu mới đọc kho). */
 FbmSync.stateRead = function () {
+  var store = FbmSync.sliceStore;
+  if (!store) { return FbmSync.stateLoad(); }
+  if (!store.state) { store.state = FbmSync.stateLoad(); }
+  return store.state;
+};
+/**
+ * Ghi state. Trong lát chỉ đánh dấu bản của lát cần ghi và trả lại chính bản đó; bản khác là một bản sao cũ sắp đè thay đổi của hàm khác nên ném. Lát chưa đọc ô lượt thì nhận bản được ghi làm bản của lát.
+ * Mở lượt mới thay hẳn ô lượt thì dùng `stateReplace`.
+ */
+FbmSync.stateWrite = function (state) {
+  var store = FbmSync.sliceStore;
+  if (!store) { return FbmSync.stateStore(state); }
+  if (store.state && state !== store.state) {
+    var foreign = new Error('Ghi một bản ô lượt khác bản của lát đang chạy; bản này sẽ đè mất thay đổi của hàm khác trong cùng lát.');
+    foreign.code = 'SLICE_FOREIGN_STATE';
+    throw foreign;
+  }
+  store.state = state;
+  store.dirty = true;
+  return state;
+};
+/** Thay hẳn ô lượt (mở lượt mới): trong lát bản mới thành bản của lát, bản cũ ai còn giữ mà ghi lại thì bị `stateWrite` chặn. */
+FbmSync.stateReplace = function (state) {
+  var store = FbmSync.sliceStore;
+  if (!store) { return FbmSync.stateStore(state); }
+  store.state = state;
+  store.dirty = true;
+  return state;
+};
+/** Đóng bản của lát; có thay đổi thì ghi xuống kho một lần. Trả bản đã ghi, hoặc `null` khi lát không đổi ô lượt. */
+FbmSync.sliceStoreClose = function () {
+  var store = FbmSync.sliceStore;
+  FbmSync.sliceStore = null;
+  return store && store.dirty ? FbmSync.stateStore(store.state) : null;
+};
+/** Đọc ô lượt từ kho và tự bù field thiếu từ mặc định. */
+FbmSync.stateLoad = function () {
   var fallback = FbmSync.stateDefault();
   var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
   if (!parsed) { return fallback; }
@@ -269,8 +311,8 @@ FbmSync.stateRead = function () {
   FbmSync.requestWatchNote(read);
   return read;
 };
-/** Ghi state, cập nhật timestamp và giữ cấu trúc nhất quán. */
-FbmSync.stateWrite = function (state) {
+/** Ghi ô lượt xuống kho, cập nhật timestamp và giữ cấu trúc nhất quán. */
+FbmSync.stateStore = function (state) {
   var next = Object.assign(FbmSync.stateDefault(), state || {});
   next.session = Object.assign(FbmSync.stateDefault().session, next.session || {});
   next.session.lookups = Object.assign({}, FbmSync.stateDefault().session.lookups, next.session.lookups || {});

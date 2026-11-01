@@ -5,19 +5,34 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
- * Ranh giới một lát đồng bộ, chạy bên trong khóa điều phối: nhả bộ gom vấn đề theo bản ghi, và nếu lát ném lỗi thì chuyển phiên sang lỗi
- * trước khi nhả khóa (nhả khóa rồi mới ghi thì một lát khác có thể chen vào giữa). Đường Sidebar và đường nền dùng chung hàm này.
+ * Ranh giới một lát đồng bộ, chạy bên trong khóa điều phối. Lát giữ một bản ô lượt (`sliceStore`): mọi hàm trong lát đọc và sửa cùng bản đó, cuối lát ghi xuống kho một lần.
+ * `state`: bản cửa lệnh đã đọc trong cùng lần cầm khóa (để kiểm lệnh), thành bản của lát; không truyền thì lát đọc ở lần `stateRead` đầu.
+ * Lát ném lỗi thì chuyển lượt sang lỗi trên bản của lát rồi mới ghi, trước khi nhả khóa (nhả khóa rồi mới ghi thì một lát khác có thể chen vào giữa). Lát lồng trong lát dùng chung bản của lát ngoài.
  */
-FbmSync.runSlice = function (work) {
-  var failure = null, result;
-  // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
+FbmSync.runSlice = function (work, state) {
+  var owner = !FbmSync.sliceStore, failure = null, result;
+  if (owner) { FbmSync.sliceStore = { state: state || null, dirty: false }; }
   try {
+    // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
     result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() } : FbmSync.stopBeforeIssue(work());
-  } catch (error) { failure = error; throw error; } finally {
-    FbmSync.recordIssuesFlush();
-    if (failure) { FbmSync.controlFailRun(failure); }
+  } catch (error) {
+    failure = error;
+    FbmSync.controlFailRun(error);
   }
+  FbmSync.recordIssuesFlush();
+  if (owner) { FbmSync.sliceClose(failure); }
+  if (failure) { throw failure; }
   return FbmSync.runLeftOpenClose(result);
+};
+/**
+ * Ghi bản của lát xuống kho. Ghi hỏng khi lát chạy êm thì đưa lượt sang lỗi trên ô lượt trong kho rồi ném; lát đã lỗi sẵn thì chỉ thêm một dòng Log, lỗi gốc vẫn là lỗi được ném.
+ */
+FbmSync.sliceClose = function (failure) {
+  try { FbmSync.sliceStoreClose(); }
+  catch (closeError) {
+    FbmSync.controlFailRun(closeError);
+    if (!failure) { throw closeError; }
+  }
 };
 /** Lệnh Dừng ghi cờ trong lúc lát này đang chạy: không phát request vừa dựng, đóng lượt luôn. Đọc cờ từ kho thật, một lần đọc mỗi lát có request. */
 FbmSync.stopBeforeIssue = function (result) {

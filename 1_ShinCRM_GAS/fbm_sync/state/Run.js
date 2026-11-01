@@ -42,7 +42,7 @@ FbmSync.runOpen = function (spec) {
     startedAt: Number(now), updatedAt: Number(now)
   });
   state.runLabel = FbmSync.runLabelOf(state, opt.kindLabel);
-  return FbmSync.stateWrite(state);
+  return FbmSync.stateReplace(state);
 };
 
 /**
