@@ -18,6 +18,7 @@ const NHOM_CA = [
   require('./cases/textNormalize'),
   require('./cases/schemaCheck'),
   require('./cases/namespace'),
+  require('./cases/devProbes'),
   require('./cases/sourceEncoding'),
   require('./cases/settings'),
   require('./cases/logMask'),

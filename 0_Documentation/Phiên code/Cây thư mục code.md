@@ -306,6 +306,8 @@ tests\
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
 │   └── quet\                     Công cụ quét mã nguồn.
+│       ├── bang-md.js            Đọc bảng markdown trong tài liệu thành hàng ô kèm số dòng, để test đối chiếu tài liệu với code.
+│       ├── khai-bao.js           Tên khai báo ở cột 0 của mã GAS (tên toàn cục), bỏ bảng khai mở.
 │       ├── liet-tep.js           Liệt kê tệp trong dự án GAS hoặc thư mục bất kỳ của repo, đi cả thư mục con, bỏ node_modules và thư mục chấm.
 │       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
 │       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
@@ -319,6 +321,7 @@ tests\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
+    ├── devProbes.js              Bảng tài liệu Hàm dò DEV khớp DEV_RUNNER_ALLOWED (thiếu dòng hoặc dòng trỏ hàm không có là đỏ); danh sách bọc của FbmPerfProbe chỉ chứa tên còn trong code.
     ├── sourceEncoding.js         Mã GAS và Sidebar không chứa chữ mojibake (UTF-8 bị đọc nhầm bảng mã).
     ├── settings.js               Cổng cài đặt: bảng khai, đọc khi kho rỗng hay hỏng, settingsSave chuẩn hóa và phát tín hiệu, các kiểu trường, ngầm định lệch thì bỏ và có thông báo, LOG_TRACE.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.

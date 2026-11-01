@@ -68,7 +68,7 @@ Quy tắc mới chỉ áp cho một loại phiên thì ghi vào tệp của lo�
 
 - Sau mỗi thay đổi code chạy `node tests/run.js`, chỉ đọc phần tổng kết hoặc lỗi. Chạy bộ đầy đủ trước mốc bàn giao hoặc khi đổi hợp đồng dùng chung; ngoài các mốc đó vẫn chạy nếu chi phí thời gian hợp lý.
 - Bắt buộc viết test cho nhánh có thể hỏng âm thầm, mở nhầm dữ liệu, ghi đè âm thầm, tạo trùng hoặc tốn hạn mức. Chi tiết nhỏ mà chủ dự án nghiệm thu được ngay trên Sheet DEV thì không cần test riêng.
-- Nghiệm thu GAS bằng `node tests/gas.js <tên-hàm> --push`; thiếu `--push` là đang chạy bản cũ. Hàm dò mới phải có trong `DEV_RUNNER_ALLOWED`.
+- Nghiệm thu GAS bằng `node tests/gas.js <tên-hàm> --push`; thiếu `--push` là đang chạy bản cũ. Hàm dò mới phải có trong `DEV_RUNNER_ALLOWED` và có một dòng trong bảng `0_Documentation/Phiên code/2026.11.01 Hàm dò DEV.md` (test `devProbes` kiểm).
 - Chỉ thử trên Sheet DEV hoặc tệp trắng, không chạm Sheet có dữ liệu khách thật.
 - Code Extension chính thức nằm trong `2_ShinCRM_Extension/`; không sửa Extension đang chạy ngoài repo. Chủ dự án tự tải lại Extension sau mỗi commit Extension.
 - Trước khi đưa dữ liệu thật vào production: xóa `server/dev/`, deployment DEV và tệp cấu hình chạy thử, tắt chia sẻ bằng liên kết, tắt `LOG_TRACE`.
