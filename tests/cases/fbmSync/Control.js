@@ -1,6 +1,6 @@
 /** Kiểm cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng, relay chỉ gọi được lệnh của relay, mã giao thức lệch bị chặn, khóa bận không lọt, `status` chỉ đọc. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }

@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 const SECRETS = ['COOKIE_MAU', 'AUTH_KHACH_MAU', 'AUTH_GIAO_DICH_MAU'];
 /** Hàm phải chạy được với ô lượt mẫu, không được phép ném lỗi môi trường giả. */

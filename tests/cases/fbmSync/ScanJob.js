@@ -1,6 +1,7 @@
 /** Việc quét Customer: Extension gọi FBM một lần và cắt gói, GAS nhận từng gói theo cursor; kiểm cả nhánh gói trùng, gói lạ, mất response, mất tab, ghi lỗi và lượt thiếu dòng. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row } = require('./Workflow');
 const { napServer } = require('../../lib/load-gas');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });

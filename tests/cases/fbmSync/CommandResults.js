@@ -3,7 +3,7 @@
  * Bảng ca phải phủ đủ bảng lệnh, mọi loại lượt của `start` và mọi mục của `save_settings`: thêm lệnh, loại lượt hay mục cài đặt mà quên ca thì test đỏ.
  */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 /** Hộp cát đủ tệp cho mọi lệnh (lưu cài đặt chung đổi mã ra khách qua cổng mã, `trace_read` đọc sổ bước). */
 const HOP = { extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/diagnostic/Trace.js'], LOG_WARN: 'warn' };

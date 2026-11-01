@@ -1,6 +1,6 @@
 /** Kiểm `fbm_sync/transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` quyết đúng một kế hoạch cho mỗi mã lỗi, không đọc kho, không ghi. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 async function chay(so) {
   section('FBM sync — TransportCore.js: bảng lỗi đường truyền');

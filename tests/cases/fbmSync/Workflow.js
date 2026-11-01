@@ -4,6 +4,7 @@ const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU, datUngVienDay } = require('../../lib/load-gas');
+const { workflowGas, khoDongBo } = require('../../lib/fbm/hop-dong-bo');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -19,76 +20,6 @@ const WORKER = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_wor
  */
 const FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX = 6;
 const FBM_SEEN_STORE_RESET_DELETES = 8;
-
-function properties() {
-  const data = {};
-  return {
-    getProperty(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
-    setProperty(key, value) { data[key] = String(value); },
-    deleteProperty(key) { delete data[key]; },
-    getProperties() { return Object.assign({}, data); },
-    data
-  };
-}
-
-/** Hằng số `SETTINGS` của code thật, để ngưỡng trong test luôn khớp file cấu hình. */
-function settingsThat() {
-  const settings = taoHopCat({});
-  napServer(settings, 'server/config/Settings.js');
-  return settings.SETTINGS;
-}
-
-function workflowGas(options) {
-  const opt = options || {};
-  const documentProperties = opt.documentProperties || properties();
-  const scriptProperties = opt.scriptProperties || properties();
-  const scriptLock = { held: false, tryLock() { if (this.held) { return false; } this.held = true; return true; }, releaseLock() { this.held = false; } };
-  const hop = taoHopCat(Object.assign({
-    // Chỗ giữ trước khi nạp Trace.js thật (bản thật đè hàm giả này); đóng lượt luôn ghi dòng đóng bước nên bộ dựng chung nạp sổ bước.
-    FbmSync: { traceImport() {} },
-    DATA_SCHEMA: {},
-    SYNC_SCHEMA: {},
-    PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => scriptProperties },
-    Utilities: { getUuid: () => 'workflow-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
-    shinOpenBook: () => ({ getId: () => 'sheet-workflow' }),
-    LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict',
-    logEvent: () => {},
-    logTrace: () => {},
-    runEntryPoint: (name, source, fn) => fn(),
-    // Khóa script giả của hộp cát; `scriptLock.held` cho ca kiểm giữ khóa sẵn để thử nhánh bận.
-    LockService: { getScriptLock: () => scriptLock },
-    // Chỉ lấy hằng số `SETTINGS` thật, không nạp cả Settings.js vì nó kéo theo đường đọc sheet Config.
-    SETTINGS: settingsThat()
-  }, opt));
-  napServer(hop,
-    'fbm_sync/schema/FbmFields.js',
-    'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
-    'fbm_sync/state/AccountSettings.js',
-    'fbm_sync/control/ControlPort.js',
-    'fbm_sync/state/Scheduler.js',
-    'fbm_sync/reconcile/Identity.js',
-    'fbm_sync/reconcile/CategoryGate.js',
-    'fbm_sync/reconcile/Fingerprint.js',
-    'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/Conflict.js',
-    'fbm_sync/report/Report.js',
-    'fbm_sync/read/GridRead.js',
-    'fbm_sync/write/PushCandidates.js',
-    'fbm_sync/write/RequestBuilders.js',
-    'fbm_sync/auth/AutoLogin.js',
-    'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
-    'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
-    'fbm_sync/transport/EntryPoints.js',
-    'server/service/FbmSyncService.js',
-    'server/dev/FbmSyncStateProbe.js'
-  , 'fbm_sync/write/SheetSave.js', ...(opt.extraFiles || []));
-  hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
-  hop.FbmSync.configValue = () => '';
-  // `readLocal: 'sheet'` giữ readLocal thật (đi qua bản chụp Sheet) để đếm số lần đọc Sheet.
-  if (opt.readLocal !== 'sheet') { hop.FbmSync.readLocal = opt.readLocal || (() => []); }
-  return { hop, documentProperties, scriptProperties, scriptLock };
-}
 
 function gridResponse(fields, rows, total) {
   return JSON.stringify({ d: {
@@ -951,7 +882,7 @@ async function chay(so) {
     const soKhach = options && options.customers || 2, khachLoi = options && options.failing || {};
     const fullLogs = [], fullWrites = [], fullLocal = { customer: [], activity: (options && options.localActivity || []).slice() };
     // Đếm mọi lần gọi kho DocumentProperties để chốt đợt 1 bước A: một lát Activity không được đọc/ghi kho theo số sự kiện.
-    const fullProps = properties(), fullPropCalls = { count: 0 }, fullSheetReads = { customer: 0, activity: 0, category: 0 };
+    const fullProps = khoDongBo(), fullPropCalls = { count: 0 }, fullSheetReads = { customer: 0, activity: 0, category: 0 };
     ['getProperty', 'setProperty', 'deleteProperty', 'getProperties'].forEach((name) => { const original = fullProps[name]; fullProps[name] = function () { fullPropCalls.count += 1; return original.apply(this, arguments); }; });
     fullProps.setProperties = function (batch) { fullPropCalls.count += 1; Object.keys(batch).forEach((key) => { fullProps.data[key] = String(batch[key]); }); };
     const fullFlow = workflowGas({
@@ -1400,4 +1331,4 @@ async function chay(so) {
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
 }
 
-module.exports = { chay, workflowGas, executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row };
+module.exports = { chay, executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row };

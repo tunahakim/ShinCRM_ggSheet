@@ -1,6 +1,6 @@
 /** Kiểm đường mở lượt tay: Sidebar chỉ nhận `runId`, lần hỏi (`heartbeat`) của Extension đúng máy nhận lượt qua relay; máy khác, lần hỏi thứ hai, chỗ giữ quá hạn và response đến sau khi lượt đóng không chạm nhầm ô lượt. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }

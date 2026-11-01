@@ -1,6 +1,6 @@
 /** Kiểm `fbm_sync/state/Run.js`: lệnh Dừng ghi cờ không cần khóa điều phối, lát đang giữ khóa thấy cờ trước khi phát request kế, lệnh mở lượt và lát kế áp cờ còn chờ; mọi đường đóng lượt đi qua `runClose`. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }

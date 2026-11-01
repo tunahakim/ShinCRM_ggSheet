@@ -306,6 +306,8 @@ tests\
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
 │   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
+│   ├── fbm\
+│   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
 │   └── quet\                     Công cụ quét mã nguồn.

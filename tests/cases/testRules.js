@@ -107,21 +107,16 @@ const EXCEPTIONS = {
     'cases/fbmSync/RelayLoop.js': 9,
     'cases/fbmSync/Settings.js': 4,
     'cases/fbmSync/Sidebar.js': 1,
-    'cases/fbmSync/Workflow.js': 8
+    'cases/fbmSync/Workflow.js': 6
   },
   requireCa: {
     'cases/fbmSync/ActivityScan.js': 1,
     'cases/fbmSync/BackgroundChain.js': 1,
-    'cases/fbmSync/CommandResults.js': 1,
-    'cases/fbmSync/Control.js': 1,
     'cases/fbmSync/CustomerCount.js': 1,
-    'cases/fbmSync/EntryPointGate.js': 1,
     'cases/fbmSync/Gate.js': 1,
     'cases/fbmSync/Reconcile.js': 1,
     'cases/fbmSync/RelayResend.js': 1,
-    'cases/fbmSync/RelayResubmit.js': 1,
     'cases/fbmSync/Rotation.js': 1,
-    'cases/fbmSync/RunPickup.js': 1,
     'cases/fbmSync/ScanJob.js': 1,
     'cases/fbmSync/ScanPack.js': 1,
     'cases/fbmSync/SidebarDrive.js': 1,

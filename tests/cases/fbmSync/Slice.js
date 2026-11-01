@@ -1,6 +1,6 @@
 /** Kiểm `fbm_sync/state/Slice.js`: lát giữ một bản ô lượt, mọi hàm trong lát sửa cùng bản đó và cuối lát ghi xuống kho đúng một lần; bản khác đưa vào bị chặn trước khi đè. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('./Workflow');
+const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
 const KHOA_O_LUOT = 'FBM_SYNC_STATE_V1';
 
