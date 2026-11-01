@@ -237,7 +237,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
     ├── transport\Budget.js       Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
-    ├── transport\TransportCore.js Hợp đồng request và retry đọc an toàn.
+    ├── transport\TransportCore.js Hợp đồng request, retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại).
     ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
     ├── transport\ScanJob.js     Việc quét: cấp scan_job/scan_chunk, đối chiếu gói với cursor, chạy lại khi tab mất việc.
@@ -375,6 +375,7 @@ tests\
     │   ├── Run.js                  Kiểm `state/Run.js`: Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
+    │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
     │   ├── EntryPointGate.js       Kiểm cửa ra của mọi hàm fbm* về Sidebar không mang cookie/token phiên, và lệnh start giữ nguyên identity nháp của Kiểm liên kết.
     │   ├── StaticRules.js          Quét mã FBM theo quy tắc kiến trúc cứng (state, lỗi im lặng, typeof hàm, phase, DocumentProperties, popup, kind, số cứng, logEvent, baseline) với danh sách ngoại lệ chỉ được co lại.
