@@ -33,7 +33,7 @@ async function chay(so) {
   F.runOpen({ phase: 'pull_activity' });
   F.readListAdd(['FBM-C1', 'FBM-MOI']);
   F.readWaitWrite({ 'FBM-C2': ['800001'] });
-  F.stateFailRun('Lượt hỏng giả lập', 'FBM_TEST');
+  F.runFailCurrent('Lượt hỏng giả lập', 'FBM_TEST');
   const conLai = [F.readListNext(10), F.readWaitRead()];
   F.runOpen({ phase: 'pull_activity' });
   F.readListAdd(['FBM-C1']);
