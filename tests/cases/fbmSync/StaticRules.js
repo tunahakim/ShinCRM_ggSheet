@@ -148,6 +148,11 @@ const RULES = [
     find: (file, src) => matchAll(src, /\blogEvent\s*\(/, notDefinition)
   },
   {
+    // Mọi đường kết thúc lượt đi qua `runClose`/`runFail`: đặt thẳng phase cuối thì bỏ qua việc đóng bước, nhả sổ bận và loại request đang bay.
+    id: 'phaseClose', title: 'phase cuối chỉ đặt trong runClose', scope: ['gas'], allow: STATE_ORCHESTRATORS,
+    find: (file, src) => matchAll(src, /\.phase\s*=\s*'(?:done|error|paused|conflict)'/)
+  },
+  {
     id: 'baselineWrite', title: 'baseline (fbmHash) chỉ được ghi ở ba công cụ áp kết quả', scope: ['gas'], allow: BASELINE_WRITERS,
     // Khóa trong literal `fbmHash: giá_trị` (trừ khai báo schema `fbmHash: {`) và phép gán `.fbmHash = ` (không phải so sánh).
     find: (file, src) => matchAll(src, /\bfbmHash\s*:(?!\s*\{)|\.fbmHash\s*=(?!=)/)
@@ -280,6 +285,18 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2
   },
+  // Còn lại là Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết lại thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đã đóng, và đối tượng status (không phải ô lượt).
+  phaseClose: {
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 2,
+    '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7
+  },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 3,
@@ -379,6 +396,7 @@ function chay(so) {
   check(so, 'ghi baseline bằng khóa literal và phép gán bị bắt, đọc, so sánh và khai báo schema thì không', hits('baselineWrite', 'f.js', "w.push({ fbmHash: h }); r.fbmHash = h; if (r.fbmHash === h) {} var x = r.fbmHash || ''; var s = { fbmHash: { code: 'A' } };"), 2);
   check(so, 'stateWrite bị bắt, khai báo hàm thì không', hits('stateReadWrite', 'f.js', 'FbmSync.stateWrite({}); var s = stateRead(); function stateWrite(x) {}'), 2);
   check(so, 'logEvent bị bắt', hits('logEvent', 'f.js', "logEvent({ a: 1 });"), 1);
+  check(so, 'đặt phase cuối ngoài runClose bị bắt', [hits('phaseClose', 'f.js', "state.phase = 'done';"), hits('phaseClose', 'f.js', "if (state.phase === 'done') {}")], [1, 0]);
 
   section('Quét quy tắc kiến trúc FBM — phép so ngoại lệ chỉ cho co lại');
   const fakeLines = (n) => Array.from({ length: n }, (v, i) => ({ line: i + 1, text: 'x' }));
