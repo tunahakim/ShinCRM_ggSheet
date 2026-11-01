@@ -71,7 +71,7 @@ function findFbmTab() {
   return chrome.tabs.query({ url: [FBM_SITE + '*'] }).then(function (tabs) { return tabs && tabs.length ? tabs[0] : null; });
 }
 /**
- * Chờ tab tải xong trong hạn. `start` (nếu có) chạy sau khi đã gắn listener, nên lệnh tải lại hay đổi trang không thể xong trước khi kịp nghe.
+ * Chờ tab tải xong trong hạn. `start` (nếu có) chạy sau khi đã gắn listener, nên lệnh đổi trang không thể xong trước khi kịp nghe.
  * Không có `start` thì hỏi lại trạng thái tab sau khi gắn listener, vì tab có thể đã tải xong giữa lúc tìm và lúc nghe.
  */
 function waitFbmTabComplete(tabId, deadlineAt, start) {
@@ -125,7 +125,7 @@ function keepFbmTabLoaded(tab) {
 }
 /**
  * Công cụ duy nhất đưa tab FBM tới trạng thái nhận được request (Tài liệu 09/01 "Chuẩn bị tab FBM"): tìm hoặc mở tab, đánh dấu không cho Chrome dỡ, chờ tải xong và có executor.
- * Lần đầu chỉ dùng nửa hạn còn lại của envelope; hỏng thì tải lại tab đúng một lần rồi thử trong phần hạn còn lại; vẫn hỏng thì ném `FBM_TAB_NOT_READY`. Tab treo hay bị dỡ không bao giờ tự báo tải xong, nên không có nhánh chờ tiếp.
+ * Extension không tự tải lại tab: hỏng thì trả nguyên mã lỗi (`FBM_TAB_NOT_READY`, `FBM_SITE_ACCESS_BLOCKED`) để GAS quyết; GAS muốn tải lại thì cấp `meta.reloadFbmPage` ở envelope phát lại.
  * Trả null khi không có tab và GAS không cho mở; nơi gọi báo `FBM_TAB_NOT_FOUND`. `onStage(stage, code)` để nơi gọi ghi hộp đen trước mỗi bước.
  */
 function prepareFbmTab(request, onStage) {
@@ -133,30 +133,16 @@ function prepareFbmTab(request, onStage) {
   return findOrOpenFbmTab(request).then(function (tab) {
     if (!tab) { return null; }
     note('fbm_tab_preparing', String(tab.discarded ? 'discarded' : tab.status || 'complete'));
-    return keepFbmTabLoaded(tab).then(function () {
-      return readyFbmTab(tab, Date.now() + Math.floor(Math.max(0, deadlineAt - Date.now()) / 2));
-    }).catch(function (firstError) {
-      if (firstError && firstError.code === 'FBM_SITE_ACCESS_BLOCKED') { throw firstError; }
-      note('fbm_tab_reloading', String(firstError && firstError.code || 'FBM_TAB_NOT_READY'));
-      return waitFbmTabComplete(tab.id, deadlineAt, function () { return chromeApi(function (done) { return chrome.tabs.reload(tab.id, {}, done); }); }).then(function (reloaded) {
-        return readyFbmTab(Object.assign({}, tab, reloaded || {}, { id: tab.id, status: 'complete', discarded: false }), deadlineAt);
-      });
-    }).then(function (readyTab) {
-      return openFbmPageIfAsked(readyTab, request, deadlineAt, note);
-    }).catch(function (error) {
-      // Chrome chặn quyền site không phải tab chưa sẵn sàng: giữ nguyên mã và chữ gốc để GAS báo đúng việc người dùng phải làm, không thử lại.
-      if (error && error.code === 'FBM_SITE_ACCESS_BLOCKED') { throw error; }
-      throw Object.assign(new Error('Tab FBM không phản hồi kể cả sau khi tự tải lại: ' + String(error && error.message || error)), { code: 'FBM_TAB_NOT_READY' });
-    });
+    return keepFbmTabLoaded(tab).then(function () { return openFbmPageIfAsked(tab, request, deadlineAt, note); });
   });
 }
 /**
- * GAS cấp `meta.reloadFbmPage` khi trang đang mở không có mã hoặc tên người dùng để đối chiếu (tab đứng ở trang Login, trang lỗi hay trang tải từ trước khi đăng nhập). Extension chỉ đổi trang tới đúng URL đó, chờ tải xong và có executor; không tự quyết khi nào cần.
- * URL đã qua `envelopeSiteCheck` trước khi tìm tab.
+ * GAS cấp `meta.reloadFbmPage` khi tab không sẵn sàng ở lần gửi trước, hoặc trang đang mở không có mã hoặc tên người dùng để đối chiếu (tab đứng ở trang Login, trang lỗi hay trang tải từ trước khi đăng nhập). Extension chỉ đổi trang tới đúng URL đó, chờ tải xong và có executor; không tự quyết khi nào cần.
+ * Đổi trang cũng nạp lại tab Chrome đã dỡ hay tab treo, nên không xét trạng thái tab trước. URL đã qua `envelopeSiteCheck` trước khi tìm tab.
  */
 function openFbmPageIfAsked(tab, request, deadlineAt, note) {
   var url = String(request && request.meta && request.meta.reloadFbmPage || '');
-  if (!url) { return Promise.resolve(tab); }
+  if (!url) { return readyFbmTab(tab, deadlineAt); }
   note('fbm_page_reloading');
   return waitFbmTabComplete(tab.id, deadlineAt, function () {
     return chromeApi(function (done) { return chrome.tabs.update(tab.id, { url: url }, done); });
@@ -167,7 +153,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 /** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
 var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '203c4ff28fe9';
+var FBM_CONTRACT_VERSION = 'e2a5073b0ba4';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -282,14 +268,13 @@ function ensureSheetsBridge(tabId) {
 
 /**
  * Khoảng nghỉ giữa hai request liên tiếp tới FBM (Tài liệu 09/07 "Tham số phiên FBM"): GAS cấp khoảng [minMs, maxMs] trong envelope, Extension chọn ngẫu nhiên và chỉ chờ phần còn thiếu tính từ lúc request FBM trước kết thúc.
- * Mốc chỉ sống trong RAM service worker: Chrome tắt worker khi rảnh khoảng 30 giây thì mất mốc, chấp nhận vì lúc đó đã nghỉ lâu. Lấy gói từ RAM tab (`scan_chunk`) không gọi FBM nên không chờ và không dời mốc.
+ * Mốc chỉ sống trong RAM service worker: Chrome tắt worker khi rảnh khoảng 30 giây thì mất mốc, chấp nhận vì lúc đó đã nghỉ lâu. GAS chỉ cấp `requestGap` cho request gọi FBM, nên có khoảng nghỉ thì chờ và dời mốc, không cần biết loại request.
  */
 var FBM_LAST_FETCH_END_AT = 0;
 var FBM_REQUEST_GAP_CAP_MS = 60000;
-function callsFbm(request) { return String(request && request.meta && request.meta.kind || '') !== 'scan_chunk'; }
 function waitForFbmGap(request) {
   var gap = request && request.meta && request.meta.requestGap || {}, minMs = Math.max(0, Number(gap.minMs || 0)), maxMs = Math.max(minMs, Number(gap.maxMs || 0));
-  if (!callsFbm(request) || !isFinite(maxMs) || maxMs <= 0 || !FBM_LAST_FETCH_END_AT) { return Promise.resolve(); }
+  if (!isFinite(maxMs) || maxMs <= 0 || !FBM_LAST_FETCH_END_AT) { return Promise.resolve(); }
   var waitMs = Math.min(FBM_REQUEST_GAP_CAP_MS, minMs + Math.random() * (maxMs - minMs)) - (Date.now() - FBM_LAST_FETCH_END_AT);
   if (waitMs <= 0) { return Promise.resolve(); }
   return workerKeepAlive(new Promise(function (resolve) {
@@ -348,7 +333,7 @@ function sendTabExecute(tabId, request, envelope, cancelSince) {
     var remaining = envelopeRemainingMs(envelope);
     if (remaining <= 0) { return { error: 'Extension đã hết hạn chờ GAS cấp cho request này; tab FBM phản hồi quá chậm.', code: 'FBM_TRANSPORT_TIMEOUT' }; }
     return sendTabMessage(tabId, { type: 'FBM_EXECUTE_V2', request: request }, remaining).finally(function () {
-      if (callsFbm(request)) { FBM_LAST_FETCH_END_AT = Date.now(); }
+      if (request.meta && request.meta.requestGap) { FBM_LAST_FETCH_END_AT = Date.now(); }
     });
   });
 }
