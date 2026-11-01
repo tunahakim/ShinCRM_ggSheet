@@ -376,8 +376,8 @@ FbmSync.customerScanChunk = function (state, cursor, rawResponse) {
 FbmSync.contractGate = function (rawResponse) {
   var mismatch = FbmSync.protocol.contractMismatch(rawResponse);
   if (!mismatch) { return null; }
-  var before = FbmSync.stateRead(), failed = FbmSync.stateFailRun(mismatch.message, mismatch.code).failed, state = FbmSync.stateRead();
-  // Heartbeat và đăng nhập nền không có phiên đồng bộ nên `stateFailRun` bỏ qua; vẫn phải nhả request đang chờ, không thì mọi lượt sau kẹt REQUEST_IN_FLIGHT.
+  var before = FbmSync.stateRead(), failed = FbmSync.runFailCurrent(mismatch.message, mismatch.code).failed, state = FbmSync.stateRead();
+  // Heartbeat và đăng nhập nền không có phiên đồng bộ nên `runFailCurrent` bỏ qua; vẫn phải nhả request đang chờ, không thì mọi lượt sau kẹt REQUEST_IN_FLIGHT.
   if (!failed) { state.phase = 'error'; state.lastFailureCode = mismatch.code; state.retryable = false; state.lastError = mismatch.message; state.message = mismatch.message; }
   state.activeRequestId = ''; state.deadlineAt = 0;
   FbmSync.stateWrite(state);

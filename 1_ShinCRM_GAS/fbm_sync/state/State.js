@@ -9,17 +9,6 @@ FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer',
 FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
 /** Lượt còn dở (đang chạy hoặc chờ chấp thuận). Lượt đã kết thúc ở bất kỳ trạng thái cuối nào, kể cả tạm dừng vì tự đăng nhập bị từ chối, không chặn lịch nền mở lượt mới. */
 FbmSync.runInProgress = function (state) { return !!(state && state.runId) && ['idle'].concat(FbmSync.TERMINAL_PHASES).indexOf(String(state.phase || '')) < 0; };
-/**
- * Nơi duy nhất đóng lượt ngay (không chờ response đang bay): nhả bản ghi đang giữ và xóa con trỏ lượt trên state truyền vào, trả chính state đó; người điều phối gọi nó rồi tự ghi. Response đến muộn của lượt đã đóng bị loại ở `requestAnswered` (`STALE_RESPONSE`) vì `activeRequestId` đã rỗng; mã request đang bay lúc đóng giữ ở `closedRequestId` để Log ghi response đó là chuyện thường của lượt đã đóng, không phải response lạ.
- * `closing` = { phase, message } đặt trạng thái cuối; bỏ trống thì giữ nguyên phase và lỗi hiện có (lượt đã lỗi phải giữ nguyên lỗi).
- */
-FbmSync.runCloseNow = function (state, closing) {
-  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
-  state.closedRequestId = String(state.activeRequestId || '');
-  state.runId = ''; state.entity = ''; state.cursor = {}; state.current = ''; state.scheduledScan = ''; state.activeRequestId = ''; state.deadlineAt = 0;
-  if (closing) { state.phase = closing.phase; state.message = closing.message; state.lastError = ''; if (closing.origin) { state.origin = closing.origin; } }
-  return state;
-};
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';
 /** Quyền ghi được tách theo đích; mode không được kiêm thêm một cờ ẩn ngoài UI. */
 /** Chế độ chạy hợp lệ từ lựa chọn của người dùng hoặc lịch nền; giá trị lạ về `read` (chỉ lấy về), không bao giờ thành chế độ có đẩy. */
@@ -122,7 +111,7 @@ FbmSync.runLeftOpenClose = function (result) {
   var state = FbmSync.stateRead();
   if (!state.runId || state.activeRequestId || FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) < 0) { return result; }
   var phase = String(state.phase || ''), cursorKind = String(state.cursor && state.cursor.kind || '');
-  FbmSync.stateFailRun('GAS trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt để lịch nền chạy lại ở lần hỏi sau.', 'RUN_LEFT_OPEN');
+  FbmSync.runFailCurrent('GAS trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt để lịch nền chạy lại ở lần hỏi sau.', 'RUN_LEFT_OPEN');
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'run_left_open', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Lỗi GAS: trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt.' }); }
   return Object.assign({}, result, { ok: false, code: 'RUN_LEFT_OPEN', status: FbmSync.statusView(), error: FbmSync.stateRead().lastError });
 };
@@ -130,7 +119,7 @@ FbmSync.runLeftOpenClose = function (result) {
 /** Ghi phiên lỗi sau exception của lát. Lỗi gốc luôn được ném lại ở chỗ gọi; ghi state hỏng thì chỉ thêm một dòng Log, không thay lỗi gốc. */
 FbmSync.controlFailRun = function (error) {
   try {
-    FbmSync.stateFailRun(String(error && error.message || error), String(error && error.code || ''));
+    FbmSync.runFailCurrent(String(error && error.message || error), String(error && error.code || ''));
   } catch (writeError) {
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_fail_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: 'Không ghi được trạng thái lỗi của phiên: ' + String(writeError && writeError.message || writeError) }); }
   }
@@ -539,21 +528,4 @@ FbmSync.extensionTrailText = function (trail, now) {
     text += t.currentWorkerStartedAt > t.workerStartedAt ? ' Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).' : ' Phần chạy nền của Extension vẫn chạy liền từ bước đó, không khởi động lại.';
   }
   return text;
-};
-/**
- * Chuyển phiên đang chạy sang lỗi, giữ cursor và khóa ghi như thu hồi phiên treo. Gọi khi một lát ném exception hoặc client báo lỗi,
- * để phiên không đứng ở phase đang chạy chờ 2 phút mới bị thu hồi. Phiên đã kết thúc thì không đổi gì.
- */
-FbmSync.stateFailRun = function (reason, code) {
-  var state = FbmSync.stateRead();
-  if (!state.runId || FbmSync.ACTIVE_PHASES.concat(['awaiting_approval']).indexOf(String(state.phase || '')) < 0) { return { state: state, failed: false }; }
-  var step = typeof FbmSync.businessFailingStep === 'function' ? FbmSync.businessFailingStep(state) : '';
-  var label = step && typeof FbmSync.businessStepDefinition === 'function' ? FbmSync.businessStepDefinition(step).label : 'phiên đồng bộ';
-  state.phase = 'error';
-  state.lastFailureCode = String(code || 'FBM_SYNC_EXCEPTION');
-  state.retryable = false;
-  state.lastError = 'Lỗi khi ' + label + ': ' + String(reason || 'không rõ nguyên nhân');
-  state.message = state.lastError;
-  if (typeof FbmSync.readListClear === 'function') { FbmSync.readListClear(); }
-  return { state: FbmSync.stateWrite(state), failed: true };
 };

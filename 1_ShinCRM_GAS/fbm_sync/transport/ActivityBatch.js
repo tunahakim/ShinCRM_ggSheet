@@ -70,7 +70,7 @@ FbmSync.activityCustomerErrors = function (state, failed) {
 
 /** Lô lệch kế hoạch hoặc lệch cấu trúc cột là lỗi của cả lô: dừng phiên, không ghi gì. */
 FbmSync.activityBatchMismatch = function (state, message, failureCode) {
-  var code = failureCode || 'FBM_BATCH_ITEM_MISMATCH', failed = FbmSync.stateFailRun(message, code).failed;
+  var code = failureCode || 'FBM_BATCH_ITEM_MISMATCH', failed = FbmSync.runFailCurrent(message, code).failed;
   state = FbmSync.stateRead();
   if (!failed) { state.phase = 'error'; state.lastFailureCode = code; state.lastError = message; state.message = message; FbmSync.stateWrite(state); }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_batch_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { code: code } }); }

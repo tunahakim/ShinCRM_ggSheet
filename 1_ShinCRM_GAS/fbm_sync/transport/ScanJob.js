@@ -45,7 +45,7 @@ FbmSync.scanJobRequest = function (state) {
 
 /** Gói lạ là lỗi hợp đồng: dừng phiên, không ghi gì, Sidebar và Log cùng thấy. */
 FbmSync.scanJobMismatch = function (state, message) {
-  var code = 'FBM_SCAN_JOB_MISMATCH', failed = FbmSync.stateFailRun(message, code).failed;
+  var code = 'FBM_SCAN_JOB_MISMATCH', failed = FbmSync.runFailCurrent(message, code).failed;
   state = FbmSync.stateRead();
   if (!failed) { state.phase = 'error'; state.lastFailureCode = code; state.lastError = message; state.message = message; FbmSync.stateWrite(state); }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scan_job_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { code: code } }); }
@@ -100,7 +100,7 @@ FbmSync.scanJobRestart = function (state, code, message) {
   if (Number(cursor.restarts || 0) >= FbmSync.BUDGET.scanJobRestarts) {
     var text = 'Tab FBM mất việc quét ' + (Number(cursor.restarts || 0) + 1) + ' lần liên tiếp (tab tải lại hoặc Extension khởi động lại); đã dừng. Giữ tab FBM mở và chạy lại.';
     FbmSync.stateWrite(state);
-    FbmSync.stateFailRun(text, 'FBM_SCAN_JOB_GONE');
+    FbmSync.runFailCurrent(text, 'FBM_SCAN_JOB_GONE');
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scan_job_gone', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: text, detail: { restarts: Number(cursor.restarts || 0) } }); }
     return { ok: false, code: 'FBM_SCAN_JOB_GONE', request: null, error: text, status: FbmSync.statusView() };
   }

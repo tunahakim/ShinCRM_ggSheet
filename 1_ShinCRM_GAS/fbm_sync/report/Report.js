@@ -186,9 +186,9 @@ FbmSync.logTransportError = function (message, action, runId) {
     return FbmSync.statusView();
   }
   // Chạy trong khóa của cửa lệnh (lệnh `client_error`); khóa bận thì cửa lệnh ghi Log lúc bỏ.
-  var outcome = FbmSync.stateFailRun(reason, 'FBM_CLIENT_ERROR');
+  var outcome = FbmSync.runFailCurrent(reason, 'FBM_CLIENT_ERROR');
   var recorded = String(before.phase || '') === 'error' && String(before.lastError || '').indexOf(reason) >= 0;
-  // stateFailRun đã đóng bước đang chạy với đúng lý do này, nên chỉ ghi thêm khi phiên không được chuyển sang lỗi ở đây.
+  // runFailCurrent đã đóng bước đang chạy với đúng lý do này, nên chỉ ghi thêm khi phiên không được chuyển sang lỗi ở đây.
   if (!(outcome && outcome.failed) && !recorded && typeof logEvent === 'function') {
     logEvent({ source: 'fbm_sync', action: action || 'transport_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || before.metadata && before.metadata.businessRunId || ''), reason: 'Sidebar báo lỗi phiên đồng bộ: ' + reason });
   }

@@ -62,7 +62,7 @@ FbmSync.RUN_VERDICTS = {
  * Đóng lượt trên state truyền vào và trả chính state đó; người điều phối ghi. Mọi đường kết thúc (xong, lỗi, dừng, bỏ lượt) đi qua đây nên:
  * - Dòng Log kết thúc các bước được ghi ngay lúc đóng, khi state còn là lượt đang chạy, nên mang đúng mã và nhãn của lượt đó.
  * - Request đang bay bị bỏ: `activeRequestId` rỗng thì response về muộn bị `requestAnswered` loại; mã của nó giữ ở `closedRequestId` để Log ghi đó là response của lượt đã đóng.
- * - `runId` giữ lại để Sidebar còn vẽ kết quả lượt vừa xong; lượt coi là đã đóng nhờ phase cuối.
+ * - `runId` giữ lại để Sidebar còn vẽ kết quả lượt vừa xong; lượt coi là đã đóng nhờ phase cuối. Lượt lỗi giữ cursor.
  * `detail`: `message`, `code` (mã lỗi hoặc mã tạm dừng), `error` (chữ lỗi; lỗi thì mặc định là `message`), `retryable`, `keepRecords` (giữ bản ghi trong sổ bận khi lệnh ghi FBM chưa rõ kết quả).
  */
 FbmSync.runClose = function (state, verdict, detail) {
@@ -75,7 +75,9 @@ FbmSync.runClose = function (state, verdict, detail) {
   if (extra.keepRecords !== true) { recordGateReleaseOwner(FbmSync.RECORD_HOLDER); }
   FbmSync.readListClear();
   state.closedRequestId = String(state.activeRequestId || '');
-  state.activeRequestId = ''; state.deadlineAt = 0; state.cursor = {}; state.entity = ''; state.current = ''; state.scheduledScan = '';
+  state.activeRequestId = ''; state.deadlineAt = 0; state.current = ''; state.scheduledScan = '';
+  // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.
+  if (!failed) { state.cursor = {}; state.entity = ''; }
   state.phase = spec.phase;
   state.message = message;
   state.lastError = error;
@@ -87,6 +89,18 @@ FbmSync.runClose = function (state, verdict, detail) {
 /** Nơi duy nhất đưa lượt sang lỗi. `message` là chữ người dùng đọc, nên bên gọi tự nêu bước hỏng. */
 FbmSync.runFail = function (state, code, message, detail) {
   return FbmSync.runClose(state, 'error', Object.assign({}, detail || {}, { code: String(code || 'FBM_SYNC_EXCEPTION'), message: String(message || 'Lượt đồng bộ lỗi không rõ nguyên nhân.') }));
+};
+
+/**
+ * Người điều phối đưa lượt đang chạy sang lỗi khi gặp sự cố giữa lát: đọc ô lượt, nêu bước hỏng trong chữ lỗi, đóng qua `runFail` rồi ghi. Không có lượt đang chạy thì không làm gì (`failed: false`).
+ * Giữ bản ghi trong sổ bận: sự cố có thể xảy ra khi lệnh ghi FBM chưa rõ kết quả; lượt mở sau nhả chúng.
+ */
+FbmSync.runFailCurrent = function (reason, code) {
+  var state = FbmSync.stateRead();
+  if (!FbmSync.runInProgress(state)) { return { state: state, failed: false }; }
+  var step = FbmSync.businessFailingStep(state), label = step ? FbmSync.businessStepDefinition(step).label : 'phiên đồng bộ';
+  FbmSync.runFail(state, code, 'Lỗi khi ' + label + ': ' + String(reason || 'không rõ nguyên nhân'), { keepRecords: true });
+  return { state: FbmSync.stateWrite(state), failed: true };
 };
 
 /**

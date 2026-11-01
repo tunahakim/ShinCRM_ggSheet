@@ -88,7 +88,7 @@ FbmSync.activityScanToWindows = function (state, code, message) {
   if (cursor.window) {
     var window = FbmSync.activityWindow(cursor), text = 'Một khoảng ' + FbmSync.BUDGET.activityWindowDays + ' ngày giao dịch (' + (window.from || 'đầu') + ' đến ' + (window.to || 'nay') + ') vẫn quá lớn để lấy trong một lần: ' + reason + ' Đã dừng, không gắn cờ "không thấy bên FBM".';
     FbmSync.stateWrite(state);
-    FbmSync.stateFailRun(text, code);
+    FbmSync.runFailCurrent(text, code);
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: text, detail: { code: code, windowIndex: Number(cursor.windowIndex || 0) } }); }
     return { ok: false, code: code, request: null, error: text, status: FbmSync.statusView() };
   }
