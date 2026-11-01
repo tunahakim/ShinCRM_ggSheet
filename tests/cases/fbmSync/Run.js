@@ -87,6 +87,13 @@ async function chay(so) {
     tayNhan.F.stateRead().runLabel.split(' · ')[0], nenNhan.F.stateRead().runLabel.split(' · ')[0], nhanTay === tayNhan.F.stateRead().runLabel, nhanNgoai
   ], ['Tay', 'Nền', true, 'Nền']);
 
+  // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
+  const runCu = tayNhan.F.stateRead().runId;
+  const dangNhap = tayNhan.F.loginTestRequest('ref-thu', null);
+  check(so, 'đăng nhập thử mở lượt riêng qua runOpen: mã lượt mới, nhãn "Tay · Đăng nhập thử", cursor login', [
+    dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
+  ], [true, true, 'Tay · Đăng nhập thử', 'login']);
+
   // runClose là cửa duy nhất: kết luận lạ và đóng lượt đã đóng là lỗi lập trình.
   const cua = hopCoLuot();
   check(so, 'runClose: kết luận lạ ném RUN_VERDICT_UNKNOWN; đóng lượt không còn chạy ném RUN_NOT_OPEN', [

@@ -157,7 +157,7 @@ const RULES = [
 /** Danh sách ngoại lệ hiện có, mỗi quy tắc một bảng `tệp -> số vi phạm`. Chỉ được co lại. */
 const EXCEPTIONS = {
   stateReadWrite: {
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 18,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 17,
     '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
