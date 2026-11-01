@@ -80,7 +80,6 @@ const NGOAI_LE = [
   ['tests/cases/extensionBridge.js', 998, 103879, 'B4', 'kiểm bridge, scout, service worker, executor + quét chữ GAS/Sidebar'],
   ['tests/cases/fbmSync/AutoLogin.js', 488, 74951, 'B11/B4', 'gần một module; dài vì check dài (TB 155 ký tự/dòng)'],
   ['tests/cases/fbmSync/Components.js', 243, 15773, 'B12', 'quét component Sidebar đồng bộ'],
-  ['tests/cases/fbmSync/FunctionTrace.js', 209, 18022, 'B4', 'kiểm Trace'],
   ['tests/cases/fbmSync/Orchestration.js', 529, 74827, 'B4/B6', 'nhiều module: heartbeat, scheduler, status, PropertyBuffer; check dài'],
   ['tests/cases/fbmSync/Preflight.js', 184, 22886, 'B7/B9', 'một module; chỉ dài vì check dài'],
   ['tests/cases/fbmSync/ProductionMatrix.js', 709, 69081, 'B4/B8/B9', 'ma trận FBM-0xx: cursor, lỗi kéo/đẩy, xung đột, hash'],

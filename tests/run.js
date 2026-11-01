@@ -84,6 +84,8 @@ const NHOM_CA = [
   require('./cases/bindWatcher'),
   require('./cases/fbmSync'),
   require('./cases/fbmSync/FunctionTrace'),
+  require('./cases/fbmSync/SliceFailure'),
+  require('./cases/fbmSync/LateReply'),
   require('./cases/unsavedChanges'),
   require('./cases/fbmSync/AutoLogin'),
   require('./cases/fbmSync/LoginReply'),

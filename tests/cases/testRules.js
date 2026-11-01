@@ -97,7 +97,7 @@ const EXCEPTIONS = {
     'cases/fbmSync/AutoLogin.js': 7,
     'cases/fbmSync/BackgroundChain.js': 1,
     'cases/fbmSync/Builders.js': 1,
-    'cases/fbmSync/FunctionTrace.js': 2,
+    'cases/fbmSync/FunctionTrace.js': 1,
     'cases/fbmSync/Orchestration.js': 12,
     'cases/fbmSync/ProductionMatrix.js': 2,
     'cases/fbmSync/Pull.js': 5,
