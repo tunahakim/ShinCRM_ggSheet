@@ -11,6 +11,8 @@ FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(opt
 FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
+  // Tra dãy chặng trước mọi việc: mức quét lạ ném `SYNC_UNKNOWN_SCAN` khi lượt cũ chưa bị đụng tới.
+  var plan = FbmSync.runPlanOfStart(opt.scan, opt.pack);
   if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
     return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
   }
@@ -42,13 +44,13 @@ FbmSync.startRun = function (options) {
   var state = FbmSync.runOpen({
     origin: opt.origin,
     mode: opt.mode,
-    scan: opt.scan === 'activity_bulk' ? 'activity_bulk' : opt.scan === 'identity_check' ? 'identity_check' : opt.scan === 'identity_probe' ? 'identity_probe' : opt.scan === 'detail' ? 'detail' : opt.scan === 'keepalive' ? 'keepalive' : 'full'
+    scan: plan.scan
   });
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
   }
   // Gói chụp vào state đầu lượt: đổi `Mức quét` khi lượt đang chạy chỉ áp từ lượt sau.
-  state.scanPack = state.scan === 'full' ? FbmSync.scanPackOf(opt.pack) : '';
+  state.scanPack = plan.scanPack;
   // Kiểm tra liên kết đối chiếu bản nháp người dùng đang xem trên Sidebar; không gửi bản nháp thì đối chiếu liên kết đã lưu.
   state.identityTarget = state.scan === 'identity_check' ? (opt.identity && typeof opt.identity === 'object' ? FbmSync.identityNormalize(opt.identity) : FbmSync.boundIdentity()) : null;
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.

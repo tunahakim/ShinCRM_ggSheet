@@ -4,10 +4,6 @@
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Gói người dùng chọn ở `Mức quét`; giá trị lạ về gói mặc định chứ không về "Quét toàn bộ", để lỗi gõ không biến thành lượt nặng nhất. */
-FbmSync.SCAN_PACKS = ['quick', 'deep', 'all'];
-FbmSync.scanPackOf = function (value) { return FbmSync.SCAN_PACKS.indexOf(value) >= 0 ? value : 'quick'; };
-
 // Tên kho không bắt đầu bằng "activity": kho đánh theo số CUS của khách cha, không theo số ACT.
 FbmSync.READ_LIST_STORE = 'customer_read_list';
 FbmSync.READ_DONE_STORE = 'customer_read_done';
@@ -264,18 +260,15 @@ FbmSync.activityTopScanLog = function (state, cursor) {
   logEvent({ source: 'fbm_sync', action: 'activity_top_scan', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } });
 };
 
-/**
- * Chặng đọc của từng loại lượt (09/02 Phần 8): `list` là danh sách đọc, `top` lớp 3, `bulk` lớp 1, `rotation` lớp 4. Chặng `list` cuối vét khách các chặng trước mới đánh dấu (khách cha cũ của giao dịch đổi khách, khách đang giữ giao dịch vắng).
- */
-FbmSync.ACTIVITY_STAGES = { quick: ['list', 'top', 'list'], deep: ['list', 'top', 'bulk', 'list'], all: ['list'], detail: ['rotation', 'list'], activity_bulk: ['bulk', 'list'] };
-FbmSync.activityStagesOf = function (state) { return state.scan === 'full' ? FbmSync.ACTIVITY_STAGES[FbmSync.scanPackOf(state.scanPack)] : FbmSync.ACTIVITY_STAGES[state.scan] || ['list']; };
+/** Các lớp đọc của chặng Giao dịch lấy từ dãy chặng của lượt (`RUN_PLANS`). */
+FbmSync.activityStagesOf = function (state) { return FbmSync.runPlanOfState(state).activity; };
 
 /** Mở chặng kế; chặng không có việc thì sang chặng sau. Trả request đầu của chặng, hoặc `null` khi lượt đã hết chặng đọc. */
 FbmSync.activityStageNext = function (state) {
   var stages = FbmSync.activityStagesOf(state);
   state.metadata = state.metadata || {};
   if (state.cursor && state.cursor.kind === 'activity_grid' && state.cursor.layer === 'top') { FbmSync.activityTopScanLog(state, state.cursor); }
-  for (var index = Number(state.metadata.activityStage === undefined ? -1 : state.metadata.activityStage) + 1; index < stages.length; index += 1) {
+  for (var index = FbmSync.runPlanNext(stages, state.metadata.activityStage === undefined ? -1 : state.metadata.activityStage); index >= 0; index = FbmSync.runPlanNext(stages, index)) {
     state.metadata.activityStage = index;
     var stage = stages[index], request;
     if (stage === 'bulk') { request = FbmSync.beginActivityBulkPull(state); }

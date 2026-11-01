@@ -249,6 +249,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\Run.js              Đóng Lượt (`runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`) và lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
     ├── state\Slice.js            Khung lát: `runSlice` (áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
+    ├── state\RunPlan.js          Dãy chặng của từng kiểu lượt (`RUN_PLANS`), `runPlanOf` tra bảng và ném `SYNC_UNKNOWN_SCAN` khi kiểu hay mức quét lạ, `runPlanNext` đi tiếp trong dãy.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
     ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity.
