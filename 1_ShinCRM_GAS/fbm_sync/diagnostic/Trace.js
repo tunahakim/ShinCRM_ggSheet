@@ -30,7 +30,7 @@ FbmSync.traceContext = function (extra) {
 /** Trong một lần gọi qua `runEntryPoint` thì chỉ gom vào bộ nhớ, ghi một lần ở cuối (PropertyBuffer.js); ngoài đó ghi ngay. */
 FbmSync.traceAppend = function (events) {
   if (!Array.isArray(events) || !events.length) { return 0; }
-  if (typeof FbmSync.traceGathering !== 'function' || !FbmSync.traceGathering()) { return FbmSync.traceStore(events); }
+  if (!FbmSync.traceGathering()) { return FbmSync.traceStore(events); }
   var pending = FbmSync.propertyBuffer.tracePending, seen = {}, added = 0;
   pending.forEach(function (item) { seen[FbmSync.traceKey(item)] = true; });
   events.forEach(function (event) {
@@ -176,10 +176,8 @@ FbmSync.businessStepStart = function (state, key, input) {
   // Hủy phiên xóa runId trước khi ghi state; giữ runId riêng để dòng đóng bước vẫn cùng cycleId với dòng mở.
   metadata.businessRunId = String(current.runId);
   if (name !== 'run') { metadata.businessActiveStep = name; }
-  if (typeof logTrace === 'function') {
-    logTrace({ source: 'fbm_sync', action: definition.action + '_started', outcome: 'trace', cycleId: String(current.runId), entity: String(current.entity || ''), reason: 'Bắt đầu ' + definition.label + ' - Input: ' + FbmSync.businessStepInput(Object.assign({}, detail, input || {})), detail: { step: name, input: detail } });
-  }
-  if (typeof flushLogIfTraced === 'function') { flushLogIfTraced('fbm_sync'); }
+  logTrace({ source: 'fbm_sync', action: definition.action + '_started', outcome: 'trace', cycleId: String(current.runId), entity: String(current.entity || ''), reason: 'Bắt đầu ' + definition.label + ' - Input: ' + FbmSync.businessStepInput(Object.assign({}, detail, input || {})), detail: { step: name, input: detail } });
+  flushLogIfTraced('fbm_sync');
   return true;
 };
 
@@ -209,13 +207,13 @@ FbmSync.businessStepFinish = function (state, key, outcome, result) {
       : stopped
         ? 'Dừng ' + definition.label + ' vì lỗi ở bước ' + FbmSync.businessStepDefinition(result && result.failedStep).label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals)
         : 'Hoàn thành ' + definition.label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals);
-  var entry = { source: 'fbm_sync', action: definition.action + '_finished', outcome: failed ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : paused || stopped ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : name === 'run' ? (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok') : 'trace', cycleId: String(current.runId || metadata.businessRunId || ''), entity: String(current.entity || ''), reason: reason, detail: { step: name, input: step.input || {}, result: totals, durationMs: step.durationMs, phase: String(current.phase || ''), failureCode: String(current.lastFailureCode || '') } };
+  var entry = { source: 'fbm_sync', action: definition.action + '_finished', outcome: failed ? LOG_ERROR : paused || stopped ? LOG_WARN : name === 'run' ? LOG_OK : 'trace', cycleId: String(current.runId || metadata.businessRunId || ''), entity: String(current.entity || ''), reason: reason, detail: { step: name, input: step.input || {}, result: totals, durationMs: step.durationMs, phase: String(current.phase || ''), failureCode: String(current.lastFailureCode || '') } };
   if (failed || paused || stopped || name === 'run') {
-    if (typeof logEvent === 'function') { logEvent(entry); }
-  } else if (typeof logTrace === 'function') {
+    logEvent(entry);
+  } else {
     logTrace(entry);
   }
-  if (typeof flushLogIfTraced === 'function') { flushLogIfTraced('fbm_sync'); }
+  flushLogIfTraced('fbm_sync');
   return true;
 };
 
@@ -227,7 +225,7 @@ FbmSync.businessFinishSteps = function (state, keys) {
   var steps = state && state.metadata && state.metadata.businessSteps || {};
   var open = (keys || []).filter(function (key) { return steps[key] && !steps[key].finishedAt; });
   if (!open.length) { return 0; }
-  if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(state); }
+  FbmSync.recordIssuesFlush(state);
   open.forEach(function (key) { FbmSync.businessStepFinish(state, key, 'ok', {}); });
   return open.length;
 };
@@ -248,7 +246,7 @@ FbmSync.businessFailingStep = function (state) {
  */
 FbmSync.businessFinishOpenSteps = function (state, phase, result) {
   // Vấn đề theo bản ghi của lát cuối nhả trước khi đóng bước, nếu không chúng rơi xuống dưới dòng "Hoàn thành phiên đồng bộ".
-  if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(state); }
+  FbmSync.recordIssuesFlush(state);
   var current = state || {}, steps = current.metadata && current.metadata.businessSteps || {}, terminal = String(phase || current.phase || ''), outcome = terminal === 'error' ? 'error' : terminal === 'paused' || terminal === 'conflict' ? 'paused' : 'ok', error = String(result && result.error || ''), failing = outcome === 'error' ? FbmSync.businessFailingStep(current) : '';
   Object.keys(steps).forEach(function (key) {
     if (key === 'run' || steps[key].finishedAt) { return; }
@@ -267,7 +265,7 @@ FbmSync.businessFinishOpenSteps = function (state, phase, result) {
  */
 FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
-  if (!FbmSync._logContextRegistered && typeof logRegisterContext === 'function') { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
+  if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
 /** Lượt đang chạy thì lấy nhãn chốt lúc mở lượt (`runLabel`), không suy lại từ ô lượt. Ngoài lượt thì chọn theo kênh của lời gọi: chuỗi nền đang mở hoặc Extension chuyển hộ (relay) là Nền, còn lại là Tay. */
 FbmSync.logContextText = function () {

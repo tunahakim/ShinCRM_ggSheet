@@ -16,7 +16,7 @@ FbmSync.masterEnabled = function () {
 FbmSync.setMasterEnabled = function (enabled) {
   var value = enabled === true;
   FbmSync.props().setProperty(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false');
-  if (!value && typeof FbmSync.stateRead === 'function' && typeof FbmSync.stateWrite === 'function') {
+  if (!value) {
     var state = FbmSync.stateRead();
     if (!state.activeRequestId) {
       state.phase = 'paused';
@@ -24,7 +24,7 @@ FbmSync.setMasterEnabled = function (enabled) {
       FbmSync.stateWrite(state);
     }
   }
-  return { ok: true, enabled: value, status: typeof FbmSync.statusView === 'function' ? FbmSync.statusView() : null };
+  return { ok: true, enabled: value, status: FbmSync.statusView() };
 };
 
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
@@ -372,7 +372,7 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state.message = reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
-  request = typeof FbmSync.requestForCursor === 'function' ? FbmSync.requestForCursor(state) : null;
+  request = FbmSync.requestForCursor(state);
   if (!request) { return null; }
   request = FbmSync.sessionGateAttachLoginToken(request, state);
   if (reload) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
@@ -399,7 +399,7 @@ FbmSync.pauseForRuntimeLimit = function (state) {
   current.lastError = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.';
   current.message = current.lastError;
   current.retryable = true;
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'slice_limit', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: current.lastFailureCode, detail: { runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: current.cursor || {} } }); }
+  logEvent({ source: 'fbm_sync', action: 'slice_limit', outcome: LOG_ERROR, reason: current.lastFailureCode, detail: { runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: current.cursor || {} } });
   if (FbmSync.stateWrite) { FbmSync.stateWrite(current); }
   return null;
 };
@@ -442,7 +442,7 @@ FbmSync.nextEnvelope = function (request) {
     // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
     // caller né cổng bằng cách đặt một tên meta.kind lạ.
     var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
-    var loginFlowOwnsSystemRequest = typeof FbmSync.sessionGateCursorIsInternal === 'function' && FbmSync.sessionGateCursorIsInternal(pendingState);
+    var loginFlowOwnsSystemRequest = FbmSync.sessionGateCursorIsInternal(pendingState);
     if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
       var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
       if (originalCursor.kind !== 'session_probe') {
@@ -488,7 +488,7 @@ FbmSync.nextEnvelope = function (request) {
   try {
     var sessionPolicy = FbmSync.sessionGatePolicy();
     if (sessionPolicy.autoOpenTab) {
-      var script = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {};
+      var script = FbmSync.scriptSettings();
       meta.openFbmContext = { url: String(script.baseUrl || 'https://fbo.com.vn:8888') + '/Main/zccrAccount.aspx', active: false };
     } else {
       delete meta.openFbmContext;

@@ -12,9 +12,9 @@ function fbmSyncApprovePush() {
   state.cursor = { kind: 'authorize_customer' };
   state.metadata.approvalGranted = true;
   state.message = 'Đã chấp thuận; đang kiểm tra phiên FBM...';
-  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan }); }
+  FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan });
   FbmSync.stateWrite(state);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } }); }
+  logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: LOG_OK, reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } });
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 }
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
@@ -39,7 +39,7 @@ function fbmSyncRetryPushFailures() {
   FbmSync.pushFailuresRemove(reset.concat(missing));
   state.message = 'Đã mở lại ' + reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.';
   FbmSync.stateWrite(state);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_retry_batch_enabled', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Người dùng chủ động mở lại nhóm bản ghi lỗi đẩy.', detail: { total: keys.length, reset: reset.length, missing: missing.length } }); }
+  logEvent({ source: 'fbm_sync', action: 'push_retry_batch_enabled', outcome: LOG_OK, reason: 'Người dùng chủ động mở lại nhóm bản ghi lỗi đẩy.', detail: { total: keys.length, reset: reset.length, missing: missing.length } });
   return { ok: true, total: keys.length, reset: reset.length, missing: missing.length, status: FbmSync.statusView() };
 }
 
@@ -60,7 +60,7 @@ FbmSync.relayUrlRecord = function (props) {
   if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)) { throw new Error('Web App không đọc được địa chỉ /exec của chính nó (nhận được "' + url + '").'); }
   if (FbmSync.relayUrlStored(props) === url) { return { url: url, changed: false }; }
   props.setProperty(FbmSync.RELAY_URL_KEY, JSON.stringify({ url: url, scriptId: ScriptApp.getScriptId(), at: Date.now() }));
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'relay_url_recorded', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Đã ghi địa chỉ Web App đồng bộ nền của script này; Sidebar sẽ gửi địa chỉ này cho Extension.' }); }
+  logEvent({ source: 'fbm_sync', action: 'relay_url_recorded', outcome: LOG_OK, reason: 'Đã ghi địa chỉ Web App đồng bộ nền của script này; Sidebar sẽ gửi địa chỉ này cho Extension.' });
   return { url: url, changed: true };
 };
 /** Địa chỉ cho cấu hình relay; chưa có thì dừng hẳn, không cấp cấu hình trỏ sai Web App. */

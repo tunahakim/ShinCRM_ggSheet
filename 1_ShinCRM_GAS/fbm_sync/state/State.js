@@ -51,7 +51,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
     var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
     tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
     loadPrevious();
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
+    logEvent({ source: 'fbm_sync', action: 'state_write', outcome: LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } });
     return { ok: false, code: tooLarge.code, message: tooLarge.message, error: tooLarge };
   }
   try {
@@ -61,7 +61,7 @@ FbmSync.documentPropertySet = function (key, value, context) {
     var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
     loadPrevious();
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } }); }
+    logEvent({ source: 'fbm_sync', action: 'state_write', outcome: LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } });
     return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
 };
@@ -96,19 +96,12 @@ FbmSync.seenStoreIndex = function (scope, record) {
 };
 FbmSync.seenStoreClear = function (scope) {
   var props = FbmSync.props(), prefix = FbmSync.seenStorePrefix(scope), count = Number(props.getProperty(prefix + 'SHARDS') || 0);
-  if (!props || typeof props.setProperty !== 'function') { return; }
-  if (typeof props.deleteProperty === 'function') {
-    for (var i = 0; i < count; i += 1) { props.deleteProperty(prefix + i); }
-    props.deleteProperty(prefix + 'TOTAL'); props.deleteProperty(prefix + 'HIGH_WATER'); props.deleteProperty(prefix + 'SHARDS');
-  } else {
-    for (var j = 0; j < count; j += 1) { props.setProperty(prefix + j, ''); }
-    props.setProperty(prefix + 'TOTAL', '0'); props.setProperty(prefix + 'HIGH_WATER', '0'); props.setProperty(prefix + 'SHARDS', '0');
-  }
+  for (var i = 0; i < count; i += 1) { props.deleteProperty(prefix + i); }
+  props.deleteProperty(prefix + 'TOTAL'); props.deleteProperty(prefix + 'HIGH_WATER'); props.deleteProperty(prefix + 'SHARDS');
 };
 FbmSync.seenStoreBegin = function (scope, recordsOrTotal) {
   FbmSync.seenStoreClear(scope);
   var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), records = Array.isArray(recordsOrTotal) ? recordsOrTotal : null, highWater = 0;
-  if (!props || typeof props.setProperty !== 'function') { return; }
   if (records) {
     records.forEach(function (record) { highWater = Math.max(highWater, FbmSync.seenStoreIndex(scope, record)); });
   }
@@ -123,7 +116,6 @@ FbmSync.seenStoreBeginExact = function (scope) {
 };
 FbmSync.seenStoreMark = function (scope, localRecords, incomingRecords) {
   var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, local = localRecords || [], incoming = incomingRecords || [], positions = {}, shards = {}, maxShard = -1;
-  if (!props || typeof props.setProperty !== 'function') { return; }
   local.forEach(function (record) {
     var id = String(record && record.fbmId || '').trim(), index = FbmSync.seenStoreIndex(scope, record);
     if (id && index >= 0) { positions[id] = index; }
@@ -307,7 +299,7 @@ FbmSync.stateLoad = function () {
   var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}) });
   // Khóa bản ghi cũ trong state đã chuyển sang sổ bận của lõi; bản state cũ còn mang thì bỏ, không ai đọc nữa.
   delete read.locks;
-  if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(read); }
+  FbmSync.logContextNote(read);
   FbmSync.requestWatchNote(read);
   return read;
 };
@@ -338,10 +330,10 @@ FbmSync.stateStore = function (state) {
   next.progress = Object.assign(FbmSync.stateDefault().progress, next.progress || {});
   next.updatedAt = Date.now();
   // Cửa ghi state là chỗ duy nhất thấy mọi đường kết thúc phiên, nên sổ bước nghiệp vụ được đóng tại đây chứ không rải ở từng lệnh.
-  if (FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 && typeof FbmSync.businessFinishOpenSteps === 'function') {
+  if (FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0) {
     FbmSync.businessFinishOpenSteps(next, next.phase, { error: String(next.lastError || next.message || '') });
   }
-  if (typeof FbmSync.logContextNote === 'function') { FbmSync.logContextNote(next); }
+  FbmSync.logContextNote(next);
   FbmSync.requestWatchCheck(next);
   var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
   if (stateWrite.ok) { FbmSync.requestWatchNote(next); return next; }
@@ -399,9 +391,8 @@ FbmSync.requestWatchCheck = function (next, now) {
   var open = FbmSync.requestWatch.open, at = Number(now || Date.now());
   if (!open || String(next && next.activeRequestId || '') === open.id || FbmSync.requestWatch.answered[open.id] || at < open.deadlineAt) { return; }
   FbmSync.requestWatch.answered[open.id] = true;
-  if (typeof logEvent !== 'function') { return; }
   var trail = FbmSync.requestWatch.trail, overdue = open.deadlineAt ? Math.max(0, Math.round((at - open.deadlineAt) / 60000)) : 0;
-  logEvent({ source: 'fbm_sync', action: 'request_unanswered', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: open.runId, reason: (open.id.indexOf(FbmSync.PICKUP_PREFIX) === 0 ? 'Lượt ' + open.runId + ' chờ Extension máy được giao đến nhận nhưng Extension không hỏi GAS lần nào, đã quá hạn ' + overdue + ' phút; GAS đóng lượt, chưa có request nào sang FBM.' : 'Request FBM ' + open.id + (open.kind ? ' (bước ' + open.kind + ')' : '') + ' không nhận được trả lời từ Extension, đã quá hạn chờ ' + overdue + ' phút; GAS bỏ request này.') + (trail !== undefined ? ' ' + FbmSync.extensionTrailText(trail, at) : ''), detail: { code: 'REQUEST_UNANSWERED', requestId: open.id, kind: open.kind, runId: open.runId, extensionTrail: trail !== undefined ? FbmSync.extensionTrailSafe(trail) : undefined } });
+  logEvent({ source: 'fbm_sync', action: 'request_unanswered', outcome: LOG_ERROR, cycleId: open.runId, reason: (open.id.indexOf(FbmSync.PICKUP_PREFIX) === 0 ? 'Lượt ' + open.runId + ' chờ Extension máy được giao đến nhận nhưng Extension không hỏi GAS lần nào, đã quá hạn ' + overdue + ' phút; GAS đóng lượt, chưa có request nào sang FBM.' : 'Request FBM ' + open.id + (open.kind ? ' (bước ' + open.kind + ')' : '') + ' không nhận được trả lời từ Extension, đã quá hạn chờ ' + overdue + ' phút; GAS bỏ request này.') + (trail !== undefined ? ' ' + FbmSync.extensionTrailText(trail, at) : ''), detail: { code: 'REQUEST_UNANSWERED', requestId: open.id, kind: open.kind, runId: open.runId, extensionTrail: trail !== undefined ? FbmSync.extensionTrailSafe(trail) : undefined } });
 };
 FbmSync.STATE_MINIMAL_TEXT_LIMIT = 1000;
 FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái phiên; đã lưu bản rút gọn, xem Log.)';
@@ -412,7 +403,7 @@ FbmSync.stateWriteMinimal = function (full, failure) {
   var tiers = [Object.assign({}, base, { cursor: full.cursor || {} }), base];
   for (var i = 0; i < tiers.length; i += 1) {
     if (!FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(tiers[i]), 'state_minimal').ok) { continue; }
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write_minimal', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Không lưu được đầy đủ trạng thái phiên (' + String(failure.code || '') + '); đã lưu bản rút gọn để đóng phiên ở "' + String(full.phase || '') + '"' + (i ? ', bỏ cả con trỏ và khóa ghi.' : '.'), detail: { runId: String(full.runId || ''), phase: String(full.phase || '') } }); }
+    logEvent({ source: 'fbm_sync', action: 'state_write_minimal', outcome: LOG_WARN, reason: 'Không lưu được đầy đủ trạng thái phiên (' + String(failure.code || '') + '); đã lưu bản rút gọn để đóng phiên ở "' + String(full.phase || '') + '"' + (i ? ', bỏ cả con trỏ và khóa ghi.' : '.'), detail: { runId: String(full.runId || ''), phase: String(full.phase || '') } });
     return FbmSync.stateRead();
   }
   return null;
@@ -423,7 +414,7 @@ FbmSync.stateStorageError = function (error) { return !!error && FbmSync.STATE_S
 /** Snapshot thay cho status khi kho state hỏng: ghi Log và trả lý do kèm cờ mở nút đặt lại. */
 FbmSync.stateStuckView = function (error) {
   var reason = String(error && error.message || error || '');
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_stuck', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: reason, detail: { code: String(error && error.code || '') } }); }
+  logEvent({ source: 'fbm_sync', action: 'state_stuck', outcome: LOG_ERROR, reason: reason, detail: { code: String(error && error.code || '') } });
   return { ok: false, code: 'SYNC_STATE_STUCK', failureCode: String(error && error.code || ''), resetOffered: true, runId: '', phase: 'error', label: 'Có lỗi', message: 'Màn đồng bộ đang kẹt: ' + reason, lastError: reason, counts: {} };
 };
 /**
@@ -443,7 +434,7 @@ FbmSync.stateReset = function (now) {
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
     throw failure;
   }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_reset', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Người dùng đặt lại phiên đồng bộ bị kẹt' + (unreadable ? ' (state không đọc được: ' + String(unreadable.message || unreadable) + ')' : ' (phiên ' + String(current.runId || '') + ' ở "' + String(current.phase || '') + '")') + '; dữ liệu Sheet và FBM không đổi.', detail: { runId: current ? String(current.runId || '') : '', phase: current ? String(current.phase || '') : '' } }); }
+  logEvent({ source: 'fbm_sync', action: 'state_reset', outcome: LOG_WARN, reason: 'Người dùng đặt lại phiên đồng bộ bị kẹt' + (unreadable ? ' (state không đọc được: ' + String(unreadable.message || unreadable) + ')' : ' (phiên ' + String(current.runId || '') + ' ở "' + String(current.phase || '') + '")') + '; dữ liệu Sheet và FBM không đổi.', detail: { runId: current ? String(current.runId || '') : '', phase: current ? String(current.phase || '') : '' } });
   return { ok: true };
 };
 /** Ghi một phần state mà không làm mất field đang có. */
