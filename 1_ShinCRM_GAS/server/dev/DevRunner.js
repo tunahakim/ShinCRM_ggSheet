@@ -18,14 +18,14 @@
  * Xếp theo tầng, cùng thứ tự với đường nạp thật: dựng sheet, rồi các phép đọc lẻ, rồi cả đường nạp, rồi khung sidebar. Chạy lần lượt từ trên xuống thì hỏng ở đâu là biết tầng nào hỏng, thay vì chỉ biết "sidebar không mở".
  */
 var DEV_RUNNER_ALLOWED = [
-  'smokeTest', 'smokeDiag', 'setupSheets', 'verifySheets',
+  'smokeTest', 'setupSheets', 'verifySheets',
   'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmDevOpenBackgroundRun', 'fbmDevProbeStopBackground', 'fbmDevReleaseUnsentRequest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmDevResetApprovalThreshold', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbePreflightCost', 'fbmProbeStuckState', 'fbmProbePendingPushes', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmSeedActivityConflict', 'fbmDevMarkConflict', 'fbmDevClearConflict', 'fbmDevEditAltWebsite', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePreflightTiming', 'fbmProbeCursorPosition', 'fbmProbeActivityStepTiming', 'fbmProbeStateMetadataSizes', 'fbmProbePropertySizes', 'fbmProbeCustomerActivities', 'fbmProbeConflicts', 'fbmProbeScheduleMarkers', 'fbmProbeSheetReadCost', 'fbmProbePushStepCost', 'fbmProbePushHashSplit', 'fbmProbePushListStepCost', 'fbmDevAlignSheetTimezone', 'fbmRepairFalseMissing', 'fbmRepairFalseMissingApply', 'fbmProbeServiceUrl',
   'dumpColumnMap', 'dumpSheetGrid', 'dumpNamedRanges', 'wipeNamedRanges', 'dumpCoreSheetHead', 'dumpRecentLog', 'probeBookBinding',
   'devLogTraceOn', 'devLogTraceOff', 'settingsMigrateFromConfig', 'shinSettingsShow', 'shinLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig',
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
-  'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'viewProbeCreateRender', 'viewProbeCreateSheet', 'viewProbeAutoRender',
+  'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent',
   'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmDriveCommand', 'fbmGetSyncStatus', 'fbmCancelSync', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmSaveSettings'
 ];

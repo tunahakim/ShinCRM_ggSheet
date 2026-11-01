@@ -121,7 +121,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị (việc cài trigger ở entry/TriggerSetup.js).
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
-│       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
 │       ├── reload\               Hàm dò reload trên DEV.
 │       │   ├── ReloadProbeKit.js     Đồ dùng chung: chụp và trả lại thuộc tính tài liệu, dòng báo cáo DAT/LOI ném khi ca hỏng.
 │       │   ├── ReloadMatrixProbe.js  Tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.

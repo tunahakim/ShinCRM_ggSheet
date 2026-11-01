@@ -1,40 +1,6 @@
 /**
- * Tệp thử của chặng 1.0. Nó tồn tại để trả lời đúng một câu: đường ống clasp push, mở editor, chạy hàm, rồi clasp pull về có thông suốt không.
- * Không có nghiệp vụ nào ở đây, và tệp này sẽ bị xóa khi chặng 1.1 có tệp thật để chạy thử.
+ * Phép thử đường ống: đẩy code, chạy hàm qua cửa chạy hàm rồi đọc kết quả có thông suốt không. Không có nghiệp vụ nào ở đây; chạy kèm `--push` khi chỉ cần đẩy code lên DEV.
  */
-
-/**
- * Hàm soi lỗi tạm của chặng 1.0: nó không ném lỗi mà kể lại từng bước một, để biết bước nào chết khi chạy không có người ngồi trước máy.
- * Xóa cùng lúc với cả tệp này khi chặng 1.1 có hàm thật để chạy thử.
- */
-function smokeDiag() {
-  var steps = [];
-  var buoc = function (ten, viec) {
-    try {
-      steps.push(ten + ': OK — ' + viec());
-    } catch (loi) {
-      steps.push(ten + ': LỖI — ' + (loi && loi.message ? loi.message : String(loi)));
-    }
-  };
-
-  buoc('getActiveSpreadsheet', function () {
-    var a = SpreadsheetApp.getActiveSpreadsheet();
-    return a === null ? 'trả về null' : 'trả về đối tượng';
-  });
-  buoc('getActiveSpreadsheet().getId', function () {
-    return SpreadsheetApp.getActiveSpreadsheet().getId();
-  });
-  buoc('shinOpenBook', function () {
-    return shinOpenBook().getName();
-  });
-  buoc('Session.getEffectiveUser', function () {
-    return Session.getEffectiveUser().getEmail() || '(rỗng)';
-  });
-
-  var report = steps.join('\n');
-  console.log(report);
-  return report;
-}
 
 /** In ra một dòng để xác nhận đường ống chạy được, kèm phép đối chiếu ID tệp đang mở. */
 function smokeTest() {
