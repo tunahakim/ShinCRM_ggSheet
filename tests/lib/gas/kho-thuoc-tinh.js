@@ -3,10 +3,17 @@
  *
  * Vì sao chỉ một bản: trước đây mỗi tệp ca tự dựng kho và các bản trả khác nhau (`|| null` biến chuỗi rỗng đã lưu thành `null`, khóa chưa có trả `''`, có bản thiếu `deleteProperty`). Test xanh trên một kho như thế không chứng minh được gì về kho thật.
  *
- * Hành vi theo kho thật: khóa chưa có trả `null`; giá trị lưu thành chuỗi; `setProperty`, `setProperties`, `deleteProperty`, `deleteAllProperties` trả lại chính kho để gọi nối. Kho thiếu phương thức nào thì lời gọi nổ "is not a function", không có đường vá im lặng.
+ * Hành vi theo kho thật: khóa chưa có trả `null`; giá trị lưu thành chuỗi, số nguyên thành dạng `5.0`; `setProperty`, `setProperties`, `deleteProperty`, `deleteAllProperties` trả lại chính kho để gọi nối. Kho thiếu phương thức nào thì lời gọi nổ "is not a function", không có đường vá im lặng.
  */
 
 const coKhoa = (duLieu, key) => Object.prototype.hasOwnProperty.call(duLieu, key);
+
+/** Kho thật lưu số nguyên thành dạng số thực (`5` đọc lại ra `"5.0"`, đo bằng `probePropertiesBehavior`). Số chưa đo (số lẻ, số lớn) thì ném, không đoán. */
+function chuoiKho(value) {
+  if (typeof value !== 'number') { return String(value); }
+  if (Number.isInteger(value) && Math.abs(value) < 1e7) { return value + '.0'; }
+  throw new Error('Kho giả chưa đo cách kho thật lưu số ' + value + '; đo bằng probePropertiesBehavior rồi thêm vào chuoiKho.');
+}
 
 /**
  * Dựng một kho trên đối tượng `duLieu` (giữ nguyên tham chiếu để ca kiểm soi trực tiếp). `dem` là bộ đếm tùy chọn `{ doc, ghi }`; mỗi lệnh gọi kho tăng đúng một, như một lệnh gọi kho thật tốn một lượt. `dem.lenh` đếm riêng từng lệnh theo tên, cho phép kiểm "chỉ một lệnh setProperties, không lệnh xóa nào".
@@ -19,11 +26,11 @@ function taoKhoThuocTinh(duLieu, dem) {
     getProperty: (key) => { tinh.doc += 1; return coKhoa(d, key) ? d[key] : null; },
     getProperties: () => { tinh.doc += 1; return Object.assign({}, d); },
     getKeys: () => { tinh.doc += 1; return Object.keys(d); },
-    setProperty: (key, value) => { tinh.ghi += 1; d[key] = String(value); return kho; },
+    setProperty: (key, value) => { tinh.ghi += 1; d[key] = chuoiKho(value); return kho; },
     setProperties: (values, deleteAllOthers) => {
       tinh.ghi += 1;
       if (deleteAllOthers === true) { Object.keys(d).forEach((key) => { delete d[key]; }); }
-      Object.keys(values).forEach((key) => { d[key] = String(values[key]); });
+      Object.keys(values).forEach((key) => { d[key] = chuoiKho(values[key]); });
       return kho;
     },
     deleteProperty: (key) => { tinh.ghi += 1; delete d[key]; return kho; },

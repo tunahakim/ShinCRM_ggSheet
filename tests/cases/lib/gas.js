@@ -19,9 +19,9 @@ function testKho(so) {
   check(so, 'kho: khóa chưa có trả null, chuỗi rỗng đã lưu vẫn là chuỗi rỗng',
     [kho.getProperty('khong'), kho.getProperty('rong')],
     [null, '']);
-  check(so, 'kho: giá trị lưu thành chuỗi, ghi nối được vì trả lại chính kho',
+  check(so, 'kho: giá trị lưu thành chuỗi, số nguyên thành 5.0 như kho thật, ghi nối được vì trả lại chính kho',
     [kho.setProperty('so', 5) === kho, duLieu.so],
-    [true, '5']);
+    [true, '5.0']);
   kho.setProperties({ a: 1, b: true });
   check(so, 'kho: setProperties giữ khóa cũ khi không xóa hết', Object.keys(duLieu).sort(), ['a', 'b', 'rong', 'so']);
   kho.setProperties({ c: 'x' }, true);
