@@ -226,11 +226,32 @@ async function testNoSelfCancel(so) {
   check(so, 'đóng màn đồng bộ: đồng hồ chờ bị hủy, status relay về sau không đặt đồng hồ mới, chỗ chờ vẫn giữ', [timers[daDat - 1].cleared, timers.length === daDat, hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId], [true, true, 'run-10']);
 }
 
+async function testStuckStopsWaiting(so) {
+  // GAS báo lượt kẹt qua status: Sidebar thôi chờ ngay với chữ của GAS, không gửi lệnh Dừng, không đặt đồng hồ mới.
+  const { hop } = taoBoTest();
+  const calls = [], timers = [];
+  hop.setTimeout = (fn, ms) => { timers.push({ fn, ms, cleared: false }); return timers.length; };
+  hop.clearTimeout = (id) => { if (timers[id - 1]) { timers[id - 1].cleared = true; } };
+  const kep = { runId: 'run-11', phase: 'pull_customer', running: true, stuck: true, stuckCode: 'SYNC_STALE_RUN', stuckMessage: 'Lượt đồng bộ đang kẹt: thử.' };
+  hop.callServer = (name) => { calls.push(name); return Promise.resolve(name === 'fbmGetSyncStatus' ? { status: kep } : {}); };
+  hop.FBM_SYNC_CLIENT.active = true;
+  let ketQua = null;
+  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-11', resolve(value) { ketQua = value; }, reject() {}, timer: null };
+  hop.fbmSyncRunWaitArm();
+  const daDat = timers.length;
+  timers[daDat - 1].fn();
+  await new Promise((resolve) => setImmediate(resolve));
+  check(so, 'status báo lượt kẹt: chỗ chờ kết thúc với mã và chữ của GAS, không gửi lệnh Dừng, không đặt đồng hồ mới', [
+    ketQua && ketQua.ok, ketQua && ketQua.code, ketQua && ketQua.error, calls.indexOf('fbmCancelSync'), hop.FBM_SYNC_CLIENT.runWaiter, timers.length === daDat
+  ], [false, 'SYNC_STALE_RUN', 'Lượt đồng bộ đang kẹt: thử.', -1, null, true]);
+}
+
 async function chay(so) {
   await testSharedShellLifecycle(so);
   await testOwnRunId(so);
   await testErrorPathFailures(so);
   await testNoSelfCancel(so);
+  await testStuckStopsWaiting(so);
   section('FBM sync — Sidebar UI smoke');
   let bo;
   try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }

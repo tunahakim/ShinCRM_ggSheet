@@ -55,6 +55,7 @@ async function chay(so) {
   let readFinishMissing = 0;
   let readFinishPushRequests = 0;
   const readFinish = taoHopCat({
+    recordGateReleaseOwner: () => {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => null, getProperties: () => ({}), setProperty: () => {}, setProperties: () => {}, deleteProperty: () => {} }) },
     FbmSync: {
       stateRead: () => readFinishState,
@@ -67,14 +68,16 @@ async function chay(so) {
       pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
       nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
+      runInProgress: (state) => !!state.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(state.phase) < 0, businessFinishOpenSteps: () => {}, RECORD_HOLDER: 'fbm',
       runDoneMessage: () => 'Đồng bộ hoàn tất.',
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
   readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
   readFinish.FbmSync.readListClear = () => {};
+  readFinish.FbmSync.recoverStaleRun = (state) => ({ state, recovered: false });
   readFinish.FbmSync.customerBaselineWrite = () => {};
   readFinish.FbmSync.activityStageNext = () => null;
   const readFinished = readFinish.FbmSync.continueStep({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
@@ -250,7 +253,7 @@ async function chay(so) {
   builders.FbmSync.customerAbsentMark = () => { marked.push('vắng'); };
   builders.FbmSync.customerBaselineWrite = () => { marked.push('mốc'); };
   builders.FbmSync.activityStagesContinue = () => { marked.push('cửa ghi'); return { ok: true }; };
-  const scanRun = (pages) => { const st = { mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
+  const scanRun = (pages) => { const st = { runId: 'scan-run', mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
   const rowsOf = (n) => Array.from({ length: n }, () => ({}));
   check(so, 'chỉ xét khách vắng và sang cửa ghi khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE, chưa ghi gì',
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],

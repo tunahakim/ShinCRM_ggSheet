@@ -1080,7 +1080,7 @@ async function chay(so) {
   const { fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses } = await fullPipeline(false);
   const fullFinal = fullFlow.hop.FbmSync.statusView();
   // Lượt có sổ bước nghiệp vụ: dòng tổng kết là dòng đóng bước "run", không còn dòng snapshot `slice`.
-  const fullSummaryLog = fullLogs.filter((item) => item.action === 'sync_session_finished' && item.detail && item.detail.phase === 'done').slice(-1)[0] || {};
+  const fullSummaryLog = fullLogs.filter((item) => item.action === 'sync_session_finished').slice(-1)[0] || {};
   const ui = taoBoTest();
   ui.hop.fbmSyncPaint(fullFinal);
   check(so, 'pipeline giả lập Customer + Activity đi qua GAS, Extension, cửa ghi và kết thúc; bản ghi thành công không sinh dòng Log theo bản ghi', [

@@ -94,6 +94,20 @@ async function chay(so) {
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);
 
+  // Lượt chết (Extension im giữa lượt): status chỉ báo kẹt, không ghi; lần bấm Đồng bộ kế đóng lượt cũ rồi mở lượt mới.
+  const ket = hopCoLuot();
+  const runKet = ket.F.stateRead().runId, cu = JSON.parse(ket.data.FBM_SYNC_STATE_V1);
+  Object.assign(cu, { activeRequestId: '', deadlineAt: 0, updatedAt: Date.now() - ket.F.STALE_RUN_MS - 1000 });
+  ket.data.FBM_SYNC_STATE_V1 = JSON.stringify(cu);
+  const truocStatus = ket.data.FBM_SYNC_STATE_V1, xem = ket.F.statusView();
+  check(so, 'status gặp lượt chết: báo stuck kèm mã và chữ hướng dẫn, không ghi ô lượt', [xem.stuck, xem.stuckCode, /Bấm Đồng bộ/.test(xem.stuckMessage), ket.data.FBM_SYNC_STATE_V1 === truocStatus], [true, 'SYNC_STALE_RUN', true, true]);
+  const truocMoi = ket.logs.length;
+  const moi = ket.F.start({ mode: 'read', origin: 'manual', manual: true });
+  const thuHoi = ket.logs.slice(truocMoi).filter((line) => line.action === 'stale_run')[0] || {};
+  check(so, 'lượt kẹt rồi bấm Đồng bộ: lượt cũ đóng lỗi SYNC_STALE_RUN có dòng Log riêng, lượt mới mở với mã khác và phát request đầu', [
+    thuHoi.cycleId === runKet, thuHoi.detail && thuHoi.detail.code, ket.F.stateRead().runId !== runKet, !!moi.request, ket.F.statusView().stuck
+  ], [true, 'SYNC_STALE_RUN', true, true, false]);
+
   // runClose là cửa duy nhất: kết luận lạ và đóng lượt đã đóng là lỗi lập trình.
   const cua = hopCoLuot();
   check(so, 'runClose: kết luận lạ ném RUN_VERDICT_UNKNOWN; đóng lượt không còn chạy ném RUN_NOT_OPEN', [

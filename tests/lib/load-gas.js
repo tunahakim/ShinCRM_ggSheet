@@ -27,6 +27,9 @@ function taoHopCat(stubs) {
   // Khóa điều phối giả mặc định (luôn lấy được); ca cần thử nhánh bận tự truyền `LockService`.
   // Hạn chờ khóa của GAS thật; ca cần số khác tự truyền `SETTINGS`.
   if (!hopCat.SETTINGS) { hopCat.SETTINGS = { LOCK_WAIT_MS: 15000 }; }
+  // Cửa ghi Log mặc định nuốt dòng; ca cần đọc Log tự truyền `logEvent`. Mã GAS mới gọi thẳng, không dò sự có mặt của nó.
+  if (!hopCat.logEvent) { hopCat.logEvent = () => {}; }
+  ['LOG_OK', 'LOG_WARN', 'LOG_ERROR'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = key.slice(4).toLowerCase(); } });
   if (!hopCat.LockService) { hopCat.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }; }
   vm.createContext(hopCat);
   return hopCat;
