@@ -379,6 +379,7 @@ tests\
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
     ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
+    ├── fbmSync\LoginReply.js    Kiểm bảng đọc câu trả lời Login của FBM (`d`): lượt bị từ chối đóng lỗi, sai mật khẩu hoặc câu trả lời chưa gặp thì ngừng tự đăng nhập, dòng Log ghi trước khi lượt đóng.
     ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
     ├── fbmSync\UserJourneys.js  Kiểm các hành trình Sidebar, cấu hình kết nối, công tắc và thông báo lỗi.
     ├── fbmSync\Components.js    Kiểm hợp đồng Sync dùng component/lớp chung của ShinCRM, không tái tạo control generic.
