@@ -134,7 +134,11 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── NoticeGateProbe.js    Nghiệm thu cổng thông báo trên DocumentProperties thật và đo phí một lần getProperties lạnh.
 │       ├── BookBindingProbe.js       Hàm dò cặp mã Sheet và mã script đã ghi, để nghiệm thu chuyển Sheet.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
-│       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Sidebar/Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService.
+│       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService. Danh sách bọc có tên đã mất thì báo lỗi, không bỏ qua.
+│       ├── FbmPerfScope.js       Dựng phạm vi và dữ liệu cho phiên đo: thu phạm vi về vài khách thử, xóa vài dòng Activity, chỉnh múi giờ tệp DEV.
+│       ├── FbmPayloadProbe.js    Đo GAS giải JSON và băm gói Activity nhiều cỡ để chọn cỡ gói một lần gọi.
+│       ├── FbmSyncFixture.js     Dựng dữ liệu thử đồng bộ trên Sheet DEV qua cửa bản ghi (ALT00010, CUS-020061, xung đột, mã bị xóa).
+│       ├── FbmSyncBackgroundProbe.js Nghiệm thu dừng đồng bộ nền bằng đúng các cửa Sidebar gọi, đóng request không Extension nào gửi.
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
@@ -409,8 +413,6 @@ tests\
     │   └── view\                  viewSheetRenderer.js (vẽ theo giao dịch sống gần nhất, cột động, lọc, sắp), viewLedger.js (lượt vẽ hỏng không tự đánh thức, mỗi lỗi một dòng Log), viewTabTint.js (tab cam khi sheet cũ).
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
-
-`server/dev/FbmSyncFixture.js` — Chuẩn bị live test ALT00010 và probe auth, ghi checklist vào Log, không xóa dữ liệu và không gửi request FBM.
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
 
