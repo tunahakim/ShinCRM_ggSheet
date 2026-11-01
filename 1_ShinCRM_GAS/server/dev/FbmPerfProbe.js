@@ -3,14 +3,15 @@
  *
  * Vì sao bọc hàm thay vì rải `Date.now()` vào code nghiệp vụ: đo là việc tạm, rải mốc vào nghiệp vụ thì gỡ sót là thành rác lâu dài. Ở đây mỗi lần gọi GAS bọc tạm một danh sách hàm có sẵn, đo thời gian tự thân (trừ thời gian các hàm con cũng được bọc) nên các ô cộng lại đúng bằng tổng thời gian lần gọi, không đếm trùng.
  * Cạm bẫy: chỉ đo khi đã bật bằng `fbmPerfOn`; tắt thì `runEntryPoint` chỉ tốn một lần đọc Cache. Kết quả nằm trong CacheService (hết hạn sau 6 giờ) chứ không nằm trong DocumentProperties, vì state đã sát trần 9 KB và chính phép đo không được làm đổi state.
- * Thời gian phía Sidebar/Extension lấy từ trace client gửi kèm mỗi lần gọi; các mốc đó cùng đồng hồ máy người dùng nên trừ nhau được. Thời gian đường truyền GAS = (Sidebar thấy GAS trả về − lúc Sidebar gọi) − thời gian GAS tự đo, nên không phụ thuộc lệch đồng hồ hai máy.
+ * Thời gian phía Extension lấy từ trace của response gửi kèm mỗi lần gọi; các mốc đó cùng đồng hồ máy người dùng nên trừ nhau được. Sidebar hiện không phát mốc nào, nên đoạn Sidebar và đường truyền GAS không đo được ở đây.
+ * Danh sách bọc là tên cứng: đổi tên hàm đồng bộ mà quên sửa ở đây thì `fbmPerfOn` và mỗi lần mở phiên đo ném lỗi nêu đủ tên thiếu, không lặng lẽ bỏ ô đo.
  */
 var FBM_PERF_FLAG_KEY = 'FBM_PERF_ON';
 var FBM_PERF_STORE_KEY = 'FBM_PERF_STORE';
 var FBM_PERF_TTL_SECONDS = 21600;
 /** Hàm của FbmSync được bọc; thêm tên ở đây khi cần chẻ nhỏ một ô còn lớn. */
 var FBM_PERF_FBM_FUNCTIONS = [
-  'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'compactStatePreview', 'stateWriteMinimal',
+  'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
   'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
@@ -19,24 +20,35 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'hash', 'threeWay', 'canonical',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanRecord', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
-  'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
+  'runPreflight', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
-  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
+  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure',
   'activityBatchContinue', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
 /** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */
 var FBM_PERF_GLOBAL_FUNCTIONS = ['entityReadAllCombined', 'entityReadAll', 'writeGateSave', 'logEvent', 'logTrace', 'flushLog', 'flushLogIfTraced', 'shinCorePreflight'];
-/** Cặp mốc phía client: [tên đoạn, mốc bắt đầu, mốc kết thúc, thuộc lần gọi trước?]. */
+/** Cặp mốc phía client: [tên đoạn, mốc bắt đầu, mốc kết thúc]. Chỉ ghi cặp mà Extension còn phát (`executor.js`). */
 var FBM_PERF_CLIENT_SEGMENTS = [
-  ['sidebar_to_extension', 'client_next_request_started', 'executor_started', false],
-  ['extension_fetch_fbm', 'fetch_started', 'fetch_finished', false],
-  ['extension_to_gas_call', 'fetch_finished', 'client_gas_call_started', false],
-  ['gas_roundtrip', 'client_gas_call_started', 'client_gas_success', true],
-  ['sidebar_after_gas', 'client_gas_success', 'client_next_request_started', true]
+  ['extension_fetch_fbm', 'fetch_started', 'fetch_finished']
 ];
 
 function fbmPerfCache() { return CacheService.getDocumentCache(); }
+
+/** Tên trong danh sách bọc mà code đã đẩy lên không còn; kiểm trước khi bọc để không bọc dở một nửa. */
+function fbmPerfMissing() {
+  var missing = [];
+  FBM_PERF_FBM_FUNCTIONS.forEach(function (fn) { if (typeof FbmSync[fn] !== 'function') { missing.push('FbmSync.' + fn); } });
+  FBM_PERF_PROTOCOL_FUNCTIONS.forEach(function (fn) { if (!FbmSync.protocol || typeof FbmSync.protocol[fn] !== 'function') { missing.push('FbmSync.protocol.' + fn); } });
+  FBM_PERF_GLOBAL_FUNCTIONS.concat(['documentStoreReal']).forEach(function (fn) { if (typeof globalThis[fn] !== 'function') { missing.push(fn); } });
+  if (typeof FbmSync.orchestrationLock !== 'function') { missing.push('FbmSync.orchestrationLock'); }
+  return missing;
+}
+
+function fbmPerfAssertWrappable() {
+  var missing = fbmPerfMissing();
+  if (missing.length) { throw new Error('Danh sách bọc đo có tên không còn trong code, sửa danh sách ở FbmPerfProbe.js: ' + missing.join(', ')); }
+}
 
 /** Mở phiên đo của một lần gọi GAS; trả `null` khi chưa bật để `runEntryPoint` chạy như thường. */
 function devPerfBegin(name, args) {
@@ -56,9 +68,10 @@ function fbmPerfBeginUnsafe(name, args) {
   if (raw[FBM_PERF_FLAG_KEY] !== '1') { return null; }
   var perf = { name: String(name), startedAt: startedAt, flagMs: Date.now() - startedAt, stack: [], buckets: {}, callers: {}, restore: [], runId: '', kind: '', store: null, args: args || {} };
   try { perf.store = raw[FBM_PERF_STORE_KEY] ? JSON.parse(raw[FBM_PERF_STORE_KEY]) : null; } catch (parseError) { perf.store = null; perf.storeError = String(parseError && parseError.message || parseError); }
-  if (!perf.store || typeof perf.store !== 'object') { perf.store = { runs: {}, order: [], client: { lastAt: 0, lastStage: {}, lastKind: '', lastServerMs: 0 } }; }
+  if (!perf.store || typeof perf.store !== 'object') { perf.store = { runs: {}, order: [], client: { lastAt: 0, lastStage: {} } }; }
+  fbmPerfAssertWrappable();
   FBM_PERF_FBM_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, FbmSync, fn, fn); });
-  if (FbmSync.protocol) { FBM_PERF_PROTOCOL_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, FbmSync.protocol, fn, 'protocol.' + fn); }); }
+  FBM_PERF_PROTOCOL_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, FbmSync.protocol, fn, 'protocol.' + fn); });
   FBM_PERF_GLOBAL_FUNCTIONS.forEach(function (fn) { fbmPerfWrap(perf, globalThis, fn, fn); });
   fbmPerfWrapProps(perf);
   fbmPerfWrapLock(perf);
@@ -67,7 +80,7 @@ function fbmPerfBeginUnsafe(name, args) {
 
 /** Bọc một hàm: cộng thời gian tự thân và đếm hàm gọi nó; giữ nguyên `this`, giá trị trả về và lỗi ném ra. */
 function fbmPerfWrap(perf, owner, key, label) {
-  if (!owner || typeof owner[key] !== 'function' || owner[key].__fbmPerf) { return; }
+  if (owner[key].__fbmPerf) { return; }
   var original = owner[key];
   var wrapped = function () {
     var frame = fbmPerfEnter(perf, label), result;
@@ -84,7 +97,6 @@ function fbmPerfWrap(perf, owner, key, label) {
 
 /** DocumentProperties: đo từng lần gọi kho thật (lõi lẫn đồng bộ), bọc ở cửa kho dùng chung nên lần đọc trúng bản đọc trong bộ nhớ không bị tính. */
 function fbmPerfWrapProps(perf) {
-  if (typeof documentStoreReal !== 'function') { return; }
   var originalReal = documentStoreReal;
   var timed = function (props) {
     return {
@@ -97,13 +109,11 @@ function fbmPerfWrapProps(perf) {
     };
   };
   documentStoreReal = function () { return timed(originalReal()); };
-  perf.propsServiceWrapped = true;
   perf.restore.push(function () { documentStoreReal = originalReal; });
 }
 
 /** Thời gian chờ khóa điều phối tách riêng khỏi thời gian xử lý. */
 function fbmPerfWrapLock(perf) {
-  if (typeof FbmSync.orchestrationLock !== 'function') { return; }
   var original = FbmSync.orchestrationLock;
   FbmSync.orchestrationLock = function () {
     var lock = original.apply(FbmSync, arguments);
@@ -151,27 +161,22 @@ function fbmPerfEndUnsafe(perf, failed) {
     dst.n += src.n; dst.selfMs += src.selfMs; agg.measuredMs += src.selfMs;
   });
   Object.keys(perf.callers).forEach(function (edge) { agg.callers[edge] = Number(agg.callers[edge] || 0) + perf.callers[edge]; });
-  if (perf.propsServiceWrapped === false) { agg.propsServiceNotWrapped = true; }
   fbmPerfClientSegments(perf, run, kind);
-  store.client.lastKind = kind;
-  store.client.lastServerMs = serverMs;
   var text = JSON.stringify(store);
   fbmPerfCache().put(FBM_PERF_STORE_KEY, text, FBM_PERF_TTL_SECONDS);
 }
 
-/** Ghép mốc client mới (chưa xử lý ở lần gọi trước) thành các đoạn thời gian Sidebar/Extension. */
+/** Ghép mốc client mới (chưa xử lý ở lần gọi trước) thành các đoạn thời gian Extension. */
 function fbmPerfClientSegments(perf, run, kind) {
   var store = perf.store, client = store.client, args = perf.args || {}, events = [], seen = {};
   var add = function (list) { (Array.isArray(list) ? list : []).forEach(function (item) { if (!item || !item.stage || !item.at) { return; } var key = item.stage + '|' + item.at; if (seen[key]) { return; } seen[key] = true; events.push({ stage: String(item.stage), at: Number(item.at) }); }); };
-  add(args.clientTrace);
   add(args.response && args.response.transport && args.response.transport.trace);
   events = events.filter(function (item) { return item.at > Number(client.lastAt || 0); }).sort(function (a, b) { return a.at - b.at; });
   events.forEach(function (event) {
     FBM_PERF_CLIENT_SEGMENTS.forEach(function (segment) {
       if (segment[2] !== event.stage || !client.lastStage[segment[1]] || client.lastStage[segment[1]] > event.at) { return; }
-      var ms = event.at - client.lastStage[segment[1]], targetKind = segment[3] ? client.lastKind || kind : kind, target = run.kinds[targetKind] || run.kinds[kind];
-      fbmPerfAddClient(target, segment[0], ms);
-      if (segment[0] === 'gas_roundtrip' && client.lastServerMs) { fbmPerfAddClient(target, 'gas_transit (khứ hồi − GAS tự đo)', Math.max(0, ms - client.lastServerMs)); }
+      var ms = event.at - client.lastStage[segment[1]]
+      fbmPerfAddClient(run.kinds[kind], segment[0], ms);
       client.lastStage[segment[1]] = 0;
     });
     client.lastStage[event.stage] = event.at;
@@ -185,7 +190,7 @@ function fbmPerfAddClient(agg, name, ms) {
 }
 
 /** Bật đo; xóa số liệu cũ để bảng chỉ chứa lượt chạy sắp tới. */
-function fbmPerfOn() { var cache = fbmPerfCache(); cache.remove(FBM_PERF_STORE_KEY); cache.put(FBM_PERF_FLAG_KEY, '1', FBM_PERF_TTL_SECONDS); return 'Đã bật đo thời gian đồng bộ FBM trong 6 giờ; số liệu cũ đã xóa.'; }
+function fbmPerfOn() { fbmPerfAssertWrappable(); var cache = fbmPerfCache(); cache.remove(FBM_PERF_STORE_KEY); cache.put(FBM_PERF_FLAG_KEY, '1', FBM_PERF_TTL_SECONDS); return 'Đã bật đo thời gian đồng bộ FBM trong 6 giờ; số liệu cũ đã xóa.'; }
 function fbmPerfOff() { fbmPerfCache().remove(FBM_PERF_FLAG_KEY); return 'Đã tắt đo thời gian đồng bộ FBM; số liệu vẫn giữ tới khi Cache hết hạn.'; }
 
 /** Bảng đo đọc được bằng chữ: theo lượt, theo loại lần gọi, các ô xếp từ tốn nhất xuống. */
@@ -199,7 +204,7 @@ function fbmPerfReport() {
     lines.push('=== Lượt ' + runKey + ' (' + Math.round((run.lastAt - run.firstAt) / 1000) + ' giây từ lần gọi đầu đến lần cuối) ===');
     Object.keys(run.kinds).sort(function (a, b) { return run.kinds[b].serverMs - run.kinds[a].serverMs; }).forEach(function (kind) {
       var agg = run.kinds[kind];
-      lines.push('-- ' + kind + ': ' + agg.calls + ' lần gọi' + (agg.failed ? ' (' + agg.failed + ' lỗi)' : '') + ', GAS tổng ' + agg.serverMs + ' ms, TB ' + Math.round(agg.serverMs / agg.calls) + ' ms (min ' + agg.minServerMs + ', max ' + agg.maxServerMs + '), chưa bọc ' + (agg.serverMs - agg.measuredMs) + ' ms' + (agg.propsServiceNotWrapped ? ' [PropertiesService của trace không bọc được]' : ''));
+      lines.push('-- ' + kind + ': ' + agg.calls + ' lần gọi' + (agg.failed ? ' (' + agg.failed + ' lỗi)' : '') + ', GAS tổng ' + agg.serverMs + ' ms, TB ' + Math.round(agg.serverMs / agg.calls) + ' ms (min ' + agg.minServerMs + ', max ' + agg.maxServerMs + '), chưa bọc ' + (agg.serverMs - agg.measuredMs) + ' ms');
       Object.keys(agg.client).forEach(function (name) { var c = agg.client[name]; lines.push('   [client] ' + name + ': ' + c.n + ' lần, TB ' + Math.round(c.ms / c.n) + ' ms, max ' + c.maxMs + ' ms, tổng ' + c.ms + ' ms'); });
       Object.keys(agg.buckets).sort(function (a, b) { return agg.buckets[b].selfMs - agg.buckets[a].selfMs; }).forEach(function (label) {
         var b = agg.buckets[label];
@@ -211,192 +216,4 @@ function fbmPerfReport() {
     });
   });
   return lines;
-}
-
-/** Phạm vi đo có giới hạn: giới hạn phạm vi với tối đa `FbmSync.SCOPE_CODES_MAX` mã FBM (`fbmCustomerCode`); khách đã ghép cặp thì GAS tự đổi ra cả mã ShinCRM cho chiều ghi. Ưu tiên khách đã có giao dịch trong Sheet Activity để đo cả nhánh ghi Sheet, bù bằng khách cuối Sheet Customer đã có FBM ID. Chỉ đọc FBM nên an toàn; cất cài đặt cũ để `fbmPerfTestScopeOff` trả lại. */
-function fbmPerfTestScopeOn() {
-  var before = FbmSync.syncSettingsRead(), codes = [], withActivity = {};
-  FbmSync.readLocal('activity').forEach(function (record) { var id = String(record.customerId || '').trim(); if (id) { withActivity[id] = true; } });
-  var customers = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmId || '').trim() && FbmSync.SCOPE_CODE_PATTERN.test(String(record.fbmCustomerCode || '').trim()); });
-  var ordered = customers.filter(function (record) { return withActivity[String(record.id || '').trim()]; }).concat(customers.slice().reverse());
-  ordered.forEach(function (record) {
-    var id = String(record.fbmCustomerCode).trim();
-    if (codes.length < FbmSync.SCOPE_CODES_MAX && codes.indexOf(id) < 0) { codes.push(id); }
-  });
-  if (!fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS')) { fbmPerfCache().put('FBM_PERF_PREVIOUS_SETTINGS', JSON.stringify({ scopeLimited: before.scopeLimited, scopeCodes: before.scopeCodes }), FBM_PERF_TTL_SECONDS); }
-  var saved = FbmSync.syncSettingsSave({ scopeLimited: true, scopeCodes: codes });
-  return saved.ok ? 'Đã giới hạn phạm vi ' + codes.length + ' mã FBM (' + Object.keys(withActivity).length + ' khách có giao dịch trong Sheet).' : 'LỖI ' + saved.code + ': ' + saved.message;
-}
-function fbmPerfTestScopeOff() {
-  var raw = fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS');
-  if (!raw) { return 'Không còn bản cài đặt cũ trong Cache; hãy sửa phạm vi đồng bộ bằng tay ở Sidebar.'; }
-  var saved = FbmSync.syncSettingsSave(JSON.parse(raw));
-  return saved.ok ? 'Đã trả phạm vi đồng bộ và danh sách khách chỉ định về như trước khi đo.' : 'LỖI ' + saved.code + ': ' + saved.message;
-}
-
-/** Số dòng Activity của khách thử bị xóa khỏi Sheet DEV để lượt Lấy kế tiếp đi nhánh ghi giao dịch mới (`fbmPerfDropScopeActivities`). */
-var FBM_PERF_DROP_ACTIVITY_ROWS = 10;
-
-/**
- * Chuẩn bị đo nhánh ghi Sheet mà không tạo giao dịch thật trên FBM: xóa vài dòng Activity đã liên kết FBM của khách trong phạm vi thử khỏi Sheet DEV; lượt "Lấy từ FBM → ShinCRM" kế tiếp thấy chúng là giao dịch mới và ghi lại.
- * Chỉ chạy khi phạm vi đồng bộ đang giới hạn (gọi `fbmPerfTestScopeOn` trước). Xóa từ dưới lên để vị trí dòng phía trên không dịch.
- */
-function fbmPerfDropScopeActivities() {
-  var scope = FbmSync.scope(), customers = {};
-  if (!scope || !scope.shin.length) { return 'LỖI: phạm vi chưa giới hạn vào khách có trên Sheet; chạy fbmPerfTestScopeOn trước.'; }
-  FbmSync.readLocal('customer').forEach(function (customer) { customers[String(customer.id || '')] = customer; });
-  var targets = {}, picked = 0;
-  FbmSync.readLocal('activity').forEach(function (record) {
-    var fbmId = String(record.fbmId || '').trim(), customer = customers[String(record.customerId || '')];
-    if (picked < FBM_PERF_DROP_ACTIVITY_ROWS && fbmId && customer && FbmSync.inScope(customer, scope)) { targets[fbmId] = true; picked += 1; }
-  });
-  var sheet = shinOpenSheet('Activity'), columns = readColumnMap('Activity'), at = columnIndex(columns, '@ACT_FBM_ID');
-  var count = sheetGridDataRowCount(sheet, SHEET_FIRST_DATA_ROW), values = count ? sheet.getRange(SHEET_FIRST_DATA_ROW, at, count, 1).getValues() : [], rows = [];
-  values.forEach(function (row, index) { if (targets[String(row[0] || '').trim()]) { rows.push(SHEET_FIRST_DATA_ROW + index); } });
-  rows.reverse().forEach(function (row) { sheet.deleteRow(row); });
-  return 'Đã xóa ' + rows.length + ' dòng Activity của khách thử khỏi Sheet DEV (FBM ID: ' + Object.keys(targets).join(', ') + ').';
-}
-
-/** Kích thước gói (MB) thử ở `fbmProbePayloadBudget`; lớn dần để thấy chỗ GAS bắt đầu chậm hoặc vỡ. */
-var FBM_PERF_PAYLOAD_SIZES_MB = [0.5, 1, 5, 10, 20];
-
-/**
- * Đo GAS xử lý một gói Activity cỡ 0,5–20 MB: giải JSON, tính hash từng bản ghi, dựng bảng id → hash. Không gọi FBM, không ghi gì.
- * Bản ghi nhân bản từ Activity thật của Sheet DEV (đổi id) để kích thước và hình dạng giống thật. Chỉ đo phía GAS; thời gian truyền gói từ Sidebar lên GAS phải đo ở lượt chạy thật.
- * GAS không có API đọc bộ nhớ, nên cỡ nào vỡ thì báo lỗi đúng cỡ đó và dừng, các cỡ trước vẫn có số.
- */
-function fbmProbePayloadBudget() {
-  var templates = FbmSync.readLocal('activity').filter(function (record) { return record.fbmId; });
-  if (!templates.length) { return 'Sheet DEV chưa có Activity nào có mã FBM để làm mẫu.'; }
-  var gate = FbmSync.readCategoryGate(), lines = ['Mẫu: ' + templates.length + ' Activity thật trên Sheet DEV'];
-  for (var s = 0; s < FBM_PERF_PAYLOAD_SIZES_MB.length; s++) {
-    var targetBytes = FBM_PERF_PAYLOAD_SIZES_MB[s] * 1024 * 1024, step = 'dựng gói';
-    try {
-      var t0 = Date.now(), records = [], bytes = 2, i = 0;
-      while (bytes < targetBytes) {
-        var copy = JSON.parse(JSON.stringify(templates[i % templates.length]));
-        copy.fbmId = String(copy.fbmId) + '-' + i;
-        records.push(copy);
-        bytes += JSON.stringify(copy).length + 1;
-        i++;
-      }
-      var text = JSON.stringify(records);
-      records = null;
-      var t1 = Date.now(); step = 'giải JSON';
-      var parsed = JSON.parse(text);
-      var t2 = Date.now(); step = 'tính hash';
-      var map = {};
-      parsed.forEach(function (record) { map[record.fbmId] = FbmSync.hash(record, 'activity', gate); });
-      var t3 = Date.now();
-      lines.push(FBM_PERF_PAYLOAD_SIZES_MB[s] + ' MB: ' + parsed.length + ' bản ghi, ' + Math.round(text.length / parsed.length) + ' B/bản ghi | giải JSON ' + (t2 - t1) + ' ms | hash + bảng id→hash ' + (t3 - t2) + ' ms (' + Math.round((t3 - t2) * 1000 / parsed.length) + ' µs/bản ghi) | dựng gói thử ' + (t1 - t0) + ' ms');
-      text = null; parsed = null; map = null;
-    } catch (error) {
-      lines.push(FBM_PERF_PAYLOAD_SIZES_MB[s] + ' MB: VỠ lúc ' + step + ' — ' + String(error && error.message || error));
-      break;
-    }
-  }
-  return lines;
-}
-
-/** Tách chi phí một lần đọc Sheet của đồng bộ thành: dựng bối cảnh, `getValues`, chuyển ô (riêng ô ngày) để biết tối ưu chỗ nào. Chỉ đọc. */
-function fbmProbeSheetReadCost() {
-  return ['customer', 'activity'].map(function (entity) {
-    var fields = {};
-    [DATA_SCHEMA, SYNC_SCHEMA].forEach(function (schema) { var part = schema[entity] || {}; Object.keys(part).forEach(function (name) { fields[name] = part[name]; }); });
-    var t0 = Date.now(), context = entityReadContext(entity, fields), t1 = Date.now();
-    var block = sheetGridReadBlock(context.sheet, SHEET_FIRST_DATA_ROW, context.rowCount, context.columnMap.lastColumn), t2 = Date.now();
-    var dateCells = 0, dateMs = 0, otherMs = 0;
-    block.forEach(function (raw) {
-      context.indexes.forEach(function (at, k) {
-        var spec = context.specs[k], a = Date.now();
-        entityReadCell(raw[at], spec, context.timezone);
-        if (spec.type === 'DATE') { dateCells += 1; dateMs += Date.now() - a; } else { otherMs += Date.now() - a; }
-      });
-    });
-    var t3 = Date.now(), full = entityReadAllCombined(entity, [DATA_SCHEMA, SYNC_SCHEMA]), t4 = Date.now(), lech = 0, soNgay = 0;
-    block.forEach(function (raw) { context.indexes.forEach(function (at, k) { var spec = context.specs[k]; if (spec.type !== 'DATE' || !dateTextIsDate(raw[at]) || isNaN(raw[at].getTime())) { return; } soNgay += 1; if (dateToText(raw[at], spec.precision, context.timezone) !== Utilities.formatDate(raw[at], context.timezone, dateTextFormatOf(spec.precision))) { lech += 1; } }); });
-    return entity + ': ' + block.length + ' dòng x ' + context.columnMap.lastColumn + ' cột Sheet, ' + context.names.length + ' trường đọc | bối cảnh ' + (t1 - t0) + ' ms | getValues ' + (t2 - t1) + ' ms | chuyển ô ' + (t3 - t2) + ' ms (ô ngày ' + dateCells + ' ô ~' + dateMs + ' ms, ô khác ~' + otherMs + ' ms) | entityReadAllCombined trọn ' + (t4 - t3) + ' ms, ' + full.rows.length + ' bản ghi | so với Utilities.formatDate: ' + lech + '/' + soNgay + ' ô ngày lệch';
-  }).concat(['Múi giờ tệp: ' + shinOpenBook().getSpreadsheetTimeZone() + ' | múi giờ script: ' + Session.getScriptTimeZone() + ' | 10.000 lần ghép giờ địa phương: ' + (function () { var a = Date.now(), d = new Date(); for (var i = 0; i < 10000; i += 1) { dateTextLocal(d, 'minute'); } return Date.now() - a; })() + ' ms']).join('\n');
-}
-
-/** Đặt múi giờ tệp Sheet DEV trùng múi giờ script để đổi ô ngày đi đường nhanh (`dateTextLocal`); chỉ đổi khi hai múi giờ cùng giờ ở các mốc thử, không thì báo và giữ nguyên. */
-function fbmDevAlignSheetTimezone() {
-  var book = shinOpenBook(), before = book.getSpreadsheetTimeZone(), script = Session.getScriptTimeZone();
-  if (before === script) { return 'Múi giờ tệp đã trùng script: ' + script; }
-  var moc = [new Date(Date.UTC(1976, 0, 1)), new Date(Date.UTC(1999, 0, 1)), new Date(Date.UTC(2026, 6, 1))], lech = moc.filter(function (d) { return Utilities.formatDate(d, before, 'Z') !== Utilities.formatDate(d, script, 'Z'); });
-  if (lech.length) { return 'Không đổi: ' + before + ' và ' + script + ' khác giờ ở ' + lech.length + ' mốc thử.'; }
-  book.setSpreadsheetTimeZone(script);
-  return 'Đã đổi múi giờ tệp từ ' + before + ' sang ' + book.getSpreadsheetTimeZone();
-}
-
-/** Chi phí chặng đẩy theo danh sách mã (V17): lần quét cả hai sheet ở đầu mỗi vòng, và một bước đọc lại đúng dòng theo mã rồi xét bằng phép xét một dòng. Mỗi phép xóa tờ nháp trước để đo như lần gọi GAS mới. Chỉ đọc. */
-function fbmProbePushStepCost() {
-  function cold(label, fn) { sheetReadCopyClear(); var a = Date.now(), out = FbmSync.withLocalSnapshot(fn); return label + ': ' + (Date.now() - a) + ' ms' + (out !== undefined ? ' (' + out + ')' : ''); }
-  var customerId = 'CUS-020075', activityId = 'ACT-011377';
-  function step(entity, id) {
-    var context = FbmSync.pushReviewContext(FbmSync.stateRead()), record = FbmSync.readLocalById(entity, id);
-    if (!record) { return 'không thấy ' + id; }
-    var parent = entity === 'activity' ? FbmSync.readLocalById('customer', record.customerId) : null, candidate = FbmSync.pushReview(entity, record, parent, context);
-    return candidate ? 'có việc: ' + candidate.kind + (candidate.hold ? ', chờ sửa ' + candidate.hold.code : '') : 'không có việc';
-  }
-  return [
-    cold('Quét đầu vòng (localScan + pushCandidatesAll), lạnh', function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan)).length + ' ứng viên'; }),
-    cold('Một bước Customer: đọc theo mã + xét, lạnh', function () { return step('customer', customerId); }),
-    cold('Một bước Activity: đọc theo mã kèm khách cha + xét, lạnh', function () { return step('activity', activityId); }),
-    cold('hydratePushCandidate Activity', function () { return FbmSync.hydratePushCandidate({ entity: 'activity', id: activityId }).record ? 'có' : 'không'; })
-  ].join(String.fromCharCode(10));
-}
-
-/** Tách chi phí trong `pushCandidates`: đọc Sheet, chuyển ô thành bản ghi (gọi lại khi Sheet đã đọc), băm, và các phép đọc state đi kèm. Chỉ đọc. */
-function fbmProbePushHashSplit() {
-  sheetReadCopyClear();
-  return FbmSync.withLocalSnapshot(function () {
-    var out = [], gate = FbmSync.stateCategoryGate(FbmSync.stateRead());
-    ['customer', 'activity'].forEach(function (entity) {
-      var a = Date.now(), first = FbmSync.readLocal(entity), b = Date.now(), again = FbmSync.readLocal(entity), c = Date.now();
-      again.forEach(function (record) { FbmSync.hash(record, entity, gate); }); var d = Date.now();
-      out.push(entity + ': đọc lần đầu ' + (b - a) + ' ms | dựng lại bản ghi khi Sheet đã đọc ' + (c - b) + ' ms | băm ' + again.length + ' dòng ' + (d - c) + ' ms');
-    });
-    sheetReadCopyClear();
-    var fields = entityReadCombinedFields('activity', [DATA_SCHEMA, SYNC_SCHEMA]), ctx = entityReadContext('activity', fields), total = ctx.rowCount;
-    [total, Math.floor(total / 2), 100, 10].forEach(function (n) { var f = Date.now(), got = entityReadRange(ctx, SHEET_FIRST_DATA_ROW + total - n, n); out.push('activity đọc ' + n + ' dòng cuối (đã có bối cảnh): ' + (Date.now() - f) + ' ms, ' + got.rows.length + ' bản ghi'); });
-    var e = Date.now(); FbmSync.stateRead(); FbmSync.pushFailuresRead(); if (typeof FbmSync.scope === 'function') { FbmSync.scope(); } out.push('state + sổ lỗi + phạm vi: ' + (Date.now() - e) + ' ms');
-    return out.join(String.fromCharCode(10));
-  });
-}
-
-/** Chi phí kiểm tra trước phiên tách theo phần rẻ (chạy trước request FBM đầu) và phần đắt (chạy sau khi phiên FBM xác thực, chỉ chiều có đẩy); mỗi phép xóa tờ nháp trước để đo như lần gọi mới. Chỉ đọc. */
-function fbmProbePreflightCost() {
-  function timed(label, fn) { sheetReadCopyClear(); var a = Date.now(), result = FbmSync.withLocalSnapshot(fn); return label + ": " + (Date.now() - a) + " ms" + (result && result.candidateCount !== undefined ? " (ứng viên " + result.candidateCount + ", chặn " + result.blocking.length + ")" : ""); }
-  return [
-    timed("Phần rẻ, chiều Lấy", function () { return FbmSync.preflightGates({ mode: "read", origin: "background", scan: "full" }); }),
-    timed("Phần rẻ, chiều hai chiều", function () { return FbmSync.preflightGates({ mode: "write", origin: "background", scan: "full" }); }),
-    timed("Phần đắt, chiều hai chiều", function () { return FbmSync.preflightLocal({ mode: "write", origin: "background", scan: "full" }, []); }),
-    timed("Cả hai liền nhau (lệnh chẩn đoán), chiều hai chiều", function () { return FbmSync.runPreflight({ mode: "write", origin: "background", scan: "full" }); })
-  ].join(' | ');
-}
-
-/** Chi phí một bước đẩy theo danh sách mã: dựng bối cảnh đọc, đọc cột mã để tra dòng, đọc đúng một dòng, và đọc/ghi một khóa DocumentProperties cỡ 9 KB (khóa thử, xóa ngay sau đo). */
-function fbmProbePushListStepCost() {
-  var out = [], nl = String.fromCharCode(10), key = 'DEV_PROBE_PUSH_LIST';
-  ['customer', 'activity'].forEach(function (entity) {
-    sheetReadCopyClear();
-    var fields = entityReadCombinedFields(entity, [DATA_SCHEMA, SYNC_SCHEMA]);
-    var a = Date.now(), ctx = entityReadContext(entity, fields), b = Date.now(), ids = entityReadIdColumn(ctx), c = Date.now();
-    var id = String(ids[Math.floor(ids.length / 2)] || '').trim(), got = entityReadByIds(ctx, [id]), d = Date.now();
-    out.push(entity + ': bối cảnh ' + (b - a) + ' ms | cột mã ' + ids.length + ' dòng ' + (c - b) + ' ms | đọc 1 dòng theo mã ' + (d - c) + ' ms (' + got.rows.length + ' bản ghi)');
-  });
-  var list = [], n = 0;
-  while (JSON.stringify(list).length < 8800) { list.push('ACT-' + String(100000 + n)); n += 1; }
-  var text = JSON.stringify(list), real = documentStoreReal();
-  function loadAll(label) { var times = []; for (var i = 0; i < 5; i += 1) { var t = Date.now(); real.getProperties(); times.push(Date.now() - t); } return label + ' ' + times.join('/') + ' ms'; }
-  var all = real.getProperties(), bytes = 0; Object.keys(all).forEach(function (k) { bytes += k.length + String(all[k]).length; });
-  out.push('DocumentProperties đang dùng: ' + Object.keys(all).length + ' khóa, ' + bytes + ' byte');
-  var before = loadAll('nạp cả kho, chưa có khóa thử:');
-  var e = Date.now(); real.setProperty(key, text); var f = Date.now(); var back = real.getProperty(key); var g = Date.now();
-  var withKey = loadAll('nạp cả kho, có khóa thử:');
-  var h0 = Date.now(); real.deleteProperty(key); var h = Date.now();
-  out.push('Khóa thử ' + list.length + ' mã, ' + text.length + ' byte: ghi ' + (f - e) + ' ms | đọc ' + (g - f) + ' ms | xóa ' + (h - h0) + ' ms | khớp ' + (back === text));
-  out.push(before); out.push(withKey);
-  return out.join(nl);
 }

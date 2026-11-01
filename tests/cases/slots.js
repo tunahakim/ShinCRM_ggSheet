@@ -4,8 +4,9 @@
  * Slot trả về **cây Block**, không trả chuỗi HTML, nên kiểm được offline mà không cần DOM: mỗi phép kiểm dưới đây soi vào node chứ soi vào chữ đã vẽ. Trọng tâm là ba điều: dòng lịch sử giữ đúng thứ tự thời gian kể cả khi có bản ghi đã xóa mềm chen giữa, mỗi dòng mang đủ mã bản ghi để hành động biết bấm vào đâu, và **không dòng nào mang `field`** — `renderFieldValue` tra một bản ghi cho một thực thể nên một `Field` lặp xuống danh sách sẽ đọc sai bản ghi.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
+const { moiNode } = require('../lib/sidebar/schema-node');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 /** Ba khách và ba giao dịch dùng cho cả nhóm ca. Giao dịch ở giữa theo thứ tự thời gian là bản ghi đã xóa mềm, để chứng minh nó không bị dồn xuống cuối. */
@@ -22,16 +23,6 @@ const GIAO_DICH = [
   { id: 'ACT-000003', customerId: 'CUS-000001', workDate: '2026-09-02', taskType: 'Gửi báo giá', product: 'Thép tấm', content: 'Gửi bản chào\nkèm chiết khấu', contractValue: 0, recordStatus: 'deleted' }
 ];
 
-/** Mọi node trong một mảng Block, kể cả con của con. */
-function moiNode(nodes, ra) {
-  (nodes || []).forEach((n) => {
-    if (!n || !n.role) { return; }
-    ra.push(n);
-    if (Array.isArray(n.elements)) { moiNode(n.elements, ra); }
-  });
-  return ra;
-}
-
 /** Chữ của mọi node có chữ, ghép lại theo thứ tự — dùng để đọc một dòng như người dùng thấy. */
 function chuCua(nodes) {
   return moiNode(nodes, []).filter((n) => n.text).map((n) => n.text);
@@ -39,9 +30,8 @@ function chuCua(nodes) {
 
 /** Dựng hộp cát client đã có Schema thật và kho đã nạp ba khách, ba giao dịch. */
 function dungCanh(nac) {
-  const hop = napClient(taoHopCat(),
-    'client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
-    'client/ram/prefs.html', 'client/util/valueText.html', 'client/ui/uiBuilder.html', 'client/ui/slots.html');
+  const hop = napTheoSidebar(['client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
+    'client/ram/prefs.html', 'client/util/valueText.html', 'client/ui/uiBuilder.html', 'client/ui/slots.html']);
 
   hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   hop.storeReset();

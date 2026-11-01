@@ -1,5 +1,5 @@
 /**
- * Ca kiểm kỷ luật bộ đệm và số lệnh ghi của `server/log/LogGate.js`. Tài liệu 10 Phần 2 tới Phần 6.
+ * Ca kiểm kỷ luật bộ đệm và số lệnh ghi của `server/log/LogGate.js` và `server/log/LogSheet.js`. Tài liệu 10 Phần 2 tới Phần 6.
  *
  * Nhóm ca này đứng được là nhờ tệp Sheet giả **tự đếm** từng lệnh `setValues` và `deleteRows`. Nhờ vậy luật "cả lượt chỉ tốn một lệnh ghi" không còn là lời hứa đọc từ con số do chính `LogGate` tự báo, mà là con số đếm từ phía tệp Sheet — nghĩa là cách hỏng kinh điển (ghi từng dòng trong vòng lặp) bị bắt tại đây, thay vì bị phát hiện qua hóa đơn hạn mức sau này.
  *
@@ -7,6 +7,7 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { docLog } = require('../lib/gas/doc-log');
 const { napServer } = require('../lib/load-gas');
 const { formatDateGia } = require('../lib/gas-stubs');
 const { section, check, ghiLoiNap } = require('../lib/assert');
@@ -23,14 +24,6 @@ function dungLog(vanHanh, props) {
     caiDat: vanHanh ? { core_ops: vanHanh } : {},
     props: Object.assign({ LOG_LAST_CLEANUP: homNay() }, props || {})
   });
-}
-
-/** Đọc các dòng dữ liệu của sheet `Log` giả, mỗi dòng là mảng chín ô. */
-function docLog(nen) {
-  const sheet = nen.Log.sheet;
-  const dau = nen.hop.SHEET_LAYOUT.Log.firstDataRow;
-  if (sheet.getLastRow() < dau) { return []; }
-  return sheet.getRange(dau, 1, sheet.getLastRow() - dau + 1, 9).getValues();
 }
 
 /** Nhồi sẵn dòng vào cuối sheet `Log`. Mỗi phần tử là cặp `[ô Lúc, ô Lý do]` — hai ô duy nhất mà luật cắt log đọc tới. */
@@ -76,7 +69,9 @@ function chay(so) {
   check(so, 'bộ đếm lệnh ghi của chính LogGate cũng nói đúng một lệnh', motLuot.hop.logGateWriteCount(), 1);
   check(so, 'lượt chạy trơn thì dòng vết KHÔNG ra sheet',
     bangLuot.some((dong) => String(dong[6]).indexOf('DÒNG VẾT') !== -1), false);
-  check(so, 'nhả bộ đệm rỗng thì không tốn lệnh ghi nào', [motLuot.hop.flushLog(), motLuot.dem.setValues - ghiTruoc], [0, 1]);
+  check(so, 'nhả bộ đệm rỗng thì không tốn lệnh ghi nào',
+    [motLuot.hop.flushLog(), motLuot.dem.setValues - ghiTruoc],
+    [0, 1]);
 
   // Vòng đệm vết ra sheet khi lượt chạy có lỗi. Đây là điểm đáng giá nhất của thiết kế: các bước dẫn tới lỗi có sẵn
   // mà không phải bật gì trước đó, nên một lỗi phía FBM không tái tạo được vẫn còn vết để đọc.
@@ -176,7 +171,7 @@ function chay(so) {
 
   // Lưới sheet hết chỗ. Đây là lỗi đã nổ trên sheet thật, và nó nổ theo cách tệ nhất: `setValues` không tự nới sheet, `getRange`
   // chạm quá hàng cuối là ném lỗi, `flushLog` bắt mọi lỗi rồi đi tiếp — nên log tắt hẳn trong im lặng. Sheet `Log` thật lúc đó
-  // có lưới 7 hàng vì phép đo `measureDeleteRows` đã co lưới xuống, nên hoàn cảnh dựng ở đây là hoàn cảnh có thật, không phải giả định.
+  // có lưới 7 hàng vì một phép đo trên DEV đã co lưới xuống, nên hoàn cảnh dựng ở đây là hoàn cảnh có thật, không phải giả định.
   const chatCho = dungLog();
   nhoiLog(chatCho, [['2026-09-05 08:00:01', 'cũ 1'], ['2026-09-05 08:00:02', 'cũ 2'], ['2026-09-05 08:00:03', 'cũ 3']]);
   chatCho.Log.sheet._datLuoi(chatCho.Log.sheet.getLastRow());
@@ -200,7 +195,6 @@ function chay(so) {
   check(so, 'tệp giả từ chối xóa hết các hàng không đóng băng, đúng như Google',
     (() => { try { chanLuoi.Log.sheet.deleteRows(1, 5); return 'KHÔNG NÉM LỖI'; } catch (err) { return String(err.message).indexOf('không thể xóa tất cả các hàng không được cố định') !== -1; } })(),
     true);
-
 
   // FBM-018: lượt bị Google cắt ở 6 phút không chạy `finally`, nên dòng "Bắt đầu bước" phải tự lên sheet ngay khi chế độ vết bật.
   // Kiểm bằng Trace.js thật nạp chung với LogGate thật, và KHÔNG gọi flushLog — giả lập đúng lượt chết giữa đường.

@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { napClient, taoHopCat, GAS_DIR } = require('../lib/load-gas');
+const { taoHopCat, GAS_DIR } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
@@ -21,8 +22,7 @@ function dungCanh() {
   notice.rect = { left: 0, top: 53, bottom: 81, right: 300 };
   dom.root.appendChild(notice);
   dom.document.body.appendChild(overlay);
-  const hop = napClient(taoHopCat({ document: dom.document, window: dom.window }),
-    'client/ui/progress.html', 'client/ui/popupList.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html');
+  const hop = napTheoSidebar(['client/ui/progress.html', 'client/ui/popupList.html', 'client/ui/dispatch.html', 'client/ui/menu.html', 'client/ui/collapse.html'], taoHopCat({ document: dom.document, window: dom.window }));
   hop._alerts = [];
   hop.alert = (message) => { hop._alerts.push(String(message)); };
   hop.console = { error: () => {} };
@@ -121,9 +121,13 @@ async function chay(so) {
     [false, 2, '✓Tự động', 'true', 'true', 'fixed', false, '196px', '44px']);
   nutMenu.rect = { left: 280, top: 200, bottom: 220, right: 300 };
   hop.PopupList.place(lop, nutMenu, { region: bodyRegion });
-  check(so, 'PopupList luôn bám theo vị trí mới của trigger, không dùng tọa độ cố định', [lop.style.left, lop.style.top], ['196px', '224px']);
+  check(so, 'PopupList luôn bám theo vị trí mới của trigger, không dùng tọa độ cố định',
+    [lop.style.left, lop.style.top],
+    ['196px', '224px']);
   hop.menuToggle(nutMenu);
-  check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con', [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')], [true, 0, 'false']);
+  check(so, 'bấm lại nút menu đang mở thì đóng và dọn mục con',
+    [lop.hidden, lop.children.length, nutMenu.getAttribute('aria-expanded')],
+    [true, 0, 'false']);
   check(so, 'menuInstall chỉ gắn một tai nghe Escape', [hop.menuInstall(), hop.menuInstall()], [true, false]);
 
   const bodyMenu = dom.document.createElement('button');
@@ -131,7 +135,9 @@ async function chay(so) {
   bodyMenu.rect = { left: 180, top: 300, bottom: 320, right: 280 };
   bodyRegion.appendChild(bodyMenu);
   const bodyLop = hop.menuOpen(bodyMenu);
-  check(so, 'menu trong body nằm cùng lớp cuộn và dùng tọa độ tuyệt đối', [bodyLop.parentNode === bodyRegion, bodyLop.style.position, bodyLop.classList.contains('is-body-popup')], [true, 'absolute', true]);
+  check(so, 'menu trong body nằm cùng lớp cuộn và dùng tọa độ tuyệt đối',
+    [bodyLop.parentNode === bodyRegion, bodyLop.style.position, bodyLop.classList.contains('is-body-popup')],
+    [true, 'absolute', true]);
   hop.menuClose();
 
   const scrollAnchor = dom.document.createElement('button');
@@ -149,17 +155,25 @@ async function chay(so) {
   bodyRegion.scrollTop = 100;
   scrollAnchor.rect = { left: 20, top: 100, bottom: 120, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList cuộn cùng trigger trong cùng lớp body', [popupTopBeforeScroll, scrollPopup.style.top], ['94px', '94px']);
+  check(so, 'PopupList cuộn cùng trigger trong cùng lớp body',
+    [popupTopBeforeScroll, scrollPopup.style.top],
+    ['94px', '94px']);
   bodyRegion.scrollTop = 0;
   scrollAnchor.rect = { left: 20, top: 300, bottom: 320, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList giữ tọa độ trong vùng body khi sidebar cuộn', [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden], ['94px', '194px', false]);
+  check(so, 'PopupList giữ tọa độ trong vùng body khi sidebar cuộn',
+    [popupTopBeforeScroll, scrollPopup.style.top, scrollPopup.hidden],
+    ['94px', '194px', false]);
   scrollAnchor.rect = { left: 20, top: 900, bottom: 920, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList không kẹp vào mép dưới khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '686px']);
+  check(so, 'PopupList không kẹp vào mép dưới khi trigger rời vùng cuộn',
+    [scrollPopup.hidden, scrollPopup.style.top],
+    [false, '686px']);
   scrollAnchor.rect = { left: 20, top: -50, bottom: -30, right: 120 };
   dom.document.listeners.scroll({ target: bodyRegion });
-  check(so, 'PopupList không kẹp vào mép trên khi trigger rời vùng cuộn', [scrollPopup.hidden, scrollPopup.style.top], [false, '-156px']);
+  check(so, 'PopupList không kẹp vào mép trên khi trigger rời vùng cuộn',
+    [scrollPopup.hidden, scrollPopup.style.top],
+    [false, '-156px']);
 
   const holder = dom.document.createElement('div');
   const khoi = dom.document.createElement('div');
@@ -185,7 +199,9 @@ async function chay(so) {
   vuaNoi.scrollHeight = 40;
   vua.appendChild(vuaNoi);
   dom.root.appendChild(vua);
-  check(so, 'collapseApply không hiện nút khi nội dung vừa khung', [hop.collapseApply(vuaNoi), vua.children.length], ['fit', 1]);
+  check(so, 'collapseApply không hiện nút khi nội dung vừa khung',
+    [hop.collapseApply(vuaNoi), vua.children.length],
+    ['fit', 1]);
 }
 
 /** Đọc đủ đối số của mỗi lời gọi `ten(` trong một tệp, đếm ngoặc để lời gọi trải nhiều dòng vẫn lấy trọn. */
@@ -229,9 +245,13 @@ function chayKhaiBaoKhoa(so) {
       });
     });
   });
-  check(so, 'mọi lời gọi sidebarBusyRun/sidebarBusyBegin trong client khai báo block', [thieu, Object.keys(goi).length >= 5], [[], true]);
+  check(so, 'mọi lời gọi sidebarBusyRun/sidebarBusyBegin trong client khai báo block',
+    [thieu, Object.keys(goi).length >= 5],
+    [[], true]);
   const veView = (goi['link/sheetLink.html'] || []).filter((call) => /sidebarBusyRun\(message, run,/.test(call));
-  check(so, 'tự vẽ sheet quản trị theo quyết định lời hỏi không khóa Sidebar (chỉ ghi ra Sheet)', veView.map((call) => /block:\s*false/.test(call)), [true]);
+  check(so, 'tự vẽ sheet quản trị theo quyết định lời hỏi không khóa Sidebar (chỉ ghi ra Sheet)',
+    veView.map((call) => /block:\s*false/.test(call)),
+    [true]);
 }
 
 module.exports = { chay: async (so) => { await chay(so); chayKhaiBaoKhoa(so); } };

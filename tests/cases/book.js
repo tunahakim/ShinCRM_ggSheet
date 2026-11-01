@@ -6,10 +6,12 @@
 
 const { taoHopCat, napServer } = require('../lib/load-gas');
 const { section, check } = require('../lib/assert');
+const { taoKhoThuocTinh, taoPropertiesService } = require('../lib/gas/kho-thuoc-tinh');
 
 function dungKho(initial) {
   const data = Object.assign({}, initial || {});
-  return { data, writes: 0, getProperty(key) { return data[key] === undefined ? null : data[key]; }, setProperty(key, value) { this.writes++; data[key] = value; } };
+  const dem = { doc: 0, ghi: 0 };
+  return Object.assign(taoKhoThuocTinh(data, dem), { data, dem });
 }
 
 function dungHopBook(options) {
@@ -21,7 +23,7 @@ function dungHopBook(options) {
     LOG_OK: 'ok',
     logEvent: (entry) => events.push(entry.action),
     ScriptApp: { getScriptId: () => opts.scriptId || 'script-A' },
-    PropertiesService: { getScriptProperties: () => props },
+    PropertiesService: taoPropertiesService({ script: props.data, demScript: props.dem }),
     SpreadsheetApp: {
       getActiveSpreadsheet: () => { if (opts.active) { return opts.active; } throw new Error('reading from storage NOT_FOUND'); },
       openById: (id) => { opened.push(id); return { getId: () => id, getName: () => 'Sheet ' + id }; }
@@ -36,24 +38,32 @@ function chay(so) {
 
   const banSao = { getId: () => 'sheet-copy', getName: () => 'Bản sao' };
   const coMo = dungHopBook({ active: banSao });
-  check(so, 'có Sheet đang mở (Sidebar, menu, trigger) thì dùng nó dù là bản sao', coMo.hop.shinOpenBook().getId(), 'sheet-copy');
+  check(so, 'có Sheet đang mở (Sidebar, menu, trigger) thì dùng nó dù là bản sao',
+    coMo.hop.shinOpenBook().getId(),
+    'sheet-copy');
 
   const kho = dungKho();
   const ghi = dungHopBook({ active: banSao, props: kho });
   const lan1 = ghi.hop.shinBookBindingRecord(banSao, kho);
   const lan2 = ghi.hop.shinBookBindingRecord(banSao, kho);
-  check(so, 'mở Sidebar ghi cặp mã Sheet và mã script một lần, lần sau giống thì không ghi lại', [lan1.changed, lan2.changed, kho.writes, ghi.events], [true, false, 1, ['bookBindingRecorded']]);
+  check(so, 'mở Sidebar ghi cặp mã Sheet và mã script một lần, lần sau giống thì không ghi lại',
+    [lan1.changed, lan2.changed, kho.dem.ghi, ghi.events],
+    [true, false, 1, ['bookBindingRecorded']]);
 
   const ngoai = dungHopBook({ props: kho });
   const a = ngoai.hop.shinOpenBook();
   const b = ngoai.hop.shinOpenBook();
-  check(so, 'lời gọi từ ngoài mở đúng Sheet đã ghi, nhiều lần trong một lượt chỉ mở một lần', [a.getId(), b === a, ngoai.opened], ['sheet-copy', true, ['sheet-copy']]);
+  check(so, 'lời gọi từ ngoài mở đúng Sheet đã ghi, nhiều lần trong một lượt chỉ mở một lần',
+    [a.getId(), b === a, ngoai.opened],
+    ['sheet-copy', true, ['sheet-copy']]);
 
   const khoGoc = dungKho({ SHIN_BOOK_BINDING_V1: JSON.stringify({ spreadsheetId: 'sheet-original', scriptId: 'script-original' }) });
   const saoNgoai = dungHopBook({ props: khoGoc, scriptId: 'script-copy' });
   let loi = '';
   try { saoNgoai.hop.shinOpenBook(); } catch (err) { loi = err.message; }
-  check(so, 'bản sao mang kho của script gốc: lời gọi từ ngoài báo lỗi rõ, không mở Sheet gốc', [saoNgoai.opened, /Mở Sidebar ShinCRM trên Sheet này/.test(loi)], [[], true]);
+  check(so, 'bản sao mang kho của script gốc: lời gọi từ ngoài báo lỗi rõ, không mở Sheet gốc',
+    [saoNgoai.opened, /Mở Sidebar ShinCRM trên Sheet này/.test(loi)],
+    [[], true]);
 
   const chuaGhi = dungHopBook({});
   let loi2 = '';
@@ -66,7 +76,9 @@ function chay(so) {
   try { hongNgoai.hop.shinOpenBook(); } catch (err) { loi3 = err.message; }
   const hongMo = dungHopBook({ active: banSao, props: khoHong });
   const ghiLai = hongMo.hop.shinBookBindingRecord(banSao, khoHong);
-  check(so, 'cặp hỏng: lời gọi từ ngoài báo lỗi; mở Sidebar ghi đè lại theo Sheet đang mở', [hongNgoai.opened, /bị hỏng/.test(loi3), ghiLai.changed, JSON.parse(khoHong.data.SHIN_BOOK_BINDING_V1).spreadsheetId], [[], true, true, 'sheet-copy']);
+  check(so, 'cặp hỏng: lời gọi từ ngoài báo lỗi; mở Sidebar ghi đè lại theo Sheet đang mở',
+    [hongNgoai.opened, /bị hỏng/.test(loi3), ghiLai.changed, JSON.parse(khoHong.data.SHIN_BOOK_BINDING_V1).spreadsheetId],
+    [[], true, true, 'sheet-copy']);
 
   check(so, 'Book.js không còn hằng số mã Sheet', typeof coMo.hop.SETUP_EXPECTED_SPREADSHEET_ID, 'undefined');
 }

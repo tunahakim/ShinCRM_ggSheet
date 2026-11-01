@@ -4,7 +4,7 @@
  * Trọng tâm là ngăn xếp form, vì nó là chỗ duy nhất có thể lệch: `screen` là một trường thật chứ không suy ra từ đỉnh ngăn xếp, nên push và pop phải giữ hai bên khớp nhau. Kiểm luôn cái bẫy `window.screen` — nếu ai đó đổi `ScreenState.screen` thành một biến toàn cục rời thì phép kiểm này đỏ.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -12,7 +12,7 @@ function chay(so) {
 
   let hop;
   try {
-    hop = napClient(taoHopCat(), 'client/ram/screenState.html');
+    hop = napTheoSidebar(['client/ram/screenState.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp screenState', err);
   }
@@ -24,7 +24,9 @@ function chay(so) {
 
   // Bẫy `window.screen`: giữ trong một object thì gán mới ăn. Đây là lý do tệp không dùng ba biến rời.
   hop.ScreenState.screen = 'customerForm';
-  check(so, 'gán màn vào object thì ăn thật, không bị getter của trình duyệt chặn', hop.ScreenState.screen, 'customerForm');
+  check(so, 'gán màn vào object thì ăn thật, không bị getter của trình duyệt chặn',
+    hop.ScreenState.screen,
+    'customerForm');
   hop.screenStateReset();
 
   check(so, 'đổi khách trả về mã đã chuẩn hóa thành chuỗi', hop.screenStateSetCustomer(17), '17');
@@ -41,7 +43,9 @@ function chay(so) {
 
   hop.screenStateSetDraft({ content: 'đang gõ dở' });
   hop.screenStateOpenForm('noteForm', 'customer', { note: 'ghi chú cũ' });
-  check(so, 'form lồng: ngăn xếp hai tầng, màn là tầng trên', [hop.ScreenState.formStack.length, hop.ScreenState.screen], [2, 'noteForm']);
+  check(so, 'form lồng: ngăn xếp hai tầng, màn là tầng trên',
+    [hop.ScreenState.formStack.length, hop.ScreenState.screen],
+    [2, 'noteForm']);
 
   const conLai = hop.screenStateCloseForm();
   check(so, 'đóng form lồng thì đỉnh mới là form cần vẽ lại, mang theo bản nháp của chính nó',

@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GAS_DIR } = require('../lib/load-gas');
-const { liet } = require('./namespace');
+const { liet } = require('../lib/quet/liet-tep');
 const { section, check } = require('../lib/assert');
 
 const MOJIBAKE = /[ÃÄáÆ][\u0080-¿‘-›ŒœŠšŸŽžƒˆ˜]/;
@@ -18,7 +18,9 @@ function chay(so) {
   const tep = liet('.', '.js').concat(liet('.', '.html')).filter((ten) => !/^node_modules\//.test(ten));
   const loi = tep.filter((ten) => MOJIBAKE.test(fs.readFileSync(path.join(GAS_DIR, ten), 'utf8')));
   check(so, 'FBM-007: mã GAS và Sidebar không chứa chữ mojibake kiểu "Ä‘ang Ä‘á»c"', loi, []);
-  check(so, 'mẫu mojibake bắt được chuỗi rác cũ nhưng không bắt chữ "MÃ" hợp lệ', [MOJIBAKE.test('ÄÃ£ ghi; Ä‘ang Ä‘á»c xÃ¡c nháº­n'), MOJIBAKE.test('MÃ. Tên # | MÃ. Tên')], [true, false]);
+  check(so, 'mẫu mojibake bắt được chuỗi rác cũ nhưng không bắt chữ "MÃ" hợp lệ',
+    [MOJIBAKE.test('ÄÃ£ ghi; Ä‘ang Ä‘á»c xÃ¡c nháº­n'), MOJIBAKE.test('MÃ. Tên # | MÃ. Tên')],
+    [true, false]);
 }
 
 module.exports = { chay };

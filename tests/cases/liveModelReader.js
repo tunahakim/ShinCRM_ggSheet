@@ -1,9 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
-
-const FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'model', 'live_model_reader.js');
+const { napExtension } = require('../lib/ext/nap-extension');
 
 /** Tên biến toàn cục và thuộc tính cố ý khác bản Google thật: bộ đọc phải tự dò từ `window`, không dựa vào tên rút gọn nào. */
 function napReader(globals) {
@@ -14,15 +10,11 @@ function napReader(globals) {
     addEventListener(name, fn) { if (name === 'message') { onMessage = fn; } },
     postMessage(data, targetOrigin) { sent.push({ data, targetOrigin }); }
   }, globals);
-  const hop = {
-    console,
-    WeakSet,
+  const hop = napExtension('liveModelReader', {
     location: { origin: 'https://docs.google.com' },
     setTimeout(fn) { timers.push(fn); return timers.length; },
     window
-  };
-  vm.createContext(hop);
-  vm.runInContext(fs.readFileSync(FILE, 'utf8'), hop, { filename: FILE });
+  });
   hop.request = (data) => {
     onMessage({ source: window, origin: 'https://docs.google.com', data });
     return sent[sent.length - 1].data;
@@ -260,7 +252,9 @@ function chayAnVaLoc(so, base) {
 
   const hong = (patch, nhan) => {
     const ket = docLead(trangLead(patch), [4]).ketQua[0];
-    check(so, nhan + ' thì không đọc được, không trả ok', [ket.status, ket.reason], ['unavailable', 'LIVE_AXIS_NOT_FOUND']);
+    check(so, nhan + ' thì không đọc được, không trả ok',
+      [ket.status, ket.reason],
+      ['unavailable', 'LIVE_AXIS_NOT_FOUND']);
   };
   hong({ Ax: { dims: trucDu('9', CUSTOMER) } }, 'không có bảng quy đổi của sheet');
   hong({ Ax: { dims: [truc('7', LEAD.length, AN_HANG), truc('7', LEAD[0].length)] } }, 'bảng cột dài khác số cột của lưới');

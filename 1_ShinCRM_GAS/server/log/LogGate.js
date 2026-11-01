@@ -1,5 +1,5 @@
 /**
- * Cửa ghi log: gom dòng trong RAM rồi ghi xuống sheet `Log` bằng đúng một lệnh, kèm luật che bí mật và luật cắt cửa sổ. Tài liệu 10 Phần 2 tới Phần 7.
+ * Cửa ghi log: gom dòng trong RAM rồi ghi xuống sheet `Log` bằng đúng một lệnh, Tài liệu 10 Phần 2 tới Phần 7.
  *
  * Tên `LogGate` tránh trùng `Logger` có sẵn của Apps Script, và nằm cùng họ với `WriteGate`, `IdGate`, `DeleteGate`.
  *
@@ -8,7 +8,7 @@
  *   2. **Không bao giờ ném lỗi ra ngoài.** Đổi một dòng log lấy một khách là đổi lỗ. Hỏng thì `console.error` rồi đi tiếp.
  *   3. **Không kiểm giá trị của bên gọi.** Gõ sai một giá trị enum thì giá trị sai được ghi thẳng ra sheet để nó lộ ra khi lọc, chứ không ném lỗi. Chỗ này cố ý ngược với luật "sai schema thì báo lỗi ngay", vì luật 2 đứng trên.
  *
- * Tệp này chỉ sở hữu việc ghi. `ErrorReport.js` chọn kênh hiển thị, còn `EntryPoint.js` bảo đảm mọi cửa vào nhả bộ đệm trong `finally`; ranh giới này giữ lỗi giao diện khỏi làm hỏng việc ghi log.
+ * Tệp này giữ bộ đệm, định dạng dòng và người điều phối `flushLog`; che bí mật ở `LogMask.js`, thao tác sheet `Log` ở `LogSheet.js`. `ErrorReport.js` chọn kênh hiển thị, còn `EntryPoint.js` bảo đảm mọi cửa vào nhả bộ đệm trong `finally`; ranh giới này giữ lỗi giao diện khỏi làm hỏng việc ghi log.
  */
 
 /** Múi giờ ghi cột `Lúc`. Chốt cứng theo tài liệu 10 Phần 2 chứ không lấy múi giờ của tệp Sheet, vì múi giờ của tệp là thứ người dùng đổi được, mà cột `Lúc` thì phải đọc được như nhau ở mọi bản. */
@@ -22,12 +22,6 @@ var LOG_OK = '✅ ok';
 var LOG_WARN = '⚠️ warn';
 var LOG_ERROR = '❌ error';
 var LOG_CONFLICT = '🔀 conflict';
-
-/** Khóa `DocumentProperties` chặn việc quét tuổi log quá một lần mỗi ngày dương lịch. Tài liệu 10 Phần 11. */
-var LOG_CLEANUP_KEY = 'LOG_LAST_CLEANUP';
-
-/** Số hàng nới thừa mỗi lần lưới sheet `Log` hết chỗ. Nới thừa để một lượt nới đủ cho vài trăm lượt nhả sau đó, chứ nới vừa đủ thì gần như mọi lượt nhả đều tốn thêm một lệnh gọi. */
-var LOG_GRID_SLACK = 500;
 
 /** Dòng luôn ghi: mọi thứ vào đây sẽ ra sheet ở lần nhả tới. */
 var LOG_BUFFER = [];
@@ -48,19 +42,11 @@ var LOG_SEQ = 0;
 /** Ngữ cảnh theo nguồn: hàm trả một câu ngắn gắn vào cột Chi tiết kỹ thuật của mọi dòng thuộc nguồn đó (khóa `luot`). Module đăng ký lúc chạy, không lúc nạp tệp, vì Apps Script nạp tệp theo tên và nhiều module nạp trước tệp này. */
 var LOG_SOURCE_CONTEXT = {};
 
-/** Đếm số lệnh `setValues` mà tệp này đã gọi. Chỉ dùng cho phép nghiệm thu "một lượt chỉ tốn một lệnh ghi" — không có nó thì luật đó là lời hứa không đo được. */
-var LOG_WRITE_CALLS = 0;
-
 /** Xóa cả hai bộ đệm và cờ lỗi. Gọi sau mỗi lần nhả, và gọi ở đầu phép nghiệm thu để nó không phụ thuộc thứ đã đệm trước đó. */
 function logResetBuffers() {
   LOG_BUFFER = [];
   LOG_TRACE_RING = [];
   LOG_RUN_HAS_ERROR = false;
-}
-
-/** Số lệnh ghi đã tốn. Phép nghiệm thu đọc số này trước và sau một lượt để biết một lượt tốn mấy lệnh. */
-function logGateWriteCount() {
-  return LOG_WRITE_CALLS;
 }
 
 /** Câu lỗi ngắn cho mắt người đọc. Lấy `message` chứ không lấy cả `stack`: `stack` thuộc sheet `Log`, nơi có chỗ và có người đi tìm nó. */
@@ -156,67 +142,6 @@ function flushLogIfTraced(source) {
   return logTraceCoversSource(source) ? flushLog() : 0;
 }
 
-/** Tên khóa này có phải tên khóa giữ bí mật không. Khớp theo chuỗi con và không phân biệt hoa thường, nên `payloadCookie` và `ASP.NET_SessionId` đều trúng. Tài liệu 10 Phần 7. */
-function logIsSecretKey(name) {
-  var lower = String(name === null || name === undefined ? '' : name).toLowerCase();
-  return SETTINGS.LOG_SECRET_KEYS.some(function (word) { return lower.indexOf(word) !== -1; });
-}
-
-/**
- * Dựng nhãn che cho một giá trị bí mật: `[132 ký tự · ASP. · #a3f1]`.
- *
- * Nhãn giữ đúng ba thứ hữu ích khi debug — độ dài, vài ký tự đầu, và một mã băm ngắn để so hai lần chạy xem có cùng một bí mật hay không — mà không mang giá trị thật ra ngoài. Nó thay `***` vì `***` không trả lời được câu nào trong ba câu đó.
- *
- * Mã băm ở đây là **dấu nhận dạng ngắn để so hai lần chạy**, không phải một phép bảo vệ. Bốn chữ số hex thì dò ra được, và điều đó không sao: thứ cần bảo vệ là giá trị thật, và giá trị thật không có trong nhãn.
- */
-function logMaskLabel(value) {
-  var text = String(value === null || value === undefined ? '' : value);
-  var hash = '????';
-
-  try {
-    var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, text);
-    hash = bytes.slice(0, 2).map(function (b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
-  } catch (khongBamDuoc) {
-    hash = '????';
-  }
-
-  return '[' + text.length + ' ký tự · ' + text.slice(0, 4) + ' · #' + hash + ']';
-}
-
-/**
- * Che bí mật nằm trong một chuỗi, dạng `tên khóa: giá trị` hoặc `tên khóa=giá trị`.
- *
- * Phép này là **cố gắng hết sức, không phải bảo đảm**: nó chỉ thấy được bí mật nào đi kèm tên khóa của nó. Một chuỗi chỉ có giá trị trần, không có tên khóa nào cạnh, thì không có gì để nhận ra. Đường an toàn là bên gọi đưa `detail` dạng đối tượng — lúc đó tên khóa là tên khóa thật và phép che ăn chắc.
- */
-function logMaskText(text) {
-  return String(text).replace(/([A-Za-z_][\w.\-]*)\s*[:=]\s*("[^"]*"|'[^']*'|[^\s,;&}]+)/g, function (all, key, raw) {
-    if (!logIsSecretKey(key)) { return all; }
-    return key + ': ' + logMaskLabel(raw.replace(/^["']/, '').replace(/["']$/, ''));
-  });
-}
-
-/** Dựng bản sao đã che của một giá trị bất kỳ. Đi sâu vào đối tượng và mảng, dừng ở độ sâu 5 để một cấu trúc tự trỏ vào chính nó không làm treo lượt chạy. */
-function logMaskCopy(value, depth) {
-  if (value === null || value === undefined) { return value; }
-  if (depth > 5) { return '[lồng quá sâu]'; }
-  if (typeof value === 'string') { return logMaskText(value); }
-  if (typeof value !== 'object') { return value; }
-  // Nhận Date bằng `Object.prototype.toString` chứ không bằng `instanceof Date`: `instanceof` trả về false khi đối tượng
-  // sinh ra ở một vùng chạy khác (different realm — hai môi trường JavaScript khác nhau). Bộ kiểm offline nạp code trong
-  // hộp cát `vm` chính là hoàn cảnh đó, nên với `instanceof` thì luật này không có cách nào kiểm được trên máy — mà một
-  // luật không kiểm được là một luật không có ai canh.
-  if (Object.prototype.toString.call(value) === '[object Date]') { return Utilities.formatDate(value, LOG_TIMEZONE, LOG_TIME_FORMAT); }
-  if (Array.isArray(value)) {
-    return value.map(function (item) { return logMaskCopy(item, depth + 1); });
-  }
-
-  var out = {};
-  Object.keys(value).forEach(function (key) {
-    out[key] = logIsSecretKey(key) ? logMaskLabel(value[key]) : logMaskCopy(value[key], depth + 1);
-  });
-  return out;
-}
-
 /**
  * Đổi `detail` thành chuỗi ghi được vào ô, che bí mật nếu chế độ thường và để nguyên văn nếu `LOG_TRACE` phủ nguồn đó.
  *
@@ -258,42 +183,6 @@ function logRowCells(line) {
 }
 
 /**
- * Lấy sheet `Log`, **tạo lại kèm hàng tiêu đề nếu không tìm thấy**.
- *
- * Đây là ca hỏng có thật và hay xảy ra nhất: chủ dự án không phải người viết code, một lúc nào đó sẽ xóa hoặc đổi tên sheet. Tự tạo lại xóa hẳn một lớp lỗi thay vì báo cáo nó. Tài liệu 10 Phần 5.
- *
- * Cố ý không gọi `setupSheets`: hàm đó dựng lại cả năm sheet, mà ở đây chỉ thiếu một sheet không phải nguồn sự thật.
- */
-function logSheet() {
-  var book = shinOpenBook();
-  var sheet = book.getSheetByName('Log');
-  if (sheet) { return sheet; }
-
-  sheet = sheetBookCreate('Log');
-  sheetCellsWrite(sheet, 1, 1, [LOG_HEADERS]);
-  sheetCellsStyle(sheet, 1, 1, 1, LOG_HEADERS.length, { bold: true, background: SHEET_LAYOUT.Log.headerColor });
-  sheetFrozenRowsSet(sheet, SHEET_LAYOUT.Log.headerRows);
-  console.error('Sheet Log không tồn tại nên đã dựng lại. Lịch sử log trước đó đã mất.');
-  return sheet;
-}
-
-/**
- * Nới lưới sheet nếu vùng ghi sắp tới vượt quá số hàng sheet đang có.
- *
- * Vì sao phải có: `setValues` **không** tự nới sheet, và `getRange` chạm quá hàng cuối là ném lỗi ngay. Ghép với việc `flushLog` bắt mọi lỗi
- * rồi đi tiếp, cách hỏng của nó là thứ tệ nhất trong các cách hỏng — log **lặng lẽ tắt hẳn** kể từ dòng đầu tiên vượt lưới, sheet `Log` đứng
- * im ở đúng con số cũ, và không có gì ngoài một dòng trong Cloud logging nói ra. Sheet mới của Google có 1.000 hàng, nên nó tự hỏng đúng vào
- * lúc log bắt đầu có ích.
- *
- * Nới thừa `LOG_GRID_SLACK` hàng chứ không nới vừa đủ: nới vừa đủ nghĩa là gần như mọi lượt nhả sau đó đều tốn thêm một lệnh gọi.
- *
- * Phép nới thật nằm ở `SheetGrid.gs`, vì bài học về lưới hữu hạn phải nằm ở một chỗ duy nhất mà cả đường ghi log lẫn đường nạp dữ liệu đều đi qua. Còn **nới thừa bao nhiêu** thì vẫn là chính sách riêng của sheet `Log`: đây là sheet duy nhất bị ghi thêm vài dòng mỗi lượt chạy, nên nó cần đệm dày hơn các sheet khác.
- */
-function logEnsureRoom(sheet, endRow) {
-  sheetGridEnsureRoom(sheet, endRow, LOG_GRID_SLACK);
-}
-
-/**
  * Ghi cả bộ đệm xuống sheet bằng **đúng một lệnh `setValues`**, rồi áp hai trần cắt log. Trả về số dòng đã ghi.
  *
  * Ghi một lô là lý do các dòng của cùng một lượt luôn nằm liền nhau, nên không cần một cột mã lượt chạy để nhóm chúng lại.
@@ -322,12 +211,7 @@ function flushLog() {
 
     var rows = lines.map(function (line) { return logRowCells(line); });
     var sheet = logSheet();
-    var startRow = Math.max(sheetReadLastRow(sheet) + 1, SHEET_LAYOUT.Log.firstDataRow);
-
-    logEnsureRoom(sheet, startRow + rows.length - 1);
-    sheetCellsWrite(sheet, startRow, 1, rows);
-    LOG_WRITE_CALLS += 1;
-
+    logSheetAppend(sheet, rows);
     logTrimRows(sheet);
     logTrimAge(sheet);
     logResetBuffers();
@@ -337,63 +221,6 @@ function flushLog() {
     logResetBuffers();
     return 0;
   }
-}
-
-/**
- * Trần số dòng: cắt cũ nhất trước bằng công cụ xóa dòng, kiểm mỗi lần nhả.
- *
- * Kiểm mỗi lần vì rẻ: chỉ một lệnh `getLastRow()`. Vai trò thật của trần này là lưới an toàn cho một vòng lặp lỗi chạy hoang, không phải cái cắt log trong ngày thường.
- *
- * `deleteRows` là một lệnh gọi API bất kể xóa bao nhiêu dòng. Đã đo trên sheet `Log` 5.000 dòng thật: xóa 1 dòng mất 309 ms, xóa 1.000 dòng mất 374 ms. Chi phí phẳng.
- */
-function logTrimRows(sheet) {
-  var firstDataRow = SHEET_LAYOUT.Log.firstDataRow;
-  var excess = sheetReadLastRow(sheet) - firstDataRow + 1 - SETTINGS.LOG_MAX_ROWS;
-  if (excess > 0) {
-    sheetRowsDelete(sheet, logRowRange(firstDataRow, excess));
-  }
-}
-
-/**
- * Trần tuổi dòng: xóa dòng cũ hơn `SETTINGS.LOG_RETENTION_DAYS` ngày, nhiều nhất một lần mỗi ngày dương lịch.
- *
- * Đây là cái thực sự cắt log trong ngày thường. Nó phải đọc cột `Lúc` nên không kiểm mỗi lần nhả; khóa ngày trong `DocumentProperties` chặn việc đó.
- *
- * Khóa ngày đặt **trước** khi quét, không phải sau. Nếu đặt sau thì một lần quét lỗi sẽ quét lại ở mọi lần nhả trong suốt cả ngày — mà một phép quét đã lỗi thì lần sau cũng lỗi đúng như thế, chỉ thêm tốn.
- *
- * Dòng nào ô `Lúc` rỗng hoặc không theo khuôn thì **dừng lại**, không xóa. Không đoán được ngày của một dòng thì không có quyền xóa nó.
- */
-function logTrimAge(sheet) {
-  var props = documentProps();
-  var today = Utilities.formatDate(new Date(), LOG_TIMEZONE, 'yyyy-MM-dd');
-  if (props.getProperty(LOG_CLEANUP_KEY) === today) { return; }
-  props.setProperty(LOG_CLEANUP_KEY, today);
-
-  var firstDataRow = SHEET_LAYOUT.Log.firstDataRow;
-  var lastRow = sheetReadLastRow(sheet);
-  if (lastRow < firstDataRow) { return; }
-
-  var cutoffMs = new Date().getTime() - SETTINGS.LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  var cutoff = Utilities.formatDate(new Date(cutoffMs), LOG_TIMEZONE, LOG_TIME_FORMAT);
-  var stamps = sheetReadColumnValues(sheet, 1, firstDataRow);
-  var tooOld = 0;
-
-  for (var i = 0; i < stamps.length; i += 1) {
-    var stamp = sheetReadCellText(stamps[i]);
-    if (stamp.length !== LOG_TIME_FORMAT.length || stamp >= cutoff) { break; }
-    tooOld += 1;
-  }
-
-  if (tooOld > 0) {
-    sheetRowsDelete(sheet, logRowRange(firstDataRow, tooOld));
-  }
-}
-
-/** Danh sách `count` số dòng liền nhau từ `firstRow`, cho công cụ xóa dòng (nó gom lại thành một lệnh). */
-function logRowRange(firstRow, count) {
-  var rows = [];
-  for (var i = 0; i < count; i++) { rows.push(firstRow + i); }
-  return rows;
 }
 
 /**

@@ -28,6 +28,8 @@ const TEP_NEN = [
   'server/sheet/SheetHeader.js',
   'server/sheet/SheetGrid.js',
   'server/config/Settings.js',
+  'server/log/LogMask.js',
+  'server/log/LogSheet.js',
   'server/log/LogGate.js',
   'server/util/DateText.js',
   'server/util/TextNormalize.js',

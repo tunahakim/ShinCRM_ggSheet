@@ -13,41 +13,9 @@ const fs = require('fs');
 const path = require('path');
 const { GAS_DIR, catRuotScript } = require('../lib/load-gas');
 const { stripComments } = require('../lib/strip-comments');
+const { liet } = require('../lib/quet/liet-tep');
+const { tenKhaiBao } = require('../lib/quet/khai-bao');
 const { section, check, ghiTruot, ghiDat } = require('../lib/assert');
-
-/** Khai báo ở cột 0: `var TÊN` hoặc `function TÊN(`. */
-const MO_KHAI_BAO = /^(?:var|let|const)\s+([A-Za-z_$][\w$]*)|^function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
-
-/** Liệt kê tệp theo đuôi trong một thư mục con của dự án GAS. Thư mục không có thì trả về mảng rỗng, vì có thư mục chưa dựng là chuyện bình thường. */
-function liet(thuMuc, duoi) {
-  const goc = path.join(GAS_DIR, thuMuc);
-  if (!fs.existsSync(goc)) { return []; }
-
-  const ra = [];
-  (function di(hienTai) {
-    fs.readdirSync(hienTai, { withFileTypes: true }).forEach((muc) => {
-      const day = path.join(hienTai, muc.name);
-      if (muc.isDirectory()) { di(day); }
-      else if (muc.name.endsWith(duoi)) { ra.push(path.relative(GAS_DIR, day).split(path.sep).join('/')); }
-    });
-  })(goc);
-  return ra.sort();
-}
-
-/** Bảng khai mở `var X = typeof X !== 'undefined' ? X : {};`: lõi và module cùng khai để không phụ thuộc thứ tự nạp tệp, mỗi bên chỉ thêm khóa của mình nên không tranh nhau. */
-const BANG_KHAI_MO = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*typeof\s+\1\s*!==\s*'undefined'\s*\?\s*\1\s*:\s*\{\};/;
-
-/** Lấy danh sách tên khai báo ở tầng ngoài cùng của một đoạn mã, bỏ qua bảng khai mở. */
-function tenKhaiBao(code) {
-  const ten = [];
-  let khop;
-  MO_KHAI_BAO.lastIndex = 0;
-  while ((khop = MO_KHAI_BAO.exec(code)) !== null) {
-    if (BANG_KHAI_MO.test(code.slice(khop.index, code.indexOf('\n', khop.index) >>> 0))) { continue; }
-    ten.push(khop[1] || khop[2]);
-  }
-  return ten;
-}
 
 /**
  * Đọc phần mã thật của một tệp: tệp `.html` thì cắt ruột thẻ `<script>`, tệp `.js` thì lấy nguyên.
@@ -102,9 +70,15 @@ function chay(so) {
 
   // Phép kiểm chiều phụ thuộc bên dưới đứng trên vai `stripComments`, nên kiểm chính nó trước.
   // Ba ca: chú thích dòng, chú thích khối, và chuỗi có chứa thứ trông như chú thích — ca thứ ba là ca dễ làm hỏng nhất.
-  check(so, 'stripComments bỏ chú thích dòng', stripComments('var a = 1; // SYNC_SCHEMA').includes('SYNC_SCHEMA'), false);
-  check(so, 'stripComments bỏ chú thích khối', stripComments('/* SYNC_SCHEMA */ var a = 1;').includes('SYNC_SCHEMA'), false);
-  check(so, 'stripComments giữ nguyên chuỗi trông như chú thích', stripComments('var a = "// SYNC_SCHEMA";').includes('SYNC_SCHEMA'), true);
+  check(so, 'stripComments bỏ chú thích dòng',
+    stripComments('var a = 1; // SYNC_SCHEMA').includes('SYNC_SCHEMA'),
+    false);
+  check(so, 'stripComments bỏ chú thích khối',
+    stripComments('/* SYNC_SCHEMA */ var a = 1;').includes('SYNC_SCHEMA'),
+    false);
+  check(so, 'stripComments giữ nguyên chuỗi trông như chú thích',
+    stripComments('var a = "// SYNC_SCHEMA";').includes('SYNC_SCHEMA'),
+    true);
   check(so, 'stripComments giữ nguyên số dòng', stripComments('a\n/* x\ny */\nb').split('\n').length, 4);
 
   // Chiều phụ thuộc một hướng, tài liệu 09 Phần 13 và tài liệu 03 Phần 1: fbm_sync đọc được DATA_SCHEMA, lõi không đọc được SYNC_SCHEMA.
@@ -158,4 +132,4 @@ function kiemDuDuongNhung(so, tepClient) {
   check(so, 'không dòng include nào mang đuôi tệp', daNhung.filter((d) => /\.html$|\.js$/.test(d)), []);
 }
 
-module.exports = { chay, liet, tenKhaiBao };
+module.exports = { chay };

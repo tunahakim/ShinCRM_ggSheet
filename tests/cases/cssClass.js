@@ -14,7 +14,8 @@
 
 const { docTep } = require('../lib/load-gas');
 const { section, check, checkContains, ghiTruot, ghiDat } = require('../lib/assert');
-const { liet } = require('./namespace');
+const { liet } = require('../lib/quet/liet-tep');
+const { lopCoLuat } = require('../lib/quet/lop-css');
 
 /** Ruột mọi thẻ `<style>` của một tệp client, đã bỏ chú thích CSS. Tệp không có `<style>` thì trả chuỗi rỗng — phần lớn tệp client là vậy. */
 function catRuotStyle(raw) {
@@ -49,16 +50,6 @@ function lopSoHuu(css) {
   return ra;
 }
 
-/** Mọi tên lớp có mặt trong một đoạn CSS, kể cả trong bộ chọn nhiều mắt. Dùng cho phép quét "khai `className` mà không có luật". */
-function lopCoLuat(css) {
-  const ra = {};
-  const mo = /([^{}]+)\{[^{}]*\}/g;
-  let khop;
-  while ((khop = mo.exec(css)) !== null) {
-    (khop[1].match(/\.([A-Za-z_][\w-]*)/g) || []).forEach((t) => { ra[t.slice(1)] = true; });
-  }
-  return Object.keys(ra);
-}
 
 /** Tên lớp mà bản khai giao diện và các hàm slot gọi qua `className: '...'`. Đây là cửa duy nhất để bản khai đặt lớp lên một Block. */
 function lopBanKhaiGoi(tepList) {
@@ -175,4 +166,4 @@ function tuKiemPhepQuet(so) {
     timTrung({ 'a.html': '.shin-box { display: block; }', 'b.html': '.shin-box { padding: 12px; }' }), 'a.html');
 }
 
-module.exports = { chay, lopSoHuu, lopCoLuat };
+module.exports = { chay, lopSoHuu };

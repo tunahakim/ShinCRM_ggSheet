@@ -6,7 +6,7 @@
  * Lý do có tệp này: `bootTellProblems` từng trộn `warnings` với `skipped` vào cùng một hộp thoại. Hai danh sách đó khác người đọc — một cái nói về dữ liệu trong sheet, một cái nói về bộ kiểm — nên trộn lại lần nữa là một cú lùi mà không ai nhìn ra bằng mắt.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 async function chay(so) {
@@ -14,7 +14,7 @@ async function chay(so) {
 
   let hop = null;
   try {
-    hop = napClient(taoHopCat(), 'client/ram/bootstrap.html');
+    hop = napTheoSidebar(['client/ram/bootstrap.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp bootstrap', err);
   }
@@ -101,7 +101,9 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT = { active: true, lastStatus: { phase: 'idle' } };
   hop.fbmSyncPaint = (status) => paints.push(status);
   hop.sidebarRenderAfterBoot(true);
-  check(so, 'full-core reload khi đang ở Đồng bộ chỉ vá snapshot, không dựng màn chính', [renders, paints], [[], [{ phase: 'idle' }]]);
+  check(so, 'full-core reload khi đang ở Đồng bộ chỉ vá snapshot, không dựng màn chính',
+    [renders, paints],
+    [[], [{ phase: 'idle' }]]);
 
   renders.length = 0;
   hop.FBM_SYNC_CLIENT.active = false;

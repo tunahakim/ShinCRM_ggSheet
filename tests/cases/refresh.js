@@ -1,4 +1,5 @@
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 async function chay(so) {
@@ -18,7 +19,7 @@ async function chay(so) {
       screenViewDropStale: () => null,
       screenViewRender: () => { hop.rendered = true; return {}; }
     });
-    napClient(hop, 'client/ram/refresh.html');
+    napTheoSidebar(['client/ram/refresh.html'], hop);
   } catch (err) { return ghiLoiNap(so, 'nạp refresh', err); }
   hop.refreshRecordsApply({
     ok: true,
@@ -26,8 +27,12 @@ async function chay(so) {
     activity: { fields: ['id', 'customerId'], rows: [['GD2', 'KH1']] },
     affectedCustomerIds: ['KH1', 'KH2'],
   }, ['GD2']);
-  check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ', [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2], [['KH1'], 'KH1', undefined]);
-  check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt', [hop.Store.activitiesByCustomer.KH1.length, hop.rendered], [1, true]);
+  check(so, 'bản ghi customer còn trên máy chủ được upsert, bản ghi biến mất bị bỏ',
+    [Object.keys(hop.Store.customers), hop.Store.customers.KH1.id, hop.Store.customers.KH2],
+    [['KH1'], 'KH1', undefined]);
+  check(so, 'activity mới được upsert và màn hình được vẽ lại cùng lượt',
+    [hop.Store.activitiesByCustomer.KH1.length, hop.rendered],
+    [1, true]);
 
   hop.Store.categories = { leadSource: ['Cũ'] };
   hop.refreshCategoryApply({ ok: true, categories: { leadSource: ['Mới'] } });
@@ -57,9 +62,9 @@ async function chay(so) {
       screenViewDropStale: () => null,
       screenViewRender: () => ({})
     });
-    napClient(counterHop, 'client/ram/refresh.html');
-    napClient(counterHop, 'client/schema/fieldLogic.html');
-    napClient(counterHop, 'client/save/saveFlow.html');
+    napTheoSidebar(['client/ram/refresh.html'], counterHop);
+    napTheoSidebar(['client/schema/fieldLogic.html'], counterHop);
+    napTheoSidebar(['client/save/saveFlow.html'], counterHop);
   } catch (err) { return ghiLoiNap(so, 'nạp refresh + saveFlow + fieldLogic', err); }
   const truocLuu = counterHop.fieldLogicNextCode('customer', 'CUS-');
   counterHop.saveFlowApply('customer', { fields: ['id'], rows: [['CUS-000013']], counters: { customer: 13, activity: 34 } });
@@ -90,7 +95,7 @@ async function chay(so) {
     screenViewDropStale: () => null,
     screenViewRender: () => { entityHop.rendered = true; return {}; }
   });
-  napClient(entityHop, 'client/ram/refresh.html');
+  napTheoSidebar(['client/ram/refresh.html'], entityHop);
   entityHop.refreshEntityApply('customer', {
     ok: true,
     customer: { fields: ['id', 'companyName'], rows: [['KH1', 'Tên mới']] }
@@ -117,13 +122,13 @@ async function chay(so) {
     SCREEN_VIEW: 'view',
     screenViewRender: () => { configHop._rendered = true; return {}; }
   });
-  napClient(configHop, 'client/ram/refresh.html');
+  napTheoSidebar(['client/ram/refresh.html'], configHop);
   const configManual = configHop.refreshManualSheetApply({ ok: true, target: 'config', reloadMode: 'config', config: { params: { X: '1' }, defaults: {}, counters: {}, sort: [], sheetSchema: {} } });
   check(so, 'Config reload thay Store.config và vẽ màn hiện tại',
     [configHop.Store.config.params.X, configHop._rendered, configManual.ok], ['1', true, true]);
 
   const fullCoreHop = taoHopCat();
-  napClient(fullCoreHop, 'client/ram/refresh.html');
+  napTheoSidebar(['client/ram/refresh.html'], fullCoreHop);
   let bootOptions = null;
   let resetCalled = false;
   fullCoreHop.screenStateGoView = () => { resetCalled = true; };
@@ -139,7 +144,7 @@ async function chay(so) {
     screenViewRender: () => { syncRefreshHop._viewRendered = true; },
     fbmSyncPaint: (status) => { syncRefreshHop._syncPainted = status; }
   });
-  napClient(syncRefreshHop, 'client/ram/refresh.html');
+  napTheoSidebar(['client/ram/refresh.html'], syncRefreshHop);
   const syncRender = syncRefreshHop.refreshDecideAndRender({ ok: true, applied: true, mode: 'fullCore' });
   check(so, 'payload reload trực tiếp cũng không vẽ đè shell Đồng bộ',
     [syncRender.screen, syncRender.rendered, syncRefreshHop._viewRendered, syncRefreshHop._syncPainted],
@@ -151,7 +156,7 @@ async function chay(so) {
     screenViewResolveSelectionMiss: () => { missRefreshHop.ScreenState.currentCustomerId = 'CUS-NEW'; return 'CUS-NEW'; },
     screenViewRender: () => 'vẽ'
   });
-  napClient(missRefreshHop, 'client/ram/refresh.html');
+  napTheoSidebar(['client/ram/refresh.html'], missRefreshHop);
   const missRender = missRefreshHop.refreshDecideAndRender({ ok: true, applied: true, mode: 'records', affectedCustomerIds: ['CUS-OTHER'] });
   check(so, 'lượt nạp records mang về khách vừa báo không tìm thấy thì vẽ lại màn dù danh sách ảnh hưởng không có khách đang xem',
     [missRender.rendered, missRefreshHop.ScreenState.currentCustomerId], [true, 'CUS-NEW']);

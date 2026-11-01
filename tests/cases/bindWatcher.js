@@ -1,9 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
-
-const WATCHER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'model', 'bind_watcher.js');
+const { napExtension } = require('../lib/ext/nap-extension');
 
 /** XHR giả: `responseText` lớn dần như kênh đẩy thật; `day()` bơm thêm khung rồi bắn `progress`. */
 function napWatcher() {
@@ -15,13 +11,8 @@ function napWatcher() {
   FakeXHR.prototype.addEventListener = function (name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); };
   FakeXHR.prototype.fire = function (name) { (this.listeners[name] || []).forEach((fn) => fn()); };
   FakeXHR.prototype.day = function (frame) { this.responseText += frame; this.readyState = 3; this.fire('progress'); };
-  const hop = {
-    location: { origin: 'https://docs.google.com' },
-    window: null
-  };
-  hop.window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
-  vm.createContext(hop);
-  vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), hop, { filename: WATCHER_FILE });
+  const window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
+  const hop = napExtension('bindWatcher', { location: { origin: 'https://docs.google.com' }, window: window });
   return { FakeXHR, posted, facts, hop };
 }
 
@@ -46,13 +37,23 @@ async function chay(so) {
   check(so, 'khung noop là nhịp sống', ca('12\n[[5,["noop"]]]\n'), ['alive']);
   check(so, 'loại 10 (con trỏ người khác) là nhịp sống', ca('40\n[[6,[[10,1760000000000,"abc",[1,2]]]]]\n'), ['alive']);
   check(so, 'loại 14 (hiện diện) là nhịp sống', ca('40\n[[7,[[14,1760000000001,"abc",{}]]]]\n'), ['alive']);
-  check(so, 'loại 0 mang khóa "c" (nội dung ô) là tín hiệu', ca('60\n[[8,[[0,1760000000002,{"c":[["A1","x"]]}]]]]\n'), ['signal']);
-  check(so, 'khóa "c" (nội dung ô) thắng mọi loại: khung loại 10 mang "c" vẫn là tín hiệu', ca('60\n[[16,[[10,1760000000011,{"c":[["A1","x"]]}]]]]\n'), ['signal']);
+  check(so, 'loại 0 mang khóa "c" (nội dung ô) là tín hiệu',
+    ca('60\n[[8,[[0,1760000000002,{"c":[["A1","x"]]}]]]]\n'),
+    ['signal']);
+  check(so, 'khóa "c" (nội dung ô) thắng mọi loại: khung loại 10 mang "c" vẫn là tín hiệu',
+    ca('60\n[[16,[[10,1760000000011,{"c":[["A1","x"]]}]]]]\n'),
+    ['signal']);
   check(so, 'loại 1 là tín hiệu', ca('40\n[[9,[[1,1760000000003,"abc"]]]]\n'), ['signal']);
-  check(so, 'loại 1 chỉ chở THUMBNAIL (ảnh thu nhỏ, mẫu đo live) là nhịp sống', ca('43\n[[30,[1,1791971258040,{"THUMBNAIL":true}]]]\n'), ['alive']);
-  check(so, 'loại 1 chở THUMBNAIL kèm trường khác vẫn là tín hiệu', ca('60\n[[31,[1,1791971258041,{"THUMBNAIL":true,"x":1}]]]\n'), ['signal']);
+  check(so, 'loại 1 chỉ chở THUMBNAIL (ảnh thu nhỏ, mẫu đo live) là nhịp sống',
+    ca('43\n[[30,[1,1791971258040,{"THUMBNAIL":true}]]]\n'),
+    ['alive']);
+  check(so, 'loại 1 chở THUMBNAIL kèm trường khác vẫn là tín hiệu',
+    ca('60\n[[31,[1,1791971258041,{"THUMBNAIL":true,"x":1}]]]\n'),
+    ['signal']);
   check(so, 'loại lạ 99 là tín hiệu', ca('40\n[[10,[[99,1760000000004,"abc"]]]]\n'), ['signal']);
-  check(so, 'khung nhiễu lẫn khung loại lạ trong cùng gói là tín hiệu', ca('[[11,[[10,1760000000005,"a"]]],[12,[[1,1760000000006,"b"]]]]'), ['signal']);
+  check(so, 'khung nhiễu lẫn khung loại lạ trong cùng gói là tín hiệu',
+    ca('[[11,[[10,1760000000005,"a"]]],[12,[[1,1760000000006,"b"]]]]'),
+    ['signal']);
   check(so, 'khung cắt dở không nhận dạng được là tín hiệu', ca('35\n[[13,[[0,17600'), ['signal']);
   check(so, 'khung tiếng Việt nhiều byte vẫn nhận đúng loại, không lệch con trỏ',
     [ca('80\n[[14,[[0,1760000000007,{"c":[["B2","Công ty Thép Việt Nhật — Hà Nội"]]}]]]]\n'), ca('12\n[[15,["noop"]]]\n')], [['signal'], ['alive']]);
@@ -87,7 +88,7 @@ async function chay(so) {
   check(so, 'SID khác hoặc không có SID thì sameSession false', n.facts.map((f) => f.sameSession), [false, false]);
 
   const lai = w.FakeXHR.prototype.send;
-  vm.runInContext(fs.readFileSync(WATCHER_FILE, 'utf8'), w.hop, { filename: WATCHER_FILE });
+  napExtension('bindWatcher', null, w.hop);
   check(so, 'nạp lại tệp không vá chồng lần hai', w.FakeXHR.prototype.send === lai, true);
 }
 

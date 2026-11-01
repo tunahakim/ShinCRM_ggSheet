@@ -7,6 +7,7 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { khoGay } = require('../lib/gas/kho-thuoc-tinh');
 const { section, check, checkThrows } = require('../lib/assert');
 
 function chay(so) {
@@ -43,7 +44,7 @@ function chay(so) {
 
   // Kho gãy hẳn: chiều an toàn là ba ngầm định, không phải ném lỗi giữa lượt nạp lõi.
   const gay = dungHop();
-  gay.hop.PropertiesService = { getUserProperties: function () { throw new Error('Đọc thuộc tính người dùng thất bại'); } };
+  gay.hop.PropertiesService = khoGay('Đọc thuộc tính người dùng thất bại');
   check(so, 'PropertiesService gãy hẳn thì trả ba ngầm định chứ không ném — đây là chiều an toàn',
     gay.hop.userPrefsRead(), { followSelection: true, autoRenderView: true, activityView: 'active' });
 

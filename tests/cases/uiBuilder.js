@@ -4,7 +4,7 @@
  * Hai tệp này cố ý không chạm DOM, nên chúng là phần **đầu tiên** của tầng giao diện kiểm được offline. Phần đáng giá không phải "dựng đúng thì ra đúng" mà là "dựng sai thì có chặn không": luật "không có khóa `style` tự do" chỉ có thật nếu một khóa lạ thật sự bị ném lỗi.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
 function chay(so) {
@@ -12,7 +12,7 @@ function chay(so) {
 
   let hop = null;
   try {
-    hop = napClient(taoHopCat(), 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html');
+    hop = napTheoSidebar(['client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html']);
   } catch (err) {
     return ghiLoiNap(so, 'nạp uiBuilder và screenBuild', err);
   }

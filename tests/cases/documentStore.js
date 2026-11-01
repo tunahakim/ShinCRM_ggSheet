@@ -1,12 +1,12 @@
 const fs = require('fs');
-const { trongLanChay } = require('../lib/load-gas');
+const { trongLanGoi } = require('../lib/gas/lan-goi');
 const path = require('path');
 const { dungHop, ghiO } = require('../lib/dung-hop');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 const GAS = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
-// Cửa kho chính nó, và bộ đo DEV bọc khóa giả để đếm thời gian.
-const NGOAI_LE = ['server/state/DocumentStore.js', 'server/dev/FbmPerfProbe.js'];
+// Cửa kho chính nó, bộ đo DEV bọc khóa giả để đếm thời gian, và hàm dò DEV đo hành vi kho thật (đi qua cửa kho là đo lớp đệm, không đo Google).
+const NGOAI_LE = ['server/state/DocumentStore.js', 'server/dev/FbmPerfProbe.js', 'server/dev/PropertiesProbe.js'];
 
 function taoHop() {
   const nen = dungHop({ sheets: ['Customer', 'Activity', 'Category', 'Log'] });
@@ -32,7 +32,7 @@ function chay(so) {
   // Ghi một khách mới trong một lần gọi: cấp mã + phát tín hiệu reload trước đây đọc kho khoảng 150 lần mỗi lần ghi.
   nen.hop.documentStoreBegin();
   const docTruoc = nen.stubs._khoDem.doc;
-  const saved = trongLanChay(nen.hop, () => nen.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
+  const saved = trongLanGoi(nen.hop, () => nen.hop.writeGateSave({ entity: 'customer', records: [{ companyName: 'Khách mới', phone: '0987000115' }], source: 'pull' }));
   const soLanDoc = nen.stubs._khoDem.doc - docTruoc;
   nen.hop.documentStoreEnd();
   check(so, 'cửa kho: writeGateSave ghi khách mới trong một lần gọi chỉ đọc kho thật tối đa 3 lần',
@@ -49,7 +49,7 @@ function chay(so) {
     return khoa;
   };
   signalEnv.hop.documentStoreBegin();
-  trongLanChay(signalEnv.hop, () => signalEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
+  trongLanGoi(signalEnv.hop, () => signalEnv.hop.writeGateSave({ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000111' }], source: 'pull' }));
   signalEnv.hop.documentStoreEnd();
   check(so, 'cửa kho: tín hiệu reload của lõi đã ở kho thật trước khi nhả khóa tài liệu', revisionLucNha, 1);
 
@@ -75,9 +75,15 @@ function chay(so) {
     trongKhoKhiDangGiu = [giu.stubs._props.khoaA, giu.hop.documentProps().getProperty('khoaB')];
     return 'xong';
   });
-  check(so, 'người giữ khóa: gọi lồng chạy tiếp, chỉ cầm khóa một lần (khóa Google không tái nhập)', [ra, giu.stubs._khoa.dem, giu.stubs._khoa.demNha], ['xong', 1, 1]);
-  check(so, 'người giữ khóa: trong khóa, ghi kho chờ (kho thật chưa có) nhưng đọc lại trong lần chạy thấy ngay', trongKhoKhiDangGiu, [undefined, '2']);
-  check(so, 'người giữ khóa: trước khi nhả thì flush Sheet rồi gửi mọi khóa đã ghi bằng đúng một lệnh kho', [thuTu, dem.ghi - ghiTruoc], [['flush', 'nha:12'], 1]);
+  check(so, 'người giữ khóa: gọi lồng chạy tiếp, chỉ cầm khóa một lần (khóa Google không tái nhập)',
+    [ra, giu.stubs._khoa.dem, giu.stubs._khoa.demNha],
+    ['xong', 1, 1]);
+  check(so, 'người giữ khóa: trong khóa, ghi kho chờ (kho thật chưa có) nhưng đọc lại trong lần chạy thấy ngay',
+    trongKhoKhiDangGiu,
+    [undefined, '2']);
+  check(so, 'người giữ khóa: trước khi nhả thì flush Sheet rồi gửi mọi khóa đã ghi bằng đúng một lệnh kho',
+    [thuTu, dem.ghi - ghiTruoc],
+    [['flush', 'nha:12'], 1]);
 
   const loiGiu = dungHop({ sheets: ['Log'] });
   let loiRa = null;
@@ -90,7 +96,9 @@ function chay(so) {
   let daChay = false;
   let banRa = null;
   try { ban.hop.documentLockRun(() => { daChay = true; }, 'Bận riêng.'); } catch (e) { banRa = e.message; }
-  check(so, 'người giữ khóa: hết giờ chờ thì ném câu bận của bên gọi và không chạy việc', [banRa, daChay], ['Bận riêng.', false]);
+  check(so, 'người giữ khóa: hết giờ chờ thì ném câu bận của bên gọi và không chạy việc',
+    [banRa, daChay],
+    ['Bận riêng.', false]);
 
   const lop = dungHop({ sheets: ['Log'] });
   lop.hop.withDocumentStoreDeferred(() => {
@@ -141,7 +149,9 @@ function chay(so) {
     const nguon = fs.readFileSync(path.join(GAS, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     return /\.getProperty\s*\(/.test(nguon) && /JSON\.parse\s*\(/.test(nguon);
   });
-  check(so, 'đọc JSON kho: không tệp GAS nào vừa đọc kho vừa tự JSON.parse ngoài công cụ documentPropertyJson', tuParse, []);
+  check(so, 'đọc JSON kho: không tệp GAS nào vừa đọc kho vừa tự JSON.parse ngoài công cụ documentPropertyJson',
+    tuParse,
+    []);
 
   // Quét chống tái phạm: chỉ cửa kho được gọi thẳng DocumentProperties và lấy khóa.
   const viPham = cacTepJs(GAS, GAS).filter((tep) => NGOAI_LE.indexOf(tep) < 0).filter((tep) => {
@@ -149,7 +159,9 @@ function chay(so) {
     const nguon = fs.readFileSync(path.join(GAS, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     return /getDocumentProperties\s*\(/.test(nguon) || /\.(tryLock|waitLock)\s*\(/.test(nguon);
   });
-  check(so, 'cửa kho: không tệp GAS nào gọi thẳng getDocumentProperties() hoặc tryLock/waitLock ngoài server/state/DocumentStore.js', viPham, []);
+  check(so, 'cửa kho: không tệp GAS nào gọi thẳng getDocumentProperties() hoặc tryLock/waitLock ngoài server/state/DocumentStore.js',
+    viPham,
+    []);
 
   // Khóa tài liệu chỉ cầm qua documentLockRun. Ngoại lệ: khóa điều phối của đồng bộ chỉ lùi về khóa tài liệu khi môi trường không có khóa script (Google luôn có).
   const NGOAI_LE_KHOA = NGOAI_LE.concat(['fbm_sync/state/State.js']);

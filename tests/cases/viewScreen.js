@@ -4,7 +4,8 @@
  * Bốn thứ đáng kiểm nhất, cả bốn đều là loại hỏng-trong-im-lặng: mã card lịch sử ở hai tệp lệch nhau nên nút đổi nấc xem không vẽ lại gì; đổi khách mà chỉ vẽ lại một trong ba vùng nên hai vùng kia đứng ở khách cũ; đổi khách lúc đang mở form nên bản nháp bay mất; và tệp màn tự chạm DOM thay vì đi qua engine.
  */
 
-const { napClient, taoHopCat, catRuotScript, docTep } = require('../lib/load-gas');
+const { catRuotScript, docTep } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { khungGia } = require('../lib/khung-gia');
 const { stripComments } = require('../lib/strip-comments');
@@ -22,14 +23,13 @@ const GIAO_DICH = [
 
 /** Hộp cát đủ cả tầng dữ liệu, bộ máy vẽ, bảng khai bố cục và khung giả — đúng những gì màn xem cần và không hơn. */
 function dungCanh() {
-  const hop = napClient(taoHopCat(),
-    'client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
+  const hop = napTheoSidebar(['client/util/textNormalize.html', 'client/schema/schemaAccess.html', 'client/ram/store.html',
     'client/ram/prefs.html', 'client/ram/screenState.html', 'client/util/valueText.html',
     'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html',
     'client/ui/renderEngine.html', 'client/ui/slots.html', 'client/schema/screens/formHeader.html',
     'client/schema/screens/view.html', 'client/schema/screens/customerForm.html', 'client/schema/screens/activityForm.html',
     'client/schema/screens/noteForm.html', 'client/schema/uiSchema.html',
-    'client/screen/viewScreen.html');
+    'client/screen/viewScreen.html']);
 
   hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   hop.document = khungGia([hop.SCREEN_VIEW_HISTORY_ID]);
@@ -153,9 +153,13 @@ function chay(so) {
       els['sidebar-info'].innerHTML.indexOf('shin-notice-warning') > 0,
       els['sidebar-body'].innerHTML],
     ['', true, true, '']);
-  check(so, 'không có khách thì vẽ lại riêng card lịch sử bỏ qua, không ném lỗi thiếu card', hop.screenViewActivityCard(), null);
+  check(so, 'không có khách thì vẽ lại riêng card lịch sử bỏ qua, không ném lỗi thiếu card',
+    hop.screenViewActivityCard(),
+    null);
 
-  check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách', hop.screenViewResolveSelectionMiss(), '');
+  check(so, 'mã vẫn chưa có trong RAM thì lượt nạp sau không tự chuyển khách',
+    hop.screenViewResolveSelectionMiss(),
+    '');
   hop.Store.upsertRecord('customer', Object.assign({}, KHACH[0], { id: 'CUS-999999', companyName: 'Khách vừa thêm' }));
   check(so, 'lượt nạp mang khách vừa thêm về thì tự chuyển sang khách đó và bỏ câu báo',
     [hop.screenViewResolveSelectionMiss(), hop.ScreenState.currentCustomerId, hop.ScreenState.selectionMiss],
@@ -166,7 +170,9 @@ function chay(so) {
     [els['sidebar-info'].innerHTML.indexOf('Hàng này không có khách nào.') > 0, els['sidebar-info'].innerHTML.indexOf('shin-notice-pending') > 0, els['sidebar-body'].innerHTML],
     [true, true, '']);
   hop.screenViewSetCustomer('CUS-000001');
-  check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất', [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0], [null, true]);
+  check(so, 'chọn khách bằng đường khác thì câu báo hàng trống mất',
+    [hop.ScreenState.selectionMiss, els['sidebar-info'].innerHTML.indexOf('Công ty Thép Hòa Phát') > 0],
+    [null, true]);
 
   hop.screenStateOpenForm('activityForm', 'activity', {});
   check(so, 'đang mở form thì báo hàng không ra khách bị bỏ qua, khách đang gõ dở giữ nguyên',

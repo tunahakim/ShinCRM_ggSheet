@@ -100,7 +100,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── FbmSyncService.js     Hàm Sidebar gọi của đồng bộ FBM, mỗi hàm là adapter một dòng vào `FbmSync.controlDispatch`; khai ranh giới ghi vết và mục cài đặt của FBM vào bảng khai mở của lõi.
 │   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
-│   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
+│   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, định dạng dòng, flushLog điều phối việc ghi xuống sheet Log bằng đúng một lệnh.
+│   │   ├── LogSheet.js           Thao tác sheet Log: dựng lại khi mất, ghi một khối dòng bằng một lệnh, cắt log theo hai trần.
+│   │   ├── LogMask.js            Che bí mật, công cụ tính thuần dùng chung cho Log và thông báo.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
 │   ├── notice\
 │   │   └── NoticeGate.js         Cổng thông báo duy nhất: phát, gỡ, bỏ, liệt kê. Mỗi thông báo một khóa NOTICE:<key> trong DocumentProperties; lõi không biết kênh, Sidebar là một adapter.
@@ -119,25 +121,25 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   ├── Triggers.js                Trigger đánh dấu dữ liệu bẩn và chuẩn bị sheet quản trị (việc cài trigger ở entry/TriggerSetup.js).
 │   └── dev\                      CHỈ DÙNG LÚC PHÁT TRIỂN — xóa cả thư mục này trước khi Sheet mang dữ liệu khách hàng thật.
 │       ├── DevRunner.js          Cửa web chạy một hàm trong danh sách trắng. Mở một địa chỉ chạy code dưới quyền chủ tệp.
-│       ├── ViewProbe.js          Probe DEV tạo/xóa sheet quản trị tạm để nghiệm thu renderer thật trên Google.
-│       ├── ReloadMatrixProbe.js  Probe DEV tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.
-│       ├── ReloadRefactorProbe.js Probe DEV thử công thức mảng cho bộ đọc Extension và đo chi phí trigger, lời dò, tô màu tab.
-│       ├── ReloadJournalProbe.js Probe DEV đếm lệnh DocumentProperties và đo thời gian của tín hiệu nạp lại và từng mức nạp (trước/sau sổ nhật ký).
-│       ├── SaveBreakdownProbe.js Probe DEV tách một lần lưu khách từ Sidebar thành từng đoạn (khóa, đọc, kiểm, ghi, đọc lại, ghi nhận thay đổi) để tìm chỗ tốn thời gian.
-│       ├── ViewRenderProbe.js   Probe DEV tách lượt vẽ sheet quản trị và "Làm mới tất cả" (tạm thêm hai sheet `!` thử, xóa và dọn sổ vẽ trong lượt).
-│       ├── SheetReadGapProbe.js Probe DEV đo phí cố định một lệnh đọc Sheet và phí mỗi dòng, ra ngưỡng gộp dòng của bản đọc Sheet; so `loadCore` và một lần sửa ô khi tắt và bật bản đọc.
+│       ├── reload\               Hàm dò reload trên DEV.
+│       │   ├── ReloadProbeKit.js     Đồ dùng chung: chụp và trả lại thuộc tính tài liệu, dòng báo cáo DAT/LOI ném khi ca hỏng.
+│       │   ├── ReloadMatrixProbe.js  Tạo fixture nhỏ, mô phỏng onEdit theo ma trận reload và tự khôi phục dữ liệu/thuộc tính.
+│       │   └── ReloadPayloadProbe.js Đánh dấu một mã Customer có sẵn rồi hỏi như Sidebar để kiểm nạp lại cùng response; không ghi ô nào.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
 │       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger thành thông báo và hiện ở Sidebar đang mở.
+│       ├── PropertiesProbe.js    Đo hành vi DocumentProperties thật (chuỗi rỗng, khóa chưa có, số) để kho giả của bộ test theo đúng; khóa tạm, xóa trước khi trả.
 │       ├── NoticeGateProbe.js    Nghiệm thu cổng thông báo trên DocumentProperties thật và đo phí một lần getProperties lạnh.
 │       ├── BookBindingProbe.js       Hàm dò cặp mã Sheet và mã script đã ghi, để nghiệm thu chuyển Sheet.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
-│       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Sidebar/Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService.
+│       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService. Danh sách bọc có tên đã mất thì báo lỗi, không bỏ qua.
+│       ├── FbmPerfScope.js       Dựng phạm vi và dữ liệu cho phiên đo: thu phạm vi về vài khách thử, xóa vài dòng Activity, chỉnh múi giờ tệp DEV.
+│       ├── FbmPayloadProbe.js    Đo GAS giải JSON và băm gói Activity nhiều cỡ để chọn cỡ gói một lần gọi.
+│       ├── FbmSyncFixture.js     Dựng dữ liệu thử đồng bộ trên Sheet DEV qua cửa bản ghi (ALT00010, CUS-020061, xung đột, mã bị xóa).
+│       ├── FbmSyncBackgroundProbe.js Nghiệm thu dừng đồng bộ nền bằng đúng các cửa Sidebar gọi, đóng request không Extension nào gửi.
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
-│       ├── MeasureLog.js         Đo chi phí thật của deleteRows trên sheet Log lớn. Con số trong tài liệu 10 đến từ đây.
-│       ├── MeasureChunk.js       Đo đường nạp trên dữ liệu đang có, không ghi ô nào: measureFirstPaint đo thời gian tới khung hình đầu, measureChunkRows so các cỡ gói.
 │       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
 │
@@ -291,7 +293,29 @@ tests\
 │   ├── dung-hop.js               Dựng sẵn hộp cát kèm sheet giả và hàm ghi ô theo mã cột. Nơi duy nhất giữ danh sách đường dẫn tệp máy chủ.
 │   ├── dung-client.js            Hộp cát RIÊNG cho tệp client. Riêng vì server và client có hàm sinh đôi cùng tên, chung hộp thì bản nạp sau đè bản nạp trước.
 │   ├── khung-gia.js              Khung sidebar giả cho bộ máy vẽ: bốn vùng, chỉ ba khả năng getElementById/innerHTML/hidden. Thay innerHTML một vùng thì phần tử con bị xóa nội dung, đúng như trình duyệt.
-│   └── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
+│   ├── strip-comments.js         Bỏ chú thích trước khi quét mã, để docstring được phép nhắc tên mà mã thì không.
+│   ├── gas\                      Mảnh dựng môi trường GAS giả mà mọi tệp ca dùng chung; tệp ca không tự dựng lại.
+│   │   ├── kho-thuoc-tinh.js     Ba kho thuộc tính giả theo đúng hành vi kho thật (khóa chưa có trả null, lưu thành chuỗi), đếm lệnh theo tên, và kho gãy.
+│   │   ├── lan-goi.js            Chạy một đoạn code trong một lần gọi qua cửa vào thật runEntryPoint.
+│   │   ├── doc-log.js            Đọc dòng dữ liệu của sheet Log, có thể nhả bộ đệm trước.
+│   │   └── mau-ban-ghi.js        Ghi khách hoặc giao dịch mẫu theo mã cột, nhận đối tượng chứ không nhận tham số theo vị trí.
+│   ├── sidebar\                  Mảnh nạp tệp client của Sidebar.
+│   │   ├── nap-sidebar.js        Nạp tệp client theo thứ tự include() của client/Sidebar.html; tệp ngoài Sidebar thì nổ.
+│   │   ├── hop-lien-ket.js       Hộp cho tầng liên kết client/link: đồng hồ, hẹn giờ, DOM giả, callServer trả ngay.
+│   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
+│   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
+│   ├── ext\
+│   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
+│   ├── view\
+│   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
+│   └── quet\                     Công cụ quét mã nguồn.
+│       ├── bang-md.js            Đọc bảng markdown trong tài liệu thành hàng ô kèm số dòng, để test đối chiếu tài liệu với code.
+│       ├── khai-bao.js           Tên khai báo ở cột 0 của mã GAS (tên toàn cục), bỏ bảng khai mở.
+│       ├── liet-tep.js           Liệt kê tệp trong dự án GAS hoặc thư mục bất kỳ của repo, đi cả thư mục con, bỏ node_modules và thư mục chấm.
+│       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
+│       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
+├── tools\
+│   └── wrapChecks.js             Xuống dòng lệnh check( dài thành ba phần (sổ và nhãn, giá trị nhận, giá trị mong đợi); chỉ đụng lệnh một dòng bốn đối số. Ngưỡng độ dài ở đầu tệp.
 ├── contracts\
 │   ├── fbmSyncPipeline.js         Charter use case đồng bộ FBM độc lập với code: trigger và kết quả quan sát được theo tài liệu 09.
 │   └── gasExtensionContract.js    Hợp đồng dữ liệu GAS–Extension và cách tính mã phiên bản hợp đồng.
@@ -300,6 +324,7 @@ tests\
     ├── textNormalize.js          Hai bản sinh đôi server và client cho cùng kết quả trên một bảng ca dùng chung.
     ├── schemaCheck.js            Bảng khai cột tự nhất quán, và chiều phụ thuộc một hướng với SYNC_SCHEMA.
     ├── namespace.js              Không tên nào khai ở hai tệp. Bẫy số một của Apps Script.
+    ├── devProbes.js              Bảng tài liệu Hàm dò DEV khớp DEV_RUNNER_ALLOWED (thiếu dòng hoặc dòng trỏ hàm không có là đỏ); danh sách bọc của FbmPerfProbe chỉ chứa tên còn trong code.
     ├── sourceEncoding.js         Mã GAS và Sidebar không chứa chữ mojibake (UTF-8 bị đọc nhầm bảng mã).
     ├── settings.js               Cổng cài đặt: bảng khai, đọc khi kho rỗng hay hỏng, settingsSave chuẩn hóa và phát tín hiệu, các kiểu trường, ngầm định lệch thì bỏ và có thông báo, LOG_TRACE.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
@@ -345,7 +370,8 @@ tests\
     ├── formScreen.js             Bốn cái hỏng-trong-im-lặng của ba màn form: tiêu đề suy sai vì bản ghi mới đã có mã xem trước, ô kế tục không có dấu, form giao dịch thiếu bản ghi khách, và đóng form lồng thì rơi thẳng về màn xem.
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
-    ├── selectionPoll.js          Đồng hồ giả khóa luật ACK loại trừ mọi vòng gọi, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây, lịch hỏi sau tín hiệu kênh và watchdog.
+    ├── link.js                   Điều phối ba tệp kiểm tầng liên kết của Sidebar.
+    ├── link\                     selectionPoll.js (luật ACK, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây), changeSignal.js (lịch hỏi sau tín hiệu kênh, watchdog kênh im), viewSync.js (đồng bộ sheet quản trị từ Sidebar).
     ├── bindWatcher.js            XHR giả khóa bộ lọc danh sách đen khung /bind, chỉ bắt GET /bind và con trỏ không đọc lại.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.
@@ -386,11 +412,16 @@ tests\
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
-    │   └── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
+    │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
+    │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
+    │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
+    │   ├── fileSize.js            Cỡ tệp toàn repo (GAS, Extension, tests): vượt 20 KB hoặc 200 dòng phải có tên trong danh sách kèm trần, nhóm sẽ xử lý và lý do; trần chỉ co lại.
+    │   ├── wrapChecks.js          Kiểm công cụ tests/tools/wrapChecks.js: chỉ cắt lệnh check dài bốn đối số, không cắt nhầm dấu phẩy trong chuỗi hay ngoặc.
+    │   ├── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
+    │   ├── view.js                Điều phối ba tệp kiểm của server/view.
+    │   └── view\                  viewSheetRenderer.js (vẽ theo giao dịch sống gần nhất, cột động, lọc, sắp), viewLedger.js (lượt vẽ hỏng không tự đánh thức, mỗi lỗi một dòng Log), viewTabTint.js (tab cam khi sheet cũ).
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
-
-`server/dev/FbmSyncFixture.js` — Chuẩn bị live test ALT00010 và probe auth, ghi checklist vào Log, không xóa dữ liệu và không gửi request FBM.
 
 ## Bảng tra: tên trong tài liệu thiết kế → tệp thật
 
@@ -405,7 +436,7 @@ Không sửa tên trong tài liệu thiết kế vì hai lẽ: chúng là bản 
 | `server/SheetLayout.gs` | `server/data/SheetLayout.js` |
 | `server/SheetIo.gs` | `server/sheet/SheetIo.js` |
 | `server/TextNormalize.gs` | `server/util/TextNormalize.js` |
-| `server/LogGate.gs` | `server/log/LogGate.js` |
+| `server/LogGate.gs` | `server/log/LogGate.js`, `server/log/LogSheet.js`, `server/log/LogMask.js` |
 | `server/LoadService.gs` | `server/service/LoadService.js` |
 | `server/DirtyState.gs` | `server/state/DirtyState.js` |
 | `client/util/textNormalize.js` | `client/util/textNormalize.html` |

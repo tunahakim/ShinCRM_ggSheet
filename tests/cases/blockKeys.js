@@ -10,7 +10,7 @@
  * Bảng đầu dò dưới đây phải phủ **hết** bảng khóa của `uiBuilder`, và có một ca kiểm đúng việc phủ hết đó. Nhờ vậy thêm một khóa mới cho một vai mà quên dạy lá dùng nó thì bộ kiểm đỏ ngay, chứ không đợi tới lúc có người nhìn bằng mắt.
  */
 
-const { napClient, taoHopCat } = require('../lib/load-gas');
+const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { dungHop } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiTruot, ghiDat, ghiLoiNap } = require('../lib/assert');
 
@@ -99,9 +99,8 @@ function chay(so) {
 
   let hop;
   try {
-    hop = napClient(taoHopCat(),
-      'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/icons.html',
-      'client/util/valueText.html', 'client/schema/schemaAccess.html', 'client/ui/renderEngine.html');
+    hop = napTheoSidebar(['client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/icons.html',
+      'client/util/valueText.html', 'client/schema/schemaAccess.html', 'client/ui/renderEngine.html']);
     hop.Schema = hop.buildSchema(dungHop().hop.DATA_SCHEMA);
   } catch (err) {
     return ghiLoiNap(so, 'nạp uiBuilder cùng engine và bảng khai trường thật', err);

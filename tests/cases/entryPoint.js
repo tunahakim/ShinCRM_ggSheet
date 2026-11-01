@@ -5,14 +5,8 @@
  */
 
 const { dungHop } = require('../lib/dung-hop');
+const { docLog } = require('../lib/gas/doc-log');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
-
-function docLog(nen) {
-  const sheet = nen.Log.sheet;
-  const dau = nen.hop.SHEET_LAYOUT.Log.firstDataRow;
-  if (sheet.getLastRow() < dau) { return []; }
-  return sheet.getRange(dau, 1, sheet.getLastRow() - dau + 1, 9).getValues().map((row) => row.join('|'));
-}
 
 function chay(so) {
   section('EntryPoint — cửa vào tự động ghi Log theo chuyển trạng thái');
@@ -21,7 +15,7 @@ function chay(so) {
   const hop = nen.hop;
   const goi = (name, fn) => hop.runEntryPoint(name, 'sidebar', fn);
   const hong = (message) => () => { throw new Error(message); };
-  const dem = (text) => docLog(nen).filter((row) => row.indexOf(text) >= 0).length;
+  const dem = (text) => docLog(nen, { noi: '|' }).filter((row) => row.indexOf(text) >= 0).length;
 
   checkThrows(so, 'lỗi đầu tiên của cửa vào tự động vẫn ném cho Sidebar', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
   checkThrows(so, 'lỗi trùng vẫn ném cho Sidebar', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
@@ -34,7 +28,9 @@ function chay(so) {
   check(so, 'kết quả ok:false (báo lại lỗi cũ) không tính là hết lỗi', dem('Đã hết lỗi'), 0);
   goi('renderViewIfDirty', () => ({ ok: true }));
   goi('renderViewIfDirty', () => ({ ok: true }));
-  check(so, 'thành công sau lỗi ghi đúng một dòng hết lỗi, thành công tiếp không ghi gì', [dem('Đã hết lỗi: lỗi B'), dem('Đã hết lỗi')], [1, 1]);
+  check(so, 'thành công sau lỗi ghi đúng một dòng hết lỗi, thành công tiếp không ghi gì',
+    [dem('Đã hết lỗi: lỗi B'), dem('Đã hết lỗi')],
+    [1, 1]);
   checkThrows(so, 'lỗi cũ quay lại sau khi đã hết', () => goi('renderViewIfDirty', hong('lỗi A')), 'lỗi A');
   check(so, 'lỗi quay lại sau khi đã hết thì ghi lại', dem('lỗi A'), 2);
 
@@ -51,10 +47,14 @@ function chay(so) {
   const dongCuoi = () => hop.reloadJournalRead().entries.slice(-1)[0] || {};
   const truoc = rev();
   goi('fbmContinueSync', () => { mark('KH0001'); mark('KH0002'); mark('KH0003'); });
-  check(so, 'cửa vào ghi ba lô trong một lần chạy chỉ tăng một revision, đủ ba mã', [rev() - truoc, dongCuoi().customer], [1, ['KH0001', 'KH0002', 'KH0003']]);
+  check(so, 'cửa vào ghi ba lô trong một lần chạy chỉ tăng một revision, đủ ba mã',
+    [rev() - truoc, dongCuoi().customer],
+    [1, ['KH0001', 'KH0002', 'KH0003']]);
   const truocLoi = rev();
   checkThrows(so, 'lần chạy lỗi sau khi đã ghi vẫn ném lỗi gốc', () => goi('fbmContinueSync', () => { mark('KH0004'); throw new Error('lỗi D'); }), 'lỗi D');
-  check(so, 'lần chạy lỗi sau khi đã ghi vẫn ghi nhận thay đổi: Sidebar được báo phần đã ghi', [rev() - truocLoi, (dongCuoi().customer || []).indexOf('KH0004') >= 0], [1, true]);
+  check(so, 'lần chạy lỗi sau khi đã ghi vẫn ghi nhận thay đổi: Sidebar được báo phần đã ghi',
+    [rev() - truocLoi, (dongCuoi().customer || []).indexOf('KH0004') >= 0],
+    [1, true]);
   const truocRong = rev();
   goi('fbmContinueSync', () => ({ ok: true }));
   check(so, 'lần chạy không ghi gì không tăng revision', rev() - truocRong, 0);

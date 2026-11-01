@@ -6,7 +6,8 @@
  * Hộp này **không** có `google` và **không** có `document`: các tệp nạp ở đây là tầng dữ liệu, chúng không được phép chạm vào lời gọi máy chủ hay DOM. Tệp nào chạm thì sẽ nổ "is not defined" ngay lúc nạp, và đó là điều mong muốn.
  */
 
-const { napClient, taoHopCat } = require('./load-gas');
+const { taoHopCat } = require('./load-gas');
+const { napTheoSidebar } = require('./sidebar/nap-sidebar');
 
 /**
  * Tầng dữ liệu phía sidebar, xếp theo chiều phụ thuộc để người đọc thấy tầng: chuẩn hóa chữ → cửa đọc bảng khai → bộ tự kiểm → kho → đường bung gói.
@@ -25,7 +26,7 @@ const TEP_CLIENT = [
 /** Dựng hộp cát client. Truyền `tep` để nạp một danh sách khác, dùng khi chỉ cần kiểm đúng một tệp. */
 function dungClient(chon) {
   const y = chon || {};
-  return napClient(taoHopCat(y.stubs), ...(y.tep || TEP_CLIENT));
+  return napTheoSidebar(y.tep || TEP_CLIENT, taoHopCat(y.stubs));
 }
 
 module.exports = { dungClient, TEP_CLIENT };
