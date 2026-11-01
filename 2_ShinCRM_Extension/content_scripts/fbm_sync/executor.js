@@ -180,14 +180,10 @@
         traceEvent(trace, 'login_request_built', request, { database: database, unit: selectedUnit });
         return post('Login', body).then(function (login) {
           if (!login.response.ok) { return { ok: false, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { trace: trace } }; }
-          // Khi FBM giữ khóa phiên cũ, dừng adapter tại response Login để GAS
-          // phân loại riêng; không gọi thêm account page và không tự bấm nút hủy.
-          var blocked = /đã\s+đăng\s+nhập[\s\S]{0,120}hủy\s+phiên\s+làm\s+việc\s+trước/i.test(String(login.text || ''))
-            || /da\s+dang\s+nhap[\s\S]{0,120}huy\s+phien\s+lam\s+viec\s+truoc/i.test(String(login.text || ''));
-          // FBM chỉ báo đăng nhập được bằng {"d":true}; khác đi thì trả nguyên response Login cho GAS phân loại, không mở trang tài khoản (mở khi chưa đăng nhập thì FBM chuyển sang Error.htm, gặp thật 2026-10-07).
+          // FBM chỉ báo đăng nhập được bằng {"d":true}; khác đi thì trả nguyên response Login cho GAS phân loại (GAS giữ bảng nghĩa của `d`), không mở trang tài khoản (mở khi chưa đăng nhập thì FBM chuyển sang Error.htm, gặp thật 2026-10-07) và không tự bấm nút hủy phiên cũ.
           var accepted = /^\s*\{\s*"d"\s*:\s*true\s*\}\s*$/.test(String(login.text || ''));
-          if (blocked || !accepted) {
-            traceEvent(trace, blocked ? 'login_session_blocked' : 'login_rejected', request, { httpStatus: login.response.status });
+          if (!accepted) {
+            traceEvent(trace, 'login_rejected', request, { httpStatus: login.response.status });
             return { ok: true, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { loginStage: 'login', loginBlocked: true, trace: trace } };
           }
           traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
