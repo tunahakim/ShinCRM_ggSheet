@@ -74,6 +74,17 @@ async function chay(so) {
   check(so, 'thử lại vẫn không thấy tab: không thử lần nữa, lượt về lỗi FBM_TAB_NOT_FOUND', [twiceNoTab.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_FOUND']);
   FbmSync.sessionGatePolicy = policy;
 
+  // Tab không sẵn sàng: Extension không tự tải lại nên GAS quyết, kể cả khi tắt tự mở tab; phát lại đúng một lần kèm lệnh đổi tab về trang khách hàng.
+  const notReadyRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
+  const notReadyPick = notReadyRun.runId ? hoi('may-A').request : null;
+  const notReady = (id) => FbmSync.controlDispatch('continue', { machineId: 'may-A', error: { requestId: id, code: 'FBM_TAB_NOT_READY', message: 'Tab FBM không phản hồi.' } }, 'relay');
+  const reloadRetry = notReady(notReadyPick.id);
+  check(so, 'tab không sẵn sàng lần đầu (tắt tự mở tab): GAS phát lại cùng bước kèm reloadFbmPage về trang khách hàng, không kèm lệnh mở tab, hạn envelope cộng thêm một lần chờ tab', [
+    reloadRetry.ok, reloadRetry.code, reloadRetry.request && reloadRetry.request.meta.kind, reloadRetry.request && reloadRetry.request.meta.reloadFbmPage, !!(reloadRetry.request && reloadRetry.request.meta.openFbmContext), reloadRetry.request && reloadRetry.request.meta.timeoutMs - notReadyPick.meta.timeoutMs
+  ], [true, 'FBM_TAB_RETRY_REQUEST_READY', notReadyPick.meta.kind, FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH, false, FbmSync.BUDGET.tabReadyMs]);
+  const twiceNotReady = notReady(reloadRetry.request.id);
+  check(so, 'tải lại rồi vẫn không sẵn sàng: không tải lại mãi, lượt về lỗi FBM_TAB_NOT_READY', [twiceNotReady.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_READY']);
+
   // Tin đánh thức mất và Extension máy được giao không hỏi lần nào: chỗ giữ quá hạn đóng ở lần hỏi của máy bất kỳ, kể cả khi nền tắt, Log nói rõ Extension không đến nhận.
   const lostRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
   const lost = FbmSync.stateRead();

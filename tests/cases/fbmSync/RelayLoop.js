@@ -156,9 +156,9 @@ async function tabVaMien(so) {
   const batDau = Date.now();
   await chayLuot(treo.ctx);
   const loiTreo = treo.st.bodies[1].payload.error;
-  check(so, 'Tab FBM chưa sẵn sàng (không trả lời ping kể cả sau khi tải lại): tải lại đúng một lần, không gửi request, nộp lỗi FBM_TAB_NOT_READY kèm requestId về GAS trong hạn envelope', [
+  check(so, 'Tab FBM chưa sẵn sàng (không trả lời ping): Extension không tự tải lại, không gửi request, nộp nguyên lỗi FBM_TAB_NOT_READY kèm requestId về GAS trong hạn envelope để GAS quyết', [
     loiTreo.code, loiTreo.requestId, treo.st.reloads, treo.st.executes.length, treo.st.bodies[1].command, Date.now() - batDau < 2000, treo.ctx.workerKeepAliveTimer, treo.st.listeners.length
-  ], ['FBM_TAB_NOT_READY', 'r', 1, 0, 'continue', true, null, 0]);
+  ], ['FBM_TAB_NOT_READY', 'r', 0, 0, 'continue', true, null, 0]);
 
   const chan = voiPhongBi({ ping: false, pingRefused: true, inject: () => Promise.reject(new Error('Cannot access contents of url "https://fbo.com.vn:8888/Main/". Extension manifest must request permission to access this host.')) });
   await chayLuot(chan.ctx);

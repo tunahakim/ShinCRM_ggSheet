@@ -18,7 +18,7 @@ const CONTRACT = {
     // Mọi URL trong envelope phải thuộc miền này; Extension từ chối envelope có địa chỉ khác trước khi tìm tab.
     site: 'https://fbo.com.vn:8888/',
     transport: ['captures', 'replacements'],
-    // Khoảng nghỉ ngẫu nhiên Extension chờ trước mỗi request gọi FBM (kể cả từng phần tử của lô), tính từ lúc request FBM trước kết thúc.
+    // Khoảng nghỉ ngẫu nhiên Extension chờ trước mỗi request gọi FBM (kể cả từng phần tử của lô), tính từ lúc request FBM trước kết thúc. GAS chỉ cấp cho request gọi FBM; Extension có `requestGap` thì chờ và dời mốc, không xét loại request.
     requestGap: ['minMs', 'maxMs'],
     // Lô request đọc độc lập (`meta.kind = 'batch'`): Extension chạy lần lượt, dừng khi tổng thân vượt `batch.maxBytes`.
     batch: ['maxBytes'],
@@ -38,8 +38,8 @@ const CONTRACT = {
     job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize'],
     // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
     codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'],
-    // Lỗi Extension không gửi được envelope tới tab: Chrome chặn quyền site (không thử lại, người dùng phải mở quyền), địa chỉ ngoài miền FBM.
-    transportCodes: ['FBM_SITE_ACCESS_BLOCKED', 'FBM_URL_OUTSIDE_SITE']
+    // Lỗi Extension không gửi được envelope tới tab, trả nguyên mã để GAS quyết: không có tab (GAS cho mở thì phát lại kèm `openFbmContext`), tab không sẵn sàng (Extension không tự tải lại; GAS phát lại một lần kèm `reloadFbmPage`), Chrome chặn quyền site (không thử lại, người dùng phải mở quyền), địa chỉ ngoài miền FBM.
+    transportCodes: ['FBM_TAB_NOT_FOUND', 'FBM_TAB_NOT_READY', 'FBM_SITE_ACCESS_BLOCKED', 'FBM_URL_OUTSIDE_SITE']
   },
   // Extension → Web App GAS: cửa duy nhất phong bì ra khỏi GAS, cho cả lượt nền lẫn lượt tay. `heartbeat` hỏi việc (GAS trả request của lượt tay đang chờ máy hỏi, hoặc việc nền đến hạn); `continue` nộp `response` / `error` (`requestId`, `code`, `message`). Mọi thân mang `machineId`; GAS chỉ nhận `continue` từ đúng máy đang lái lượt.
   relay: {

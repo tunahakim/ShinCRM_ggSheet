@@ -394,8 +394,8 @@ async function chay(so) {
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_TIMEOUTscript.');
   check(so, 'Hộp đen Extension: relay 404 thì Log nêu mã RELAY_ENDPOINT_NOT_FOUND kèm HTTP 404', heartbeat.FbmSync.extensionTrailText({ stage: 'gas_reply_failed', at: 1000, code: 'RELAY_ENDPOINT_NOT_FOUND', httpStatus: 404 }, 1000),
     'Hộp đen Extension: bước cuối (cách đây 0 phút) là GAS trả lời lỗi hoặc Extension không gọi được GAS, Extension dừng lượt. Mã lỗi: RELAY_ENDPOINT_NOT_FOUND (HTTP 404).');
-  check(so, 'Hộp đen Extension: lượt dừng lúc tự tải lại tab FBM thì Log nói rõ bước đó, mã lỗi và việc phần chạy nền khởi động lại', heartbeat.FbmSync.extensionTrailText({ stage: 'fbm_tab_reloading', requestId: 'r-1', code: 'FBM_TAB_NOT_READY', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
-    'Hộp đen Extension: bước cuối (cách đây 0 phút) là tab FBM không phản hồi, Extension đang tự tải lại tab, request r-1. Mã lỗi: FBM_TAB_NOT_READY. Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).');
+  check(so, 'Hộp đen Extension: lượt dừng lúc đổi tab FBM về trang GAS yêu cầu thì Log nói rõ bước đó, mã lỗi và việc phần chạy nền khởi động lại', heartbeat.FbmSync.extensionTrailText({ stage: 'fbm_page_reloading', requestId: 'r-1', code: 'FBM_TAB_NOT_READY', at: 1000, workerStartedAt: 50, currentWorkerStartedAt: 900 }, 1000),
+    'Hộp đen Extension: bước cuối (cách đây 0 phút) là Extension đang đổi tab FBM về trang GAS yêu cầu tải lại, request r-1. Mã lỗi: FBM_TAB_NOT_READY. Phần chạy nền của Extension đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng (Chrome tắt phần chạy nền hoặc Extension được tải lại).');
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'manual', phase: 'done', scan: 'full', chain: { current: 'heartbeat' } });
   const ctxHeartbeat = heartbeat.FbmSync.logContextText();
   heartbeat.FbmSync.logContextNote({ runId: 'r', origin: 'background', phase: 'pull_customer', scan: 'full', chain: { current: 'heartbeat' } });

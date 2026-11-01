@@ -286,14 +286,14 @@ async function chay(so) {
     (workerSource.match(/envelopeRun\(request, hop \+ 1\)/g) || []).length,
     ['relayRun(', 'relayReplyBody', 'relayFailureBody', "kind: 'background_sync'", "kind: 'heartbeat'", 'transport_failure', 'RELAY_CHANNELS', 'relayScheduledRequests', 'relayHeartbeatToGas', 'relayHeartbeatTransportFailure', 'used >= 10'].every((old) => workerSource.indexOf(old) < 0)
   ], [1, 2, true, true, 1, true]);
-  check(so, 'Chuẩn bị tab FBM chỉ có một công cụ (một nơi gọi: envelopeRun), dùng cho cả nhịp nền lẫn lượt Sidebar; không còn đường chờ tab cũ', [
+  check(so, 'Chuẩn bị tab FBM chỉ có một công cụ (một nơi gọi: envelopeRun), dùng cho cả nhịp nền lẫn lượt Sidebar; không còn đường chờ tab cũ; Extension không tự tải lại tab và không rẽ nhánh theo loại request khi nghỉ giữa hai request', [
     (workerSource.match(/prepareFbmTab\(/g) || []).length,
     workerSource.indexOf('ensureFbmTab') < 0 && workerSource.indexOf('waitForFbmTabReady') < 0,
-    workerSource.indexOf('autoDiscardable: false') >= 0 && workerSource.indexOf('chrome.tabs.reload(tab.id') >= 0
+    workerSource.indexOf('autoDiscardable: false') >= 0 && workerSource.indexOf('chrome.tabs.reload') < 0 && workerSource.indexOf('callsFbm') < 0
   ], [2, true, true]);
-  check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, chuẩn bị tab, tải lại tab, gửi tab, tab trả, gửi GAS, báo lỗi, GAS trả lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop, giờ và mã lỗi', [
+  check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, chuẩn bị tab, đổi trang theo lệnh GAS, gửi tab, tab trả, gửi GAS, báo lỗi, GAS trả lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop, giờ và mã lỗi', [
     ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'gas_reply_failed', 'chain_finished'].every((stage) => workerSource.indexOf("'" + stage + "'") >= 0),
-    ['fbm_tab_preparing', 'fbm_tab_reloading'].every((stage) => workerSource.indexOf("note('" + stage + "'") >= 0),
+    ['fbm_tab_preparing', 'fbm_page_reloading'].every((stage) => workerSource.indexOf("note('" + stage + "'") >= 0),
     workerSource.indexOf("ask: { command: 'heartbeat', trail: true }") >= 0 && workerSource.indexOf('Object.assign({}, payload, { trail: trail })') >= 0,
     workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };") >= 0
   ], [true, true, true, true]);
@@ -465,12 +465,12 @@ async function chay(so) {
     return promise;
   };
   const gap = { minMs: 1000, maxMs: 1000 };
-  const gapEnvelope = (id, kind, ids) => ({ protocol: 'shincrm-fbm', id, meta: { kind, timeoutMs: 30000, fetchMs: 10000, requestGap: gap, job: { jobId: 'j', chunkIndex: 1 } }, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', items: ids && ids.map((itemId) => ({ id: itemId, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', meta: { kind: 'activity_grid' } })) });
+  const gapEnvelope = (id, kind, ids) => ({ protocol: 'shincrm-fbm', id, meta: { kind, timeoutMs: 30000, fetchMs: 10000, requestGap: kind === 'scan_chunk' ? undefined : gap, job: { jobId: 'j', chunkIndex: 1 } }, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', items: ids && ids.map((itemId) => ({ id: itemId, url: 'https://fbo.com.vn:8888/service', bodyText: '{}', meta: { kind: 'activity_grid' } })) });
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('dau', 'grid')));
   virtualNow += 300;
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('lo', 'batch', ['0', '1', '2'])));
   await chayHet(workerContext.sendToFbmTab(77, gapEnvelope('goi', 'scan_chunk')));
-  check(so, 'Khoảng cách 1 giây giữa hai request FBM: request đầu không chờ, lần sau chỉ chờ phần còn thiếu, mỗi phần tử trong lô cách nhau đủ 1 giây, lấy gói từ RAM tab không chờ',
+  check(so, 'Khoảng cách 1 giây giữa hai request FBM: request đầu không chờ, lần sau chỉ chờ phần còn thiếu, mỗi phần tử trong lô cách nhau đủ 1 giây, gói lấy từ RAM tab (GAS không cấp khoảng nghỉ) không chờ và không dời mốc',
     [sentAt, waitTimers.filter((item) => item.fn.name === 'wake').map((item) => item.ms)], [['dau@1000', '0@2000', '1@3000', '2@4000', 'goi@4000'], [700, 1000, 1000]]);
   gap.maxMs = 0; gap.minMs = 0; sentAt.length = 0;
   const truocMacDinh = waitTimers.length;
@@ -654,24 +654,24 @@ async function chay(so) {
 
   const dO = tabWorker({ id: 5, status: 'unloaded', discarded: true, autoDiscardable: true }, { request: tabRequest('tab-do'), reloadCompletes: true, answersAfterReload: true });
   const ketQuaDo = await chayChuoi(dO);
-  check(so, 'Tab FBM bị Chrome dỡ: Extension đánh dấu không cho dỡ, tự tải lại đúng một lần rồi gửi request và nộp kết quả về GAS bằng lệnh continue; hộp đen ghi bước chuẩn bị và tải lại', [
+  check(so, 'Tab FBM bị Chrome dỡ: Extension đánh dấu không cho dỡ, không tự tải lại, không gửi request, nộp nguyên lỗi FBM_TAB_NOT_READY về GAS bằng lệnh continue; hộp đen ghi bước chuẩn bị', [
     ketQuaDo.ok, dO.state.updates.map((item) => item.autoDiscardable), dO.state.reloads, dO.state.executes, thanNop(dO.state).map(moTaThan),
     dO.state.trails.filter((item) => /^fbm_tab_/.test(item))
-  ], [true, [false], 1, 1, ['continue:response'], ['fbm_tab_preparing:discarded', 'fbm_tab_reloading:FBM_TAB_NOT_READY', 'fbm_tab_sent', 'fbm_tab_replied']]);
+  ], [true, [false], 0, 0, ['continue:error:FBM_TAB_NOT_READY'], ['fbm_tab_preparing:discarded']]);
   check(so, 'Xong chuỗi thì không còn hẹn giờ giữ worker sống, không giữ listener tab', [dO.context.workerBusyCount, dO.context.workerKeepAliveTimer, dO.state.listeners.length], [0, null, 0]);
 
   const treo = tabWorker({ id: 6, status: 'complete', autoDiscardable: false }, { request: tabRequest('tab-treo'), reloadCompletes: true, answersAfterReload: false });
   const batDauTreo = Date.now();
   await chayChuoi(treo);
-  check(so, 'Tab FBM treo (không trả lời ping kể cả sau khi tải lại): Extension tải lại đúng một lần, không gửi request, báo FBM_TAB_NOT_READY về GAS (continue kèm lỗi) trong hạn envelope', [
+  check(so, 'Tab FBM treo (không trả lời ping): Extension không tự tải lại, không gửi request, báo FBM_TAB_NOT_READY về GAS (continue kèm lỗi) trong hạn envelope', [
     treo.state.reloads, treo.state.executes, treo.state.updates.length, thanNop(treo.state).map(moTaThan), Date.now() - batDauTreo < 1500
-  ], [1, 0, 0, ['continue:error:FBM_TAB_NOT_READY'], true]);
+  ], [0, 0, 0, ['continue:error:FBM_TAB_NOT_READY'], true]);
 
   const tai = tabWorker({ id: 7, status: 'loading', autoDiscardable: true }, { request: tabRequest('tab-tai'), reloadCompletes: false, answersAfterReload: true });
   await chayChuoi(tai);
-  check(so, 'Tab FBM tải mãi không xong, tải lại cũng không xong: hết hạn envelope thì báo FBM_TAB_NOT_READY về GAS (continue kèm lỗi, hop 1), không chờ vô hạn và không còn hẹn giờ giữ worker', [
+  check(so, 'Tab FBM tải mãi không xong: Extension không tự tải lại; hết hạn envelope thì báo FBM_TAB_NOT_READY về GAS (continue kèm lỗi, hop 1), không chờ vô hạn và không còn hẹn giờ giữ worker', [
     tai.state.reloads, tai.state.executes, thanNop(tai.state).map((item) => [item.command, item.payload.error && item.payload.error.code, item.payload.hop]), tai.context.workerKeepAliveTimer, tai.state.listeners.length
-  ], [1, 0, [['continue', 'FBM_TAB_NOT_READY', 1]], null, 0]);
+  ], [0, 0, [['continue', 'FBM_TAB_NOT_READY', 1]], null, 0]);
 
   const reloadRequest = (id, url) => { const item = tabRequest(id); item.meta.reloadFbmPage = url; return item; };
   const doiTrang = tabWorker({ id: 8, status: 'complete', autoDiscardable: false }, { request: reloadRequest('tab-doi-trang', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx'), answers: true });
@@ -679,6 +679,11 @@ async function chay(so) {
   check(so, 'GAS cấp reloadFbmPage: Extension đổi tab tới đúng URL đó, chờ tải xong rồi mới gửi request; không tải lại tab', [
     ketQuaDoiTrang.ok, doiTrang.state.updates.map((item) => item.url), doiTrang.state.reloads, doiTrang.state.executes, doiTrang.state.trails.filter((item) => /^fbm_(tab|page)_/.test(item))
   ], [true, ['https://fbo.com.vn:8888/Main/zccrAccount.aspx'], 0, 1, ['fbm_tab_preparing:complete', 'fbm_page_reloading', 'fbm_tab_sent', 'fbm_tab_replied']]);
+  const doLai = tabWorker({ id: 15, status: 'unloaded', discarded: true, autoDiscardable: true }, { request: reloadRequest('tab-do-lai', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx'), answers: true });
+  const ketQuaDoLai = await chayChuoi(doLai);
+  check(so, 'Tab bị Chrome dỡ, GAS phát lại kèm reloadFbmPage: Extension đổi trang (nạp lại tab dỡ) rồi gửi request; không gọi tải lại tab', [
+    ketQuaDoLai.ok, doLai.state.updates.map((item) => item.url || 'giu-tab'), doLai.state.reloads, doLai.state.executes, thanNop(doLai.state).map(moTaThan)
+  ], [true, ['giu-tab', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx'], 0, 1, ['continue:response']]);
   const ngoaiMien = tabWorker({ id: 9, status: 'complete', autoDiscardable: false }, { request: reloadRequest('tab-ngoai-mien', 'https://example.com/'), answers: true });
   await chayChuoi(ngoaiMien);
   check(so, 'URL reloadFbmPage ngoài miền FBM: envelopeSiteCheck chặn trước khi tìm tab — không đổi trang, không gửi request, báo FBM_URL_OUTSIDE_SITE', [thanNop(ngoaiMien.state).map(moTaThan), ngoaiMien.state.updates.length, ngoaiMien.state.executes, ngoaiMien.state.pings], [['continue:error:FBM_URL_OUTSIDE_SITE'], 0, 0, 0]);
