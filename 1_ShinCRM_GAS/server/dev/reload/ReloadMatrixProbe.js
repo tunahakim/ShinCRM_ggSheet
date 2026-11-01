@@ -265,9 +265,9 @@ function reloadMatrixProbe() {
 
     var viewOrdinaryColumn = viewSheet.getLastColumn();
     var viewRow1Before = reloadMatrixProbeState();
-    var viewRow1Result = reloadMatrixProbeWriteEvent(viewSheet, 1, viewOrdinaryColumn, 'DEV_RELOAD_ORDINARY_2');
+    reloadMatrixProbeWriteEvent(viewSheet, 1, viewOrdinaryColumn, 'DEV_RELOAD_ORDINARY_2');
     var viewRow1After = reloadMatrixProbeState();
-    reloadProbeAssert(report, 'Sheet quản trị hàng 1 cột thường không vẽ', viewRow1After.revision === viewRow1Before.revision, JSON.stringify({ revision: viewRow1After.revision, rendered: viewRow1Result && viewRow1Result.rendered && viewRow1Result.rendered.length }));
+    reloadProbeAssert(report, 'Sheet quản trị hàng 1 cột thường không vẽ', viewRow1After.revision === viewRow1Before.revision, JSON.stringify({ revision: viewRow1After.revision, ledger: viewLedgerEntry(RELOAD_MATRIX_PROBE_VIEW) }));
 
     var viewValidHeaderColumn = viewSheet.getRange(1, 1, 1, viewSheet.getLastColumn()).getValues()[0].indexOf(DATA_SCHEMA.customer.id.code) + 1;
     var viewValidHeaderCell = viewSheet.getRange(1, viewValidHeaderColumn);
