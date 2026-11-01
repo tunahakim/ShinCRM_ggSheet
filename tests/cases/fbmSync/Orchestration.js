@@ -1,6 +1,7 @@
 /** Kiểm tra state, cursor và status điều phối. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhiDongBo, TRANG_FBM_THU } = require("../../lib/load-gas");
+const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 /** Nộp response của lượt nền như `continue` qua lát chung, bỏ phần khóa của cửa lệnh (khóa kiểm ở Control). */
@@ -222,7 +223,7 @@ async function chay(so) {
   orchestration.FbmSync.recoverStaleRun(orchestration.FbmSync.stateRead(), Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1);
   check(so, 'Lượt kẹt không chờ lệnh ghi thì nhả mọi bản ghi đồng bộ đang giữ', orchestration.recordHoldsPeekOwner('fbm'), false);
   const lookupProps = {};
-  const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => ({ getProperty: (key) => lookupProps[key] || null, setProperty: (key, value) => { lookupProps[key] = String(value); } }) } });
+  const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => taoKhoThuocTinh(lookupProps) } });
   napServer(lookupHop, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/SheetSave.js');
   lookupHop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, valid: {}, namesBySource: {}, warnings: [] });
   lookupHop.FbmSync.readLocal = () => [];
@@ -426,7 +427,6 @@ async function chay(so) {
   const lostWrite = heartbeat.FbmSync.stateRead();
   // Lượt hỏng thì phiên chưa xác minh, nên Giữ phiên của chính lần hỏi này mở bằng probe (phase kiểm tra phiên); probe xong phase quay về `error` của lượt vừa đóng.
   check(so, 'Lần hỏi nền gặp lệnh ghi mất response: kết thúc SYNC_STALE_WRITE, giữ khóa bản ghi, không gửi lại lệnh ghi', [lostWrite.lastFailureCode, heartbeat.recordHoldsPeekOwner('fbm'), lostWrite.phase, lostWrite.cursor.kind, (lostWrite.metadata.sessionGate || {}).resumePhase], ['SYNC_STALE_WRITE', true, 'checking_session', 'session_probe', 'error']);
-  delete heartbeat.logEvent;
   const activeState = heartbeat.FbmSync.stateRead();
   activeState.phase = 'pull_customer'; activeState.runId = 'heartbeat-run'; activeState.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }; activeState.activeRequestId = 'in-flight-request'; activeState.deadlineAt = Date.now() + 60000;
   heartbeat.FbmSync.stateWrite(activeState);
@@ -489,7 +489,6 @@ async function chay(so) {
   cancelLogs.length = 0;
   heartbeat.FbmSync.continue({ d: {}, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'foreign-request' }] } });
   check(so, 'response lạ không thuộc lượt vừa Dừng vẫn là lỗi STALE_RESPONSE', cancelLogs.map((entry) => [entry.action, entry.outcome, entry.detail && entry.detail.code || '']), [['stale_response', 'error', 'STALE_RESPONSE']]);
-  delete heartbeat.logEvent;
   const cancelWithoutFlight = heartbeat.FbmSync.runStopCommand('any').status;
   check(so, 'dung phien khi khong con request bay giu man ket qua o trang thai tam dung ma khong khoa lich nen sau do', [cancelWithoutFlight.phase, cancelWithoutFlight.runId, cancelWithoutFlight.message.indexOf('kết quả và log') >= 0], ['paused', 'cancel-run', true]);
 

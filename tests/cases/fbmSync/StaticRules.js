@@ -11,6 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 const { section, check } = require('../../lib/assert');
+const { stripComments } = require('../../lib/strip-comments');
+const { compareExceptions } = require('../../lib/quet/ngoai-le');
 
 const REPO = path.join(__dirname, '..', '..', '..');
 
@@ -50,35 +52,6 @@ const LOG_WRITERS = ['1_ShinCRM_GAS/fbm_sync/state/Slice.js'];
 
 /** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
 const BASELINE_WRITERS = [];
-
-/** Bỏ comment `//` và `/* *\/`, thay bằng khoảng trắng để số dòng không lệch; không coi `//` trong chuỗi '…', "…", `…` là comment. */
-function stripComments(source) {
-  let out = '';
-  let state = 'code';
-  for (let i = 0; i < source.length; i += 1) {
-    const ch = source[i];
-    const next = source[i + 1];
-    if (state === 'code') {
-      if (ch === '/' && next === '/') { out += '  '; i += 1; state = 'line'; }
-      else if (ch === '/' && next === '*') { out += '  '; i += 1; state = 'block'; }
-      else if (ch === "'") { out += ch; state = 'single'; }
-      else if (ch === '"') { out += ch; state = 'double'; }
-      else if (ch === '`') { out += ch; state = 'template'; }
-      else { out += ch; }
-    } else if (state === 'line') {
-      if (ch === '\n') { out += '\n'; state = 'code'; } else { out += ' '; }
-    } else if (state === 'block') {
-      if (ch === '*' && next === '/') { out += '  '; i += 1; state = 'code'; }
-      else if (ch === '\n') { out += '\n'; } else { out += ' '; }
-    } else {
-      if (ch === '\\') { out += ch + (next === undefined ? '' : next); i += 1; }
-      else if ((state === 'single' && ch === "'") || (state === 'double' && ch === '"') || (state === 'template' && ch === '`')) { out += ch; state = 'code'; }
-      else if (ch === '\n' && state !== 'template') { out += ch; state = 'code'; }
-      else { out += ch; }
-    }
-  }
-  return out;
-}
 
 function lineAt(source, index) { return source.slice(0, index).split('\n').length; }
 
@@ -204,7 +177,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 10,
-    '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 9,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 4,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
@@ -218,16 +190,15 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 9,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 13,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 5,
+    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 36,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 24,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 15,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 8,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 1,
     '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js': 2,
     '2_ShinCRM_Extension/background/service_worker.js': 11,
@@ -247,7 +218,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 14,
     '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 6,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 17,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 13,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2,
@@ -341,25 +312,6 @@ function scanRule(rule, files, readSource) {
     if (found.length) { out[item.file] = found; }
   });
   return out;
-}
-
-/** So vi phạm thật với ngoại lệ đã ghi; trả danh sách thông báo lỗi (rỗng là đạt). Sắp theo tên tệp để kết quả ổn định. */
-function compareExceptions(ruleId, actual, listed) {
-  const problems = [];
-  Object.keys(actual).sort().forEach((file) => {
-    const have = actual[file].length;
-    if (!Object.prototype.hasOwnProperty.call(listed, file)) {
-      problems.push(ruleId + ': vi phạm mới ở ' + file + ' (' + have + '): ' + actual[file].map((v) => 'dòng ' + v.line + ' `' + v.text + '`').join(' | '));
-    } else if (have > listed[file]) {
-      problems.push(ruleId + ': ' + file + ' có ' + have + ' vi phạm, nhiều hơn ' + listed[file] + ' đã ghi; vi phạm ở dòng ' + actual[file].map((v) => v.line).join(', '));
-    } else if (have < listed[file]) {
-      problems.push(ruleId + ': ' + file + ' đã giảm, hạ số trong danh sách ngoại lệ xuống ' + have);
-    }
-  });
-  Object.keys(listed).sort().forEach((file) => {
-    if (!actual[file]) { problems.push(ruleId + ': ' + file + ' không còn vi phạm, xóa khỏi danh sách ngoại lệ'); }
-  });
-  return problems;
 }
 
 function ruleById(id) { return RULES.filter((rule) => rule.id === id)[0]; }

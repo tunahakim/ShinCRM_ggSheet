@@ -87,9 +87,7 @@ const RULES = [
 
 /** Chỗ đang có lúc dựng luật. Chỉ được hạ số hoặc xóa dòng. */
 const EXCEPTIONS = {
-  tenKhung: {
-    'cases/fbmSync/StaticRules.js': 2
-  },
+  tenKhung: {},
   dungHop: {
     'cases/extensionBridge.js': 35,
     'cases/fbmSync/ActivityScan.js': 3,

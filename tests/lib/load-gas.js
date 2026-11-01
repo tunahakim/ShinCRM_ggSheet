@@ -12,6 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const hopFbm = require('./fbm/hop-gas');
+const { taoKhoThuocTinh } = require('./gas/kho-thuoc-tinh');
 
 const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 
@@ -27,8 +29,8 @@ function taoHopCat(stubs) {
   // Khóa điều phối giả mặc định (luôn lấy được); ca cần thử nhánh bận tự truyền `LockService`.
   // Hạn chờ khóa của GAS thật; ca cần số khác tự truyền `SETTINGS`.
   if (!hopCat.SETTINGS) { hopCat.SETTINGS = { LOCK_WAIT_MS: 15000 }; }
-  // Cửa ghi Log mặc định nuốt dòng; ca cần đọc Log tự truyền `logEvent`. Mã GAS mới gọi thẳng, không dò sự có mặt của nó.
-  if (!hopCat.logEvent) { hopCat.logEvent = () => {}; }
+  // Cửa ghi Log (LogGate) mặc định nuốt dòng; ca cần đọc Log tự truyền `logEvent`. Mã GAS gọi thẳng, không dò sự có mặt.
+  ['logEvent', 'logTrace', 'flushLogIfTraced', 'logRegisterContext'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = () => {}; } });
   ['LOG_OK', 'LOG_WARN', 'LOG_ERROR'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = key.slice(4).toLowerCase(); } });
   if (!hopCat.LockService) { hopCat.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }; }
   vm.createContext(hopCat);
@@ -74,56 +76,6 @@ function docTep(duongDanTuongDoi) {
   return fs.readFileSync(duongDan, 'utf8').replace(/\r\n/g, '\n');
 }
 
-/** Nạp một hoặc nhiều tệp `.js` phía máy chủ vào hộp cát, theo đúng thứ tự truyền vào. */
-/**
- * Trên GAS mọi tệp chung một phạm vi toàn cục, nên module đồng bộ luôn thấy bảng giá trị "Cho phép đồng bộ FBM" khai ở `DataSchema.js`. Hộp cát chỉ nạp vài tệp nên phải cấp riêng bảng đó; chỉ chép đúng hai tên này để không đè `DATA_SCHEMA` giả mà test tự dựng.
- */
-function capBangChoPhepDongBo(hopCat) {
-  if (hopCat.FBM_SYNC_PERMISSION_OPTIONS) { return; }
-  const rieng = taoHopCat({});
-  vm.runInContext(docTep('server/data/DataSchema.js'), rieng, { filename: 'server/data/DataSchema.js' });
-  hopCat.FBM_SYNC_PERMISSION_OPTIONS = rieng.FBM_SYNC_PERMISSION_OPTIONS;
-  hopCat.fbmSyncPermissionValues = rieng.fbmSyncPermissionValues;
-}
-
-/** Giá trị Xác thực của khách mới kéo từ FBM trong tệp thử; test cần nhánh khác thì tự gán `FbmSync.pullDefaults` hoặc nạp `fbm_sync/state/PullDefaults.js` thật. */
-const XAC_THUC_MAC_DINH_THU = 'Chưa xác thực';
-
-/**
- * Tệp thật luôn có ngầm định kéo từ FBM (preflight chặn khi thiếu), nên hộp cát chỉ nạp vài tệp đồng bộ được cấp sẵn `FbmSync.pullDefaults` trả Xác thực thử và một `categoryReadAll` rỗng cho chỗ gọi nó. Hộp đã có hàm thật hoặc tự gán thì giữ nguyên; nạp `PullDefaults.js` sau thì bản thật thay vào.
- */
-function capNgamDinhKeoThu(hopCat) {
-  const F = hopCat.FbmSync;
-  if (!F) { return; }
-  if (typeof F.pullDefaults !== 'function') { F.pullDefaults = (entity) => (entity === 'customer' ? { verifyStatus: XAC_THUC_MAC_DINH_THU } : {}); }
-  if (typeof hopCat.categoryReadAll !== 'function') { hopCat.categoryReadAll = () => ({}); }
-}
-
-/** Mã người dùng FBM thử; test cần nhánh thiếu mã thì tự gán `scriptSettings`. */
-const MA_NGUOI_DUNG_THU = '2037';
-/** Giá trị Extension bắt từ trang FBM thử (`transport.captures`), khớp liên kết thử 2037 / Le Tuan Anh mà các test hay lưu; response probe hay grid User giả phải mang theo, vì GAS so liên kết với cả grid lẫn trang. */
-const TRANG_FBM_THU = { payloadCookie: '461020379855cFHN_CRM_App', pageUserId: '2037', pageAccountName: 'Le Tuan Anh' };
-
-/**
- * Tệp thật chỉ dựng request đọc khách sau khi phiên đã xác minh (cổng phát request chèn probe User trước), nên mã người dùng của điều kiện quyền luôn có. Nhiều test dựng request trực tiếp, không qua probe, nên nguồn danh tính phiên (`sessionVerifiedIdentity`) được cấp mã thử khi trống.
- * Chỉ bọc nguồn, không bọc `scriptSettings`: test nào đi qua probe thật thì mã của grid User đi thẳng vào request. Cổng vẫn đọc `sessionIdentityIsVerified` thật, nên test nào kiểm "phiên chưa xác minh phải probe trước" vẫn thấy đúng hành vi.
- */
-function capPhienThu(hopCat) {
-  const F = hopCat.FbmSync;
-  if (!F) { return; }
-  // Hộp cát chỉ nạp tệp dựng request, không nạp cổng phiên (TransportCore): cấp danh tính thử tối thiểu; nạp TransportCore sau thì hàm thật thay vào và được bọc lại.
-  if (typeof F.sessionVerifiedIdentity !== 'function') { const gia = () => ({ userId: MA_NGUOI_DUNG_THU, username: '', accountName: '' }); gia.laBanThu = true; F.sessionVerifiedIdentity = gia; return; }
-  if (F.sessionVerifiedIdentity.laBanThu) { return; }
-  const goc = F.sessionVerifiedIdentity;
-  const thu = function () {
-    const value = goc.apply(this, arguments);
-    if (!value.userId) { value.userId = MA_NGUOI_DUNG_THU; }
-    return value;
-  };
-  thu.laBanThu = true;
-  F.sessionVerifiedIdentity = thu;
-}
-
 /**
  * Đồng bộ ghi Sheet qua Cửa bản ghi (`recordGateRun`), còn hộp cát FBM chỉ nạp tệp đồng bộ và tự gán `FbmSync.readLocal`, `writeGateSave`. Nạp cửa và sổ bận thật; phần chỉ có trên Google thay bằng bản tối thiểu, chỉ khi hộp cát chưa có:
  *   - không có khóa tài liệu (`LockService.getDocumentLock`) hoặc `SETTINGS` thì khóa tài liệu là bộ đếm lồng (đủ để sổ bận biết đang trong khóa);
@@ -133,8 +85,8 @@ function capPhienThu(hopCat) {
 function capCuaBanGhi(hopCat) {
   if (typeof hopCat.recordGateRun === 'function') { return; }
   if (!hopCat.PropertiesService) {
-    const kho = {};
-    hopCat.PropertiesService = { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, setProperties: (m) => { Object.keys(m).forEach((k) => { kho[k] = String(m[k]); }); }, getProperties: () => Object.assign({}, kho) }) };
+    const kho = taoKhoThuocTinh({});
+    hopCat.PropertiesService = { getDocumentProperties: () => kho };
   }
   // Kho thật luôn có `deleteProperty` (sổ bận rỗng thì xóa khóa); kho giả của test cũ thiếu thì xóa bằng cách ghi chuỗi rỗng, nghĩa như chưa có.
   const layKho = hopCat.PropertiesService.getDocumentProperties;
@@ -187,20 +139,7 @@ function soBan(hopCat) {
 /** Công cụ đọc/ghi Sheet tầng 1–3 (tài liệu 06 Phần 2): mọi tệp chạm Sheet đi qua chúng. */
 const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetStructure.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
-/**
- * Dấu lần đẩy sạch đọc sổ nạp lại, cài đặt phạm vi và tài khoản đã liên kết; trên GAS ba thứ đó luôn có. Hộp chỉ nạp chặng đẩy thì cấp bản trung tính cho cài đặt và sổ (không giới hạn phạm vi, sổ ở 0); hộp nạp tệp thật hoặc tự gán thì dùng bản của nó.
- */
-function capDauDaySach(hopCat) {
-  const F = hopCat.FbmSync;
-  if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ approvalThreshold: 10, scopeLimited: false, scopeCodes: [] }); }
-  // Tài khoản đã liên kết đọc bằng hàm thật của Identity.js (kho trống thì chưa liên kết); không cấp hàm giả để hàm bị đổi tên là test hỏng ngay.
-  if (typeof F.boundIdentity !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/Identity.js'), hopCat, { filename: 'fbm_sync/reconcile/Identity.js' }); }
-  if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
-}
-
-/** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. */
-const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
-
+/** Nạp một hoặc nhiều tệp `.js` phía máy chủ vào hộp cát, theo đúng thứ tự truyền vào. */
 function napServer(hopCat, ...duongDans) {
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
@@ -213,17 +152,12 @@ function napServer(hopCat, ...duongDans) {
     TEP_TANG_SHEET.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
   }
   duongDans.forEach((duongDan) => {
-    if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
-    // Liên kết tài khoản đọc qua cửa đọc JSON của kho (`documentPropertyJson` trong State.js); bản thật luôn có nó.
-    if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.documentPropertyJson === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
-      vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
-    }
+    hopFbm.capTruocTep(hopCat, duongDan, duongDans);
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });
-    if (duongDan.indexOf('fbm_sync/') === 0) { capNgamDinhKeoThu(hopCat); }
-    if (duongDan === 'fbm_sync/transport/TransportCore.js' || duongDan === 'fbm_sync/read/GridRead.js') { capPhienThu(hopCat); }
+    hopFbm.capSauTep(hopCat, duongDan);
     if (duongDan === 'fbm_sync/write/SheetSave.js' || duongDan === 'fbm_sync/state/State.js') { capCuaBanGhi(hopCat); }
   });
-  if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
+  hopFbm.capSauNap(hopCat, duongDans);
   return hopCat;
 }
 
@@ -245,15 +179,9 @@ function napRieng(duongDan, stubs) {
   return duongDan.endsWith('.html') ? napClient(hopCat, duongDan) : napServer(hopCat, duongDan);
 }
 
-/** Chạy `fn` trong danh sách thay đổi chờ ghi nhận như một lần chạy GAS (`runEntryPoint`): dấu nạp lại gom lại và ghi nhận một lần khi `fn` xong. Dùng cho test gọi thẳng cửa ghi mà không qua cửa vào. */
-function trongLanChay(hopCat, fn) {
-  hopCat.pendingChangesBegin();
-  try { return fn(); } finally { hopCat.pendingChangesEnd(); }
-}
-
 /** Dòng sổ nhật ký nạp lại mới nhất (rỗng nếu chưa có), để ca kiểm xem một lần chạy đã báo đổi phần nào. */
 function dongSoCuoi(hopCat) {
   return hopCat.reloadJournalRead().entries.slice(-1)[0] || {};
 }
 
-module.exports = { GAS_DIR, taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, TRANG_FBM_THU };
+module.exports = { GAS_DIR, taoHopCat, napServer, TEP_KHUNG_LUOT: hopFbm.TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, dongSoCuoi, TRANG_FBM_THU: hopFbm.TRANG_FBM_THU };
