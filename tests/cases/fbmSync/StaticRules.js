@@ -212,7 +212,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 10,
     '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 13,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 11,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 16,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 6,
