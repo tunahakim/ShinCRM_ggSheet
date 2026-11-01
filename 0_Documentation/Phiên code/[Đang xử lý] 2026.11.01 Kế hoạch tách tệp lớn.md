@@ -83,15 +83,11 @@ Ca kiểm chính các luật: mã mẫu vi phạm trong bộ nhớ phải đỏ.
 ### 4.4 Dọn và tách `server/dev/` (không có `client/dev/`)
 
 - Xóa 38 hàm đo một lần đã ghi số đo (31 tên bỏ khỏi `DEV_RUNNER_ALLOWED`), trong đó xóa trọn 7 tệp: `MeasureChunk.js`, `MeasureLog.js`, `ReloadJournalProbe.js`, `ReloadRefactorProbe.js`, `SaveBreakdownProbe.js`, `SheetReadGapProbe.js`, `ViewRenderProbe.js`. Bỏ 2 tên mất định nghĩa khỏi `DEV_RUNNER_ALLOWED`. Sửa các chú thích còn nhắc tên đã xóa (`tests/gas.js`, `tests/cases/logGate.js`, `server/config/Settings.js`).
-- `FbmPerfProbe.js` tách thành `FbmPerfProbe.js` (bộ bọc đo, bật/tắt, báo cáo) và `FbmPerfScope.js` (dựng và gỡ dữ liệu đo); `fbmPerfWrap` gặp tên hàm không có thì ném lỗi thay vì bỏ qua, bỏ 3 tên đã mất và các mốc client không còn nơi phát.
-- `FbmSyncFixture.js` tách phần chạy nền thử sang `FbmSyncBackgroundProbe.js`; xóa phần sửa dữ liệu một lần (`fbmRepairFalseMissing*`).
+- `FbmPerfProbe.js` tách thành `FbmPerfProbe.js` (bộ bọc đo, bật/tắt, báo cáo), `FbmPerfScope.js` (dựng và gỡ dữ liệu đo) và `FbmPayloadProbe.js` (đo cỡ gói); `fbmPerfOn` và lúc mở phiên đo ném lỗi khi danh sách bọc có tên không còn, bỏ 3 tên đã mất và các mốc Sidebar không có nơi phát (`fbmSyncClientTrace` không được gọi ở đâu).
+- `FbmSyncFixture.js` tách phần chạy nền thử sang `FbmSyncBackgroundProbe.js`; xóa phần sửa dữ liệu một lần (`fbmRepairFalseMissing*`). Mọi hàm đo FBM bị xóa đều đã có số đo ghi trong tài liệu (nơi ghi nằm trong mô tả commit). Các tệp FBM ở `server/dev/` để phẳng, chưa vào thư mục con, vì `tests/cases/fbmSync/Workflow.js` của B4 nạp `server/dev/FbmSyncStateProbe.js` theo đường dẫn.
 - `ReloadMatrixProbe.js`: tách thành `server/dev/reload/` (`ReloadProbeKit.js` đồ dùng chung, `ReloadMatrixProbe.js`, `ReloadPayloadProbe.js`). Hai phép so cũ chờ `shinOnEdit` vẽ ngay và trả `rendered`; thiết kế hiện tại chỉ gắn cờ `controls` trong sổ vẽ cho đúng sheet bị sửa, lượt vẽ chạy sau. Đã đổi hai ca sang kiểm quyết định `view-control` đúng một sheet và cờ `controls` bật từ tắt; còn chạy `node tests/gas.js reloadMatrixProbe --push` trên DEV.
-- Các tệp FBM ở `server/dev/` có thể B4 đang sửa (đổi tên `stateStart`...): hỏi phiên B4 trước khi chạm; B4 đang sửa tệp nào thì để B4 làm phần của tệp đó.
-- Hàm dò còn trong `DEV_RUNNER_ALLOWED` mà không tài liệu nào nhắc (đếm lại khi làm: 24), trình chủ dự án từng nhóm có còn dùng không, không tự xóa:
-  - Đọc và dọn Sheet DEV: `dumpSheetGrid`, `dumpCoreSheetHead`, `dumpNamedRanges`, `wipeNamedRanges`, `smokeDiag`, `probeBookBinding`.
-  - Dữ liệu giả: `seedFakeData`, `seedFakeCategory`, `seedFakeCategoryMappings`.
-  - Sheet quản trị tạm: `viewProbeCreateSheet`, `viewProbeCreateRender`.
-  - FBM (chờ B4): `fbmPrepareAltTest`, `fbmDevResetApprovalThreshold`, `fbmSeedActivityConflict`, `fbmDevMarkConflict`, `fbmDevClearConflict`, `fbmProbeCreateCustomer`, `fbmAllowTestCreateCustomer`, `fbmRequeueCreateCustomerPush`, `fbmRequeueCreateCustomerConflict`, `fbmProbePendingPushes`, `fbmDevReleaseUnsentRequest`, `fbmProbeCustomerActivities`, `fbmProbeConflicts`.
+- Hàm dò không tài liệu nào nhắc: chủ dự án quyết giữ và mô tả mọi hàm dò trong bảng `2026.11.01 Hàm dò DEV.md`; xóa `smokeDiag`, `viewProbeCreateSheet`, `viewProbeCreateRender`, `viewProbeAutoRender` (lý do trong commit). Luật `tests/cases/devProbes.js` đỏ khi bảng và `DEV_RUNNER_ALLOWED` lệch nhau hoặc dòng trỏ tới hàm không có. Các hàm FBM dựng dữ liệu thử xét xóa sau khi B4 xong.
+- Ba hàm dò DEV (`probeLogGate`, `reloadMatrixProbe`, `probePropertiesBehavior`) chỉ chạy sau khi branch này gộp vào `feature/fbm-audit` và chủ dự án cho phép: worktree này thiếu commit mới của B4, đẩy từ đây sẽ ghi đè code B4 trên DEV.
 - Phát hiện ngoài `server/dev/`: `runEntryPoint` (`server/entry/EntryPoint.js`, mã chạy thật) dò `typeof devPerfBegin === 'function'`, tức mã chạy thật biết tên hàm dev. Ghi vào danh mục dọn trước production; không sửa ở phiên này vì là cửa vào lõi.
 
 ### 4.5 Công cụ xuống dòng `check`
@@ -236,17 +232,17 @@ Cột cuối là các trách nhiệm đang lẫn trong tệp; bước B hoặc p
 
 - [x] Đo kích thước, xem cấu trúc 94 tệp, xếp nhóm; so các bản chép khung test; kiểm kê `server/dev/`.
 - [x] Chủ dự án duyệt kế hoạch.
-- [ ] Hàm dò DEV đo `PropertiesService` thật với chuỗi rỗng và khóa chưa có; ghi số đo vào mục 4.1.
+- [ ] Chạy hàm dò `probePropertiesBehavior` trên DEV (đã viết, commit 746a83ec) sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép; ghi số đo vào mục 4.1.
 - [x] Khung `tests/lib/` (mục 4.1) và test của từng khung ở `tests/cases/lib/`; test; commit.
 - [x] `tests/cases/testRules.js` (mục 4.2) với danh sách ngoại lệ hiện có; test; commit.
 - [x] Chuyển các tệp test ngoài vùng B4 sang khung chung, hạ ngoại lệ; mọi ca lộ đỏ thì dừng trình gốc lỗi; commit.
 - [x] Tách `LogGate.js`; test; commit.
-- [ ] Đẩy DEV chạy `probeLogGate` (chờ phiên điều phối cho đẩy DEV).
+- [ ] Chạy `probeLogGate` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép.
 - [x] Tách `viewRenderer.js`, `selectionPoll.js`; test; commit.
 - [x] Dọn phần không FBM của `server/dev/` (7 tệp, 2 hàm ở `ViewProbe.js`, 22 tên ở `DEV_RUNNER_ALLOWED`); tách `ReloadMatrixProbe.js`, sửa hai phép so; commit.
-- [ ] Chạy `reloadMatrixProbe` trên DEV (chờ phiên điều phối cho đẩy DEV).
-- [ ] Tệp FBM ở `server/dev/` (mục 4.4: xóa 11 hàm đo một lần, tách `FbmPerfProbe.js` và `FbmSyncFixture.js`, `fbmPerfWrap` ném lỗi khi tên mất): đã hỏi phiên điều phối, chờ trả lời.
-- [ ] Trình chủ dự án 24 hàm dò không có tài liệu nhắc (danh sách ở mục 4.4); chờ chủ dự án trả lời.
+- [ ] Chạy `reloadMatrixProbe` trên DEV sau khi gộp vào `feature/fbm-audit` và chủ dự án cho phép.
+- [x] Tệp FBM ở `server/dev/` (mục 4.4: xóa 11 hàm đo một lần, tách `FbmPerfProbe.js` và `FbmSyncFixture.js`, bộ bọc đo ném lỗi khi tên mất); test; commit.
+- [x] Bảng `2026.11.01 Hàm dò DEV.md` cho mọi tên trong `DEV_RUNNER_ALLOWED`, công cụ `tests/lib/quet/bang-md.js`, luật `tests/cases/devProbes.js`; test; commit.
 - [x] `tests/tools/wrapChecks.js`; chạy trên tệp test của phiên này; commit.
 - [x] `tests/cases/fileSize.js`; test; commit.
 - [x] Ghi dòng việc vào checklist refactor FBM và Todo mục 3, mục 4 (mục 4.7); cập nhật `Cây thư mục code.md`; đổi tiền tố tệp này.
