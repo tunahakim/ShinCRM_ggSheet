@@ -195,9 +195,13 @@ FbmSync.sessionGateFailClosed = function (state, cause) {
   FbmSync.sessionGateRecordFailure(current, 'FBM_SESSION_GATE_EXCEPTION', 'Cổng phiên FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'session_gate_exception', cause);
   return null;
 };
+/**
+ * Tự đăng nhập bị chặn (tắt, chưa cấu hình, đang giãn cách, danh tính lệch): lượt đóng lỗi qua `runFail` kèm đúng mã chặn, không "Tạm dừng" — tạm dừng là việc của người dùng bấm Dừng, còn đây là lượt không chạy tiếp được cho tới khi người dùng sửa cấu hình. Lượt nền lỗi còn được giãn cách thử lại.
+ * Giữ phiên ngoài lượt (chưa có mã lượt) không có lượt để đóng: chỉ ghi mã chặn.
+ */
 FbmSync.sessionGateBlock = function (state, code, message) {
   var current = state || FbmSync.stateRead();
-  current.phase = 'paused';
+  if (FbmSync.runInProgress(current)) { FbmSync.runFail(current, code, message); }
   current.retryable = false;
   return FbmSync.sessionGateRecordFailure(current, code, message, 'session_gate_blocked');
 };
