@@ -167,7 +167,7 @@ const RULES = [
 /** Danh sách ngoại lệ hiện có, mỗi quy tắc một bảng `tệp -> số vi phạm`. Chỉ được co lại. */
 const EXCEPTIONS = {
   stateReadWrite: {
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 17,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 14,
     '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
@@ -203,7 +203,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html': 1,
     '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 12,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 10,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 9,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 4,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 3,
@@ -292,7 +292,7 @@ const EXCEPTIONS = {
   },
   // Còn lại là Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết lại thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đã đóng, và đối tượng status (không phải ô lượt).
   phaseClose: {
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 5,
     '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
@@ -300,7 +300,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 6
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,

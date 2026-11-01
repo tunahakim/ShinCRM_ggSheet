@@ -179,8 +179,8 @@ async function chay(so) {
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const failedLoginProbe = hoiNen(heartbeat);
   const failedLoginRequest = phienChet(failedLoginProbe);
-  const failedLogin = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
-  check(so, 'login heartbeat that bai tam dung va khong lap ngay', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'login_failure')], [false, 'AUTO_LOGIN_FAILED', null, 'paused', true]);
+  const failedLogin = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":"Duplicate"}', transport: { contract: MA_HOP_DONG }, trace: [{ requestId: failedLoginRequest.request.id }] });
+  check(so, 'login heartbeat bi FBM bao con phien cu: luot dong loi, khong lap ngay, cho chu ky thu lai', [failedLogin.ok, failedLogin.code, failedLogin.request, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'login_failure'), heartbeat.FbmSync.loginConfigRead().loginHalted], [false, 'AUTO_LOGIN_FAILED', null, 'error', true, false]);
   // Trong chu kỳ chờ, lần hỏi sau gửi request việc thật (người dùng có thể đã tự đăng nhập); phiên vẫn chết thì không đăng nhập lại.
   const throttledProbe = hoiNen(heartbeat);
   const throttledAfterFailure = phienChet(throttledProbe);
@@ -245,7 +245,7 @@ async function chay(so) {
   check(so, 'login test khong truyen ref van dung credential da luu', [testRequest.request.meta.credentialRef, testRequest.request.meta.testOnly], ['cred-heartbeat-123', true]);
   const testFailure = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: testRequest.request.id }] } });
   const afterTestFailure = heartbeat.FbmSync.loginConfigRead();
-  check(so, 'dang nhap thu that bai khong thay doi throttle hay loi auto-login', [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError], ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, beforeTestConfig.lastError]);
+  check(so, 'dang nhap thu bang thong tin da luu bi bao sai mat khau: khong doi moc thu lai, nhung ngung tu dang nhap vi thong tin da luu da sai', [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError, afterTestFailure.loginHalted], ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, 'FBM báo sai tên đăng nhập hoặc mật khẩu.', true]);
 
   // FBM không kiểm trường cookie trong body (đo 2026-10-06: đọc, xin quyền mở form và lưu ALT00010 đều thành công với mã rỗng). Login thành công mà không bắt
   // được mã phiên thì vẫn đi tiếp bước xác minh; request xác minh được cấp mã rỗng làm dự phòng thay vì token bắt buộc khiến Extension chặn FBM_TRANSPORT_CAPTURE_MISSING.
@@ -271,24 +271,11 @@ async function chay(so) {
   const draftLoginIdentity = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2040,"USERB","Tai khoan B"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2040', pageAccountName: 'Tai khoan B' }, trace: [{ requestId: draftLoginAuthorize.request.id }] } });
   check(so, 'login test doi chieu theo identity ban nhap B, khong ep theo binding A', [draftLoginIdentity.code, heartbeat.FbmSync.stateRead().session.accountUsername], ['LOGIN_OK', 'USERB']);
 
-  // Gặp thật 2026-10-07: FBM trả {"d":null} khi đăng nhập hỏng, code cũ coi là thành công rồi báo sai "FBM không trả mã xác thực" ở bước sau.
-  heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
-  heartbeat.FbmSync.statePatch({ runId: 'login-null-run', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'heartbeat' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  const loginNull = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":null}' });
-  check(so, 'Login trả d:null là đăng nhập thất bại, không đi tiếp sang xin mã xác thực', [loginNull.code, loginNull.request, heartbeat.FbmSync.loginConfigPublic().lastError.indexOf('FBM từ chối đăng nhập') === 0, heartbeat.FbmSync.stateRead().message.indexOf('Tự đăng nhập thất bại: FBM từ chối đăng nhập') === 0, (gateLogs.filter((event) => event.action === 'login_failure').pop() || {}).detail.response.dType], ['AUTO_LOGIN_FAILED', null, true, true, 'null']);
-  const backgroundNullText = heartbeat.FbmSync.stateRead().message;
-  heartbeat.FbmSync.statePatch({ runId: 'login-null-manual', origin: 'manual', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', manual: true, testOnly: false, resumeCursor: { kind: 'customer_grid' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":null}' });
-  const manualNullText = heartbeat.FbmSync.stateRead().message;
-  check(so, 'Login trả d:null thì thông báo nêu khả năng FBM còn giữ phiên cũ và cách hủy trên tab FBM; lượt bấm tay không hứa tự thử lại, chạy nền thì có', [manualNullText.indexOf('còn giữ phiên cũ hoặc sai mật khẩu') > 0, manualNullText.indexOf('Hủy phiên cũ và đăng nhập') > 0, manualNullText.indexOf('tự thử lại') < 0, backgroundNullText.indexOf('Chạy nền tự thử lại sau 30 phút') > 0, backgroundNullText.indexOf('Hủy phiên cũ và đăng nhập') > 0], [true, true, true, true, true]);
-  // Gặp thật 2026-10-07: sai mật khẩu FBM trả d:false; còn giữ phiên cũ thì d là chuỗi ngắn.
-  heartbeat.FbmSync.statePatch({ runId: 'login-false-manual', origin: 'manual', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', manual: true, testOnly: false, resumeCursor: { kind: 'customer_grid' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":false}' });
-  const falseText = heartbeat.FbmSync.stateRead().message, falseOffered = heartbeat.FbmSync.statusView().forceLoginOffered;
+  // Cách đọc từng câu trả lời Login (false, null, chuỗi lạ) kiểm ở LoginReply.js; ở đây chỉ dựng lượt FBM báo còn phiên cũ để mở nút hủy phiên.
   heartbeat.FbmSync.statePatch({ runId: 'login-text-manual', origin: 'manual', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', manual: true, testOnly: false, resumeCursor: { kind: 'customer_grid' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":"abcdefghi"}' });
+  heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":"Duplicate"}' });
   const textText = heartbeat.FbmSync.stateRead().message;
-  check(so, 'Login trả d:false thì báo sai tên hoặc mật khẩu và không mở nút hủy phiên cũ; d là chuỗi thì báo còn giữ phiên cũ và mở nút', [falseText.indexOf('sai tên đăng nhập hoặc mật khẩu') > 0, falseText.indexOf('màn Tài khoản') > 0, falseOffered, textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, true, false, true, true, true]);
+  check(so, 'Login trả d:"Duplicate" thì báo còn giữ phiên cũ và mở nút hủy phiên cũ', [textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, true, true]);
   const serviceSource = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8');
   check(so, 'mọi lệnh mở lượt (đăng nhập thử, hủy phiên cũ, kiểm liên kết, đồng bộ) đi qua cửa fbmDriveCommand và vỏ runEntryPoint để Log được ghi ra sheet', ['fbmDriveCommand'].map((name) => serviceSource.indexOf('function ' + name + '(') >= 0 && serviceSource.indexOf("fbmCommandRun('" + name + "'") >= 0).concat(/function fbmCommandRun\([^)]*\) \{ return runEntryPoint\(name, 'fbm_sync'/.test(serviceSource)), [true, true]);
   // FBM-057: nút hủy phiên cũ. GAS chỉ mở sau khi FBM trả lời từ chối; đăng nhập tự động luôn là login mềm.
@@ -296,10 +283,10 @@ async function chay(so) {
   const forceLogsBefore = gateLogs.length;
   const forceStart = heartbeat.FbmSync.loginForceRequest();
   check(so, 'bấm hủy phiên cũ gửi đăng nhập có cờ hủy phiên bằng thông tin đã lưu, đóng nút lại và ghi Log', [forceStart.ok, forceStart.request.meta.force, forceStart.request.meta.credentialRef, heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginForceRequest().code, gateLogs.slice(forceLogsBefore).some((event) => event.action === 'login_force_requested')], [true, true, 'cred-heartbeat-123', false, 'LOGIN_FORCE_NOT_OFFERED', true]);
-  heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":null}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceStart.request.id }] } });
-  check(so, 'đã hủy phiên cũ mà FBM vẫn từ chối thì báo khả năng sai mật khẩu và không mở lại nút hủy phiên', [heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ nhưng FBM vẫn từ chối') === 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, false]);
+  heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceStart.request.id }] } });
+  check(so, 'đã hủy phiên cũ mà FBM vẫn báo sai mật khẩu thì nói đúng như vậy và không mở lại nút hủy phiên', [heartbeat.FbmSync.stateRead().message.indexOf('Hủy phiên cũ rồi đăng nhập không thành công: FBM báo sai tên đăng nhập hoặc mật khẩu') === 0, heartbeat.FbmSync.statusView().forceLoginOffered], [true, false]);
   const throttleText = heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', { retryAt: new Date(2026, 9, 7, 16, 48).getTime() });
-  check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay', [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM còn giữ phiên đăng nhập cũ') > 0, throttleText.indexOf('Đăng nhập thử') > 0], [true, true, true]);
+  check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay', [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0, throttleText.indexOf('Đăng nhập thử') > 0], [true, true, true]);
   heartbeat.FbmSync.statePatch({ phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
   const forceAgain = heartbeat.FbmSync.loginForceRequest();
   const forceLogin = heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":true}', transport: { contract: MA_HOP_DONG, payloadCookie: '461020379855cFHN_CRM_App', trace: [{ requestId: forceAgain.request.id }] } });
@@ -313,8 +300,8 @@ async function chay(so) {
   check(so, 'xin mã xác thực sau đăng nhập hỏng thì ghi lý do cho lần chờ sau và ghi dấu hiệu response an toàn vào Log, không lộ tên trường nhạy cảm', [authorizeFalse.code, heartbeat.FbmSync.loginConfigPublic().lastError, authorizeLog.detail && authorizeLog.detail.response], ['LOGIN_IDENTITY_AUTHORIZE_FAILED', 'FBM không trả mã xác thực để kiểm tra tài khoản sau đăng nhập.', { httpStatus: 200, responseLength: 38, json: true, dType: 'object', dKeys: 'Rows', deniedFlag: true }]);
   heartbeat.FbmSync.loginConfigPolicySave({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 1 });
   heartbeat.FbmSync.statePatch({ runId: 'blocked-session-run', origin: 'background', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, resumePhase: 'pull_customer', resumeEntity: 'customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: true, identityVerified: false, sessionId: '', identitySessionId: '' }, metadata: { sessionGate: {} } });
-  const blockedAuto = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: 'Đã đăng nhập. Hủy phiên làm việc trước' });
-  check(so, 'FBM chặn vì còn phiên cũ: tách khỏi sai mật khẩu, không tắt tự đăng nhập, lượt kết thúc tạm dừng chứ không giữ lượt chờ', [blockedAuto.code, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().cursor.kind, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['LOGIN_SESSION_BLOCKED', 'paused', undefined, true, false]);
+  const blockedAuto = heartbeat.FbmSync.loginAdapterContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":"Duplicate"}' });
+  check(so, 'FBM chặn vì còn phiên cũ: tách khỏi sai mật khẩu, không tắt và không ngừng tự đăng nhập, lượt đóng lỗi chứ không giữ lượt chờ', [blockedAuto.code, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().cursor.kind, heartbeat.FbmSync.loginConfigPublic().enabled, heartbeat.FbmSync.loginConfigRead().loginHalted, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['AUTO_LOGIN_FAILED', 'error', undefined, true, false, false]);
   // Lần hỏi nền sau là lượt mới: response báo chưa xác thực thì probe; chưa hết chu kỳ thử lại thì lượt kết thúc, không gửi lệnh đăng nhập.
   const unauthBody = '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}';
   // Lần đăng nhập vừa bị chặn được ghi là lần thử gần nhất (thực tế do beginAutoLogin ghi trước khi gửi lệnh).
