@@ -75,13 +75,24 @@ FbmSync.CURSOR_TABLE = {
 FbmSync.cursorTable = function (kind) {
   return Object.prototype.hasOwnProperty.call(FbmSync.CURSOR_TABLE, kind) && kind !== 'run' ? FbmSync.CURSOR_TABLE[kind] : FbmSync.CURSOR_TABLE.run;
 };
-/** Response của request đang chờ về qua một cửa; cursor chọn bộ xử lý qua `cursorTable`. */
+/** Response về qua một cửa: qua các phép kiểm chung (`replyAdmit`) rồi cursor chọn bộ xử lý qua `cursorTable`. Bộ xử lý của từng kiểu cursor không kiểm lại. */
 FbmSync.continue = function (rawResponse) {
-  return FbmSync.cursorTable(String((FbmSync.stateRead().cursor || {}).kind || '')).run(rawResponse);
+  var state = FbmSync.stateRead(), stop = FbmSync.replyAdmit(state, FbmSync.responseRequestId(rawResponse), rawResponse);
+  return stop || FbmSync.cursorTable(String((state.cursor || {}).kind || '')).run(rawResponse);
+};
+/**
+ * Phép kiểm chung của mọi kết quả và lỗi Extension nộp về, theo thứ tự: lượt quá hạn thì thu hồi; không thuộc request đang chờ thì bỏ (`staleReplyDrop`); response lệch mã hợp đồng thì dừng. Trả `null` khi được xử lý tiếp.
+ * `rawResponse` bỏ trống khi nộp lỗi gửi request (không có response để so mã hợp đồng).
+ */
+FbmSync.replyAdmit = function (state, requestId, rawResponse) {
+  var recovered = FbmSync.recoverStaleRun(state);
+  if (recovered.recovered) { return { ok: false, code: recovered.state.lastFailureCode, request: null, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
+  if (!FbmSync.requestAnswered(state, requestId)) { return FbmSync.staleReplyDrop(state, requestId, !rawResponse); }
+  return rawResponse ? FbmSync.contractGate(rawResponse) : null;
 };
 
 /**
- * Người điều phối lệnh `continue`: nộp lặp thì phát lại request đã cấp; lỗi gửi thì qua bảng lỗi đường truyền; response thì qua `continue`.
+ * Người điều phối lệnh `continue`: nộp lặp thì phát lại request đã cấp; lỗi gửi thì qua bảng lỗi đường truyền; response thì qua `continue`. Hai cửa đều qua `replyAdmit` trước.
  * Relay chỉ nộp khi công tắc tổng còn bật: tắt giữa chừng thì không xử lý tiếp, lượt tự đóng khi quá hạn.
  */
 FbmSync.sliceContinue = function (input, state) {
@@ -95,17 +106,21 @@ FbmSync.sliceContinue = function (input, state) {
   return result;
 };
 
+/** Kết quả hay lỗi không thuộc request đang chờ (về muộn sau khi lượt đóng, hoặc của lượt trước): bỏ, không xử lý và không phát lại request nào, kể cả lệnh ghi. */
+FbmSync.staleReplyDrop = function (state, requestId, isError) {
+  FbmSync.logStaleResponse(state, requestId, isError ? 'transport_failure_stale' : 'stale_response');
+  var message = isError ? 'Lỗi cầu nối không còn thuộc request đang chờ.' : 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.';
+  return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: message };
+};
+
 /**
- * Extension không gửi được request tới tab FBM: chỉ nhận lỗi của đúng request đang chờ, tra `transportRecoverPlan` rồi gọi công cụ cứu tương ứng; không cứu được thì đóng lượt lỗi với đúng mã Extension báo.
+ * Extension không gửi được request tới tab FBM: qua `replyAdmit` (chỉ nhận lỗi của đúng request đang chờ), tra `transportRecoverPlan` rồi gọi công cụ cứu tương ứng; không cứu được thì đóng lượt lỗi với đúng mã Extension báo.
  * Giữ phiên chạy khi ô lượt chưa có mã lượt nên chưa đóng qua `runFail` được; nhánh đó đặt phase lỗi trực tiếp.
  */
 FbmSync.transportFailureRun = function (payload) {
   var value = payload || {}, requestId = String(value.requestId || '');
-  var state = FbmSync.stateRead();
-  if (!FbmSync.requestAnswered(state, requestId)) {
-    FbmSync.sessionGateRecordFailure(state, 'STALE_RESPONSE', 'Lỗi cầu nối không còn thuộc request đang chờ.', 'transport_failure_stale');
-    return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
-  }
+  var state = FbmSync.stateRead(), stop = FbmSync.replyAdmit(state, requestId, null);
+  if (stop) { return stop; }
   var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), recovered = null, plan;
   // Lỗi khi đọc chính sách đăng nhập hay dựng lại request hỏng thuộc cổng phiên: đóng lượt an toàn, không thử tiếp.
   try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }

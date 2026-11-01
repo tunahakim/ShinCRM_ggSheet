@@ -384,18 +384,7 @@ FbmSync.contractGate = function (rawResponse) {
 FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
 FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();
-  if (typeof FbmSync.recoverStaleRun === 'function') {
-    var recovered = FbmSync.recoverStaleRun(state);
-    if (recovered.recovered) { return { ok: false, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
-    state = recovered.state;
-  }
-  var cursor = state.cursor || {}, response, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
-  if (!FbmSync.requestAnswered(state, responseRequestId)) {
-    FbmSync.logStaleResponse(state, responseRequestId);
-    return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.' };
-  }
-  var contractStop = FbmSync.contractGate(rawResponse);
-  if (contractStop) { return contractStop; }
+  var cursor = state.cursor || {}, response;
   var completedRequestId = String(state.activeRequestId);
   state.activeRequestId = '';
   state.deadlineAt = 0;

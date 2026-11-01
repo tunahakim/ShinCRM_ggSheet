@@ -338,16 +338,10 @@ function fbmSyncHeartbeatRequest(options) {
 FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;
 
 function fbmSyncHeartbeatLocked(rawResponse, options) {
-  var state = FbmSync.stateRead(), cursor = state.cursor || {}, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '', result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
+  var state = FbmSync.stateRead(), cursor = state.cursor || {}, result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
   // Sau heartbeat, mọi request của phiên nền dùng đúng bộ xử lý continuation chung.
   // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
   if (cursor.kind !== 'heartbeat') { return FbmSync.continueRun(rawResponse); }
-  if (!FbmSync.requestAnswered(state, responseRequestId)) {
-    FbmSync.logStaleResponse(state, responseRequestId, 'heartbeat_stale_response');
-    return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Response heartbeat không còn thuộc request đang chờ.' };
-  }
-  var contractStop = FbmSync.contractGate(rawResponse);
-  if (contractStop) { return contractStop; }
   // Heartbeat không được tự suy ra phiên từ shape dữ liệu. Lỗi HTTP/parse đi qua
   // continuation chung để 401/403 được probe và mọi lỗi khác fail-closed.
   if (!result.ok) { return FbmSync.continueRun(rawResponse); }

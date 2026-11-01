@@ -70,13 +70,10 @@ FbmSync.openConflict = function () {
   return { ok: true, request: FbmSync.nextEnvelope(request), remaining: queue.length, status: FbmSync.statusView() };
 };
 
-/** Nhận response đọc bản ghi đang mở. Trả bản FBM mới nhất cùng dòng ShinCRM hiện tại, hoặc `failure` khi response cũ, FBM lỗi hay bản ghi không còn ở trạng thái xung đột. */
+/** Nhận response đọc bản ghi đang mở. Trả bản FBM mới nhất cùng dòng ShinCRM hiện tại, hoặc `failure` khi FBM lỗi hay bản ghi không còn ở trạng thái xung đột. */
 FbmSync.conflictRefreshRead = function (state, rawResponse) {
-  var refresh = state.metadata && state.metadata.conflictRefresh || {}, responseRequestId = FbmSync.responseRequestId ? FbmSync.responseRequestId(rawResponse) : '';
+  var refresh = state.metadata && state.metadata.conflictRefresh || {};
   if (!refresh.entity) { return { failure: FbmSync.conflictFail('CONFLICT_REFRESH_NOT_FOUND', 'Không còn lượt đọc lại conflict tương ứng.') }; }
-  if (!state.cursor || state.cursor.kind !== 'conflict_refresh' || !FbmSync.requestAnswered(state, responseRequestId)) {
-    return { failure: FbmSync.conflictFail('STALE_RESPONSE', 'Response đọc lại xung đột đã cũ hoặc không thuộc request đang chờ.') };
-  }
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now(); state.cursor = {};
   var entity = refresh.entity, target = String(refresh.id || ''), success = FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
