@@ -249,7 +249,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
     ├── state\State.js            DocumentProperties, cursor và progress.
-    ├── state\Run.js              Đóng Lượt (`runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`) và lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
+    ├── state\Run.js              Mở và đóng Lượt (`runOpen` và nhãn lượt, `runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`, thu hồi lượt quá hạn).
+    ├── state\RunStop.js          Lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
     ├── state\Slice.js            Khung lát: `runSlice` (giữ một bản ô lượt mỗi lát và ghi kho một lần ở `sliceClose`, áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, `replyAdmit` (phép kiểm chung của mọi kết quả và lỗi nộp về: thu hồi lượt quá hạn, bỏ response không thuộc request đang chờ, dừng khi lệch mã hợp đồng), bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
     ├── state\RunPlan.js          Dãy chặng của từng kiểu lượt (`RUN_PLANS`), `runPlanOf` tra bảng và ném `SYNC_UNKNOWN_SCAN` khi kiểu hay mức quét lạ, `runPlanNext` đi tiếp trong dãy.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
@@ -287,7 +288,7 @@ tests\
 ├── gas.js                        Chạy một hàm thật trên Google qua cửa DevRunner. Cần mạng.
 ├── lib\
 │   ├── assert.js                 Các phép so và bộ đếm đạt/trượt.
-│   ├── load-gas.js               Nạp tệp .js và .html thật vào hộp cát vm, dựng lại vùng tên chung của Apps Script.
+│   ├── load-gas.js               Nạp tệp .js và .html thật vào hộp cát vm, dựng lại vùng tên chung của Apps Script; `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
 │   ├── fake-sheet.js             Tệp Sheet giả trong RAM, TỰ ĐẾM số lệnh setValues và deleteRows.
 │   ├── gas-stubs.js              Utilities, Logger, PropertiesService, console giả — vừa đủ phần mà code gọi tới.
 │   ├── dung-hop.js               Dựng sẵn hộp cát kèm sheet giả và hàm ghi ô theo mã cột. Nơi duy nhất giữ danh sách đường dẫn tệp máy chủ.
@@ -308,6 +309,7 @@ tests\
 │   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
 │   ├── fbm\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
+│   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
@@ -406,7 +408,7 @@ tests\
     │   ├── RelayResend.js          Kiểm Sidebar gửi lại cấu hình relay đang giữ khi Extension được tải lại, không gọi GAS.
     │   ├── RelayResubmit.js        Kiểm nộp lặp qua relay: GAS phát lại request đang chờ, không chạy lại nghiệp vụ; dựng lại lệch bước thì báo lỗi; lượt đã đóng thì trả status
     │   ├── CommandResults.js       Chạy mọi lệnh của bảng lệnh qua controlDispatch như Sidebar và relay gọi thật; bảng ca phải phủ đủ lệnh, loại lượt và mục cài đặt, trường bị cửa ra bỏ là đỏ.
-    │   ├── Run.js                  Kiểm `state/Run.js`: Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
+    │   ├── Run.js                  Kiểm `state/Run.js` và `state/RunStop.js`: nhãn lượt, Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
     │   ├── Slice.js                Kiểm `state/Slice.js`: hai công cụ sửa hai trường trong một lát đều còn, ghi kho một lần, bản khác bị chặn `SLICE_FOREIGN_STATE`, lỗi giữa lát, ghi kho hỏng, lát lồng.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
