@@ -63,7 +63,7 @@ function workflowGas(options) {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
+    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/state/AccountSettings.js',
     'fbm_sync/control/ControlPort.js',
     'fbm_sync/state/Scheduler.js',

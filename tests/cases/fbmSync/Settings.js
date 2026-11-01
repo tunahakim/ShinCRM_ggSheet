@@ -7,7 +7,7 @@ function chay(so) {
   const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
   const settingsLog = [];
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent: (event) => { settingsLog.push(event); } });
-  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
+  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
   const first = hop.FbmSync.accountSettingsRead();
   first.customerPrefix = 'SỬA-BẢN-SAO';
   const syncFirst = hop.FbmSync.syncSettingsRead();
@@ -75,7 +75,7 @@ function chay(so) {
     logEvent: (event) => quotaLogs.push(event),
     LOG_ERROR: 'error'
   });
-  napServer(quotaHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(quotaHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { customerErrors: { total: 1, recent: [{ customer: 'CUS-000001', reason: 'x'.repeat(200) }] } } });
   const previousState = quotaData.FBM_SYNC_STATE_V1;
   quotaFull = true;
@@ -90,7 +90,7 @@ function chay(so) {
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
   const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps } });
-  napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
+  napServer(brokenHop, 'server/gate/IdGate.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
   const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
   check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
     [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
@@ -106,7 +106,7 @@ function chay(so) {
   const escData = {}, escLogs = [];
   const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
   const escHop = taoHopCat({ FbmSync: { transportValue: (value) => value }, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', runEntryPoint: (name, source, fn) => fn() });
-  napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
+  napServer(escHop, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
   const closed = escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { customerErrors: bloated } }));

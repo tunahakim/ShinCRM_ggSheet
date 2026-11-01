@@ -43,7 +43,7 @@ function chay(so) {
       PropertiesService: { getDocumentProperties: () => ({ getProperty: (k) => (k in kho ? kho[k] : null), setProperty: (k, v) => { kho[k] = String(v); }, deleteProperty: (k) => { delete kho[k]; }, getKeys: () => Object.keys(kho) }) },
       logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
     });
-    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+    napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
     // Hủy phiên trả status công khai; ca này chỉ kiểm sổ bước nên status giả là đủ.
     nen.FbmSync.statusView = () => ({ ok: true });
     const st = nen.FbmSync.runOpen({ phase: 'checking_session' });
@@ -119,7 +119,7 @@ function chay(so) {
     ['error', true, 0]);
 
   const nenHb = dungState();
-  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js');
+  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js');
   nenHb.nen.fbmSyncHeartbeatLocked = () => { throw new Error('Lỗi lát nền'); };
   nenHb.nen.FbmSync.masterEnabled = () => true;
   nenHb.nen.FbmSync.statePatch({ cursor: { kind: 'heartbeat' } });

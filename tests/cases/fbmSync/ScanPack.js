@@ -98,12 +98,25 @@ async function chay(so) {
   const nhanh = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'quick', null);
   const ky = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'deep', null);
   const toanBo = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'all', null);
-  const la = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, 'gõ nhầm', null);
+  const trong = await sauLuotDau({ customers: 6, budget: { activityTopScanQuietStreak: 2 } }, '', null);
   const loai = (run) => Array.from(new Set(run.h.trace.kinds.map((kind) => (kind === 'scan_job:activity' ? kind : kind.split(':')[0])).filter((kind) => kind === 'batch' || kind === 'scan_job:activity' || kind === 'scan_job')));
   check(so, 'Quét nhanh: danh sách khách rồi đọc giao dịch theo khách, không lấy toàn bộ giao dịch', [nhanh.end.status.phase, nhanh.state.scanPack, loai(nhanh), nhanh.h.trace.activityCustomers.length], ['done', 'quick', ['scan_job', 'batch'], 2]);
   check(so, 'Quét kỹ: như Quét nhanh rồi lấy toàn bộ giao dịch (lớp 1) mới chốt lượt', [ky.end.status.phase, ky.state.scanPack, loai(ky), ky.h.trace.activityCustomers.length, ky.h.trace.kinds.slice(-2)], ['done', 'deep', ['scan_job', 'batch', 'scan_job:activity'], 2, ['scan_job:activity', 'customer_count']]);
   check(so, 'Quét toàn bộ: đọc giao dịch của mọi khách dù giao dịch cuối đều khớp', [toanBo.end.status.phase, toanBo.state.scanPack, loai(toanBo), toanBo.h.trace.activityCustomers.length], ['done', 'all', ['scan_job', 'batch'], 6]);
-  check(so, 'Gói lạ về Quét nhanh chứ không về Quét toàn bộ', [la.state.scanPack, la.h.trace.activityCustomers.length], ['quick', 2]);
+  check(so, 'không nêu gói thì chạy gói mặc định Quét nhanh', [trong.state.scanPack, trong.h.trace.activityCustomers.length], ['quick', 2]);
+  // Gói hay mức quét lạ là lỗi, không rơi về một dãy chặng khác: lượt cũ còn nguyên, không request nào được cấp.
+  const goNham = scanHarness({ customers: 1 });
+  await goNham.run({ pack: 'all' });
+  const truocGoNham = goNham.F.stateRead().runId;
+  const maLoi = (fn) => { try { fn(); return ''; } catch (error) { return String(error && error.code || ''); } };
+  check(so, 'gói lạ, mức quét lạ: lệnh start ném SYNC_UNKNOWN_SCAN trước khi mở lượt, ô lượt không đổi', [
+    maLoi(() => goNham.F.start({ mode: 'read', pack: 'gõ nhầm', origin: 'manual', manual: true })), maLoi(() => goNham.F.start({ mode: 'read', scan: 'detial', origin: 'manual', manual: true })), goNham.F.stateRead().runId === truocGoNham
+  ], ['SYNC_UNKNOWN_SCAN', 'SYNC_UNKNOWN_SCAN', true]);
+  check(so, 'RUN_PLANS: các lớp chặng Giao dịch của từng mức quét, kiểu lượt riêng không có lớp Giao dịch; runPlanNext đi hết dãy rồi trả -1', [
+    goNham.F.runPlanOf('sync', 'full', 'quick').activity, goNham.F.runPlanOf('sync', 'full', 'deep').activity, goNham.F.runPlanOf('sync', 'full', 'all').activity, goNham.F.runPlanOf('sync', 'activity_bulk').activity, goNham.F.runPlanOf('sync', 'detail').activity,
+    goNham.F.runPlanOfStart('keepalive').activity, goNham.F.runPlanOfStart('identity_probe').stages, maLoi(() => goNham.F.runPlanOf('dong_bo')),
+    [goNham.F.runPlanNext(['a', 'b'], -1), goNham.F.runPlanNext(['a', 'b'], 0), goNham.F.runPlanNext(['a', 'b'], 1)]
+  ], [['list', 'top', 'list'], ['list', 'top', 'bulk', 'list'], ['list'], ['bulk', 'list'], ['rotation', 'list'], [], ['session', 'identity'], 'SYNC_UNKNOWN_SCAN', [0, 1, -1]]);
 
   const dau = scanHarness({ customers: 6, budget: { activityTopScanQuietStreak: 2 } });
   await dau.run({ pack: 'quick' });
