@@ -81,50 +81,6 @@ FbmSync.withOrchestrationLock = function (work, waitMs) {
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
 };
 
-/**
- * Ranh giới một lát đồng bộ, chạy bên trong khóa điều phối: nhả bộ gom vấn đề theo bản ghi, và nếu lát ném lỗi thì chuyển phiên sang lỗi
- * trước khi nhả khóa (nhả khóa rồi mới ghi thì một lát khác có thể chen vào giữa). Đường Sidebar và đường nền dùng chung hàm này.
- */
-FbmSync.runSlice = function (work) {
-  var failure = null, result;
-  // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
-  try {
-    result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() } : FbmSync.stopBeforeIssue(work());
-  } catch (error) { failure = error; throw error; } finally {
-    if (typeof FbmSync.recordIssuesFlush === 'function') { FbmSync.recordIssuesFlush(); }
-    if (failure) { FbmSync.controlFailRun(failure); }
-  }
-  return FbmSync.runLeftOpenClose(result);
-};
-/** Lệnh Dừng ghi cờ trong lúc lát này đang chạy: không phát request vừa dựng, đóng lượt luôn. Đọc cờ từ kho thật, một lần đọc mỗi lát có request. */
-FbmSync.stopBeforeIssue = function (result) {
-  if (!result || !result.request) { return result; }
-  if (!FbmSync.stopPendingApply(true).stopped) { return result; }
-  return Object.assign({}, result, { code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() });
-};
-/**
- * Lát trả lời không kèm request trong khi lượt còn ở phase đang chạy và không request nào đang chờ: không ai còn đẩy lượt đi tiếp (Extension hết việc, Sidebar không có gì để gửi).
- * Đóng lượt ngay ở đây, có Log ghi rõ lỗi thuộc GAS, thay vì để lượt treo tới lần hỏi nền sau rồi bị ghi nhầm là Extension bỏ dở.
- */
-FbmSync.runLeftOpenClose = function (result) {
-  if (!result || typeof result !== 'object' || result.request) { return result; }
-  var state = FbmSync.stateRead();
-  if (!state.runId || state.activeRequestId || FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) < 0) { return result; }
-  var phase = String(state.phase || ''), cursorKind = String(state.cursor && state.cursor.kind || '');
-  FbmSync.runFailCurrent('GAS trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt để lịch nền chạy lại ở lần hỏi sau.', 'RUN_LEFT_OPEN');
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'run_left_open', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Lỗi GAS: trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt.' }); }
-  return Object.assign({}, result, { ok: false, code: 'RUN_LEFT_OPEN', status: FbmSync.statusView(), error: FbmSync.stateRead().lastError });
-};
-
-/** Ghi phiên lỗi sau exception của lát. Lỗi gốc luôn được ném lại ở chỗ gọi; ghi state hỏng thì chỉ thêm một dòng Log, không thay lỗi gốc. */
-FbmSync.controlFailRun = function (error) {
-  try {
-    FbmSync.runFailCurrent(String(error && error.message || error), String(error && error.code || ''));
-  } catch (writeError) {
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_fail_run', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: 'Không ghi được trạng thái lỗi của phiên: ' + String(writeError && writeError.message || writeError) }); }
-  }
-};
-
 /** Bitmap phân mảnh theo mã nội bộ ổn định; thứ tự dòng Sheet có đổi thì dấu vẫn đúng. */
 FbmSync.seenStorePrefix = function (scope) { return 'FBM_SYNC_SEEN_' + String(scope || '').toUpperCase().replace(/[^A-Z0-9_]/g, '_') + '_'; };
 FbmSync.seenStoreIndex = function (scope, record) {

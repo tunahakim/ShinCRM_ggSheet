@@ -379,13 +379,6 @@ FbmSync.contractGate = function (rawResponse) {
 };
 
 /** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
-/** Mọi response sau request đầu về qua cổng `continue` chung của Extension, nên cursor chọn bộ xử lý: giữ phiên của chuỗi nền, đọc lại xung đột, còn lại là bước của lượt. */
-FbmSync.continue = function (rawResponse) {
-  var kind = String((FbmSync.stateRead().cursor || {}).kind || '');
-  if (kind === 'heartbeat') { return fbmSyncHeartbeatLocked(rawResponse, {}); }
-  if (kind === 'conflict_refresh') { return FbmSync.conflictOpened(rawResponse); }
-  return FbmSync.continueRun(rawResponse);
-};
 FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
 FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();

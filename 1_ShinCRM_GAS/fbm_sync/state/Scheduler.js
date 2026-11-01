@@ -395,40 +395,6 @@ function fbmSyncHeartbeatLocked(rawResponse, options) {
   return { ok: true, request: request ? (request.protocol ? request : FbmSync.nextEnvelope(request)) : null, status: status };
 }
 
-/** Thu hồi reservation khi Extension hoặc Sidebar không gửi được envelope tới tab FBM. Chạy trong khóa của cửa lệnh (lệnh `continue` kèm `error`). */
-function fbmSyncHeartbeatTransportFailure(payload) {
-  var value = payload || {}, requestId = String(value.requestId || '');
-  var state = FbmSync.stateRead();
-  if (!FbmSync.requestAnswered(state, requestId)) {
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, 'STALE_RESPONSE', 'Lỗi cầu nối không còn thuộc request đang chờ.', 'transport_failure_stale'); }
-    return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
-  }
-  var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), recovered = null;
-  // Lỗi khi đọc chính sách đăng nhập hay dựng lại request hỏng thuộc cổng phiên: đóng lượt an toàn, không thử tiếp.
-  var plan;
-  try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }
-  catch (policyError) { return FbmSync.sessionGateFailClosed(state, policyError); }
-  if (plan === 'activity_windows') { recovered = FbmSync.activityScanToWindows(state, failureCode, failureMessage); }
-  if (plan === 'scan_restart') { recovered = FbmSync.scanJobRestart(state, failureCode, failureMessage); }
-  if (plan === 'reload_page' || plan === 'open_tab') {
-    try { recovered = FbmSync.transportReissue(state, requestId, failureCode, failureMessage, plan); }
-    catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
-  }
-  if (recovered) { return recovered; }
-  state.activeRequestId = '';
-  state.deadlineAt = 0;
-  state.lastProgressAt = Date.now();
-  state.lastFailureCode = failureCode;
-  state.retryable = false;
-  state.lastError = failureMessage;
-  state.message = state.lastError;
-  state.cursor = {};
-  state.phase = 'error';
-  FbmSync.stateWrite(state);
-  if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, failureCode, failureMessage, 'transport_failure'); }
-  return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-}
-FbmSync.heartbeatTransportFailure = fbmSyncHeartbeatTransportFailure;
 
 /**
  * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.

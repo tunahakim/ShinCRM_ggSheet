@@ -12,7 +12,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.COMMANDS = {
   start: { lock: true, drives: true, run: function (input) { return FbmSync.commandStart(input); } },
-  continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input, state) { return FbmSync.commandContinue(input, state); } },
+  continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input, state) { return FbmSync.sliceContinue(input, state); } },
   heartbeat: { lock: true, relay: true, run: function (input) { return fbmSyncHeartbeatRequest(input); } },
   cancel: { run: function () { return FbmSync.runStopCommand('any'); } },
   stop_background: { run: function () { return FbmSync.runStopCommand('background'); } },
@@ -165,21 +165,6 @@ FbmSync.commandStart = function (input) {
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };
   var result = spec.slice ? FbmSync.runSlice(run) : run();
   if (kind === 'sync' && result && result.status) { FbmSync.logStatus(result.status, 'start'); }
-  return result;
-};
-
-/**
- * Nộp kết quả của request đang chờ (`response`) hoặc lỗi không gửi được request (`error` kèm `requestId`). Lượt đọc lại xung đột và lượt nền đi chung cửa này; `FbmSync.continue` theo cursor chọn bộ xử lý.
- * Relay chỉ nộp khi công tắc tổng còn bật: tắt giữa chừng thì không xử lý tiếp, lượt tự đóng khi quá hạn.
- */
-FbmSync.commandContinue = function (input, state) {
-  FbmSync.traceImport(input.clientTrace);
-  if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
-  if (input.error) { return fbmSyncHeartbeatTransportFailure(input.error); }
-  if (input.source === 'relay' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
-  // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật. Xét theo lượt chứ không theo kênh: lượt tay cũng nộp qua relay.
-  var before = FbmSync.statusView(), result = FbmSync.continue(input.response);
-  if (before.origin !== 'background' && result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); }
   return result;
 };
 
