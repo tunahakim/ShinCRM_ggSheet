@@ -391,7 +391,7 @@ FbmSync.sessionGateResponseStarted = function (state) {
   return state;
 };
 FbmSync.pauseForRuntimeLimit = function (state) {
-  var current = state || (FbmSync.stateRead ? FbmSync.stateRead() : {});
+  var current = state || FbmSync.stateRead();
   current.activeRequestId = '';
   current.deadlineAt = 0;
   current.phase = 'paused';
@@ -400,7 +400,7 @@ FbmSync.pauseForRuntimeLimit = function (state) {
   current.message = current.lastError;
   current.retryable = true;
   logEvent({ source: 'fbm_sync', action: 'slice_limit', outcome: LOG_ERROR, reason: current.lastFailureCode, detail: { runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: current.cursor || {} } });
-  if (FbmSync.stateWrite) { FbmSync.stateWrite(current); }
+  FbmSync.stateWrite(current);
   return null;
 };
 /**
@@ -415,14 +415,14 @@ FbmSync.nextEnvelope = function (request) {
   // Đang tắt thì không cấp request kế tiếp. Request đã gửi trước đó không thể thu hồi;
   // state được chuyển sang paused để người dùng xem và chủ động tiếp tục sau khi bật lại.
   if (!FbmSync.masterEnabled()) {
-    var stopped = FbmSync.stateRead ? FbmSync.stateRead() : {};
+    var stopped = FbmSync.stateRead();
     stopped.phase = 'paused';
     stopped.message = 'Đồng bộ đang tắt; không cấp request FBM mới. Request đang bay vẫn được giữ để không mất cursor.';
     stopped.lastError = '';
-    if (FbmSync.stateWrite) { FbmSync.stateWrite(stopped); }
+    FbmSync.stateWrite(stopped);
     return null;
   }
-  var pendingState = FbmSync.stateRead ? FbmSync.stateRead() : {};
+  var pendingState = FbmSync.stateRead();
   if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(pendingState); }
   try {
     var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
@@ -466,7 +466,7 @@ FbmSync.nextEnvelope = function (request) {
   (request.items || [request]).forEach(function (item) {
     var endpoint = FbmSync.protocol.validateEndpoint(item.url);
     if (!endpoint.ok) {
-      if (FbmSync.traceEvent) { FbmSync.traceEvent('request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code }); }
+      FbmSync.traceEvent('request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code });
       throw new Error(endpoint.message + ' (' + endpoint.code + ')');
     }
   });
@@ -477,7 +477,7 @@ FbmSync.nextEnvelope = function (request) {
   FbmSync._requestIdSequence = sequence;
   // Giữ dạng ID cũ khi không có nguy cơ trùng để DTO/trace không phình theo số
   // bước; chỉ thêm hậu tố tuần tự cho các envelope cùng mili-giây.
-  var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), state = FbmSync.stateRead ? FbmSync.stateRead() : {}, meta = Object.assign({}, request.meta || {});
+  var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), state = FbmSync.stateRead(), meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
   var defaultTransport = FbmSync.payloadCookieTransport();
@@ -500,16 +500,14 @@ FbmSync.nextEnvelope = function (request) {
   meta.fetchMs = FbmSync.budgetFetchMs(meta);
   meta.gasReplyMs = FbmSync.budgetGasReplyMs();
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
-  if (FbmSync.stateWrite) {
-    state.activeRequestId = id;
-    state.activeRequestSig = FbmSync.requestSig(request);
-    if (state.resubmit && state.resubmit.answered && state.resubmit.answered === FbmSync.requestWatch.lastAnswered) { state.resubmit.issued = id; }
-    if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
-    state.lastProgressAt = Date.now();
-    state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
-    FbmSync.stateWrite(state);
-  }
-  if (FbmSync.traceEvent) { FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined }); }
+  state.activeRequestId = id;
+  state.activeRequestSig = FbmSync.requestSig(request);
+  if (state.resubmit && state.resubmit.answered && state.resubmit.answered === FbmSync.requestWatch.lastAnswered) { state.resubmit.issued = id; }
+  if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
+  state.lastProgressAt = Date.now();
+  state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
+  FbmSync.stateWrite(state);
+  FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
 };

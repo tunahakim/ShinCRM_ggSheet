@@ -52,7 +52,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js', 322, 27593, 'B8', 'một việc (lô giao dịch)'],
   ['1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js', 661, 51010, 'B4/B8', 'mở lượt, quét khách, continueStep'],
   ['1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js', 603, 52848, 'B9', 'xác minh sau ghi, lỗi đẩy, điều phối chặng đẩy'],
-  ['1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js', 589, 44778, 'B4', 'cờ, cổng phiên, phát phong bì'],
+  ['1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js', 587, 44518, 'B4', 'cờ, cổng phiên, phát phong bì'],
   ['1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js', 220, 16485, 'B7/B9', 'ứng viên đẩy'],
   ['1_ShinCRM_GAS/server/Triggers.js', 228, 12605, 'giữ', 'trigger Sheet'],
   ['1_ShinCRM_GAS/server/dev/FbmPerfProbe.js', 219, 16490, 'dev', 'một việc: bộ bọc đo thời gian đồng bộ (bọc, gộp số, báo cáo)'],
