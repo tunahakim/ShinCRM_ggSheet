@@ -198,6 +198,9 @@ function capDauDaySach(hopCat) {
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
 }
 
+/** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. */
+const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
+
 function napServer(hopCat, ...duongDans) {
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
@@ -253,31 +256,4 @@ function dongSoCuoi(hopCat) {
   return hopCat.reloadJournalRead().entries.slice(-1)[0] || {};
 }
 
-/**
- * Chặng đẩy chọn mã bằng phép xét một dòng (`pushReview`) trên dòng đọc lại theo mã. Hộp thử muốn định sẵn ứng viên thì thay phép xét: `danhSach(entity)` (mảng hoặc hàm) là các ứng viên, khớp theo mã và theo `entity` (thiếu là Khách); mã đã vào sổ lỗi đẩy thì không chọn lại. Dòng của ứng viên chưa có trong `readLocal` được thêm vào để lần quét và lần đọc theo mã thấy nó.
- */
-function datUngVienDay(hopCat, danhSach) {
-  const F = hopCat.FbmSync;
-  if (!F.__pushReviewGoc) { F.__pushReviewGoc = F.pushReview; }
-  const ds = (entity) => (typeof danhSach === 'function' ? danhSach(entity) : danhSach) || [];
-  const hop = (entity) => ds(entity).filter((c) => (c.entity || 'customer') === entity);
-  // Bản ghi đã vào sổ lỗi đẩy thì không chọn lại, như phép xét thật khi dữ liệu chưa đổi.
-  F.pushReview = (entity, record, customer, context) => {
-    if (context && context.pushFailures && context.pushFailures[entity + ':' + String(record && record.id)] !== undefined) { return null; }
-    const found = hop(entity).find((c) => String(c.id) === String(record && record.id));
-    return found ? Object.assign({ raw: record }, found, { entity }) : null;
-  };
-  const doc = F.readLocal;
-  F.readLocal = (entity) => {
-    const rows = (typeof doc === 'function' ? doc(entity) : []) || [], ids = rows.map((r) => String(r && r.id));
-    return rows.concat(hop(entity).filter((c) => ids.indexOf(String(c.id)) < 0).map((c) => c.record || { id: c.id }));
-  };
-}
-
-/** Trả phép xét thật sau `datUngVienDay`. */
-function boUngVienDay(hopCat) {
-  const F = hopCat.FbmSync;
-  if (F.__pushReviewGoc) { F.pushReview = F.__pushReviewGoc; }
-}
-
-module.exports = { GAS_DIR, taoHopCat, napServer, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, TRANG_FBM_THU, datUngVienDay, boUngVienDay };
+module.exports = { GAS_DIR, taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan, napClient, napRieng, catRuotScript, docTep, trongLanChay, dongSoCuoi, TRANG_FBM_THU };

@@ -2,7 +2,7 @@
  * Hộp cát của sổ bước nghiệp vụ: một lượt đang mở, đã xong bước kiểm phiên, đang ở bước kéo khách và đối soát. Dùng để kiểm mỗi đường đóng lượt đóng đúng bước đang mở và ghi đúng dòng Log.
  * Hủy phiên trả status công khai; các ca này chỉ kiểm sổ bước nên `statusView` là bản giả.
  */
-const { taoHopCat, napServer } = require('../load-gas');
+const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../load-gas');
 const { taoKhoThuocTinh } = require('../gas/kho-thuoc-tinh');
 
 function hopBuoc() {
@@ -13,7 +13,7 @@ function hopBuoc() {
     PropertiesService: { getDocumentProperties: () => kho },
     logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
   });
-  napServer(nen, 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  napServer(nen, ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
   nen.FbmSync.statusView = () => ({ ok: true });
   const st = nen.FbmSync.runOpen({ phase: 'checking_session' });
   nen.FbmSync.businessStepStart(st, 'run', {});

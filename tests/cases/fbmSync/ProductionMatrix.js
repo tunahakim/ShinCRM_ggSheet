@@ -1,6 +1,6 @@
 /** Ma trận offline cho kỳ đồng bộ nhiều Customer/Activity và lỗi vận chuyển. */
 const { section, check } = require('../../lib/assert');
-const { taoHopCat, napServer, giuBanGhi } = require('../../lib/load-gas');
+const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require('../../lib/load-gas');
 
 function propertyStore() {
   const data = {};
@@ -30,7 +30,7 @@ function makeSync() {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
+    ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/reconcile/Fingerprint.js',
     'fbm_sync/reconcile/Conflict.js',

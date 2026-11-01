@@ -2,7 +2,7 @@
  * Hộp cát GAS của đồng bộ FBM: nạp đủ các tệp `fbm_sync` thật cùng kho thuộc tính, khóa script và cửa vào giả. Mọi tệp ca FBM dựng hộp từ đây, không lấy bộ dựng từ tệp ca khác.
  */
 
-const { taoHopCat, napServer } = require('../load-gas');
+const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../load-gas');
 const { taoKhoThuocTinh } = require('../gas/kho-thuoc-tinh');
 
 /** Kho thuộc tính dùng chung; `data` là chính đối tượng kho giữ, để ca kiểm soi khóa mà không tốn lượt đọc. */
@@ -45,7 +45,7 @@ function workflowGas(options) {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
+    ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/state/AccountSettings.js',
     'fbm_sync/control/ControlPort.js',
     'fbm_sync/state/Scheduler.js',

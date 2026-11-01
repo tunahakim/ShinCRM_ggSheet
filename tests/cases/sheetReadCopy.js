@@ -4,7 +4,7 @@
  * Nhánh hỏng âm thầm cần chốt: nhớ ngoài lần gọi (đọc hàng mã cũ ở lần gọi sau), không bỏ khi vừa cầm khóa (đọc số dòng cũ do tiến trình khác vừa ghi), và writer ghi xong mà lần đọc sau trong cùng lần gọi vẫn thấy số dòng cũ.
  */
 const { dungHop, ghiO } = require('../lib/dung-hop');
-const { napServer } = require('../lib/load-gas');
+const { napServer, TEP_KHUNG_LUOT } = require('../lib/load-gas');
 const { section, check, ghiLoiNap } = require('../lib/assert');
 const { trongLanGoi } = require('../lib/gas/lan-goi');
 
@@ -29,7 +29,7 @@ function taoHop() {
 /** Hộp cát có phần đồng bộ FBM: nạp các tệp đọc/ghi của `fbm_sync` và thêm cột đồng bộ vào hàng mã Customer như `SyncColumnSetup` làm trên tệp thật. */
 function taoHopFbm() {
   const nen = taoHop();
-  napServer(nen.hop, 'fbm_sync/SyncSchema.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/SheetSave.js', 'server/service/FbmSyncService.js');
+  napServer(nen.hop, 'fbm_sync/SyncSchema.js', 'fbm_sync/schema/FbmFields.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/SheetSave.js', 'server/service/FbmSyncService.js');
   const sync = Object.keys(nen.hop.SYNC_SCHEMA.customer).map((name) => nen.hop.SYNC_SCHEMA.customer[name].code).filter((code) => nen.Customer.codes.indexOf(code) < 0);
   nen.Customer.codes = nen.Customer.codes.concat(sync);
   nen.Customer.sheet.getRange(1, 1, 1, nen.Customer.codes.length).setValues([nen.Customer.codes]);

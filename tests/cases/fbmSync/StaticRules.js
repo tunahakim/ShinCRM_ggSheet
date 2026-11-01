@@ -42,8 +42,8 @@ const SESSION_SECRET_FILES = [
   '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
 ];
 
-/** Tệp được đọc/ghi state: người điều phối khung lượt (Run.js) và khung lát (Slice.js). Chỗ gọi khác hiện nay là ngoại lệ. */
-const STATE_ORCHESTRATORS = ['1_ShinCRM_GAS/fbm_sync/state/Run.js', '1_ShinCRM_GAS/fbm_sync/state/Slice.js'];
+/** Tệp được đọc/ghi state: người điều phối khung lượt và khung lát. Chỗ gọi khác là ngoại lệ. */
+const STATE_ORCHESTRATORS = ['Run', 'RunStop', 'Slice'].map((ten) => '1_ShinCRM_GAS/fbm_sync/state/' + ten + '.js');
 
 /** Tệp được ghi `logEvent`: khung lát (Slice.js). Chỗ gọi khác hiện nay là ngoại lệ. */
 const LOG_WRITERS = ['1_ShinCRM_GAS/fbm_sync/state/Slice.js'];

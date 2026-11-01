@@ -93,6 +93,9 @@ async function chay(so) {
   check(so, 'đăng nhập thử mở lượt riêng qua runOpen: mã lượt mới, nhãn "Tay · Đăng nhập thử", cursor login', [
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);
+  // Gặp khi nghiệm thu 2026-11-01: lượt tay mở ngay sau lượt nền Quét nhanh chỉ mang nhãn "Tay" vì ô lượt còn chuỗi nền cũ.
+  tayNhan.F.statePatch({ chain: { current: 'customerFull' } });
+  check(so, 'lượt tay mở khi ô lượt còn chuỗi nền Quét nhanh vẫn ghi tên kiểu quét', tayNhan.F.runOpen({ origin: 'manual', scan: 'full' }).runLabel, 'Tay · Quét nhanh');
 
   // Lượt chết (Extension im giữa lượt): status chỉ báo kẹt, không ghi; lần bấm Đồng bộ kế đóng lượt cũ rồi mở lượt mới.
   const ket = hopCoLuot();

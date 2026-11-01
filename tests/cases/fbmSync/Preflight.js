@@ -1,6 +1,6 @@
 /** Kiểm tra ranh giới Core -> module và các lỗi phải báo trước phiên FBM. */
 const { section, check } = require("../../lib/assert");
-const { taoHopCat, napServer } = require("../../lib/load-gas");
+const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require("../../lib/load-gas");
 
 async function chay(so) {
   section("FBM sync — preflight");
@@ -12,7 +12,7 @@ async function chay(so) {
   }),
   settingsValue: (section, field) => (section === 'defaults_fbm_pull' && field === 'values' ? { customer: { verifyStatus: coreXacThuc.stored } } : undefined),
   settingsDefaultsChecked: (section, category) => (category.categories['@CAT_XAC_THUC'].indexOf(coreXacThuc.stored) >= 0 ? { customer: { verifyStatus: coreXacThuc.stored } } : {}) });
-  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/write/PushCandidates.js');
+  napServer(hop, 'server/gate/IdGate.js', 'fbm_sync/transport/Budget.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/write/PushCandidates.js');
   // Định sẵn các dòng có việc nhưng giữ phép xét chờ sửa thật (`pushHold`): preflight phải báo đúng dòng mà chặng đẩy sẽ đánh dấu.
   const pushCandidatesAllGoc = hop.FbmSync.pushCandidatesAll;
   const ungVien = (danhSach) => { const ds = danhSach('customer').concat(danhSach('activity')); hop.FbmSync.pushCandidatesAll = (scan, context) => ds.map((c) => { const hold = hop.FbmSync.pushHold(c, context); return hold ? Object.assign({}, c, { hold }) : c; }); };
