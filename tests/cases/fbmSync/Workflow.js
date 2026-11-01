@@ -63,7 +63,7 @@ function workflowGas(options) {
   napServer(hop,
     'fbm_sync/schema/FbmFields.js',
     'fbm_sync/protocol/Protocol.js',
-    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
+    'fbm_sync/state/State.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/Slice.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/state/AccountSettings.js',
     'fbm_sync/control/ControlPort.js',
     'fbm_sync/state/Scheduler.js',
@@ -1322,7 +1322,7 @@ async function chay(so) {
 
   const manualTransport = workflowGas();
   const manualStarted = manualTransport.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
-  const transportFailure = manualTransport.hop.FbmSync.heartbeatTransportFailure({ requestId: manualStarted.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  const transportFailure = manualTransport.hop.FbmSync.transportFailureRun({ requestId: manualStarted.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'loi bridge thu cong: GAS chi ghi nhan loi dung reservation, ket thuc ro rang va khong cap request moi', [
     transportFailure.ok, transportFailure.code, transportFailure.request || null, transportFailure.status.phase,
     transportFailure.status.lastError, manualTransport.hop.FbmSync.stateRead().activeRequestId

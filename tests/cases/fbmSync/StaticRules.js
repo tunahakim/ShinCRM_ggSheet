@@ -42,11 +42,11 @@ const SESSION_SECRET_FILES = [
   '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
 ];
 
-/** Tệp được đọc/ghi state: tệp của người điều phối khung lượt. Chỗ gọi khác hiện nay là ngoại lệ. */
-const STATE_ORCHESTRATORS = ['1_ShinCRM_GAS/fbm_sync/state/Run.js'];
+/** Tệp được đọc/ghi state: người điều phối khung lượt (Run.js) và khung lát (Slice.js). Chỗ gọi khác hiện nay là ngoại lệ. */
+const STATE_ORCHESTRATORS = ['1_ShinCRM_GAS/fbm_sync/state/Run.js', '1_ShinCRM_GAS/fbm_sync/state/Slice.js'];
 
-/** Tệp được ghi `logEvent`: tương lai chỉ người điều phối lát ghi Log một lần; hiện để trống. */
-const LOG_WRITERS = [];
+/** Tệp được ghi `logEvent`: khung lát (Slice.js). Chỗ gọi khác hiện nay là ngoại lệ. */
+const LOG_WRITERS = ['1_ShinCRM_GAS/fbm_sync/state/Slice.js'];
 
 /** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
 const BASELINE_WRITERS = [];
@@ -173,13 +173,13 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Probe.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 27,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 25,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 44,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 43,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 34,
@@ -212,8 +212,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 10,
     '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 11,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 16,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 9,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 13,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 4,
@@ -274,7 +274,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/Run.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 8,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 6,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 3,
@@ -291,7 +291,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 2,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
