@@ -14,26 +14,8 @@ const path = require('path');
 const { GAS_DIR, catRuotScript } = require('../lib/load-gas');
 const { stripComments } = require('../lib/strip-comments');
 const { liet } = require('../lib/quet/liet-tep');
+const { tenKhaiBao } = require('../lib/quet/khai-bao');
 const { section, check, ghiTruot, ghiDat } = require('../lib/assert');
-
-/** Khai báo ở cột 0: `var TÊN` hoặc `function TÊN(`. */
-const MO_KHAI_BAO = /^(?:var|let|const)\s+([A-Za-z_$][\w$]*)|^function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
-
-
-/** Bảng khai mở `var X = typeof X !== 'undefined' ? X : {};`: lõi và module cùng khai để không phụ thuộc thứ tự nạp tệp, mỗi bên chỉ thêm khóa của mình nên không tranh nhau. */
-const BANG_KHAI_MO = /^var\s+([A-Za-z_$][\w$]*)\s*=\s*typeof\s+\1\s*!==\s*'undefined'\s*\?\s*\1\s*:\s*\{\};/;
-
-/** Lấy danh sách tên khai báo ở tầng ngoài cùng của một đoạn mã, bỏ qua bảng khai mở. */
-function tenKhaiBao(code) {
-  const ten = [];
-  let khop;
-  MO_KHAI_BAO.lastIndex = 0;
-  while ((khop = MO_KHAI_BAO.exec(code)) !== null) {
-    if (BANG_KHAI_MO.test(code.slice(khop.index, code.indexOf('\n', khop.index) >>> 0))) { continue; }
-    ten.push(khop[1] || khop[2]);
-  }
-  return ten;
-}
 
 /**
  * Đọc phần mã thật của một tệp: tệp `.html` thì cắt ruột thẻ `<script>`, tệp `.js` thì lấy nguyên.
@@ -150,4 +132,4 @@ function kiemDuDuongNhung(so, tepClient) {
   check(so, 'không dòng include nào mang đuôi tệp', daNhung.filter((d) => /\.html$|\.js$/.test(d)), []);
 }
 
-module.exports = { chay, tenKhaiBao };
+module.exports = { chay };
