@@ -250,7 +250,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\Run.js              Đóng Lượt (`runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`) và lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
-    ├── state\Slice.js            Khung lát: `runSlice` (giữ một bản ô lượt mỗi lát và ghi kho một lần ở `sliceClose`, áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
+    ├── state\Slice.js            Khung lát: `runSlice` (giữ một bản ô lượt mỗi lát và ghi kho một lần ở `sliceClose`, áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, `replyAdmit` (phép kiểm chung của mọi kết quả và lỗi nộp về: thu hồi lượt quá hạn, bỏ response không thuộc request đang chờ, dừng khi lệch mã hợp đồng), bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
     ├── state\RunPlan.js          Dãy chặng của từng kiểu lượt (`RUN_PLANS`), `runPlanOf` tra bảng và ném `SYNC_UNKNOWN_SCAN` khi kiểu hay mức quét lạ, `runPlanNext` đi tiếp trong dãy.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
@@ -307,6 +307,7 @@ tests\
 │   ├── ext\
 │   │   └── nap-extension.js      Đường dẫn tệp Extension khai một chỗ và nạp một tệp Extension vào hộp có biến của trình duyệt.
 │   ├── fbm\
+│   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
@@ -384,6 +385,8 @@ tests\
     ├── fbmSync\UserJourneys.js  Kiểm các hành trình Sidebar, cấu hình kết nối, công tắc và thông báo lỗi.
     ├── fbmSync\Components.js    Kiểm hợp đồng Sync dùng component/lớp chung của ShinCRM, không tái tạo control generic.
     ├── fbmSync\FunctionTrace.js  Kiểm log bắt đầu/kết thúc hàm, tóm tắt payload và che dữ liệu bí mật.
+    ├── fbmSync\SliceFailure.js   Kiểm lát bị exception, Sidebar báo lỗi và cửa ghi Sheet bị chặn: lượt chuyển lỗi ngay, đóng đúng bước đang mở, lỗi theo bản ghi vẫn xả ra Log.
+    ├── fbmSync\LateReply.js      Kiểm response lệnh ghi FBM về muộn: bỏ, không áp kết quả đẩy, không ghi Sheet, không phát lại lệnh ghi.
     ├── fbmSync\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Contract.js            Mã phiên bản hợp đồng GAS–Extension hai bên công bố khớp mã tính từ hợp đồng.
