@@ -91,11 +91,10 @@ FbmSync.scanJobOversize = function (state, entity, ids) {
 
 /**
  * Tab không còn giữ việc quét: chạy lại cả việc với lần thử mới, tối đa `scanJobRestarts` lần rồi dừng lỗi.
- * Trả kết quả cho cổng lỗi vận chuyển; `null` khi cursor không phải việc quét.
+ * Chỉ chạy khi `transportRecoverPlan` chọn `scan_restart` (cursor đang là việc quét, mã `FBM_SCAN_JOB_GONE`).
  */
 FbmSync.scanJobRestart = function (state, code, message) {
   var cursor = state.cursor || {};
-  if (cursor.kind !== 'scan_job' || String(code || '') !== 'FBM_SCAN_JOB_GONE') { return null; }
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now();
   if (Number(cursor.restarts || 0) >= FbmSync.BUDGET.scanJobRestarts) {
     var text = 'Tab FBM mất việc quét ' + (Number(cursor.restarts || 0) + 1) + ' lần liên tiếp (tab tải lại hoặc Extension khởi động lại); đã dừng. Giữ tab FBM mở và chạy lại.';

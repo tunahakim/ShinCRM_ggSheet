@@ -21,7 +21,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'customerScanRecord', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightEvaluate', 'preflightLocalScan', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
-  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'sessionGateTransportRetry', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
+  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure', 'sessionGateResumeAfterWaitProbe',
   'activityBatchContinue', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];

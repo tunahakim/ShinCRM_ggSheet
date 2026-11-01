@@ -348,29 +348,38 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   return envelope ? { ok: true, request: envelope, status: FbmSync.statusView() } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
 };
 /**
- * Phát lại đúng một lần khi Extension báo tab FBM hỏng; Extension không tự tải lại nên mọi quyết định cứu tab nằm ở đây.
- * Tab không sẵn sàng: phát lại kèm `reloadFbmPage` để Extension đổi tab về trang khách hàng. Không có tab: chỉ phát lại khi chính sách cho mở tab (`openFbmContext` do `nextEnvelope` gắn).
+ * Bảng lỗi đường truyền: nơi duy nhất quyết GAS làm gì khi Extension không gửi được request (không đọc kho, không ghi; chính sách tự mở tab được truyền vào).
+ * `activity_windows`: quét giao dịch quá sức thì chia cửa sổ ngày. `scan_restart`: tab mất việc quét thì chạy lại việc. `reload_page`: tab không sẵn sàng thì phát lại kèm lệnh đổi trang (Extension không tự tải lại). `open_tab`: không có tab và chính sách cho mở. `stop`: còn lại, kể cả lần phát lại của chính request vừa cứu tab.
  */
-FbmSync.sessionGateTransportRetry = function (state, requestId, code, message) {
-  var value = String(code || ''), notReady = value === 'FBM_TAB_NOT_READY', policy = FbmSync.sessionGatePolicy(), gate = FbmSync.sessionGateMeta(state), request, envelope;
-  if (!(notReady || (value === 'FBM_TAB_NOT_FOUND' && policy.autoOpenTab)) || String(gate.noTabRetryRequestId || '') === String(requestId || '')) { return null; }
+FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
+  var value = String(code || ''), cursor = state && state.cursor || {}, gate = state && state.metadata && state.metadata.sessionGate || {};
+  var reissued = String(gate.noTabRetryRequestId || '') === String(requestId || '');
+  if (FbmSync.ACTIVITY_WINDOW_CODES.indexOf(value) >= 0 && cursor.kind === 'scan_job' && cursor.entity === 'activity' && !(Number(cursor.chunkCount || 0) > 0)) { return 'activity_windows'; }
+  if (value === 'FBM_SCAN_JOB_GONE' && cursor.kind === 'scan_job') { return 'scan_restart'; }
+  if (value === 'FBM_TAB_NOT_READY' && !reissued) { return 'reload_page'; }
+  if (value === 'FBM_TAB_NOT_FOUND' && !reissued && policy && policy.autoOpenTab === true) { return 'open_tab'; }
+  return 'stop';
+};
+/** Phát lại đúng request vừa hỏng một lần theo kế hoạch `reload_page` hoặc `open_tab` của `transportRecoverPlan`; ghi dấu request phát lại để lần hỏng kế là `stop`. */
+FbmSync.transportReissue = function (state, requestId, code, message, plan) {
+  var reload = plan === 'reload_page', gate = FbmSync.sessionGateMeta(state), request, envelope;
   state.activeRequestId = '';
   state.deadlineAt = 0;
   gate.noTabRetryRequestId = String(requestId || '');
-  state.message = notReady ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
+  state.message = reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
   request = typeof FbmSync.requestForCursor === 'function' ? FbmSync.requestForCursor(state) : null;
   if (!request) { return null; }
   request = FbmSync.sessionGateAttachLoginToken(request, state);
-  if (notReady) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
+  if (reload) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
   envelope = FbmSync.nextEnvelope(request);
   if (!envelope) { return null; }
   state = FbmSync.stateRead();
   gate = FbmSync.sessionGateMeta(state);
   gate.noTabRetryRequestId = String(envelope.id || '');
-  state.message = notReady ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
-  FbmSync.sessionGateRecordFailure(state, value, message || (notReady ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.'), 'transport_retry');
+  state.message = reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
+  FbmSync.sessionGateRecordFailure(state, String(code || ''), message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.'), 'transport_retry');
   return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
 FbmSync.sessionGateResponseStarted = function (state) {

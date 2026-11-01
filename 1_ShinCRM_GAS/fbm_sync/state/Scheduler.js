@@ -403,14 +403,18 @@ function fbmSyncHeartbeatTransportFailure(payload) {
     if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, 'STALE_RESPONSE', 'Lỗi cầu nối không còn thuộc request đang chờ.', 'transport_failure_stale'); }
     return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: 'Lỗi cầu nối không còn thuộc request đang chờ.' };
   }
-  var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), retry;
-  var scanWindows = FbmSync.ACTIVITY_WINDOW_CODES.indexOf(failureCode) >= 0 ? FbmSync.activityScanToWindows(state, failureCode, failureMessage) : null;
-  if (scanWindows) { return scanWindows; }
-  var scanRestart = typeof FbmSync.scanJobRestart === 'function' ? FbmSync.scanJobRestart(state, failureCode, failureMessage) : null;
-  if (scanRestart) { return scanRestart; }
-  try { retry = typeof FbmSync.sessionGateTransportRetry === 'function' ? FbmSync.sessionGateTransportRetry(state, requestId, failureCode, failureMessage) : null; }
-  catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
-  if (retry) { return retry; }
+  var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), recovered = null;
+  // Lỗi khi đọc chính sách đăng nhập hay dựng lại request hỏng thuộc cổng phiên: đóng lượt an toàn, không thử tiếp.
+  var plan;
+  try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }
+  catch (policyError) { return FbmSync.sessionGateFailClosed(state, policyError); }
+  if (plan === 'activity_windows') { recovered = FbmSync.activityScanToWindows(state, failureCode, failureMessage); }
+  if (plan === 'scan_restart') { recovered = FbmSync.scanJobRestart(state, failureCode, failureMessage); }
+  if (plan === 'reload_page' || plan === 'open_tab') {
+    try { recovered = FbmSync.transportReissue(state, requestId, failureCode, failureMessage, plan); }
+    catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
+  }
+  if (recovered) { return recovered; }
   state.activeRequestId = '';
   state.deadlineAt = 0;
   state.lastProgressAt = Date.now();
