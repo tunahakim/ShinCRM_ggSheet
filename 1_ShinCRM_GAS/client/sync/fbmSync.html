@@ -743,7 +743,7 @@ function fbmSyncDrive(command, payload, task) {
 /** Đánh thức Extension hỏi GAS ngay; đánh thức thừa vô hại vì GAS trả lời theo ô lượt. */
 function fbmSyncExtensionWake(retryMs) { return fbmSyncExtensionRpc('CRM_FBM_RUN_NOW', { retryMs: retryMs }, 'hỏi GAS nhận lượt'); }
 /**
- * Chờ lượt `runId` hết chuỗi. Extension im quá `FBM_SYNC_RUN_SILENCE_MS` (Chrome tắt worker, tab Sheets mất cầu nối) thì hỏi GAS một lần: lượt đã đóng thì kết thúc theo status GAS, còn chạy thì chờ tiếp; lượt vẫn chờ Extension nhận thì đánh thức lại.
+ * Chờ lượt `runId` hết chuỗi. Extension im quá `FBM_SYNC_RUN_SILENCE_MS` (Chrome tắt worker, tab Sheets mất cầu nối) thì hỏi GAS một lần: lượt đã đóng thì kết thúc theo status GAS; GAS báo lượt kẹt (`stuck`) thì thôi chờ và hiện chữ của GAS; còn chạy thì chờ tiếp; lượt vẫn chờ Extension nhận thì đánh thức lại.
  * Chỉ một lượt tay tại một thời điểm nên chỉ có một chỗ chờ.
  */
 function fbmSyncRunWait(runId) {
@@ -764,6 +764,10 @@ function fbmSyncRunWaitArm() {
     callServer('fbmGetSyncStatus').then(function (bundle) {
       var status = bundle && bundle.status || {};
       if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
+      if (status.running && String(status.runId || '') === waiter.runId && status.stuck) {
+        fbmSyncRunWaitEnd({ ok: false, code: String(status.stuckCode || 'SYNC_STALE_RUN'), error: String(status.stuckMessage || ''), status: status, conflict: null });
+        return;
+      }
       if (status.running && String(status.runId || '') === waiter.runId) {
         fbmSyncRunWaitArm();
         if (status.awaitingPickup) { fbmSyncExtensionWake([]).catch(function (error) { fbmSyncLogClientError(error, 'Không đánh thức được Extension nhận lượt đang chờ.', 'extension_wake'); }); }
