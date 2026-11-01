@@ -195,15 +195,14 @@ FbmSync.sessionGateFailClosed = function (state, cause) {
   FbmSync.sessionGateRecordFailure(current, 'FBM_SESSION_GATE_EXCEPTION', 'Cổng phiên FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'session_gate_exception', cause);
   return null;
 };
-/**
- * Tự đăng nhập bị chặn (tắt, chưa cấu hình, đang giãn cách, danh tính lệch): lượt đóng lỗi qua `runFail` kèm đúng mã chặn, không "Tạm dừng" — tạm dừng là việc của người dùng bấm Dừng, còn đây là lượt không chạy tiếp được cho tới khi người dùng sửa cấu hình. Lượt nền lỗi còn được giãn cách thử lại.
- * Giữ phiên ngoài lượt (chưa có mã lượt) không có lượt để đóng: chỉ ghi mã chặn.
- */
-FbmSync.sessionGateBlock = function (state, code, message) {
-  var current = state || FbmSync.stateRead();
-  if (FbmSync.runInProgress(current)) { FbmSync.runFail(current, code, message); }
+/** Tự đăng nhập bị chặn hoặc bị FBM từ chối: ghi Log trước để dòng mang nhãn lượt, rồi đóng lượt lỗi qua `runFail` (không "Tạm dừng"); ngoài lượt thì không để phase đang chạy treo. */
+FbmSync.sessionGateBlock = function (current, code, message, opts) {
+  var opt = opts || {};
   current.retryable = false;
-  return FbmSync.sessionGateRecordFailure(current, code, message, 'session_gate_blocked');
+  FbmSync.sessionGateRecordFailure(current, code, message, opt.action || 'session_gate_blocked', null, opt.facts);
+  if (FbmSync.runInProgress(current)) { FbmSync.runFail(current, code, current.message, opt.cursor ? { cursor: opt.cursor } : null); }
+  else if (FbmSync.ACTIVE_PHASES.indexOf(String(current.phase)) >= 0) { current.phase = 'error'; current.activeRequestId = ''; current.cursor = opt.cursor || current.cursor; }
+  return FbmSync.stateWrite(current);
 };
 /** Khởi động owner login từ cổng; flow không cần biết cách đăng nhập. */
 FbmSync.sessionGateStart = function (state, failedCursor) {
