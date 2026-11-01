@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.protocol = {
   version: 1,
   // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Mọi lời gọi giữa GAS và Extension mang mã này: GAS gửi trong phong bì, Extension gửi trong response và thân lời gọi relay; lệch mã thì bên nhận dừng với `EXTENSION_PROTOCOL_MISMATCH`.
-  contract: '203c4ff28fe9',
+  contract: 'e2a5073b0ba4',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();

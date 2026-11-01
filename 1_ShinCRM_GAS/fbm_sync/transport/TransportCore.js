@@ -347,26 +347,30 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
   envelope = FbmSync.nextEnvelope(request);
   return envelope ? { ok: true, request: envelope, status: FbmSync.statusView() } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
 };
-/** Chỉ thử lại một lần khi Extension báo không có tab; policy vẫn do GAS quyết định. */
+/**
+ * Phát lại đúng một lần khi Extension báo tab FBM hỏng; Extension không tự tải lại nên mọi quyết định cứu tab nằm ở đây.
+ * Tab không sẵn sàng: phát lại kèm `reloadFbmPage` để Extension đổi tab về trang khách hàng. Không có tab: chỉ phát lại khi chính sách cho mở tab (`openFbmContext` do `nextEnvelope` gắn).
+ */
 FbmSync.sessionGateTransportRetry = function (state, requestId, code, message) {
-  var value = String(code || ''), retryable = ['FBM_TAB_NOT_FOUND', 'FBM_TAB_NOT_READY'].indexOf(value) >= 0, policy = FbmSync.sessionGatePolicy(), gate = FbmSync.sessionGateMeta(state), request, envelope;
-  if (!retryable || !policy.autoOpenTab || String(gate.noTabRetryRequestId || '') === String(requestId || '')) { return null; }
+  var value = String(code || ''), notReady = value === 'FBM_TAB_NOT_READY', policy = FbmSync.sessionGatePolicy(), gate = FbmSync.sessionGateMeta(state), request, envelope;
+  if (!(notReady || (value === 'FBM_TAB_NOT_FOUND' && policy.autoOpenTab)) || String(gate.noTabRetryRequestId || '') === String(requestId || '')) { return null; }
   state.activeRequestId = '';
   state.deadlineAt = 0;
   gate.noTabRetryRequestId = String(requestId || '');
-  state.message = 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
+  state.message = notReady ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
   request = typeof FbmSync.requestForCursor === 'function' ? FbmSync.requestForCursor(state) : null;
   if (!request) { return null; }
   request = FbmSync.sessionGateAttachLoginToken(request, state);
+  if (notReady) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
   envelope = FbmSync.nextEnvelope(request);
   if (!envelope) { return null; }
   state = FbmSync.stateRead();
   gate = FbmSync.sessionGateMeta(state);
   gate.noTabRetryRequestId = String(envelope.id || '');
-  state.message = 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
-  FbmSync.sessionGateRecordFailure(state, value, message || 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.', 'transport_retry');
+  state.message = notReady ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
+  FbmSync.sessionGateRecordFailure(state, value, message || (notReady ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.'), 'transport_retry');
   return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
 FbmSync.sessionGateResponseStarted = function (state) {
@@ -466,7 +470,8 @@ FbmSync.nextEnvelope = function (request) {
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
   var defaultTransport = FbmSync.payloadCookieTransport();
   meta.transport = Object.assign(defaultTransport, meta.transport || {});
-  var requestGap = state.requestGap && Number(state.requestGap.maxMs) > 0 ? { minMs: Number(state.requestGap.minMs || 0), maxMs: Number(state.requestGap.maxMs) } : null;
+  // Gói quét lấy từ RAM tab, không gọi FBM: không gắn khoảng nghỉ để Extension không phải rẽ nhánh theo loại request.
+  var requestGap = String(meta.kind || '') !== 'scan_chunk' && state.requestGap && Number(state.requestGap.maxMs) > 0 ? { minMs: Number(state.requestGap.minMs || 0), maxMs: Number(state.requestGap.maxMs) } : null;
   if (requestGap) { meta.requestGap = requestGap; }
   try {
     var sessionPolicy = FbmSync.sessionGatePolicy();

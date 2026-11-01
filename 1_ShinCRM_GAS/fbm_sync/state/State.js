@@ -454,7 +454,7 @@ FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(
 FbmSync.EXTENSION_TRAIL_STAGES = {
   gas_request_received: 'đã nhận request từ GAS, chưa gửi sang tab FBM',
   fbm_tab_preparing: 'đang chuẩn bị tab FBM (chờ tab tải xong và có bộ chạy request)',
-  fbm_tab_reloading: 'tab FBM không phản hồi, Extension đang tự tải lại tab',
+  fbm_page_reloading: 'Extension đang đổi tab FBM về trang GAS yêu cầu tải lại',
   fbm_tab_sent: 'đã gửi request sang tab FBM, chưa nhận lại kết quả',
   fbm_tab_replied: 'tab FBM đã trả kết quả, chưa gửi về GAS',
   gas_response_sent: 'đã gửi kết quả về GAS, chưa nhận trả lời',
