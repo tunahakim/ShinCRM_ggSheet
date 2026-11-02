@@ -25,10 +25,10 @@ function fbmGetRelayConfig() { return fbmCommandRun('fbmGetRelayConfig', 'relay_
 function fbmRotateRelayKey() { return fbmCommandRun('fbmRotateRelayKey', 'relay_rotate_key', {}); }
 function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return fbmCommandRun('fbmLogRelaySwitchDecision', 'relay_switch_log', { decision: decision, fromSpreadsheetId: fromSpreadsheetId }); }
 
-/** Phạm vi riêng của đồng bộ quanh mỗi cửa vào nguồn `fbm_sync`: gom DocumentProperties một lần gọi và ghi mốc vết. Không lưu response FBM vào vết. */
+/** Phạm vi riêng của đồng bộ quanh mỗi cửa vào nguồn `fbm_sync`: gom DocumentProperties một lần gọi và ghi mốc vết. Không lưu response FBM vào vết. Lúc đóng, dòng Log của request bị bỏ mà không có trả lời (phát hiện ở cửa ghi ô lượt) được ghi trước khi ghi trace. */
 var ENTRY_POINT_SCOPES = typeof ENTRY_POINT_SCOPES !== 'undefined' ? ENTRY_POINT_SCOPES : {};
 ENTRY_POINT_SCOPES.fbm_sync = {
-  begin: function () { if (FbmSync.propertyBufferBegin()) { FbmSync.budgetCallBegin(); } },
-  end: function () { FbmSync.propertyBufferEnd(); },
-  boundary: function (stage, name, error) { FbmSync.traceEvent(stage, { operation: String(name || ''), error: error ? String(error && error.message || error) : '', stack: error && error.stack ? String(error.stack) : '' }); }
+  begin: function () { if (FbmSync.propertyBufferBegin()) { FbmSync.budgetCallBegin(); FbmSync.logContextNote(null); } },
+  end: function () { FbmSync.requestWatchTake().forEach(function (entry) { logEvent(entry); }); FbmSync.propertyBufferEnd(); },
+  boundary: function (stage, name, error) { FbmSync.traceEvent(FbmSync.callStateSeen(), stage, { operation: String(name || ''), error: error ? String(error && error.message || error) : '', stack: error && error.stack ? String(error.stack) : '' }); }
 };

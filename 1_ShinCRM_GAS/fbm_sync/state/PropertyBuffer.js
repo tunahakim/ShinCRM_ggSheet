@@ -5,7 +5,7 @@
  * - Trong khóa điều phối, ghi qua `FbmSync.props()` chỉ chờ và được ghi gộp một lần trước khi nhả khóa, nên lượt khác chỉ thấy bản hoàn chỉnh. Ngoài khóa thì ghi ngay.
  * - Hash chờ xác nhận (ghi trước khi gửi lệnh ghi FBM) vẫn bền trước khi Extension gửi lệnh, vì kho được ghi trước khi nhả khóa và trước khi GAS trả response.
  * - Ghi gộp hỏng thì ghi Log kèm runId/phase/cursor của state còn trong kho để biết phiên nào kẹt.
- * Trace là chẩn đoán: gom trong bộ nhớ suốt lần gọi và ghi một lần ở `propertyBufferEnd`; ghi trace hỏng không làm hỏng nghiệp vụ.
+ * Trace là chẩn đoán: gom trong bộ nhớ suốt lần gọi và ghi một lần ở `propertyBufferEnd`; ghi trace hỏng thì ném, `runEntryPoint` ghi Log mà không đổi kết quả của lời gọi.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 

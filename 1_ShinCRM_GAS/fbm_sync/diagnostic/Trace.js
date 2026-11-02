@@ -7,8 +7,9 @@ FbmSync.TRACE_KEY = 'FBM_SYNC_TRACE_V1';
 FbmSync.TRACE_LIMIT = 24;
 FbmSync.traceClip = function (value, limit) { return String(value || '').slice(0, Number(limit || 160)); };
 
-/** Ô lượt do bên gọi truyền vào; trường của `extra` đè lên. */
+/** Ô lượt do bên gọi truyền; `extra` đè lên. Thiếu ô lượt thì ném, để gọi sai chữ ký không thành mốc sai tên mà không ai thấy. */
 FbmSync.traceContext = function (state, extra) {
+  if (!state || typeof state !== 'object') { throw new Error('Ghi trace thiếu ô lượt: bên gọi truyền ô lượt trước tên mốc.'); }
   var cursor = state.cursor || {}, value = extra || {};
   return {
     runId: FbmSync.traceClip(value.runId !== undefined ? value.runId : state.runId || '', 80),
@@ -39,27 +40,17 @@ FbmSync.traceAppend = function (events) {
   return added;
 };
 
-/** Gộp sự kiện vào khóa trace trong kho, bỏ trùng với dòng đã có. */
+/** Gộp sự kiện vào khóa trace trong kho, bỏ trùng với dòng đã có. Ghi hỏng thì ném lỗi có mã; ghi Log là việc của `runEntryPoint` khi đóng lời gọi. */
 FbmSync.traceStore = function (events) {
   if (!Array.isArray(events) || !events.length) { return 0; }
-  var props = FbmSync.props(), rows = documentMemoRead(props, FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [];
-  try {
-    var seen = {};
-    rows.forEach(function (item) { if (item && item.stage) { seen[[item.stage, item.runId, item.requestId, item.at].join('|')] = true; } });
-    var added = 0;
-    events.forEach(function (event) {
-      if (!event || !event.stage) { return; }
-      var key = [event.stage, event.runId, event.requestId, event.at].join('|');
-      if (seen[key]) { return; }
-      seen[key] = true; rows.push(event); added += 1;
-    });
-    if (added) { props.setProperty(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT))); }
-    return added;
-  } catch (writeFailed) {
-    // Trace chỉ để chẩn đoán: ghi hỏng (thường là chạm trần dung lượng kho) thì báo vào Log, không làm hỏng lời gọi đồng bộ đã chạy xong.
-    logEvent({ source: 'fbm_sync', action: 'trace_store', outcome: LOG_ERROR, reason: writeFailed.code || 'FBM_TRACE_WRITE_FAILED', detail: { error: String(writeFailed && writeFailed.message || writeFailed), events: events.length } });
-    return 0;
-  }
+  var rows = documentMemoRead(FbmSync.props(), FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [], seen = {}, added = 0;
+  rows.forEach(function (item) { if (item && item.stage) { seen[FbmSync.traceKey(item)] = true; } });
+  events.forEach(function (event) {
+    if (!event || !event.stage || seen[FbmSync.traceKey(event)]) { return; }
+    seen[FbmSync.traceKey(event)] = true; rows.push(event); added += 1;
+  });
+  if (added) { FbmSync.documentPropertySet(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT)), 'trace'); }
+  return added;
 };
 
 FbmSync.traceEvent = function (state, stage, extra) {
@@ -262,6 +253,8 @@ FbmSync.businessFinishOpenSteps = function (state, phase, result) {
  * Mọi dòng Log nguồn fbm_sync mang "lượt": ai chạy (Tay hay Nền) và tiến trình nào, để lọc Log theo Giữ phiên hay lượt bấm tay khi debug.
  * Lấy từ bản state vừa đọc hoặc ghi trong lời gọi này nên không tốn thêm lần đọc kho. Đăng ký lúc chạy vì thư mục fbm_sync nạp trước server/log.
  */
+/** Ô lượt đọc hoặc ghi gần nhất của lời gọi (RAM, không đọc kho), chưa có thì ô trống; mốc trace của cửa vào lấy từ đây. */
+FbmSync.callStateSeen = function () { return FbmSync._logContextState || {}; };
 FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
   if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }

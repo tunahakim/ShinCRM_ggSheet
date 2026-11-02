@@ -22,7 +22,7 @@ var ENTRY_POINT_LOG_ON_CHANGE = ['probeSelectionAndReload', 'getReloadState', 'r
 function entryFail(name, source, err) {
   var changed = noticeRaise({ topic: 'entry_failure', scope: name, source: source, title: errorMessage(err), lines: ['Việc gây ra: ' + name], hint: 'Chi tiết ở sheet Log. Thông báo tự mất khi việc này chạy lại thành công.' });
   if (!changed && ENTRY_POINT_LOG_ON_CHANGE.indexOf(name) >= 0) { return; }
-  logEvent({ source: source, action: name, outcome: LOG_ERROR, reason: errorMessage(err), detail: { stack: err && err.stack ? String(err.stack) : '(không có stack)' } });
+  logEvent({ source: source, action: name, outcome: LOG_ERROR, reason: errorMessage(err), detail: Object.assign({ code: err && err.code ? String(err.code) : '' }, err && err.detail && typeof err.detail === 'object' ? err.detail : {}, { stack: err && err.stack ? String(err.stack) : '(không có stack)' }) });
 }
 
 /** Cửa vào chạy thành công: gỡ thông báo lỗi của nó; có gỡ thì ghi một dòng hết lỗi. Kho đã nằm trong bản đọc của lần gọi nên lượt không có lỗi cũ không tốn lệnh ghi nào. */
@@ -64,7 +64,8 @@ function runEntryPoint(name, source, fn) {
     entryFail(name, source, err);
     throw err;
   } finally {
-    // Ghi nhận thay đổi trước khi nhả log, kể cả khi lần chạy đã lỗi sau khi ghi một phần: dữ liệu đã xuống Sheet thì Sidebar phải được báo. Ghi nhận hỏng thì ghi Log và báo người dùng; lần chạy đang thành công thì thành lỗi.
+    // Ghi nhận thay đổi trước khi nhả log, kể cả khi lần chạy đã lỗi sau khi ghi một phần: dữ liệu đã xuống Sheet thì Sidebar phải được báo. Ghi nhận hỏng thì ghi Log và báo người dùng; lần chạy đang thành công thì thành lỗi, nhưng chỉ ném sau khi Log đã nhả.
+    var closeErr = null;
     try {
       pendingChangesEnd();
     } catch (basketErr) {
@@ -73,17 +74,21 @@ function runEntryPoint(name, source, fn) {
       } else {
         failed = true;
         entryFail(name, source, basketErr);
-        throw basketErr;
+        closeErr = basketErr;
       }
     }
-    if (scope) { scope.boundary('before_flush', name); }
+    // Đóng phạm vi nhánh (ghi trace, dòng Log nhánh dồn tới cuối lời gọi) trước lần nhả Log duy nhất, để dòng Log nó sinh ra cũng ra Sheet. Đóng hỏng thì báo như lỗi cửa vào nhưng không đổi kết quả: việc của lời gọi đã xong.
     try {
+      if (scope) {
+        if (!failed) { scope.boundary('gas_returned', name); }
+        try { scope.end(); } catch (endErr) { entryFail(name, source, endErr); }
+      }
       flushLog();
     } finally {
-      if (scope) { scope.boundary('after_flush', name); if (!failed) { scope.boundary('gas_returned', name); } }
-      try { if (scope) { scope.end(); } } finally { documentStoreEnd(); }
+      documentStoreEnd();
       if (perf) { devPerfEnd(perf, failed); }
     }
+    if (closeErr) { throw closeErr; }
   }
 }
 
