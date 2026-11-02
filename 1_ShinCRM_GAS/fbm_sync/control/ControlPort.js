@@ -20,7 +20,7 @@ FbmSync.COMMANDS = {
   open_conflict: { lock: true, drives: true, run: function () { return FbmSync.openConflict(); } },
   confirm_conflict: { lock: true, run: function (input) { return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.fbmValues, input.shinValues, input.snapshot); } },
   save_settings: { lock: true, run: function (input) { return FbmSync.commandSaveSettings(input); } },
-  set_master: { lock: true, run: function (input) { return FbmSync.setMasterEnabled(input.enabled === true); } },
+  set_master: { run: function (input) { return FbmSync.masterSwitchCommand(input.enabled === true); } },
   set_background: { lock: true, run: function (input) { return FbmSync.setBackgroundEnabled(input.enabled === true); } },
   save_identity_binding: { lock: true, run: function (input) { return FbmSync.bindingWrite(input.binding || {}); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
@@ -207,8 +207,7 @@ FbmSync.commandSaveSettings = function (input) {
   var saved = FbmSync.SETTINGS_SAVERS[section](input.value === undefined ? {} : input.value);
   if (section !== 'sync') { return saved; }
   if (saved.ok !== false && typeof input.master === 'boolean') {
-    var master = FbmSync.setMasterEnabled(input.master);
-    if (!master || master.ok === false) { return master; }
+    if (!FbmSync.setMasterEnabled(input.master).enabled) { FbmSync.stopPendingApply(); }
   }
   return Object.assign({}, saved, { status: FbmSync.statusView() });
 };

@@ -93,7 +93,7 @@ FbmSync.replyAdmit = function (state, requestId, rawResponse) {
 
 /**
  * Người điều phối lệnh `continue`: nộp lặp thì phát lại request đã cấp; lỗi gửi thì qua bảng lỗi đường truyền; response thì qua `continue`. Hai cửa đều qua `replyAdmit` trước.
- * Relay chỉ nộp khi công tắc tổng còn bật: tắt giữa chừng thì không xử lý tiếp, lượt tự đóng khi quá hạn.
+ * Relay chỉ nộp khi công tắc tổng còn bật. Lượt đang mở đã được đóng ở đầu lát (`runSlice` áp điều kiện dừng), nên nhánh này chỉ còn chặn response của lượt đã đóng.
  */
 FbmSync.sliceContinue = function (input, state) {
   FbmSync.traceImport(state, input.clientTrace);

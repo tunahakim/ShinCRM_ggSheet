@@ -399,14 +399,9 @@ FbmSync.issueContext = null;
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
   if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
-  // Đang tắt thì không cấp request kế tiếp. Request đã gửi trước đó không thể thu hồi;
-  // state được chuyển sang paused để người dùng xem và chủ động tiếp tục sau khi bật lại.
+  // Đang tắt thì không cấp request kế tiếp; lượt đang mở đóng qua cùng cổng với lệnh Dừng.
   if (!FbmSync.masterEnabled()) {
-    var stopped = FbmSync.stateRead();
-    stopped.phase = 'paused';
-    stopped.message = 'Đồng bộ đang tắt; không cấp request FBM mới. Request đang bay vẫn được giữ để không mất cursor.';
-    stopped.lastError = '';
-    FbmSync.stateWrite(stopped);
+    FbmSync.stopPendingApply(true);
     return null;
   }
   var pendingState = FbmSync.stateRead();

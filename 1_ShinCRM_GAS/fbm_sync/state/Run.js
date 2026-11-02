@@ -55,6 +55,7 @@ FbmSync.RUN_VERDICTS = {
   paused: { phase: 'paused' },
   cancelled: { phase: 'paused', message: 'Đã dừng lượt đồng bộ theo yêu cầu; kết quả và log của lượt này vẫn được giữ để xem lại.', reason: 'dừng theo yêu cầu người dùng' },
   stopped: { phase: 'paused', message: 'Đã dừng đồng bộ nền theo yêu cầu; có thể chạy lượt thủ công.', reason: 'dừng lượt nền theo yêu cầu người dùng' },
+  disabled: { phase: 'paused', message: 'Đã tắt đồng bộ; lượt đang chạy dừng ngay, response FBM về sau bị bỏ.', reason: 'tắt đồng bộ' },
   error: { phase: 'error' }
 };
 

@@ -29,8 +29,10 @@ FbmSync.stopFlagFor = function (state, flag) {
   return !!flag && FbmSync.runInProgress(state) && String(flag.runId) === String(state.runId);
 };
 
+/** Kết luận đóng lượt theo phạm vi lệnh Dừng: `master` là tắt công tắc tổng. */
+FbmSync.STOP_SCOPE_VERDICTS = { any: 'cancelled', background: 'stopped', master: 'disabled' };
 /**
- * Lệnh Dừng có được nhận không. `background`: chỉ dừng lượt nền (người dùng chọn dừng nền để chạy lượt tay); `any`: nút Dừng, dừng mọi lượt.
+ * Lệnh Dừng có được nhận không. `background`: chỉ dừng lượt nền (người dùng chọn dừng nền để chạy lượt tay); `any` (nút Dừng) và `master` (tắt công tắc): dừng mọi lượt.
  * Trả `null` là được nhận; ngược lại là kết quả trả ngay, không ghi gì.
  */
 FbmSync.stopAllowed = function (state, scope) {
@@ -40,11 +42,11 @@ FbmSync.stopAllowed = function (state, scope) {
 };
 
 /**
- * Người điều phối của `cancel` và `stop_background`, chạy ngoài khóa điều phối: ghi cờ dừng rồi thử lấy khóa không chờ.
+ * Người điều phối của `cancel`, `stop_background` và phần dừng của `set_master`, chạy ngoài khóa điều phối: ghi cờ dừng rồi thử lấy khóa không chờ.
  * Lấy được khóa (không lát nào đang chạy, thường gặp vì phần lớn thời gian lượt chờ FBM) thì đóng lượt ngay. Không lấy được thì lát đang giữ khóa thấy cờ trước khi phát request kế và tự đóng lượt (`SYNC_STOP_PENDING`); lệnh mở lượt và nhịp nền cũng áp cờ trước khi làm gì khác.
  */
 FbmSync.runStopCommand = function (scope) {
-  var verdict = scope === 'background' ? 'stopped' : 'cancelled', state = FbmSync.stateRead(), refused = FbmSync.stopAllowed(state, scope);
+  var verdict = FbmSync.STOP_SCOPE_VERDICTS[scope], state = FbmSync.stateRead(), refused = FbmSync.stopAllowed(state, scope);
   if (refused) { return Object.assign(refused, { status: FbmSync.statusView() }); }
   FbmSync.stopFlagWrite({ runId: String(state.runId), verdict: verdict, at: Date.now() });
   var applied = FbmSync.withOrchestrationLock(function () { return FbmSync.stopPendingApply(); }, 0);
@@ -53,32 +55,42 @@ FbmSync.runStopCommand = function (scope) {
 };
 
 /**
- * Áp cờ dừng trong khóa: cờ thuộc lượt đang chạy thì đóng lượt với kết luận của cờ và ghi. Người điều phối gọi ở đầu lát, trước khi phát request kế (`fresh`), ở lệnh mở lượt và nhịp nền.
+ * Kết luận dừng của lượt đang chạy: cờ dừng thuộc lượt thì theo cờ; công tắc tổng tắt thì `disabled`; không thì rỗng.
+ * Công tắc tắt là một điều kiện dừng như cờ, nên mọi chỗ áp cờ cũng đóng lượt khi công tắc tắt. Công tắc đọc từ bản chụp (không tốn lần đọc kho): tắt giữa lát thì `masterSwitchCommand` đã ghi kèm cờ dừng, lần đọc cờ `fresh` thấy nó.
+ */
+FbmSync.stopVerdict = function (state, fresh) {
+  if (!FbmSync.runInProgress(state)) { return ''; }
+  var flag = FbmSync.stopFlagRead(fresh);
+  if (FbmSync.stopFlagFor(state, flag)) { return flag.verdict; }
+  return FbmSync.masterEnabled() ? '' : 'disabled';
+};
+
+/**
+ * Áp điều kiện dừng trong khóa: lượt đang chạy có kết luận dừng thì đóng lượt và ghi. Người điều phối gọi ở đầu lát, trước khi phát request kế (`fresh`), ở lệnh mở lượt, nhịp nền và lệnh tắt công tắc.
  * Trả `{ state, stopped }`; `state` là bản sau khi áp.
  */
 FbmSync.stopPendingApply = function (fresh) {
-  var state = FbmSync.stateRead(), flag = FbmSync.stopFlagRead(fresh);
-  if (!FbmSync.stopFlagFor(state, flag)) { return { state: state, stopped: false }; }
-  FbmSync.runClose(state, flag.verdict);
+  var state = FbmSync.stateRead(), verdict = FbmSync.stopVerdict(state, fresh);
+  if (!verdict) { return { state: state, stopped: false }; }
+  FbmSync.runClose(state, verdict);
   // Người dùng dừng thì tiến trình nền đang đến hạn cũng bỏ, không để nhịp kế mở lại đúng lượt vừa dừng; lượt chết bị thu hồi thì giữ để lịch nền chạy lại.
   state.scheduledScan = '';
   return { state: FbmSync.stateWrite(state), stopped: true };
 };
 
-/** Lệnh công tắc tổng: tắt thì không cấp request mới; lượt đang mở mà không có request đang bay thì đóng tạm dừng qua `runClose`. Request đang bay không thu hồi được nên giữ, lượt đóng khi trả lời về. */
+/** Ghi công tắc tổng, không chạm ô lượt. Đóng lượt khi tắt là việc của người điều phối gọi nó: `masterSwitchCommand` (ngoài khóa), lưu cài đặt (đang cầm khóa nên gọi thẳng `stopPendingApply`; khóa không lấy lồng được). */
 FbmSync.setMasterEnabled = function (enabled) {
   var value = enabled === true;
   FbmSync.documentPropertySet(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false', 'công tắc tổng');
-  if (!value) {
-    var state = FbmSync.stateRead();
-    if (!state.activeRequestId) {
-      var message = 'Đồng bộ đang tắt; không cấp request FBM mới.';
-      if (FbmSync.runInProgress(state)) { FbmSync.runClose(state, 'paused', { message: message }); } else { state.phase = 'paused'; }
-      state.message = message;
-      FbmSync.stateWrite(state);
-    }
-  }
-  return { ok: true, enabled: value, status: FbmSync.statusView() };
+  return { ok: true, enabled: value };
+};
+/**
+ * Người điều phối của `set_master`, chạy ngoài khóa: ghi công tắc rồi, khi tắt, đi đúng tiến trình Dừng với kết luận `disabled`.
+ * Lượt đang mở đóng ngay kể cả khi có request đang bay (request đó không thu hồi được, response về sau bị bỏ); khóa bận thì lát đang chạy thấy cờ trước khi phát request kế (`SYNC_STOP_PENDING`).
+ */
+FbmSync.masterSwitchCommand = function (enabled) {
+  var value = FbmSync.setMasterEnabled(enabled).enabled, stop = value ? null : FbmSync.runStopCommand('master');
+  return { ok: true, enabled: value, code: stop ? stop.code : '', status: FbmSync.statusView() };
 };
 /**
  * Lối thoát cuối khi kho state hỏng (FBM-044): chỉ xóa state phiên. Hash chờ xác nhận ở khóa riêng và trạng thái "đang đẩy" trên Sheet vẫn còn,
