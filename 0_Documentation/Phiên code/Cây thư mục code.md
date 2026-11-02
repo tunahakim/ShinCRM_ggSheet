@@ -312,6 +312,7 @@ tests\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
+│   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
@@ -414,6 +415,7 @@ tests\
     │   ├── Slice.js                Kiểm `state/Slice.js`: hai công cụ sửa hai trường trong một lát đều còn, ghi kho một lần, bản khác bị chặn `SLICE_FOREIGN_STATE`, lỗi giữa lát, ghi kho hỏng, lát lồng.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
+    │   ├── SiteAccess.js           Kiểm Extension chỉ hỏi Chrome quyền trang khi nạp script vào tab FBM hoặc gọi GAS đã hỏng, và báo mã riêng nêu tên trang bị chặn.
     │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
     │   ├── EntryPointGate.js       Kiểm cửa ra của mọi hàm fbm* về Sidebar không mang cookie/token phiên, và lệnh start giữ nguyên identity nháp của Kiểm liên kết.
