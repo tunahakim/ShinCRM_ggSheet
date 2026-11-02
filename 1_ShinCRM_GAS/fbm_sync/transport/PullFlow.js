@@ -392,11 +392,11 @@ FbmSync.continueStep = function (rawResponse) {
   FbmSync.stateWrite(state);
   if (FbmSync.traceImport) {
     var transportTrace = rawResponse && rawResponse.transport && rawResponse.transport.trace;
-    if (transportTrace) { FbmSync.traceImport(transportTrace, { runId: state.runId, requestId: completedRequestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
+    if (transportTrace) { FbmSync.traceImport(state, transportTrace, { runId: state.runId, requestId: completedRequestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
   }
   if (FbmSync.traceEvent) {
     var responseMeta = FbmSync.traceResponse ? FbmSync.traceResponse(rawResponse) : {};
-    FbmSync.traceEvent('fbm_response_received', { requestId: completedRequestId, httpStatus: responseMeta.httpStatus, responseLength: responseMeta.responseLength });
+    FbmSync.traceEvent(state, 'fbm_response_received', { requestId: completedRequestId, httpStatus: responseMeta.httpStatus, responseLength: responseMeta.responseLength });
   }
   state.activeRequestId = '';
   state.lastProgressAt = Date.now();

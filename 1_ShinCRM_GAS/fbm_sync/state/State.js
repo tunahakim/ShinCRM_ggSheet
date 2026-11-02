@@ -37,33 +37,22 @@ FbmSync.runDoneMessage = function (state) {
 };
 FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, transferredCustomer: 0, transferredActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
-// Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB. Chặn trước
-// khi gọi setProperty để không đẩy một JSON dở dang vào kho state.
+// Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB: chặn trước khi gọi setProperty để không đẩy một JSON dở dang vào kho.
+// Ghi hỏng thì ném lỗi có mã kèm `detail`; không tự ghi Log và không trả kết quả để bên gọi bỏ qua: người điều phối bắt được lỗi thì ghi Log, không bắt thì `runEntryPoint` ghi.
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertySet = function (key, value, context) {
-  var text = String(value === null || value === undefined ? '' : value), bytes = text.length;
-  // State lượt chỉ để ghi chi tiết Log khi ghi hỏng (khóa nào hỏng cũng cần biết lượt nào), nên chỉ đọc ở nhánh hỏng; đọc ở mỗi lần ghi từng tốn một lần gọi DocumentProperties.
-  var previous = null, loadPrevious = function () {
-    try { previous = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ'); } catch (previousFailed) { previous = { runId: '', phase: 'không đọc được state cũ: ' + (previousFailed.code || previousFailed.message) }; }
-  };
-  bytes = Utilities.newBlob(text).getBytes().length;
+  var text = String(value === null || value === undefined ? '' : value), bytes = Utilities.newBlob(text).getBytes().length, failure;
+  var detail = { key: String(key || ''), bytes: bytes, context: String(context || '') };
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
-    var tooLarge = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
-    tooLarge.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
-    loadPrevious();
-    logEvent({ source: 'fbm_sync', action: 'state_write', outcome: LOG_ERROR, reason: tooLarge.code, detail: { key: String(key || ''), bytes: bytes, context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } });
-    return { ok: false, code: tooLarge.code, message: tooLarge.message, error: tooLarge };
-  }
-  try {
-    FbmSync.props().setProperty(key, text);
-    return { ok: true };
-  } catch (err) {
-    var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
+    failure = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
+    failure.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
+  } else {
+    try { FbmSync.props().setProperty(key, text); return; } catch (err) { detail.error = String(err && err.message || err); }
+    failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
-    loadPrevious();
-    logEvent({ source: 'fbm_sync', action: 'state_write', outcome: LOG_ERROR, reason: failure.code, detail: { key: String(key || ''), context: String(context || ''), runId: previous && String(previous.runId || ''), phase: previous && String(previous.phase || ''), cursor: previous && previous.cursor || {} } });
-    return { ok: false, code: failure.code, message: failure.message, error: failure };
   }
+  failure.detail = detail;
+  throw failure;
 };
 /** Đọc một property JSON dạng object của đồng bộ qua công cụ chung `documentPropertyJson` (cursor, hash chờ xác nhận, cấu hình: hỏng thì ném, không coi là trống — FBM-025, FBM-026). */
 FbmSync.documentPropertyJson = function (key, context) {
@@ -170,8 +159,7 @@ FbmSync.pendingPushGet = function (entity, id) {
 FbmSync.pendingPushSet = function (entity, id, value) {
   var key = String(entity || '') + ':' + String(id || ''), all = FbmSync.pendingPushesRead();
   if (value && typeof value === 'object') { all[key] = value; } else { delete all[key]; }
-  var pendingWrite = FbmSync.documentPropertySet('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all), 'pending_push');
-  if (!pendingWrite.ok) { throw pendingWrite.error; }
+  FbmSync.documentPropertySet('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all), 'pending_push');
   return value || null;
 };
 FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet(entity, id, null); };
@@ -188,8 +176,7 @@ FbmSync.pushFailuresRead = function () {
 FbmSync.pushFailuresWrite = function (store) {
   var budget = FbmSync.BUDGET, details = {}, keys = Object.keys(store.details || {}).filter(function (key) { return store.hashes[key] !== undefined; });
   keys.slice(-budget.pushFailureDetailsMax).forEach(function (key) { details[key] = Object.assign({}, store.details[key], { reason: String(store.details[key] && store.details[key].reason || '').slice(0, budget.pushFailureReasonChars) }); });
-  var write = FbmSync.documentPropertySet(FbmSync.PUSH_FAILURES_KEY, JSON.stringify({ hashes: store.hashes, details: details }), 'push_failures');
-  if (!write.ok) { throw write.error; }
+  FbmSync.documentPropertySet(FbmSync.PUSH_FAILURES_KEY, JSON.stringify({ hashes: store.hashes, details: details }), 'push_failures');
 };
 /** Lỗi mới đưa xuống cuối để `details` luôn giữ các lỗi gần nhất. */
 FbmSync.pushFailureAdd = function (key, hash, detail) {
@@ -244,8 +231,7 @@ FbmSync.pushCleanNow = function () {
 /** Dấu đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
 FbmSync.pushCleanRead = function () { return FbmSync.documentPropertyJson(FbmSync.PUSH_CLEAN_KEY, 'dấu lần đẩy sạch'); };
 FbmSync.pushCleanWrite = function (mark) {
-  var write = FbmSync.documentPropertySet(FbmSync.PUSH_CLEAN_KEY, JSON.stringify(mark), 'push_clean');
-  if (!write.ok) { throw write.error; }
+  FbmSync.documentPropertySet(FbmSync.PUSH_CLEAN_KEY, JSON.stringify(mark), 'push_clean');
 };
 FbmSync.pushCleanClear = function () { FbmSync.props().deleteProperty(FbmSync.PUSH_CLEAN_KEY); };
 /**
@@ -335,12 +321,13 @@ FbmSync.stateStore = function (state) {
   }
   FbmSync.logContextNote(next);
   FbmSync.requestWatchCheck(next);
-  var stateWrite = FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state');
-  if (stateWrite.ok) { FbmSync.requestWatchNote(next); return next; }
-  // Đóng phiên mà ghi hỏng thì phiên đứng mãi ở pha đang chạy và màn đồng bộ kẹt (FBM-044); lát giữa chừng thì vẫn ném để phiên chuyển sang lỗi.
-  var minimal = FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0 ? FbmSync.stateWriteMinimal(next, stateWrite) : null;
-  if (!minimal) { throw stateWrite.error; }
-  return minimal;
+  try { FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(next), 'state'); } catch (error) {
+    // Đóng phiên mà ghi hỏng thì phiên đứng mãi ở pha đang chạy và màn đồng bộ kẹt (FBM-044): ghi bản rút gọn để phiên đóng được, rồi vẫn ném để người điều phối báo lỗi.
+    if (FbmSync.stateStorageError(error) && FbmSync.TERMINAL_PHASES.indexOf(String(next.phase || '')) >= 0) { error.minimal = FbmSync.stateWriteMinimal(next, error); }
+    throw error;
+  }
+  FbmSync.requestWatchNote(next);
+  return next;
 };
 /**
  * Luật chung cho mọi request GAS phát cho Extension (Giữ phiên, lượt nền, lượt bấm tay, đăng nhập): request đã quá hạn chờ mà rời khỏi state không qua trả lời thì có một dòng Log lỗi.
@@ -396,46 +383,36 @@ FbmSync.requestWatchCheck = function (next, now) {
 };
 FbmSync.STATE_MINIMAL_TEXT_LIMIT = 1000;
 FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái phiên; đã lưu bản rút gọn, xem Log.)';
-/** Bản state đóng phiên chỉ gồm phase, lý do và (nếu vừa) cursor/khóa ghi; preview, session, sổ bước bị bỏ vì chính chúng làm phình state. */
+/** Bản state đóng phiên chỉ gồm phase, lý do và (nếu vừa) cursor/khóa ghi; preview, session, sổ bước bị bỏ vì chính chúng làm phình state. Trả bản đã ghi kèm `cursorKept`, hoặc `null` khi không ghi được bản nào (lỗi gốc vẫn được ném ở `stateStore`). */
 FbmSync.stateWriteMinimal = function (full, failure) {
   var cut = function (text) { return String(text || '').slice(0, FbmSync.STATE_MINIMAL_TEXT_LIMIT); };
   var base = { version: full.version, runId: full.runId, origin: full.origin, mode: full.mode, scan: full.scan, phase: full.phase, entity: full.entity, startedAt: full.startedAt, updatedAt: full.updatedAt, retryable: false, lastFailureCode: String(full.lastFailureCode || failure.code || ''), lastError: cut(full.lastError), message: cut(full.message || full.lastError) + FbmSync.STATE_MINIMAL_NOTE, metadata: { conflictCount: Number(full.metadata && full.metadata.conflictCount || 0) } };
   var tiers = [Object.assign({}, base, { cursor: full.cursor || {} }), base];
   for (var i = 0; i < tiers.length; i += 1) {
-    if (!FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(tiers[i]), 'state_minimal').ok) { continue; }
-    logEvent({ source: 'fbm_sync', action: 'state_write_minimal', outcome: LOG_WARN, reason: 'Không lưu được đầy đủ trạng thái phiên (' + String(failure.code || '') + '); đã lưu bản rút gọn để đóng phiên ở "' + String(full.phase || '') + '"' + (i ? ', bỏ cả con trỏ và khóa ghi.' : '.'), detail: { runId: String(full.runId || ''), phase: String(full.phase || '') } });
-    return FbmSync.stateRead();
+    try { FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(tiers[i]), 'state_minimal'); } catch (tierError) {
+      if (!FbmSync.stateStorageError(tierError)) { throw tierError; }
+      continue;
+    }
+    return { state: tiers[i], cursorKept: i === 0 };
   }
   return null;
 };
 // Lỗi kho state: gặp ở lần đọc status thì người dùng không tự thoát được, nên GAS mở nút "Đặt lại phiên đồng bộ" (FBM-044).
 FbmSync.STATE_STORAGE_CODES = ['DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTIES_QUOTA', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED'];
 FbmSync.stateStorageError = function (error) { return !!error && FbmSync.STATE_STORAGE_CODES.indexOf(String(error.code || '')) >= 0; };
-/** Snapshot thay cho status khi kho state hỏng: ghi Log và trả lý do kèm cờ mở nút đặt lại. */
+/** Snapshot thay cho status khi kho state hỏng: lý do kèm cờ mở nút đặt lại. Không ghi Log: cửa lệnh gặp lỗi kho ghi (`storageFailureLog`). */
 FbmSync.stateStuckView = function (error) {
   var reason = String(error && error.message || error || '');
-  logEvent({ source: 'fbm_sync', action: 'state_stuck', outcome: LOG_ERROR, reason: reason, detail: { code: String(error && error.code || '') } });
   return { ok: false, code: 'SYNC_STATE_STUCK', failureCode: String(error && error.code || ''), resetOffered: true, runId: '', phase: 'error', label: 'Có lỗi', message: 'Màn đồng bộ đang kẹt: ' + reason, lastError: reason, counts: {} };
 };
-/**
- * Lối thoát cuối khi kho state hỏng (FBM-044): chỉ xóa state phiên. Hash chờ xác nhận ở khóa riêng và trạng thái "đang đẩy" trên Sheet vẫn còn,
- * nên lệnh tạo mất phản hồi vẫn được tra lại ở phiên sau, không tạo trùng. Phiên còn chạy bình thường thì từ chối, người dùng dùng "Dừng đồng bộ".
- */
-FbmSync.stateReset = function (now) {
-  var current = null, unreadable = null;
-  // Không đọc được state chính là lý do cần đặt lại, nên lỗi đọc không chặn việc xóa; nó đi vào dòng Log bên dưới.
-  try { current = FbmSync.stateRead(); } catch (readError) { unreadable = readError; }
-  var age = current ? Number(now || Date.now()) - Number(current.updatedAt || current.startedAt || 0) : 0;
-  if (current && FbmSync.ACTIVE_PHASES.indexOf(String(current.phase || '')) >= 0 && age <= FbmSync.STALE_RUN_MS) {
-    return { ok: false, code: 'SYNC_RESET_RUNNING', message: 'Phiên đồng bộ đang chạy bình thường nên không đặt lại; hãy bấm "Dừng đồng bộ" nếu muốn dừng.' };
-  }
+/** Xóa ô lượt khỏi kho (lối thoát khi kho state hỏng, lệnh `stateReset`); xóa hỏng thì ném lỗi có mã. */
+FbmSync.stateErase = function () {
   try { FbmSync.props().deleteProperty(FbmSync.STATE_KEY); } catch (deleteError) {
     var failure = new Error('Không xóa được trạng thái phiên đồng bộ; thử lại sau ít phút.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
+    failure.detail = { key: FbmSync.STATE_KEY, context: 'state_reset', error: String(deleteError && deleteError.message || deleteError) };
     throw failure;
   }
-  logEvent({ source: 'fbm_sync', action: 'state_reset', outcome: LOG_WARN, reason: 'Người dùng đặt lại phiên đồng bộ bị kẹt' + (unreadable ? ' (state không đọc được: ' + String(unreadable.message || unreadable) + ')' : ' (phiên ' + String(current.runId || '') + ' ở "' + String(current.phase || '') + '")') + '; dữ liệu Sheet và FBM không đổi.', detail: { runId: current ? String(current.runId || '') : '', phase: current ? String(current.phase || '') : '' } });
-  return { ok: true };
 };
 /** Ghi một phần state mà không làm mất field đang có. */
 FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };

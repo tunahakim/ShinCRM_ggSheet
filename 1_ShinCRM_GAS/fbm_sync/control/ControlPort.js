@@ -27,7 +27,7 @@ FbmSync.COMMANDS = {
   repair_login_username: { lock: true, run: function (input) { return FbmSync.loginConfigRepairUsername(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
   retry_push_failures: { lock: true, slice: true, run: function () { return fbmSyncRetryPushFailures(); } },
-  client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(input.clientTrace); return { ok: true, status: FbmSync.logTransportError(input.message, input.action, input.runId) }; } },
+  client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace); return { ok: true, status: FbmSync.logTransportError(input.message, input.action, input.runId) }; } },
   relay_config: { lock: true, run: function () { return FbmSync.relayConfig(false); } },
   relay_rotate_key: { lock: true, run: function () { return FbmSync.relayConfig(true); } },
   relay_switch_log: { run: function (input) { return FbmSync.relaySwitchDecisionLog(input.decision === 'switch' ? 'switch' : 'keep', input.fromSpreadsheetId); } },
@@ -96,7 +96,8 @@ FbmSync.channelResult = function (result, via) {
 /** Kho state hỏng khi đang ghi: trả status "kẹt" kèm lối đặt lại thay vì ném, không thì người dùng không có lối thoát (FBM-044). */
 FbmSync.storageFailureResult = function (error) {
   var code = String(error && error.code || ''), status;
-  try { status = FbmSync.statusView(); } catch (readError) { status = FbmSync.stateStuckView(readError); return { ok: false, code: status.code, error: status.lastError, status: status }; }
+  try { status = FbmSync.statusView(); } catch (readError) { status = FbmSync.stateStuckView(readError); FbmSync.storageFailureLog(error, status); return { ok: false, code: status.code, error: status.lastError, status: status }; }
+  FbmSync.storageFailureLog(error, status);
   // Phiên còn đứng ở pha đang chạy nghĩa là cả bản state rút gọn cũng không ghi được: mở lối đặt lại.
   status.resetOffered = FbmSync.ACTIVE_PHASES.indexOf(String(status.phase || '')) >= 0;
   status.ok = false;
@@ -106,6 +107,13 @@ FbmSync.storageFailureResult = function (error) {
   status.message = status.lastError;
   status.retryable = false;
   return { ok: false, code: code, error: status.lastError, status: status };
+};
+
+/** Một dòng Log cho lỗi kho state mà cửa lệnh bắt được: công cụ kho chỉ ném lỗi kèm `detail`, không tự ghi. */
+FbmSync.storageFailureLog = function (error, status) {
+  var minimal = error && error.minimal, view = status || {};
+  var message = String(error && error.message || error) + (minimal ? ' Đã lưu bản rút gọn để đóng phiên ở "' + String(minimal.state.phase || '') + '"' + (minimal.cursorKept ? '.' : ', bỏ cả con trỏ và khóa ghi.') : '');
+  logEvent({ source: 'fbm_sync', action: error && error.detail ? 'state_write' : 'state_stuck', outcome: LOG_ERROR, cycleId: String(view.runId || ''), reason: String(error && error.code || ''), detail: Object.assign({ message: message, runId: String(view.runId || ''), phase: String(view.phase || ''), cursor: view.cursor || {}, minimal: !!minimal }, error && error.detail || {}) });
 };
 
 /**
@@ -159,7 +167,7 @@ FbmSync.commandStart = function (input) {
     unknown.code = 'SYNC_START_KIND_UNKNOWN';
     throw unknown;
   }
-  FbmSync.traceImport(input.clientTrace);
+  FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace);
   // Lượt nền bị Dừng khi khóa bận còn chờ đóng: đóng trước, ngoài lát, để lát của lượt mới không áp nhầm cờ rồi trả "đã dừng" thay cho mở lượt.
   FbmSync.stopPendingApply();
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };
@@ -211,7 +219,7 @@ FbmSync.commandSaveSettings = function (input) {
  */
 FbmSync.statusRead = function () {
   var status;
-  try { status = FbmSync.statusView(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } status = FbmSync.stateStuckView(error); }
+  try { status = FbmSync.statusView(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } status = FbmSync.stateStuckView(error); FbmSync.storageFailureLog(error, status); }
   return { ok: true, status: status, identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.loginConfigPublic() };
 };
 FbmSync.settingsView = function () {

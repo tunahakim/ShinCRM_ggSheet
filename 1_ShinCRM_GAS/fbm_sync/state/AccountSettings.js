@@ -49,10 +49,7 @@ FbmSync.accountSettingsRead = function () {
       invalid.code = 'DOCUMENT_PROPERTY_CORRUPT'; throw invalid;
     }
     if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
-      var normalizedWrite;
-      if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings), 'account_settings'); }
-      else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
-      if (!normalizedWrite.ok) { throw normalizedWrite.error; }
+      FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(valid.settings), 'account_settings');
     }
     return valid.settings;
   }
@@ -64,10 +61,7 @@ FbmSync.accountSettingsSave = function (input) {
   if (!check.ok) { return check; }
   var props = fbmAccountSettingsProps();
   if (!props) { return { ok: false, code: 'FBM_ACCOUNT_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
-  var saved;
-  if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings), 'account_settings'); }
-  else { props.setProperty(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
-  if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
+  FbmSync.documentPropertySet(FbmSync.ACCOUNT_SETTINGS_KEY, JSON.stringify(check.settings), 'account_settings');
   return { ok: true, settings: check.settings };
 };
 

@@ -64,7 +64,7 @@ FbmSync.scanJobAccept = function (state, cursor, rawResponse) {
     return { result: FbmSync.scanJobMismatch(state, 'Gói quét "' + String(job.jobId || '') + '" số ' + String(job.chunkIndex) + ' không khớp việc quét đang chờ (gói số ' + next + '); đã dừng và không ghi gì.') };
   }
   if (index < next) {
-    if (FbmSync.traceEvent) { FbmSync.traceEvent('scan_chunk_duplicate', { operation: 'scan_job', entity: cursor.entity, error: 'gói ' + index + ' đã ghi, xin lại gói ' + next }); }
+    if (FbmSync.traceEvent) { FbmSync.traceEvent(state, 'scan_chunk_duplicate', { operation: 'scan_job', entity: cursor.entity, error: 'gói ' + index + ' đã ghi, xin lại gói ' + next }); }
     return { result: { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView() } };
   }
   if (cursor.jobTotal !== null && cursor.jobTotal !== undefined && Number(job.totalRowCount) !== Number(cursor.jobTotal)) {

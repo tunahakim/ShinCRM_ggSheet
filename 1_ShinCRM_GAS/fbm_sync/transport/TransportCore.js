@@ -13,19 +13,6 @@ FbmSync.masterEnabled = function () {
   }
   return value !== 'false';
 };
-FbmSync.setMasterEnabled = function (enabled) {
-  var value = enabled === true;
-  FbmSync.props().setProperty(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false');
-  if (!value) {
-    var state = FbmSync.stateRead();
-    if (!state.activeRequestId) {
-      state.phase = 'paused';
-      state.message = 'Đồng bộ đang tắt; không cấp request FBM mới.';
-      FbmSync.stateWrite(state);
-    }
-  }
-  return { ok: true, enabled: value, status: FbmSync.statusView() };
-};
 
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
 // Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
@@ -466,7 +453,7 @@ FbmSync.nextEnvelope = function (request) {
   (request.items || [request]).forEach(function (item) {
     var endpoint = FbmSync.protocol.validateEndpoint(item.url);
     if (!endpoint.ok) {
-      FbmSync.traceEvent('request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code });
+      FbmSync.traceEvent(pendingState, 'request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code });
       throw new Error(endpoint.message + ' (' + endpoint.code + ')');
     }
   });
@@ -507,7 +494,7 @@ FbmSync.nextEnvelope = function (request) {
   state.lastProgressAt = Date.now();
   state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
   FbmSync.stateWrite(state);
-  FbmSync.traceEvent('response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
+  FbmSync.traceEvent(state, 'response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
 };

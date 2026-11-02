@@ -1,4 +1,4 @@
-/** Lệnh Dừng và cờ dừng: cờ ghi được khi lát khác đang giữ khóa điều phối, lát áp cờ trước khi phát request kế; đóng lượt thì qua `runClose` ở `Run.js`. */
+/** Lệnh Dừng và cờ dừng, công tắc tổng, đặt lại phiên kẹt: cờ ghi được khi lát khác đang giữ khóa điều phối, lát áp cờ trước khi phát request kế; đóng lượt thì qua `runClose` ở `Run.js`. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
@@ -7,8 +7,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.STOP_KEY = 'FBM_SYNC_STOP_V1';
 FbmSync.stopFlagWrite = function (flag) {
-  var written = FbmSync.documentPropertySet(FbmSync.STOP_KEY, JSON.stringify(flag), 'cờ dừng lượt');
-  if (!written.ok) { throw written.error; }
+  FbmSync.documentPropertySet(FbmSync.STOP_KEY, JSON.stringify(flag), 'cờ dừng lượt');
   return flag;
 };
 /**
@@ -64,4 +63,36 @@ FbmSync.stopPendingApply = function (fresh) {
   // Người dùng dừng thì tiến trình nền đang đến hạn cũng bỏ, không để nhịp kế mở lại đúng lượt vừa dừng; lượt chết bị thu hồi thì giữ để lịch nền chạy lại.
   state.scheduledScan = '';
   return { state: FbmSync.stateWrite(state), stopped: true };
+};
+
+/** Lệnh công tắc tổng: tắt thì không cấp request mới; lượt đang mở mà không có request đang bay thì đóng tạm dừng qua `runClose`. Request đang bay không thu hồi được nên giữ, lượt đóng khi trả lời về. */
+FbmSync.setMasterEnabled = function (enabled) {
+  var value = enabled === true;
+  FbmSync.documentPropertySet(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false', 'công tắc tổng');
+  if (!value) {
+    var state = FbmSync.stateRead();
+    if (!state.activeRequestId) {
+      var message = 'Đồng bộ đang tắt; không cấp request FBM mới.';
+      if (FbmSync.runInProgress(state)) { FbmSync.runClose(state, 'paused', { message: message }); } else { state.phase = 'paused'; }
+      state.message = message;
+      FbmSync.stateWrite(state);
+    }
+  }
+  return { ok: true, enabled: value, status: FbmSync.statusView() };
+};
+/**
+ * Lối thoát cuối khi kho state hỏng (FBM-044): chỉ xóa state phiên. Hash chờ xác nhận ở khóa riêng và trạng thái "đang đẩy" trên Sheet vẫn còn,
+ * nên lệnh tạo mất phản hồi vẫn được tra lại ở phiên sau, không tạo trùng. Phiên còn chạy bình thường thì từ chối, người dùng dùng "Dừng đồng bộ".
+ */
+FbmSync.stateReset = function (now) {
+  var current = null, unreadable = null;
+  // Không đọc được state chính là lý do cần đặt lại, nên lỗi đọc không chặn việc xóa; nó đi vào dòng Log bên dưới.
+  try { current = FbmSync.stateRead(); } catch (readError) { unreadable = readError; }
+  var age = current ? Number(now || Date.now()) - Number(current.updatedAt || current.startedAt || 0) : 0;
+  if (current && FbmSync.ACTIVE_PHASES.indexOf(String(current.phase || '')) >= 0 && age <= FbmSync.STALE_RUN_MS) {
+    return { ok: false, code: 'SYNC_RESET_RUNNING', message: 'Phiên đồng bộ đang chạy bình thường nên không đặt lại; hãy bấm "Dừng đồng bộ" nếu muốn dừng.' };
+  }
+  FbmSync.stateErase();
+  logEvent({ source: 'fbm_sync', action: 'state_reset', outcome: LOG_WARN, reason: 'Người dùng đặt lại phiên đồng bộ bị kẹt' + (unreadable ? ' (state không đọc được: ' + String(unreadable.message || unreadable) + ')' : ' (phiên ' + String(current.runId || '') + ' ở "' + String(current.phase || '') + '")') + '; dữ liệu Sheet và FBM không đổi.', detail: { runId: current ? String(current.runId || '') : '', phase: current ? String(current.phase || '') : '' } });
+  return { ok: true };
 };

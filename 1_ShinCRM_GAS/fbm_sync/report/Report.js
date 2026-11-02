@@ -208,7 +208,7 @@ FbmSync.previewClear = function () { FbmSync.documentPropertySet(FbmSync.PREVIEW
 
 /**
  * Bản xem trước của lượt (vài khách, vài giao dịch đầu, nội dung cắt ngắn) để người dùng nhìn khi kiểm tra; nằm ở khóa riêng, không ở state, vì state chỉ giữ thứ cần để chạy tiếp và một khóa kho chỉ chứa 9 KB.
- * Gần chạm trần thì bỏ bớt dòng; ghi hỏng thì `documentPropertySet` đã ghi Log, lượt vẫn chạy tiếp vì bản xem trước không phải dữ liệu nghiệp vụ.
+ * Gần chạm trần thì bỏ bớt dòng; ghi hỏng thì `documentPropertySet` ném lỗi và lượt dừng như mọi lỗi kho, để lỗi không bị bỏ qua.
  */
 FbmSync.previewRecords = function (entity, records) {
   var preview = FbmSync.previewRead(), target = entity === 'customer' ? preview.customers : preview.activities, before = target.length;

@@ -96,7 +96,7 @@ FbmSync.replyAdmit = function (state, requestId, rawResponse) {
  * Relay chỉ nộp khi công tắc tổng còn bật: tắt giữa chừng thì không xử lý tiếp, lượt tự đóng khi quá hạn.
  */
 FbmSync.sliceContinue = function (input, state) {
-  FbmSync.traceImport(input.clientTrace);
+  FbmSync.traceImport(state, input.clientTrace);
   if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return FbmSync.transportFailureRun(input.error); }
   if (input.source === 'relay' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }

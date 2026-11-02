@@ -77,10 +77,7 @@ FbmSync.syncSettingsRead = function () {
     }
     // Ghi lại dạng tối giản để loại bỏ các key cài đặt cũ khỏi kho hiện tại.
     if (props && JSON.stringify(parsed) !== JSON.stringify(valid.settings)) {
-      var normalizedWrite;
-      if (typeof FbmSync.documentPropertySet === 'function') { normalizedWrite = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings), 'sync_settings'); }
-      else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings)); normalizedWrite = { ok: true }; }
-      if (!normalizedWrite.ok) { throw normalizedWrite.error; }
+      FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(valid.settings), 'sync_settings');
     }
     return valid.settings;
   }
@@ -103,10 +100,7 @@ FbmSync.syncSettingsSave = function (input) {
   }
   var props = fbmSyncSettingsProps();
   if (!props) { return { ok: false, code: 'FBM_SYNC_SETTINGS_STORAGE_UNAVAILABLE', message: 'Không truy cập được DocumentProperties.' }; }
-  var saved;
-  if (typeof FbmSync.documentPropertySet === 'function') { saved = FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings'); }
-  else { props.setProperty(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings)); saved = { ok: true }; }
-  if (!saved.ok) { return { ok: false, code: saved.code, message: saved.message }; }
+  FbmSync.documentPropertySet(FbmSync.SYNC_SETTINGS_KEY, JSON.stringify(check.settings), 'sync_settings');
   var oddLength = (scopeLines || []).filter(function (line) { return line.lengthExpected; }).map(function (line) { return line.code; });
   if (oddLength.length && typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'sync_settings_save', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Mã khách chỉ định đúng tiền tố mã FBM nhưng khác độ dài đã cài: ' + oddLength.join(', ') + '. Vẫn lưu; kiểm tra lại nếu gõ thiếu hoặc thừa ký tự.', detail: { codes: oddLength } }); }
   return { ok: true, settings: check.settings, scopeLines: scopeLines };

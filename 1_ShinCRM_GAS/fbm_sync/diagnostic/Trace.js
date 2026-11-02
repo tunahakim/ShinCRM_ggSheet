@@ -7,9 +7,8 @@ FbmSync.TRACE_KEY = 'FBM_SYNC_TRACE_V1';
 FbmSync.TRACE_LIMIT = 24;
 FbmSync.traceClip = function (value, limit) { return String(value || '').slice(0, Number(limit || 160)); };
 
-FbmSync.traceContext = function (extra) {
-  // State đọc hỏng thì ném thẳng (có mã): ngữ cảnh trace rỗng sẽ ghi vết sai thay vì báo lỗi.
-  var state = FbmSync.stateRead();
+/** Ô lượt do bên gọi truyền vào; trường của `extra` đè lên. */
+FbmSync.traceContext = function (state, extra) {
   var cursor = state.cursor || {}, value = extra || {};
   return {
     runId: FbmSync.traceClip(value.runId !== undefined ? value.runId : state.runId || '', 80),
@@ -63,8 +62,8 @@ FbmSync.traceStore = function (events) {
   }
 };
 
-FbmSync.traceEvent = function (stage, extra) {
-  var event = FbmSync.traceContext(extra);
+FbmSync.traceEvent = function (state, stage, extra) {
+  var event = FbmSync.traceContext(state, extra);
   event.at = Date.now();
   event.stage = String(stage || '');
   FbmSync.traceAppend([event]);
@@ -90,9 +89,9 @@ FbmSync.traceResponse = function (raw) {
 };
 
 /** Nhận trace của client/Extension nhưng chỉ giữ các field an toàn và giới hạn số lượng. */
-FbmSync.traceImport = function (events, fallback) {
+FbmSync.traceImport = function (state, events, fallback) {
   if (!Array.isArray(events)) { return 0; }
-  var base = fallback || {}, context = FbmSync.traceContext(base), imported = [];
+  var base = fallback || {}, context = FbmSync.traceContext(state, base), imported = [];
   events.slice(-20).forEach(function (item) {
     if (!item || !item.stage) { return; }
     imported.push(Object.assign({}, context, {
