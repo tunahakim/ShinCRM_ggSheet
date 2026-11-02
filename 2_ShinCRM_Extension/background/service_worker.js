@@ -134,7 +134,7 @@ function prepareFbmTab(request, onStage) {
     if (!tab) { return null; }
     note('fbm_tab_preparing', String(tab.discarded ? 'discarded' : tab.status || 'complete'));
     return keepFbmTabLoaded(tab).then(function () { return openFbmPageIfAsked(tab, request, deadlineAt, note); });
-  });
+  }).catch(function (error) { return siteAccessCheck(FBM_SITE_ORIGINS, 'FBM_SITE_ACCESS_BLOCKED', error); });
 }
 /**
  * GAS cấp `meta.reloadFbmPage` khi tab không sẵn sàng ở lần gửi trước, hoặc trang đang mở không có mã hoặc tên người dùng để đối chiếu (tab đứng ở trang Login, trang lỗi hay trang tải từ trước khi đăng nhập). Extension chỉ đổi trang tới đúng URL đó, chờ tải xong và có executor; không tự quyết khi nào cần.
@@ -226,11 +226,17 @@ function sendTabMessage(tabId, message, timeoutMs) {
   });
 }
 
-/** Chrome từ chối nạp script vì người dùng chặn quyền Extension trên site FBM: đổi sang `FBM_SITE_ACCESS_BLOCKED` kèm chữ gốc của Chrome; lỗi khác giữ nguyên. */
-function siteAccessError(error) {
-  var text = String(error && error.message || error);
-  if (/cannot access|permission|host permissions|ExtensionsSettings/i.test(text)) { throw Object.assign(new Error('Chrome đang chặn Extension truy cập site FBM: ' + text), { code: 'FBM_SITE_ACCESS_BLOCKED' }); }
-  throw error;
+/**
+ * Bước chạm một trang đã hỏng: hỏi Chrome Extension còn quyền với các trang đó không. Thiếu quyền thì ném lỗi `code` nêu tên trang; còn quyền thì ném lại lỗi gốc.
+ * Chỉ hỏi khi đã hỏng nên đường chạy bình thường không tốn lần hỏi nào. Hỏi thẳng Chrome thay vì đoán qua chữ của lỗi: chữ đổi theo bản Chrome, và có cách chặn quyền không báo lỗi mà để bước chờ tới hết hạn.
+ */
+var FBM_SITE_ORIGINS = [FBM_SITE + '*'];
+var RELAY_SITE_ORIGINS = ['https://script.google.com/macros/*', 'https://script.googleusercontent.com/macros/*'];
+function siteAccessCheck(origins, code, error) {
+  return chrome.permissions.contains({ origins: origins }).then(function (granted) {
+    if (granted) { throw error; }
+    throw Object.assign(new Error('Chrome đang chặn Extension truy cập ' + origins.join(', ') + ' (' + String(error && error.message || error) + '). Mở chrome://extensions → Chi tiết của Extension → Quyền truy cập trang web để cho phép lại.'), { code: code });
+  });
 }
 /** Ping trước, chỉ nạp executor khi chưa có đầu nhận; mọi bước nằm trong hạn `deadlineAt` của envelope. */
 var FBM_PING_MS = 1500;
@@ -238,7 +244,7 @@ function ensureFbmExecutor(tabId, deadlineAt) {
   function ping() { return sendTabMessage(tabId, { type: 'FBM_PING_V2' }, Math.min(FBM_PING_MS, Math.max(0, deadlineAt - Date.now()))); }
   return ping().then(function (reply) {
     if (reply && reply.ready && String(reply.version || '') === FBM_EXECUTOR_VERSION) { return reply; }
-    return waitUntil(chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }).catch(siteAccessError), deadlineAt, 'FBM_TAB_NOT_READY', 'Không nạp được executor vào tab FBM trong thời gian an toàn.').then(ping).then(function (injectedReply) {
+    return waitUntil(chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content_scripts/fbm_sync/executor.js'] }), deadlineAt, 'FBM_TAB_NOT_READY', 'Không nạp được executor vào tab FBM trong thời gian an toàn.').then(ping).then(function (injectedReply) {
       if (!injectedReply || !injectedReply.ready) {
         var executorError = new Error(injectedReply && injectedReply.error || 'Executor FBM không trả lời sau khi nạp.');
         executorError.code = 'FBM_TAB_NOT_READY';
@@ -482,7 +488,8 @@ function postRelay(url, key, body, timeoutMs) {
     if (error && (error.code === 'RELAY_ENDPOINT_NOT_FOUND' || error.code === 'RELAY_INVALID_JSON')) { throw error; }
     var timeout = error && error.name === 'AbortError', failure = new Error(timeout ? 'GAS relay không trả lời sau ' + limitMs + ' ms.' : String(error && error.message || error || 'Lỗi fetch GAS relay.'));
     failure.code = timeout ? 'RELAY_TIMEOUT' : 'RELAY_FETCH_FAILED';
-    throw failure;
+    if (timeout) { throw failure; }
+    return siteAccessCheck(RELAY_SITE_ORIGINS, 'RELAY_SITE_ACCESS_BLOCKED', failure);
   }).finally(function () { if (timer) { clearTimeout(timer); } }));
 }
 
