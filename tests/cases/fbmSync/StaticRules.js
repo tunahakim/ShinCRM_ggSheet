@@ -44,11 +44,9 @@ const SESSION_SECRET_FILES = [
   '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
 ];
 
-/** Tệp được đọc/ghi state: người điều phối khung lượt và khung lát. Chỗ gọi khác là ngoại lệ. */
-const STATE_ORCHESTRATORS = ['Run', 'RunStop', 'Slice'].map((ten) => '1_ShinCRM_GAS/fbm_sync/state/' + ten + '.js');
-
-/** Tệp được ghi `logEvent`: khung lát (Slice.js). Chỗ gọi khác hiện nay là ngoại lệ. */
-const LOG_WRITERS = ['1_ShinCRM_GAS/fbm_sync/state/Slice.js'];
+/** Người điều phối (thiết kế 2.3): khung lượt, lệnh dừng, khung lát và cửa lệnh. Chỉ chúng được đọc/ghi state và ghi `logEvent`; chỗ gọi khác là ngoại lệ. */
+const STATE_ORCHESTRATORS = ['state/Run', 'state/RunStop', 'state/Slice', 'control/ControlPort'].map((ten) => '1_ShinCRM_GAS/fbm_sync/' + ten + '.js');
+const LOG_WRITERS = STATE_ORCHESTRATORS;
 
 /** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
 const BASELINE_WRITERS = [];
@@ -141,8 +139,6 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 14,
-    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 12,
@@ -152,7 +148,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Probe.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 25,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 4,
@@ -160,7 +156,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 43,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 34,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 32,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 2,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
@@ -187,10 +183,10 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 6,
     '1_ShinCRM_GAS/fbm_sync/report/Probe.js': 3,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 10,
-    '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 9,
-    '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 2,
@@ -216,13 +212,10 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 14,
-    '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 6,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 13,
-    '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 1
+    '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
   popup: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 3,
@@ -239,7 +232,6 @@ const EXCEPTIONS = {
   },
   logEvent: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 2,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 2,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
@@ -249,8 +241,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/state/Run.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 3,
@@ -264,14 +255,13 @@ const EXCEPTIONS = {
   // Còn lại là Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết lại thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đã đóng, và đối tượng status (không phải ô lượt).
   phaseClose: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 5,
-    '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 6
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,

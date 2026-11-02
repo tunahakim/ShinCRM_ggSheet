@@ -181,14 +181,10 @@ async function chay(so) {
   check(so, 'GAS tao body wire escaped cho FBM', [dateEnvelope.bodyText.indexOf('\\/Date(1788912000000)\\/') >= 0, dateEnvelope.bodyText.indexOf('/Date(1788912000000)/') >= 0], [true, false]);
   const traceEvents = [{ stage: 'client_gas_call_started', requestId: 'trace-1', at: 1 }, { stage: 'client_gas_success', requestId: 'trace-1', at: 2 }];
   const writesBeforeTraceImport = propertyWrites;
-  check(so, 'trace client ghi theo lo mot lan', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [2, 1]);
-  check(so, 'trace client gui lai khong ghi lap', [orchestration.FbmSync.traceImport(traceEvents), propertyWrites - writesBeforeTraceImport], [0, 1]);
-  const realStateRead = orchestration.FbmSync.stateRead;
-  orchestration.FbmSync.stateRead = () => { const failure = new Error('state hỏng'); failure.code = 'STATE_UNREADABLE'; throw failure; };
-  let traceContextCode = '';
-  try { orchestration.FbmSync.traceContext({}); } catch (err) { traceContextCode = err.code; }
-  orchestration.FbmSync.stateRead = realStateRead;
-  check(so, 'trace đọc state hỏng thì ném lỗi có mã, không ghi vết với ngữ cảnh rỗng', traceContextCode, 'STATE_UNREADABLE');
+  const traceState = orchestration.FbmSync.stateRead();
+  check(so, 'trace client ghi theo lo mot lan', [orchestration.FbmSync.traceImport(traceState, traceEvents), propertyWrites - writesBeforeTraceImport], [2, 1]);
+  check(so, 'trace client gui lai khong ghi lap', [orchestration.FbmSync.traceImport(traceState, traceEvents), propertyWrites - writesBeforeTraceImport], [0, 1]);
+  check(so, 'ngữ cảnh trace lấy từ ô lượt bên gọi truyền vào, không tự đọc ô lượt', orchestration.FbmSync.traceContext({ runId: 'r-trace', cursor: { operation: 'grid' } }, {}).runId + '/' + orchestration.FbmSync.traceContext({ runId: 'r-trace', cursor: { operation: 'grid' } }, {}).operation, 'r-trace/grid');
   check(so, 'body lỗi FBM không phải JSON cho câu báo rõ, body có Bugs cho nội dung lỗi', [orchestration.FbmSync.protocol.httpErrorMessage(500, '<html>lỗi</html>'), orchestration.FbmSync.protocol.httpErrorMessage(400, '{"d":{"Bugs":{"Message":"Sai"}}}')], ['HTTP 500: FBM không trả nội dung lỗi đọc được.', 'HTTP 400: Sai']);
    orchestration.FbmSync.statePatch({ origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: dateEnvelope.id, deadlineAt: Date.now() + 60000, metadata: { sessionGate: {} }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: dateEnvelope.id }] } });

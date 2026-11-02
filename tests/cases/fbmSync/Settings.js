@@ -83,9 +83,10 @@ function chay(so) {
   try {
     quotaHop.FbmSync.stateWrite({ runId: 'too-large', cursor: { pageIndex: 3 }, metadata: { customerErrors: { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) } } });
   } catch (error) { quotaError = error; }
-  const syncQuota = quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 });
-  const accountQuota = quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' });
-  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict và không ghi dở JSON', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota.code, accountQuota.code, quotaLogs.some((event) => event.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA')], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', true]);
+  const quotaCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
+  const syncQuota = quotaCode(() => quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 }));
+  const accountQuota = quotaCode(() => quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' }));
+  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict, không ghi dở JSON; cổng kho ném lỗi có mã kèm khóa hỏng, không tự ghi Log', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota, accountQuota, quotaError && quotaError.detail.key, quotaLogs.length], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_SYNC_STATE_V1', 0]);
 
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
@@ -109,11 +110,12 @@ function chay(so) {
   napServer(escHop, ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
   const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
   escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
-  const closed = escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { customerErrors: bloated } }));
+  let closedError = null;
+  try { escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { customerErrors: bloated } })); } catch (error) { closedError = error; }
   const escSaved = escHop.FbmSync.stateRead();
-  check(so, 'FBM-044: đóng phiên mà state phình quá giới hạn thì lưu bản rút gọn ở phase lỗi, giữ cursor, báo Log và Sidebar',
-    [escSaved.phase, escSaved.runId, escSaved.cursor.kind, escSaved.metadata.customerErrors === undefined ? 0 : escSaved.metadata.customerErrors.recent.length, escSaved.message.indexOf('bản rút gọn') > 0, closed.phase, escLogs.some((event) => event.action === 'state_write_minimal' && event.outcome === 'warn')],
-    ['error', 'r-push', 'push_wait', 0, true, 'error', true]);
+  check(so, 'FBM-044: đóng phiên mà state phình quá giới hạn thì lưu bản rút gọn ở phase lỗi, giữ cursor, rồi vẫn ném lỗi kèm bản rút gọn để cửa lệnh ghi Log; cổng kho không tự ghi Log',
+    [escSaved.phase, escSaved.runId, escSaved.cursor.kind, escSaved.metadata.customerErrors === undefined ? 0 : escSaved.metadata.customerErrors.recent.length, escSaved.message.indexOf('bản rút gọn') > 0, closedError && closedError.code, closedError && closedError.minimal.cursorKept, escLogs.length],
+    ['error', 'r-push', 'push_wait', 0, true, 'FBM_DOCUMENT_PROPERTIES_QUOTA', true, 0]);
   let midRunError = null;
   try { escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'push', metadata: { customerErrors: bloated } })); } catch (error) { midRunError = error; }
   check(so, 'FBM-044: lát giữa chừng ghi state hỏng vẫn ném lỗi, không lặng lẽ thay bằng bản rút gọn', [midRunError && midRunError.code, escHop.FbmSync.stateRead().phase], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 'error']);

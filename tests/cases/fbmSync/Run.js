@@ -118,6 +118,19 @@ async function chay(so) {
   ], ['RUN_VERDICT_UNKNOWN', 'RUN_NOT_OPEN']);
   const loiLuot = cua.F.runFail(hopCoLuot().F.stateRead(), 'TRANSPORT_ERROR', 'Không gọi được FBM.');
   check(so, 'runFail: phase lỗi, mã lỗi và chữ lỗi người dùng đọc, request đang bay chuyển sang closedRequestId', [loiLuot.phase, loiLuot.lastFailureCode, loiLuot.lastError, loiLuot.activeRequestId, !!loiLuot.closedRequestId], ['error', 'TRANSPORT_ERROR', 'Không gọi được FBM.', '', true]);
+
+  // Công tắc tổng: request đang bay thì giữ lượt (không thu hồi được); lượt mở mà không request nào đang bay thì đóng tạm dừng qua runClose, có dòng kết thúc lượt.
+  const tat = hopCoLuot(), runTat = tat.F.stateRead().runId;
+  tat.F.setMasterEnabled(false);
+  const dangBay = tat.F.stateRead();
+  const nghi = JSON.parse(tat.data.FBM_SYNC_STATE_V1);
+  Object.assign(nghi, { activeRequestId: '', deadlineAt: 0 });
+  tat.data.FBM_SYNC_STATE_V1 = JSON.stringify(nghi);
+  tat.F.setMasterEnabled(false);
+  const dong = tat.F.stateRead(), ketThuc = tat.logs.filter((line) => line.action === 'sync_session_finished' && line.cycleId === runTat)[0];
+  check(so, 'tắt công tắc tổng: request đang bay giữ lượt; không request nào đang bay thì lượt đóng tạm dừng qua runClose, giữ runId, có dòng kết thúc lượt', [
+    dangBay.phase !== 'paused', dong.phase, dong.runId === runTat, tat.F.runInProgress(dong), !!ketThuc, tat.data.FBM_SYNC_MASTER_ENABLED_V1 || tat.data[tat.F.MASTER_SWITCH_KEY]
+  ], [true, 'paused', true, false, true, 'false']);
 }
 
 module.exports = { chay };
