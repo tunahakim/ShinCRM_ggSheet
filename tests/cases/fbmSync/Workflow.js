@@ -167,7 +167,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
           if (done) { done(tabReply ? tabReply(tabId, message) : null); }
         }
       },
-      scripting: { executeScript: () => Promise.resolve() },
+      scripting: { executeScript: () => Promise.resolve() }, permissions: { contains: () => Promise.resolve(true) },
       runtime: { getManifest: () => ({ version: '22.0' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
       alarms: { create() {}, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
       storage: { local: {
@@ -1210,9 +1210,7 @@ async function chay(so) {
     ok: true, status: 200, body: userResponse,
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
   });
-  check(so, 'master OFF request dang bay: chi chan envelope tiep theo va giu cursor de chan doan', [
-    masterStopped.ok, masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.stateRead().cursor.kind
-  ], [true, null, 'paused', 'authorize_customer']);
+  check(so, 'tắt khi request đang bay: đóng lượt', [masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.runInProgress(masterOff.hop.FbmSync.stateRead())], [null, 'paused', false]);
 
   const dto = workflowGas();
   const privateState = dto.hop.FbmSync.stateRead();

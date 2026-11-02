@@ -426,7 +426,7 @@ async function chay(so) {
     console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, crypto: globalThis.crypto, btoa, atob, Uint8Array,
     chrome: {
       tabs: { query: () => Promise.resolve([]), sendMessage() {} },
-      scripting: { executeScript: () => Promise.resolve() },
+      scripting: { executeScript: () => Promise.resolve() }, permissions: { contains: () => Promise.resolve(true) },
       runtime: { getManifest: () => ({ version: '22.2' }), lastError: null, onMessage: { addListener(fn) { workerMessageListener = fn; } }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
       alarms: {
         create(name, info) { relayAlarms += 1; relayAlarm = { name, periodInMinutes: info && info.periodInMinutes }; },
@@ -633,6 +633,7 @@ async function chay(so) {
           }
         },
         scripting: { executeScript: () => { state.injects += 1; return Promise.resolve(); } },
+        permissions: { contains: () => Promise.resolve(!behaviour.blocked) },
         runtime: { getManifest: () => ({ version: '22.2' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
         alarms: { create() {}, get(name, done) { done(null); }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
         storage: { local: { get(keys, done) { done(behaviour.relayStored ? { fbmWebAppUrl: relayConfig.url, fbmSyncKey: relayConfig.key, fbmSpreadsheetId: relayConfig.spreadsheetId } : {}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '') + (value.fbmChainTrail.httpStatus ? '@' + value.fbmChainTrail.httpStatus : '')); } if (done) { done(); } } } }
@@ -691,10 +692,9 @@ async function chay(so) {
   await chayChuoi(requestNgoai);
   const siteCheck = requestNgoai.context.envelopeSiteCheck;
   check(so, 'URL của request, phần tử lô và trang mở tab ngoài miền FBM đều bị envelopeSiteCheck chặn (FBM_URL_OUTSIDE_SITE); URL trong miền được qua', [thanNop(requestNgoai.state).map(moTaThan), requestNgoai.state.executes, siteCheck({ url: 'https://fbo.com.vn:8888/a', items: [{ url: 'https://fbo.com.vn:8888/b' }, { url: 'https://example.com/' }] }).code, siteCheck({ url: 'https://fbo.com.vn:8888/a', meta: { openFbmContext: { url: 'https://example.com/' } } }).code, siteCheck({ url: 'https://fbo.com.vn:8888/a', meta: { afterLoginUrl: 'https://fbo.com.vn:8888/Default.aspx' } })], [['continue:error:FBM_URL_OUTSIDE_SITE'], 0, 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', null]);
-  const chanQuyen = tabWorker({ id: 14, status: 'complete', autoDiscardable: false }, { request: tabRequest('tab-chan-quyen'), answers: false, reloadCompletes: true });
-  chanQuyen.context.chrome.scripting.executeScript = () => Promise.reject(new Error('Cannot access contents of the page. Extension manifest must request permission to access the respective host.'));
+  const chanQuyen = tabWorker({ id: 14, status: 'complete', autoDiscardable: false }, { request: tabRequest('tab-chan-quyen'), answers: false, reloadCompletes: true, blocked: true });
   await chayChuoi(chanQuyen);
-  check(so, 'Chrome chặn quyền site FBM: Extension giữ mã FBM_SITE_ACCESS_BLOCKED và chữ gốc, không đổi thành FBM_TAB_NOT_READY', thanNop(chanQuyen.state).map(moTaThan), ['continue:error:FBM_SITE_ACCESS_BLOCKED']);
+  check(so, 'Chrome chặn quyền site FBM (nạp executor quá hạn): hỏi Chrome thấy thiếu quyền thì báo FBM_SITE_ACCESS_BLOCKED, không đổi thành FBM_TAB_NOT_READY', thanNop(chanQuyen.state).map(moTaThan), ['continue:error:FBM_SITE_ACCESS_BLOCKED']);
 
   // Relay trả 404 hoặc HTML: không được đổi thành `{ok:false}` rồi coi như GAS đã trả lời; hộp đen phải mang mã thật và httpStatus.
   const relayHong = (status, text) => ({ ok: false, status, headers: { get() { return 'text/html'; } }, text() { return Promise.resolve(text); } });

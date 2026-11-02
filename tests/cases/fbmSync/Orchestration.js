@@ -307,7 +307,7 @@ async function chay(so) {
   const unboundHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm' });
   check(so, 'heartbeat không cấp envelope FBM khi chưa liên kết tài khoản', [unboundHeartbeat.ok, unboundHeartbeat.code, unboundHeartbeat.request], [true, 'FBM_IDENTITY_UNBOUND', null]);
   heartbeat.FbmSync.statePatch({ runId: 'master-off-run', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, activeRequestId: '' });
-  const masterOff = heartbeat.FbmSync.setMasterEnabled(false);
+  const masterOff = heartbeat.FbmSync.masterSwitchCommand(false);
   check(so, 'tắt công tắc tổng dừng ngay state khi không có request FBM đang bay', [masterOff.enabled, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId], [false, 'paused', '']);
   heartbeat.FbmSync.setMasterEnabled(true);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
@@ -468,8 +468,8 @@ async function chay(so) {
   heartbeat.FbmSync.stateWrite(preservedState);
   heartbeat.FbmSync.setMasterEnabled(false);
   const blockedByMaster = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/Main/blocked', body: {}, meta: { kind: 'grid' } });
-  const keptAfterMasterOff = heartbeat.FbmSync.stateRead();
-  check(so, 'tắt công tắc tổng giữ cursor va reservation đang bay', [blockedByMaster, keptAfterMasterOff.cursor.kind, keptAfterMasterOff.activeRequestId, keptAfterMasterOff.phase], [null, 'customer_grid', 'preserve-request', 'paused']);
+  const closedByMaster = heartbeat.FbmSync.stateRead();
+  check(so, 'công tắc tắt: không phát request, đóng lượt', [blockedByMaster, heartbeat.FbmSync.runInProgress(closedByMaster), closedByMaster.closedRequestId, closedByMaster.phase], [null, false, 'preserve-request', 'paused']);
   heartbeat.FbmSync.setMasterEnabled(true);
   const cancelledState = heartbeat.FbmSync.stateRead();
   cancelledState.runId = 'cancel-run'; cancelledState.phase = 'checking_session'; cancelledState.cursor = { kind: 'authorize_customer' }; cancelledState.activeRequestId = 'cancel-request'; cancelledState.deadlineAt = Date.now() + 60000;

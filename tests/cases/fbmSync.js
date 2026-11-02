@@ -7,6 +7,7 @@ const NHOM = [
   require("./fbmSync/Slice"),
   require("./fbmSync/RelayResubmit"),
   require("./fbmSync/RelayLoop"),
+  require("./fbmSync/SiteAccess"),
   require("./fbmSync/TransportCore"),
   require("./fbmSync/SidebarDrive"),
   require("./fbmSync/Protocol"),

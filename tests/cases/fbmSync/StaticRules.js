@@ -157,7 +157,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 43,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 28,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 32,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 30,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 2,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
@@ -186,7 +186,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 10,
     '1_ShinCRM_GAS/fbm_sync/state/AccountSettings.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 9,
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 8,
     '1_ShinCRM_GAS/fbm_sync/state/SyncSettings.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 6,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 4,
@@ -260,7 +260,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
     '1_ShinCRM_GAS/fbm_sync/transport/ScanJob.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 6
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 5
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,

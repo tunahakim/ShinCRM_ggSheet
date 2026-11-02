@@ -102,7 +102,7 @@ const EXCEPTIONS = {
     'cases/fbmSync/Push.js': 8,
     'cases/fbmSync/PushCompare.js': 2,
     'cases/fbmSync/Reconcile.js': 2,
-    'cases/fbmSync/RelayLoop.js': 9,
+    'cases/fbmSync/RelayLoop.js': 6,
     'cases/fbmSync/Settings.js': 4,
     'cases/fbmSync/Sidebar.js': 1,
     'cases/fbmSync/Workflow.js': 6

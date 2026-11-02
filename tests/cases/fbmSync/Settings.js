@@ -131,11 +131,11 @@ function chay(so) {
   const escReset = escHop.FbmSync.stateReset();
   check(so, 'FBM-044: đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log', [escReset.ok, escData.FBM_SYNC_STATE_V1, escData.FBM_SYNC_PENDING_PUSHES_V1, escHop.FbmSync.stateRead().phase, escLogs.some((event) => event.action === 'state_reset')], [true, undefined, '{"activity:ACT-1":{"hash":"h"}}', 'idle', true]);
 
-  // Lưu mục cài đặt `sync` kèm công tắc tổng: một lệnh, lưu cài đặt (đã kiểm) trước rồi mới đổi công tắc, cài đặt sai thì công tắc giữ nguyên, luôn trả status mới.
+  // Lưu mục cài đặt `sync` kèm công tắc tổng: một lệnh, lưu cài đặt (đã kiểm) trước rồi mới đổi công tắc, tắt thì áp điều kiện dừng trong cùng khóa, cài đặt sai thì công tắc giữ nguyên, luôn trả status mới.
   const saveOrder = [];
-  let masterReply = { ok: true };
   const saveHop = taoHopCat({ FbmSync: {
-    setMasterEnabled: (enabled) => { saveOrder.push(['set_master', enabled]); return masterReply; },
+    setMasterEnabled: (enabled) => { saveOrder.push(['set_master', enabled]); return { ok: true, enabled }; },
+    stopPendingApply: () => { saveOrder.push(['stop']); return { stopped: false }; },
     syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return settings.approvalThreshold < 0 ? { ok: false, code: 'FBM_SYNC_SETTINGS_INVALID', field: 'approvalThreshold' } : { ok: true, settings }; },
     statusView: () => ({ phase: 'idle', masterEnabled: false })
   } });
@@ -143,12 +143,11 @@ function chay(so) {
   const luuChung = (value, master) => saveHop.FbmSync.commandSaveSettings({ section: 'sync', value, master });
   const withMaster = luuChung({ approvalThreshold: 2 }, false);
   const withoutMaster = luuChung({ approvalThreshold: 3 }, null);
-  masterReply = { ok: false, code: 'SYNC_RUNNING' };
-  const masterFailed = luuChung({ approvalThreshold: 4 }, true);
+  luuChung({ approvalThreshold: 4 }, true);
   const invalidSettings = luuChung({ approvalThreshold: -1 }, true);
-  check(so, 'Lưu cài đặt chung: lưu cài đặt trước rồi đổi công tắc tổng, null thì không đụng công tắc; kết quả mang status mới',
-    [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase, masterFailed.code],
-    [[['save', 2], ['set_master', false], ['save', 3], ['save', 4], ['set_master', true], ['save', -1]], true, { phase: 'idle', masterEnabled: false }, 'idle', 'SYNC_RUNNING']);
+  check(so, 'Lưu cài đặt chung: lưu cài đặt trước rồi đổi công tắc tổng, tắt thì áp điều kiện dừng ngay, null thì không đụng công tắc; kết quả mang status mới',
+    [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase],
+    [[['save', 2], ['set_master', false], ['stop'], ['save', 3], ['save', 4], ['set_master', true], ['save', -1]], true, { phase: 'idle', masterEnabled: false }, 'idle']);
   check(so, 'Lưu cài đặt chung: cài đặt sai thì trả lỗi kèm status và công tắc tổng giữ nguyên (không có lệnh đổi công tắc)', [invalidSettings.ok, invalidSettings.code, invalidSettings.status.phase, saveOrder.filter((step) => step[0] === 'set_master').length], [false, 'FBM_SYNC_SETTINGS_INVALID', 'idle', 2]);
 
   // Gói đọc của màn đồng bộ: bốn phần đọc qua đúng hàm đọc của từng nơi sở hữu, một lời gọi; một phần ném lỗi thì cả gói ném để Sidebar báo.
