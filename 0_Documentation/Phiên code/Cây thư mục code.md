@@ -249,6 +249,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
     ├── state\State.js            DocumentProperties, cursor và progress.
+    ├── state\RequestWatch.js     Canh request GAS phát cho Extension trong một lời gọi: request đang chờ, đã trả lời, nộp lặp; request quá hạn bị bỏ thì ghi phát hiện, bước đóng lời gọi của phạm vi `fbm_sync` ghi Log.
     ├── state\Run.js              Mở và đóng Lượt (`runOpen` và nhãn lượt, `runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`, thu hồi lượt quá hạn).
     ├── state\RunStop.js          Lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.
     ├── state\Slice.js            Khung lát: `runSlice` (giữ một bản ô lượt mỗi lát và ghi kho một lần ở `sliceClose`, áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, `replyAdmit` (phép kiểm chung của mọi kết quả và lỗi nộp về: thu hồi lượt quá hạn, bỏ response không thuộc request đang chờ, dừng khi lệch mã hợp đồng), bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
