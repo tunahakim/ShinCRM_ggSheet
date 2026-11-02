@@ -350,7 +350,7 @@ async function chay(so) {
   check(so, 'GAS ghi dau vet callback khong chua payload', [
     fbmServiceSource.indexOf("function fbmDriveCommand(command, payload) { return fbmCommandRun('fbmDriveCommand', FbmSync.driveCommandName(command), payload || {}); }") >= 0,
     entryPointCoreSource.indexOf("scope.boundary('gas_entered', name)") >= 0 && entryPointCoreSource.indexOf("scope.boundary('gas_returned', name)") >= 0 && entryPointCoreSource.indexOf("scope.boundary('gas_failed', name, err)") >= 0,
-    scopeBoundary.indexOf("FbmSync.traceEvent(stage, { operation: String(name || ''), error:") >= 0 && !/payload|input|response|clientTrace/.test(scopeBoundary)
+    scopeBoundary.indexOf("FbmSync.traceEvent(FbmSync.callStateSeen(), stage, { operation: String(name || ''), error:") >= 0 && !/payload|input|response|clientTrace/.test(scopeBoundary)
   ], [true, true, true]);
   check(so, 'GAS chuan hoa toan bo ket qua truoc callback Sidebar', [
     fbmServiceSource.indexOf("return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.controlDispatch(command, payload); }, payload)") >= 0,
@@ -864,7 +864,7 @@ async function chay(so) {
     });
   });
 
-  // FBM từ chối đăng nhập (d khác true) thì dừng ở response Login, không mở trang tài khoản (mở khi chưa đăng nhập thì FBM chuyển sang Error.htm); cờ hủy phiên cũ chỉ đi theo meta.force của GAS.
+  // FBM từ chối đăng nhập (d khác true) thì dừng ở response Login, không mở trang tài khoản (chưa đăng nhập mà mở thì FBM sang Error.htm); cờ hủy phiên cũ theo meta.force.
   await new Promise((resolve) => {
     let listener = null;
     const calls = [];

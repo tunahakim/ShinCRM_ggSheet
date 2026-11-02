@@ -51,6 +51,24 @@ async function chay(so) {
   const draft = { spreadsheetId: 'sheet-workflow', userId: '9999', username: 'NHAP', accountName: 'Ban Nhap' };
   const started = flow.hop.fbmDriveCommand('start', { kind: 'identity_check', identity: draft, machineId: 'may-A' });
   check(so, 'Kiểm liên kết với bốn ô nháp: state.identityTarget bằng bản nháp, không phải liên kết đã lưu', [started.ok, flow.hop.FbmSync.stateRead().identityTarget], [true, draft]);
+
+  section('FBM sync — đóng lời gọi: Log của phát hiện và trace do runEntryPoint ghi');
+  // Hộp chung giả `runEntryPoint` chạy thẳng phần ruột; ở đây nạp bản thật để có bước đóng lời gọi.
+  const close = workflowGas({ extraFiles: ['server/entry/EntryPoint.js'], pendingChangesBegin: () => {}, pendingChangesEnd: () => {}, noticeRaise: () => true, noticeResolve: () => null, flushLog: () => 0, errorMessage: (err) => String(err && err.message || err) }), logs = [];
+  close.hop.logEvent = (entry) => logs.push(entry);
+  close.hop.FbmSync.stateWrite({ runId: 'run-cu', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: 'req-mat', deadlineAt: Date.now() - 60000 });
+  const closed = close.hop.runEntryPoint('thuDongLoiGoi', 'fbm_sync', () => {
+    const state = close.hop.FbmSync.stateRead();
+    close.hop.FbmSync.stateWrite(Object.assign(state, { activeRequestId: '', deadlineAt: 0 }));
+    return { ok: true, pending: close.hop.FbmSync.requestWatch.findings.length, logged: logs.filter((entry) => entry.action === 'request_unanswered').length };
+  });
+  check(so, 'request quá hạn bị bỏ: cửa ghi ô lượt chỉ ghi phát hiện, dòng Log request_unanswered do lúc đóng lời gọi ghi, đúng một lần', [closed.pending, closed.logged, logs.filter((entry) => entry.action === 'request_unanswered').length, close.hop.FbmSync.requestWatch.findings.length], [1, 0, 1, 0]);
+  const traceTrace = [];
+  close.hop.FbmSync.documentPropertySet = (key, value, context) => { if (context !== 'trace') { return; } traceTrace.push(key); const err = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.'); err.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; err.detail = { property: key, context: context }; throw err; };
+  logs.length = 0;
+  const traced = close.hop.runEntryPoint('thuTraceHong', 'fbm_sync', () => ({ ok: true }));
+  const traceLine = logs.find((entry) => entry.action === 'thuTraceHong') || {};
+  check(so, 'ghi trace hỏng lúc đóng lời gọi: lời gọi vẫn trả kết quả, Log có dòng lỗi mang mã và khóa trace, mốc trace có tên đúng', [traced.ok, traceTrace[0], traceLine.outcome, traceLine.detail && traceLine.detail.code, traceLine.detail && traceLine.detail.property, close.hop.FbmSync.propertyBuffer.tracePending.length], [true, 'FBM_SYNC_TRACE_V1', 'error', 'FBM_DOCUMENT_PROPERTIES_QUOTA', 'FBM_SYNC_TRACE_V1', 0]);
 }
 
 module.exports = { chay };

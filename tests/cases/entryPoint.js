@@ -59,6 +59,28 @@ function chay(so) {
   goi('fbmContinueSync', () => ({ ok: true }));
   check(so, 'lần chạy không ghi gì không tăng revision', rev() - truocRong, 0);
   checkThrows(so, 'đánh dấu ngoài cửa vào ném lỗi', () => mark('KH0005'), 'ngoài runEntryPoint');
+
+  section('EntryPoint — đóng phạm vi nhánh trước lần nhả Log duy nhất');
+  let dongHong = false;
+  hop.ENTRY_POINT_SCOPES.thu_pham_vi = {
+    begin: () => {}, boundary: () => {},
+    end: () => {
+      hop.logEvent({ source: 'thu_pham_vi', action: 'dong_pham_vi', outcome: hop.LOG_ERROR, reason: 'dòng Log sinh lúc đóng phạm vi' });
+      if (dongHong) { const err = new Error('đóng phạm vi hỏng'); err.code = 'THU_DONG_HONG'; err.detail = { property: 'KHO_THU' }; throw err; }
+    }
+  };
+  const ghiTruoc = hop.logGateWriteCount();
+  const ketQua = hop.runEntryPoint('thuDongPhamVi', 'thu_pham_vi', () => ({ ok: true }));
+  check(so, 'dòng Log sinh lúc đóng phạm vi ra Sheet trong cùng một lần nhả Log', [ketQua.ok, dem('dòng Log sinh lúc đóng phạm vi'), hop.logGateWriteCount() - ghiTruoc], [true, 1, 1]);
+  dongHong = true;
+  const ketQuaHong = hop.runEntryPoint('thuDongPhamVi', 'thu_pham_vi', () => ({ ok: true }));
+  check(so, 'đóng phạm vi hỏng: lời gọi vẫn trả kết quả, Log có dòng lỗi mang mã và detail của lỗi', [ketQuaHong.ok, dem('đóng phạm vi hỏng'), dem('THU_DONG_HONG'), dem('KHO_THU')], [true, 1, 1, 1]);
+  delete hop.ENTRY_POINT_SCOPES.thu_pham_vi;
+  const ghiNhanThat = hop.pendingChangesEnd;
+  hop.pendingChangesEnd = () => { ghiNhanThat(); throw new Error('ghi nhận hỏng E'); };
+  checkThrows(so, 'ghi nhận thay đổi hỏng ở lần chạy thành công thì ném', () => goi('saveRecord', () => { hop.logEvent({ source: 'sidebar', action: 'thu', outcome: hop.LOG_OK, reason: 'dòng trước khi ghi nhận hỏng' }); return { ok: true }; }), 'ghi nhận hỏng E');
+  hop.pendingChangesEnd = ghiNhanThat;
+  check(so, 'ghi nhận thay đổi hỏng vẫn nhả Log: có dòng lỗi và dòng của lần chạy', [dem('ghi nhận hỏng E'), dem('dòng trước khi ghi nhận hỏng')], [1, 1]);
 }
 
 module.exports = { chay };

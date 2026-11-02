@@ -82,7 +82,7 @@ async function chay(so) {
   relay.devRunnerGet = (event) => ({ text: 'runner:' + event.parameter.fn });
   check(so, 'Lời gọi mang token chuyển cho cửa chạy hàm lúc phát triển', relay.doGet({ parameter: { token: 't', fn: 'x' } }).text, 'runner:x');
   delete relay.devRunnerGet;
-  // FBM-034: nhịp nền chạy cả khi Sidebar đóng, nên lỗi ở đây chỉ còn Log và tin chờ ở Sidebar lần mở sau. Trước đây doPost không qua runEntryPoint: Log nằm trong RAM rồi mất, exception chỉ trả về Extension.
+  // FBM-034: nhịp nền chạy cả khi Sidebar đóng, nên lỗi chỉ còn Log và tin chờ ở Sidebar lần mở sau; doPost không qua runEntryPoint thì Log mất.
   const relayPost = (body) => JSON.parse(relay.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } }).text);
   // Địa chỉ đã ghi từ trên nên các lời gọi dưới không thêm dòng Log; đếm lại từ đầu.
   relayLog.lines = []; relayLog.flushes = 0; relayLog.reports = [];
@@ -353,16 +353,16 @@ async function chay(so) {
   check(so, 'Lần hỏi nền gặp lượt dở không còn request chờ: lượt cũ kết thúc SYNC_ABANDONED_RUN có dòng Log lỗi, lượt mới mở bằng probe User, không gửi lại trang Customer đang dở', [
     abandonLogs.some((entry) => JSON.stringify(entry).indexOf('SYNC_ABANDONED_RUN') >= 0), afterAbandon.ok, afterAbandon.request && afterAbandon.request.meta.kind, abandonState.runId !== 'abandoned-run'
   ], [true, true, 'session_probe', true]);
-  const lostLines = abandonLogs.filter((entry) => entry.action === 'request_unanswered'), staleLine = lostLines[0] || {};
+  const lostLines = abandonLogs.concat(heartbeat.FbmSync.requestWatchTake()).filter((entry) => entry.action === 'request_unanswered'), staleLine = lostLines[0] || {};
   check(so, 'Lượt bị bỏ dở: request đang chờ quá hạn có đúng một dòng request_unanswered mang hộp đen; dòng stale_run chỉ nói lượt bị đóng, không lặp hộp đen', [lostLines.length, String(staleLine.reason).indexOf('Request FBM lost-request (bước customer_grid) không nhận được trả lời từ Extension') === 0, String((abandonLogs.find((entry) => entry.action === 'stale_run') || {}).reason).indexOf('Hộp đen') < 0], [1, true, true]);
   check(so, 'Dòng Log request không có trả lời mang hộp đen Extension: bước cuối, cách đây bao lâu, worker có bị Chrome tắt; không chép trường lạ từ Extension', [
     String(staleLine.reason).indexOf('Hộp đen Extension: bước cuối (cách đây 5 phút) là đã gửi request sang tab FBM, chưa nhận lại kết quả, request lost-request.') >= 0,
     String(staleLine.reason).indexOf('đã khởi động lại sau bước đó nên lượt bị cắt giữa chừng') >= 0, JSON.stringify(staleLine).indexOf('bi-mat-khong-duoc-chep') < 0
   ], [true, true, true]);
-  // Luật chung request không có trả lời: nằm ở cửa ghi state nên mọi loại request đều đi qua, kể cả Giữ phiên không thuộc lượt nào.
+  // Request không có trả lời: phát hiện ở cửa ghi state nên mọi request đều qua, kể cả Giữ phiên ngoài lượt.
   const watchLogs = [];
   heartbeat.logEvent = (entry) => watchLogs.push(entry);
-  const unanswered = () => watchLogs.filter((entry) => entry.action === 'request_unanswered');
+  const unanswered = () => (watchLogs.push(...heartbeat.FbmSync.requestWatchTake()), watchLogs.filter((entry) => entry.action === 'request_unanswered'));
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'done', cursor: { kind: 'heartbeat' }, activeRequestId: 'hb-lost', deadlineAt: Date.now() - 4 * 60000, scheduledScan: '', chain: null });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const afterLostHeartbeat = heartbeat.fbmSyncHeartbeatRequest({ trigger: 'alarm', trail: { stage: 'gas_request_received', requestId: 'hb-lost', hop: 0, at: Date.now() - 6 * 60000 } });

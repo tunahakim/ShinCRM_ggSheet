@@ -955,7 +955,7 @@ async function chay(so) {
       } else if (kind === 'scan_chunk') {
         body = '';
       } else if ((kind === 'grid' || kind === 'scan_job' || kind === 'customer_count') && request.meta.entity === 'customer') {
-        // FBM phân trang keyset: trang kế bắt đầu sau dòng có đúng bốn giá trị khóa đã gửi, ngày ở dạng `/Date(ms)/`; khóa lệch thì trả trang rỗng. Chỉ trang đầu báo `TotalRowCount` (Nghiên cứu FBM ch03 mục 3.3, ch04 mục 4.10).
+        // FBM phân trang keyset: trang kế bắt đầu sau dòng có đúng bốn giá trị khóa đã gửi, ngày ở dạng `/Date(ms)/`; khóa lệch thì trang rỗng. Chỉ trang đầu báo `TotalRowCount` (Nghiên cứu FBM ch03 mục 3.3, ch04 mục 4.10).
         const pageSize = Number(request.body.count), pageValue = request.body.gridPageValue, khoa = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'].map((field) => fullCustomerFields.indexOf(field));
         // Trang sau chỉ có dữ liệu khi request mô tả đúng dòng cuối trang đang đứng và tổng số dòng, như FBM thật (yyyyMMdd theo giờ Việt Nam).
         const ngayFbm = (value) => new Date(Number(String(value).match(/\d+/)[0]) + 7 * 3600000).toISOString().slice(0, 10).replace(/-/g, '');
@@ -989,7 +989,7 @@ async function chay(so) {
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
         fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw }, 'relay');
-        if (withTrace) { fullFlow.hop.FbmSync.traceEvent('engine_after', { operation: 'fbmContinueSync' }); }
+        if (withTrace) { fullFlow.hop.FbmSync.traceEvent({}, 'engine_after', { operation: 'fbmContinueSync' }); }
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
         fullActivityPropCalls.push(fullPropCalls.count - callsBefore);

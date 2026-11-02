@@ -86,7 +86,7 @@ function chay(so) {
   const quotaCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
   const syncQuota = quotaCode(() => quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 }));
   const accountQuota = quotaCode(() => quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' }));
-  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict, không ghi dở JSON; cổng kho ném lỗi có mã kèm khóa hỏng, không tự ghi Log', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota, accountQuota, quotaError && quotaError.detail.key, quotaLogs.length], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_SYNC_STATE_V1', 0]);
+  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict, không ghi dở JSON; cổng kho ném lỗi có mã kèm khóa hỏng, không tự ghi Log', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota, accountQuota, quotaError && quotaError.detail.property, quotaLogs.length], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_SYNC_STATE_V1', 0]);
 
   const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
   const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
