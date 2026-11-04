@@ -19,12 +19,11 @@
 /**
  * Chạy cả ba bước. Mọi lỗi đều rơi vào một chỗ, và chỗ đó vẽ ra màn báo lỗi đọc được.
  *
- * Bắt lỗi ở đây **không phải nuốt lỗi**: máy chủ đã ghi dòng log kèm vết gọi trước khi ném, còn việc còn lại của client là
- * hiện nó lên. Nếu không bắt thì thông báo chỉ nằm trong console của trình duyệt, chỗ mà chủ dự án không có lý do gì để mở.
+ * Bắt lỗi ở đây **không phải nuốt lỗi**: lỗi máy chủ ném thì máy chủ đã ghi Log; lỗi sinh ở trình duyệt (hết hạn chờ) thì `callServer` đã tự gửi dòng Log và gắn kết quả vào `err.logged`. Việc của client là hiện lỗi lên và nói đúng là Log đã ghi hay chưa. Nếu không bắt thì thông báo chỉ nằm trong console của trình duyệt, chỗ mà chủ dự án không có lý do gì để mở.
  *
  * Bản đo thời gian chỉ gửi ở đường chạy xuôi. Đường lỗi thì không, vì lượt gửi đó cũng đi qua `google.script.run`: nếu thứ
  * vừa gãy chính là đường truyền thì nó gãy lần nữa và cuốn theo thông báo lỗi thật — đúng lúc người dùng cần đọc thông báo
- * đó nhất. Lượt chạy vỡ đã có dòng log kèm vết gọi do máy chủ tự ghi.
+ * đó nhất. Lượt chạy vỡ đã có dòng Log riêng (máy chủ ghi, hoặc `callServer` ghi khi hết hạn chờ).
  */
 function sidebarRenderAfterBoot(preserveView) {
   if (!preserveView) {
@@ -50,6 +49,7 @@ function sidebarRenderAfterBoot(preserveView) {
 async function sidebarBoot(options) {
   // Automatic full-core reloads must refresh RAM without changing the user's current surface.
   var preserveView = !!(options && options.preserveView === true);
+  var luot = ++BOOT_RUN_SEQ;
   callTimingReset(Date.now());
   var finishBusy = typeof sidebarBusyBegin === 'function' ? sidebarBusyBegin('Đang nạp dữ liệu ShinCRM…', { block: true }) : null;
   bootClearStartupWarning();
@@ -118,8 +118,15 @@ async function sidebarBoot(options) {
     return { ok: true, core: core, summary: BOOT_LAST_SUMMARY };
   } catch (err) {
     var message = err && err.message ? err.message : String(err);
-    statusLoadError(message);
-    return { ok: false, error: message };
+    if (!(err && err.logged)) {
+      statusLoadError(message, 'server');
+      return { ok: false, error: message };
+    }
+    statusLoadError(message, 'pending');
+    var logged = await err.logged;
+    // Người dùng đã bấm Thử lại trong lúc chờ ghi Log thì màn hình thuộc lượt mới, không vẽ đè.
+    if (luot === BOOT_RUN_SEQ) { statusLoadError(message, logged ? 'logged' : 'not_logged'); }
+    return { ok: false, error: message, logged: logged };
   } finally {
     if (finishBusy) { finishBusy(); }
   }
@@ -131,6 +138,8 @@ async function sidebarBoot(options) {
  * Từ chặng này lượt vẽ cuối là màn xem, nên con số của lượt nạp không còn nằm trên màn hình nữa. Giữ ở đây để `bootShowSummary()` gọi được từ console lúc nghiệm thu, và để chỗ nào cần thì tra lại mà không phải nạp lại.
  */
 var BOOT_LAST_SUMMARY = null;
+/** Số thứ tự lượt nạp, để lượt cũ đang chờ ghi Log không vẽ đè màn hình của lượt mới. */
+var BOOT_RUN_SEQ = 0;
 var BOOT_WARNING_TIMER = null;
 var BOOT_WARNING_FINISH = null;
 

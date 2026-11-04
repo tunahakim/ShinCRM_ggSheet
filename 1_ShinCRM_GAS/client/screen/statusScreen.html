@@ -45,13 +45,21 @@ function statusBudgetBlocked(budget) {
   }]);
 }
 
-function statusLoadError(message) {
+/** Câu nói về sheet Log theo việc đã thật sự xảy ra. `server`: máy chủ ném lỗi nên `runEntryPoint` đã ghi; ba trạng thái còn lại là lỗi sinh ở trình duyệt, Sidebar tự ghi qua `callServerLogError`. */
+var STATUS_LOAD_ERROR_LOG_TEXT = {
+  server: 'Lượt chạy này đã ghi một dòng vào sheet Log kèm vết gọi.',
+  pending: 'Đang ghi lỗi này vào sheet Log…',
+  logged: 'Đã ghi một dòng vào sheet Log nêu tên hàm và thời gian đã chờ.',
+  not_logged: 'Chưa ghi được lỗi này vào sheet Log vì máy chủ cũng không nhận lời gọi ghi Log; hãy chụp lại màn hình này.'
+};
+
+function statusLoadError(message, logState) {
   return statusNotices('Nạp thất bại', [{
     variant: 'error',
     title: 'Không nạp được dữ liệu',
     lines: [message],
     button: { label: 'Thử lại', action: 'reloadAll', busy: 'Đang thử lại…' },
-    hint: 'Lượt chạy này đã ghi một dòng vào sheet Log kèm vết gọi. Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.'
+    hint: STATUS_LOAD_ERROR_LOG_TEXT[logState || 'server'] + ' Bấm Thử lại, hoặc đóng rồi mở lại bảng làm việc nếu bấm mấy lần vẫn vỡ.'
   }]);
 }
 

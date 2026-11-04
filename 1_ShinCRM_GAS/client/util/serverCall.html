@@ -13,6 +13,8 @@
  * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
  * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
  *
+ * Hết hạn chờ là lỗi sinh ở trình duyệt, máy chủ không ném gì nên không có dòng Log nào. Vì vậy nhánh hết hạn tự ghi Log ngay tại đây (tên hàm và số ms) và gắn `Promise` kết quả ghi vào `error.logged`, để bên gọi nói đúng với người dùng là đã ghi hay chưa. Lỗi máy chủ ném thì không có `logged`: `runEntryPoint` đã ghi.
+ *
  * Hạn chờ mặc định `CALL_SERVER_TIMEOUT_MS`; bên gọi đã tự sở hữu hạn chờ và chẩn đoán riêng (như `fbmContinueSync`) truyền `{ timeoutMs: 0 }` để tắt hạn ở đây, nếu không hạn ngắn hơn ở đây sẽ cắt trước và biến một bước GAS chậm nhưng vẫn đang chạy thành lỗi thường.
  *
  * Phép đo thời gian mỗi vòng cũng nằm ở đây, và cũng vì lý do "một cửa duy nhất": đây là chỗ duy nhất thấy được **cả hai
@@ -39,7 +41,10 @@ function callServer(name, args, options) {
       settled = true;
       if (showProgress) { progressEnd(); }
       callTimingRecord(name, Date.now() - batDau, null);
-      reject(new Error('Máy chủ không phản hồi hàm ' + name + ' sau ' + timeoutMs + ' ms.'));
+      var hetHan = new Error('Máy chủ không phản hồi hàm ' + name + ' sau ' + timeoutMs + ' ms.');
+      // Lời gọi ghi Log tự nó hết hạn thì không ghi tiếp, nếu không đường truyền hỏng sẽ sinh chuỗi lời gọi không dứt.
+      hetHan.logged = opts.logTimeout === false ? Promise.resolve(false) : callServerLogError('client_timeout', hetHan.message, { ham: name, ms: timeoutMs });
+      reject(hetHan);
     }, timeoutMs);
 
     var runner = google.script.run
@@ -63,5 +68,15 @@ function callServer(name, args, options) {
 
     runner[name].apply(runner, args || []);
   });
+}
+
+/**
+ * Ghi một lỗi phía Sidebar vào sheet `Log` qua cổng chung `logClientError`. Trả `Promise` ra `true` khi máy chủ xác nhận đã ghi, `false` khi không ghi được — không bao giờ từ chối, vì bên gọi đang ở giữa đường báo một lỗi khác.
+ *
+ * Kết quả `false` không được nuốt: bên gọi dùng nó để nói đúng với người dùng là lỗi chưa vào Log. Đó là đường duy nhất còn lại khi chính đường truyền tới máy chủ đã hỏng.
+ */
+function callServerLogError(action, message, detail) {
+  return callServer('logClientError', [action, message, detail || {}], { silent: true, logTimeout: false })
+    .then(function (result) { return !!(result && result.ok === true); }, function () { return false; });
 }
 </script>
