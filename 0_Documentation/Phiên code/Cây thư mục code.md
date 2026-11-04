@@ -132,6 +132,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
 │       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger thành thông báo và hiện ở Sidebar đang mở.
 │       ├── PropertiesProbe.js    Đo hành vi DocumentProperties thật (chuỗi rỗng, khóa chưa có, số) để kho giả của bộ test theo đúng; khóa tạm, xóa trước khi trả.
+│       ├── SettingsReadProbe.js  Đếm số lần đọc cài đặt, Category, Sheet và DocumentProperties trong một lời gọi đồng bộ FBM; chỉ đọc, bọc tạm rồi trả lại hàm gốc.
 │       ├── NoticeGateProbe.js    Nghiệm thu cổng thông báo trên DocumentProperties thật và đo phí một lần getProperties lạnh.
 │       ├── BookBindingProbe.js       Hàm dò cặp mã Sheet và mã script đã ghi, để nghiệm thu chuyển Sheet.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
