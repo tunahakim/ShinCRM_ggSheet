@@ -1,11 +1,8 @@
 /**
- * Quét mã nguồn luồng đồng bộ FBM (GAS `fbm_sync/`, Sidebar `client/sync`, Extension) theo các quy tắc kiến trúc cứng, với danh sách ngoại lệ chỉ được co lại.
+ * Quét mã nguồn đồng bộ FBM (GAS `fbm_sync/`, Sidebar `client/sync`, Extension) theo quy tắc kiến trúc cứng; ngoại lệ chỉ được co lại.
  *
- * Mỗi quy tắc là hàm thuần `(đường dẫn, mã đã bỏ comment) => [{ line, text }]`. Vi phạm hiện có được ghi thành ngoại lệ có tên (tệp -> số vi phạm). Ba chiều đều làm test đỏ:
- * - tệp có vi phạm mà không có trong danh sách, hoặc nhiều hơn số đã ghi: vi phạm mới;
- * - số đã ghi lớn hơn số thật: ai sửa xong phải hạ số xuống, để danh sách chỉ đi xuống;
- * - tệp trong danh sách mà không còn vi phạm: xóa dòng đó đi.
- * Bỏ comment trước khi quét nhưng giữ nguyên số dòng; chuỗi ký tự được giữ lại vì nhiều quy tắc cần đọc chúng.
+ * Mỗi quy tắc là hàm thuần `(đường dẫn, mã đã bỏ comment) => [{ line, text }]`; vi phạm hiện có là ngoại lệ (tệp -> số). Đỏ khi có vi phạm mới, số ghi lớn hơn số thật (phải hạ) hoặc tệp đã hết vi phạm (xóa dòng).
+ * Bỏ comment trước khi quét, giữ số dòng và chuỗi ký tự (nhiều quy tắc đọc chuỗi).
  */
 
 const fs = require('fs');
@@ -27,7 +24,7 @@ const SCOPE = [
   { kind: 'ext', file: '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js' }
 ];
 
-/** Tên phase của một lượt chạy, lấy từ ACTIVE_PHASES, TERMINAL_PHASES và các phase `idle`, `awaiting_approval` trong `fbm_sync/state/State.js`; chỉ tệp đó được giữ danh sách phase. */
+/** Tên phase lấy từ `fbm_sync/state/State.js` (ACTIVE_PHASES, TERMINAL_PHASES, `idle`, `awaiting_approval`); chỉ tệp đó được giữ danh sách phase. */
 const PHASE_NAMES = ['idle', 'checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'awaiting_approval', 'done', 'error', 'paused', 'conflict'];
 const PHASE_OWNER = '1_ShinCRM_GAS/fbm_sync/state/State.js';
 
@@ -133,6 +130,9 @@ const RULES = [
     id: 'baselineWrite', title: 'baseline (fbmHash) chỉ được ghi ở ba công cụ áp kết quả', scope: ['gas'], allow: BASELINE_WRITERS,
     // Khóa trong literal `fbmHash: giá_trị` (trừ khai báo schema `fbmHash: {`) và phép gán `.fbmHash = ` (không phải so sánh).
     find: (file, src) => matchAll(src, /\bfbmHash\s*:(?!\s*\{)|\.fbmHash\s*=(?!=)/)
+  },
+  {
+    id: 'sessionVerify', title: 'xác minh phiên chỉ qua sessionVerifiedApply', scope: ['gas'], allow: ['1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js'], find: (file, src) => matchAll(src, /\bsessionIdentityVerify\s*\(/, notDefinition)
   }
 ];
 
@@ -173,7 +173,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html': 1,
     '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 10,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 4,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
@@ -341,7 +340,7 @@ function chay(so) {
   check(so, 'số cứng sau || và ?? bị bắt, số 0 thì không', hits('hardcodedNumber', 'f.js', 'var a = x || 5; var b = y ?? 30000; var c = z || 0;'), 2);
   check(so, 'ghi baseline bằng khóa literal và phép gán bị bắt, đọc, so sánh và khai báo schema thì không', hits('baselineWrite', 'f.js', "w.push({ fbmHash: h }); r.fbmHash = h; if (r.fbmHash === h) {} var x = r.fbmHash || ''; var s = { fbmHash: { code: 'A' } };"), 2);
   check(so, 'stateWrite bị bắt, khai báo hàm thì không', hits('stateReadWrite', 'f.js', 'FbmSync.stateWrite({}); var s = stateRead(); function stateWrite(x) {}'), 2);
-  check(so, 'logEvent bị bắt', hits('logEvent', 'f.js', "logEvent({ a: 1 });"), 1);
+  check(so, 'logEvent và gọi sessionIdentityVerify bị bắt, khai báo thì không', [hits('logEvent', 'f.js', "logEvent({ a: 1 });"), hits('sessionVerify', 'f.js', 'F.sessionIdentityVerify(s, i); F.sessionIdentityVerify = function (s, i) {};')], [1, 1]);
   check(so, 'đặt phase cuối ngoài runClose bị bắt', [hits('phaseClose', 'f.js', "state.phase = 'done';"), hits('phaseClose', 'f.js', "if (state.phase === 'done') {}")], [1, 0]);
 
   section('Quét quy tắc kiến trúc FBM — phép so ngoại lệ chỉ cho co lại');

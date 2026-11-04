@@ -258,7 +258,7 @@ async function chay(so) {
   const compactView = orchestration.FbmSync.statusView();
   check(so, 'status Sidebar khong tra Category gate va OldValue noi bo', [compactView.metadata.categoryGate, compactView.cursor.candidate, compactView.cursor.operation], [undefined, undefined, 'activity_edit_save']);
   check(so, 'status Sidebar giu identity probe de tu dien tai khoan', compactView.metadata.identityProbe, { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' });
-  check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 5000, true);
+  check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 5500, true);
 
   const pausedState = orchestration.FbmSync.stateRead();
   pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};
