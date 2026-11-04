@@ -13,7 +13,7 @@ var FBM_PERF_TTL_SECONDS = 21600;
 var FBM_PERF_FBM_FUNCTIONS = [
   'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
-  'statusView', 'recoverStaleRun', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
+  'statusView', 'staleRunClose', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
   'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',

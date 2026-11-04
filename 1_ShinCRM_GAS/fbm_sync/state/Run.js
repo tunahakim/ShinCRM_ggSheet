@@ -13,21 +13,21 @@ FbmSync.workStoreClear = function () {
 
 /**
  * Nhãn của lượt, chốt một lần lúc mở: ai chạy (Tay/Nền) và tiến trình nào. Dòng Log của lượt lấy nhãn này, không suy lại từ ô lượt lúc ghi (ô lượt có thể đã sang lượt khác).
- * `kindLabel` đặt thẳng tên tiến trình; bỏ trống thì suy từ kiểu quét và chuỗi nền đang mở (ô lượt còn `chain` của lượt nền trước, nên chỉ lượt nền bỏ tên kiểu quét trùng tên chuỗi).
+ * `kindLabel` đặt thẳng tên tiến trình; bỏ trống thì lấy tên tiến trình nền (`process`) và thêm tên kiểu quét khi khác tiến trình (Quét nhanh do bước đếm gọi trong Giữ phiên).
  */
 FbmSync.runLabelOf = function (state, kindLabel) {
-  var labels = FbmSync.SCHEDULE_LABELS || {}, scans = FbmSync.SCHEDULE_SCANS || {}, chain = state.chain || {}, background = state.origin === 'background';
+  var labels = FbmSync.SCHEDULE_LABELS, scans = FbmSync.SCHEDULE_SCANS, process = String(state.process || ''), background = state.origin === 'background';
   var parts = [background ? 'Nền' : 'Tay'];
   if (kindLabel) { parts.push(kindLabel); return parts.join(' · '); }
-  if (background && chain.current) { parts.push(labels[chain.current] || chain.current); }
+  if (background && process) { parts.push(labels[process] || process); }
   var runKind = Object.keys(scans).filter(function (kind) { return scans[kind] === state.scan; })[0] || '';
-  if (!background || runKind !== chain.current) { parts.push(labels[runKind] || String(state.scan || '')); }
+  if (!background || runKind !== process) { parts.push(labels[runKind] || String(state.scan || '')); }
   return parts.join(' · ');
 };
 
 /**
  * Nơi duy nhất mở lượt: dọn kho làm việc của lượt trước, dựng ô lượt mới từ ô hiện tại, ghi và trả về ô đã ghi.
- * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `cursor`, `message`, `kindLabel` (xem `runLabelOf`).
+ * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `cursor`, `message`, `kindLabel` (xem `runLabelOf`), `process` và `pollAt` (tiến trình nền và giờ bắt đầu lần hỏi mở lượt, xem `Heartbeat.js`).
  * Ô cũ còn lượt chưa đóng (lượt treo bị thay) thì các bước của nó được đóng trước khi metadata bị bỏ. Mỗi lượt xác nhận phiên FBM lại từ đầu nên phiên cũ không được mang sang; số xung đột đang chờ quyết thì mang sang vì nó phản ánh Sheet.
  */
 FbmSync.runOpen = function (spec) {
@@ -38,7 +38,7 @@ FbmSync.runOpen = function (spec) {
     runId: Number(now).toString(36), entity: String(opt.entity || ''), phase: opt.phase || 'checking_session', cursor: opt.cursor || {}, message: String(opt.message || ''),
     counts: Object.assign(FbmSync.countsDefault(), { total: Number(opt.total) || 0 }),
     metadata: Object.assign(FbmSync.stateDefault().metadata, { conflictCount: Number(old.metadata && old.metadata.conflictCount || 0), conflictLogged: Number(old.metadata && old.metadata.conflictLogged || 0) }),
-    chain: old.chain || null, origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'),
+    process: String(opt.process || ''), pollAt: Number(opt.pollAt || 0), origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'),
     startedAt: Number(now), updatedAt: Number(now)
   });
   state.runLabel = FbmSync.runLabelOf(state, opt.kindLabel);
@@ -135,15 +135,14 @@ FbmSync.staleRunCheck = function (state, now, options) {
 };
 
 /**
- * Người điều phối thu hồi lượt chết: `staleRunCheck` kết luận thì đóng qua `runFail`, ghi, và ghi riêng một dòng Log (lượt bị thu hồi có thể không còn bước nào mở để tự ghi dòng kết thúc). Không gửi lại lệnh ghi đang mở.
+ * Đóng lượt chết theo kết luận của `staleRunCheck`: đóng qua `runFail`, ghi, và ghi riêng một dòng Log (lượt bị thu hồi có thể không còn bước nào mở để tự ghi dòng kết thúc). Không gửi lại lệnh ghi đang mở. Trả ô lượt đã ghi.
+ * Hộp đen Extension không ghi ở đây: request quá hạn bị bỏ đã có dòng `request_unanswered` mang hộp đen (`RequestWatch.js`), lần hỏi nền nạp hộp đen trước khi đóng.
  */
-FbmSync.recoverStaleRun = function (state, now, options) {
-  var current = state || FbmSync.stateRead(), verdict = FbmSync.staleRunCheck(current, Number(now || Date.now()), options);
-  if (!verdict) { return { state: current, recovered: false }; }
-  var cursorKind = String((current.cursor || {}).kind || '');
-  current.schemaVersion = FbmSync.STATE_SCHEMA_VERSION;
-  FbmSync.runFail(current, verdict.code, verdict.message, { keepRecords: verdict.keepRecords });
-  var written = FbmSync.stateWrite(current);
-  logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: LOG_ERROR, cycleId: String(current.runId || ''), reason: verdict.message, detail: { code: verdict.code, runId: String(current.runId || ''), cursor: cursorKind } });
-  return { state: written, recovered: true, waitingWrite: verdict.keepRecords };
+FbmSync.staleRunClose = function (state, verdict) {
+  var cursorKind = String((state.cursor || {}).kind || '');
+  state.schemaVersion = FbmSync.STATE_SCHEMA_VERSION;
+  FbmSync.runFail(state, verdict.code, verdict.message, { keepRecords: verdict.keepRecords });
+  var written = FbmSync.stateWrite(state);
+  logEvent({ source: 'fbm_sync', action: 'stale_run', outcome: LOG_ERROR, cycleId: String(state.runId || ''), reason: verdict.message, detail: { code: verdict.code, runId: String(state.runId || ''), cursor: cursorKind } });
+  return written;
 };

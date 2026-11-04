@@ -17,7 +17,8 @@ FbmSync.startRun = function (options) {
     return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
   }
   var current = FbmSync.stateRead();
-  if (typeof FbmSync.recoverStaleRun === 'function') { current = FbmSync.recoverStaleRun(current).state; }
+  var stale = FbmSync.staleRunCheck(current, Date.now());
+  if (stale) { current = FbmSync.staleRunClose(current, stale); }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
   // lần bấm mới phải tạo request FBM mới, tránh vẽ lại preview cũ.
   if (FbmSync.runInProgress(current)) {
@@ -44,7 +45,9 @@ FbmSync.startRun = function (options) {
   var state = FbmSync.runOpen({
     origin: opt.origin,
     mode: opt.mode,
-    scan: plan.scan
+    scan: plan.scan,
+    process: opt.process,
+    pollAt: opt.pollAt
   });
   if (typeof FbmSync.businessStepStart === 'function') {
     FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
@@ -56,7 +59,7 @@ FbmSync.startRun = function (options) {
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
   state.requestGap = FbmSync.requestGapMs(settingsValues(FbmSync.SETTING_SECTIONS.run));
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
-  // Lượt Giữ phiên chạy mode `push` nhưng đếm khách và Quét nhanh bù theo chiều lịch nền; cổng đã quyết ở `keepaliveStart`.
+  // Lượt Giữ phiên chạy mode `push` nhưng đếm khách và Quét nhanh bù theo chiều lịch nền; cổng đã quyết ở `pushGateDue`.
   state.scheduleMode = state.scan === 'keepalive' ? FbmSync.modeOf(opt.scheduleMode) : '';
   state.pushGate = opt.pushGate || null;
   FbmSync.countTailMark(state);
@@ -381,7 +384,7 @@ FbmSync.contractGate = function (rawResponse) {
 };
 
 /** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
-FbmSync.continueRun = function (rawResponse) { return FbmSync.chainTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
+FbmSync.continueRun = function (rawResponse) { return FbmSync.backgroundTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
 FbmSync.continueStep = function (rawResponse) {
   var state = FbmSync.stateRead();
   var cursor = state.cursor || {}, response;

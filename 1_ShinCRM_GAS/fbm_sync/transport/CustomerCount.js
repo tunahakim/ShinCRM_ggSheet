@@ -16,10 +16,10 @@ FbmSync.customerBaselineWrite = function (total) {
   FbmSync.props().setProperty(FbmSync.CUSTOMER_BASELINE_KEY, JSON.stringify({ total: Number(total), at: Date.now() }));
 };
 
-/** Request đếm: đúng request trang đầu của lượt lấy danh sách toàn bộ khách, chỉ khác `count: 1`. `kind` là `heartbeat` khi chạy làm Giữ phiên. */
-FbmSync.customerCountRequest = function (kind) {
+/** Request đếm: đúng request trang đầu của lượt lấy danh sách toàn bộ khách, chỉ khác `count: 1`. */
+FbmSync.customerCountRequest = function () {
   var request = FbmSync.customerListRequest({ count: 1 });
-  request.meta.kind = kind || 'customer_count'; request.meta.entity = 'customer';
+  request.meta.kind = 'customer_count'; request.meta.entity = 'customer';
   return request;
 };
 
@@ -67,7 +67,10 @@ FbmSync.runTail = function (result) {
   return Object.assign({}, result, { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerCountRequest()), status: FbmSync.statusView() });
 };
 
-/** Nhận response đếm cuối lượt: khớp mốc thì đóng lượt với thông báo cũ; lệch thì mở ngay một lượt Quét nhanh cùng chiều, lượt đó lại kết thúc bằng bước đếm. */
+/**
+ * Nhận response đếm cuối lượt: khớp mốc thì đóng lượt với thông báo cũ; lệch thì mở ngay một lượt Quét nhanh cùng chiều (mang tiến trình nền của lượt vừa xong), lượt đó lại kết thúc bằng bước đếm.
+ * Dấu đếm có `recount: false` (Giữ phiên ở chiều không ghi Sheet) thì chỉ đếm để giữ phiên. Lượt Giữ phiên ghi giờ giữ phiên cuối.
+ */
 FbmSync.customerCountContinue = function (state, rawResponse) {
   var total = FbmSync.customerCountTotal(rawResponse), tail = state.metadata && state.metadata.countTail || {};
   if (total === null) {
@@ -77,17 +80,21 @@ FbmSync.customerCountContinue = function (state, rawResponse) {
     if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'customer_count_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: reason, detail: { code: state.lastFailureCode } }); }
     return { ok: false, code: state.lastFailureCode, request: null, error: reason, status: FbmSync.statusView() };
   }
-  var baseline = FbmSync.customerBaselineRead(), changed = FbmSync.customerCountChanged(total);
+  var baseline = FbmSync.customerBaselineRead(), changed = FbmSync.customerCountChanged(total) && tail.recount !== false;
+  if (state.scan === 'keepalive') {
+    state.session.lastHeartbeatAt = Date.now();
+    FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + total + ' khách' + (changed ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: total });
+  }
   FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
   if (!changed) { return { ok: true, request: null, status: FbmSync.statusView() }; }
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'customer_count_changed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }); }
-  return FbmSync.recountStart(tail.mode || state.mode, state.origin);
+  return FbmSync.recountStart(tail.mode || state.mode, state.origin, { process: state.process, pollAt: state.pollAt });
 };
 
-/** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn; không đi qua công tắc tiến trình và không dời mốc lịch nào. */
-FbmSync.recountStart = function (mode, origin) {
-  var started = FbmSync.start({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false });
+/** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
+FbmSync.recountStart = function (mode, origin, carry) {
+  var started = FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false }, carry));
   if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); started.status = FbmSync.statusView(); }
   return started;
 };

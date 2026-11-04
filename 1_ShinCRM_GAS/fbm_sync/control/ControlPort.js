@@ -13,7 +13,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.COMMANDS = {
   start: { lock: true, drives: true, run: function (input) { return FbmSync.commandStart(input); } },
   continue: { lock: true, slice: true, reply: true, relay: true, guard: function (input, state) { return FbmSync.continueGuard(input, state); }, run: function (input, state) { return FbmSync.sliceContinue(input, state); } },
-  heartbeat: { lock: true, relay: true, run: function (input) { return fbmSyncHeartbeatRequest(input); } },
+  heartbeat: { lock: true, relay: true, run: function (input) { return FbmSync.heartbeatRun(input); } },
+  assign_background_machine: { lock: true, run: function (input) { return FbmSync.backgroundMachineAssignCommand(input); } },
+  release_background_machine: { lock: true, run: function () { return FbmSync.backgroundMachineReleaseCommand(); } },
   cancel: { run: function () { return FbmSync.runStopCommand('any'); } },
   stop_background: { run: function () { return FbmSync.runStopCommand('background'); } },
   approve_push: { lock: true, slice: true, drives: true, run: function () { return fbmSyncApprovePush(); } },

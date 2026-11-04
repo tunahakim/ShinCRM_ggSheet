@@ -73,8 +73,6 @@ FbmSync.stopPendingApply = function (fresh) {
   var state = FbmSync.stateRead(), verdict = FbmSync.stopVerdict(state, fresh);
   if (!verdict) { return { state: state, stopped: false }; }
   FbmSync.runClose(state, verdict);
-  // Người dùng dừng thì tiến trình nền đang đến hạn cũng bỏ, không để nhịp kế mở lại đúng lượt vừa dừng; lượt chết bị thu hồi thì giữ để lịch nền chạy lại.
-  state.scheduledScan = '';
   return { state: FbmSync.stateWrite(state), stopped: true };
 };
 

@@ -68,7 +68,6 @@ FbmSync.controlFailRun = function (error) {
  * Hàm xử lý tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
  */
 FbmSync.CURSOR_TABLE = {
-  heartbeat: { legacy: true, run: function (rawResponse) { return fbmSyncHeartbeatLocked(rawResponse, {}); } },
   conflict_refresh: { legacy: true, run: function (rawResponse) { return FbmSync.conflictOpened(rawResponse); } },
   run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
 };
@@ -85,8 +84,8 @@ FbmSync.continue = function (rawResponse) {
  * `rawResponse` bỏ trống khi nộp lỗi gửi request (không có response để so mã hợp đồng).
  */
 FbmSync.replyAdmit = function (state, requestId, rawResponse) {
-  var recovered = FbmSync.recoverStaleRun(state);
-  if (recovered.recovered) { return { ok: false, code: recovered.state.lastFailureCode, request: null, status: FbmSync.statusView(), error: recovered.state.lastError, stale: true }; }
+  var stale = FbmSync.staleRunCheck(state, Date.now());
+  if (stale) { var closed = FbmSync.staleRunClose(state, stale); return { ok: false, code: closed.lastFailureCode, request: null, status: FbmSync.statusView(), error: closed.lastError, stale: true }; }
   if (!FbmSync.requestAnswered(state, requestId)) { return FbmSync.staleReplyDrop(state, requestId, !rawResponse); }
   return rawResponse ? FbmSync.contractGate(rawResponse) : null;
 };

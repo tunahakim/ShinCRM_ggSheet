@@ -259,13 +259,12 @@ FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
   if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
-/** Lượt đang chạy thì lấy nhãn chốt lúc mở lượt (`runLabel`), không suy lại từ ô lượt. Ngoài lượt thì chọn theo kênh của lời gọi: chuỗi nền đang mở hoặc Extension chuyển hộ (relay) là Nền, còn lại là Tay. */
+/** Lượt đang chạy thì lấy nhãn chốt lúc mở lượt (`runLabel`), không suy lại từ ô lượt. Ngoài lượt thì chọn theo kênh của lời gọi: Extension chuyển hộ (relay) là Nền, còn lại là Tay. */
 FbmSync.logContextText = function () {
   var state = FbmSync._logContextState;
   if (!state) { return ''; }
   if (FbmSync.runInProgress(state)) { return state.runLabel || FbmSync.runLabelOf(state); }
-  var labels = FbmSync.SCHEDULE_LABELS || {}, chain = state.chain || {}, relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
-  if (chain.current) { return 'Nền · ' + (labels[chain.current] || chain.current); }
+  var relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
   return relay ? 'Nền' : 'Tay';
 };
 

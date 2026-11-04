@@ -25,6 +25,14 @@ FbmSync.withLocalSnapshot = function (fn) {
 /** Kho mà code đồng bộ dùng: trong khóa điều phối ghi chờ tới lúc nhả khóa; ngoài khóa như `documentProps()`. */
 FbmSync.props = function () { return documentPropsDeferred(); };
 
+/** Cổng ghi một khóa JSON của đồng bộ (trong khóa điều phối thì ghi chờ tới lúc nhả khóa); `null` là xóa khóa. Kho riêng của từng việc (máy nền, sổ tiến trình) ghi qua đây, không tự gọi `setProperty`. */
+FbmSync.propertyJsonWrite = function (key, value) {
+  var props = FbmSync.props();
+  if (value === null) { props.deleteProperty(key); return null; }
+  props.setProperty(key, JSON.stringify(value));
+  return value;
+};
+
 // Chừa khoảng cho tên khóa dưới trần 9.000 byte một khóa.
 FbmSync.SHARD_LIST_BYTES = 8000;
 

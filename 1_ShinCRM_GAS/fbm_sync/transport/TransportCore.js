@@ -109,7 +109,6 @@ FbmSync.sessionSystemRequest = function (kind, value) {
   else if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer'); }
   else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(); request.meta.kind = 'session_probe'; }
   else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(); }
-  else if (kind === 'heartbeat') { request = FbmSync.customerCountRequest('heartbeat'); }
   else { return null; }
   request.meta = Object.assign({}, request.meta || {}, { systemRequest: true });
   if (options.requireIdentityProbe === true) { request.meta.requireIdentityProbe = true; }
@@ -536,7 +535,6 @@ FbmSync.responseRequestId = function (rawResponse) {
 /** Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật. */
 FbmSync.requestForCursor = function (state) {
   var cursor = state && state.cursor || {};
-  if (cursor.kind === 'heartbeat') { return FbmSync.sessionSystemRequest('heartbeat'); }
   if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: cursor.testOnly === true, force: cursor.purpose === 'force' }); }
   if (cursor.kind === 'login_identity_authorize') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }); }
   if (cursor.kind === 'login_identity_user') { return FbmSync.sessionSystemRequest('identity_user_grid'); }

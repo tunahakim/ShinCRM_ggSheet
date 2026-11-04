@@ -1,4 +1,4 @@
-/** Lịch nền nghiệp vụ ở GAS: Extension hỏi theo alarm `gas_poll`, GAS chọn tiến trình đến hạn theo mốc lưu trong DocumentProperties (09/02). */
+/** Sổ tiến trình nền và công cụ tính lịch (đến hạn, thử lại). Không biết gì về chặng hay ô lượt; người điều phối lần hỏi là `heartbeatRun` (`Heartbeat.js`). */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.DETAIL_CURSOR_KEY = 'FBM_SYNC_DETAIL_CURSOR_V1';
 /**
@@ -17,7 +17,7 @@ FbmSync.detailCursorRead = function () {
   return isFinite(cus) && cus >= 0 ? Math.floor(cus) : -1;
 };
 FbmSync.detailCursorWrite = function (cus) {
-  FbmSync.props().setProperty(FbmSync.DETAIL_CURSOR_KEY, JSON.stringify({ cus: Math.floor(Number(cus)), at: Date.now() }));
+  FbmSync.propertyJsonWrite(FbmSync.DETAIL_CURSOR_KEY, { cus: Math.floor(Number(cus)), at: Date.now() });
 };
 /** Tên tiến trình trong câu báo lỗi và câu xác nhận, đúng nhãn ở `Cài đặt phiên` (09/02 Phần 3). */
 FbmSync.SCHEDULE_LABELS = { heartbeat: 'Giữ phiên FBM', customerFull: 'Quét nhanh', activityFull: 'Lấy toàn bộ giao dịch', detail: 'Vòng xoay giao dịch' };
@@ -26,272 +26,69 @@ FbmSync.PUSH_GATE_BYPASS_SCANS = ['full'];
 FbmSync.PUSH_GATE_CLOSED_TRACE = 'Bỏ qua kiểm dữ liệu ShinCRM và chặng đẩy: từ lần đẩy sạch trước không có gì đổi.';
 /** Dòng `Mức quét` của lượt Giữ phiên có đẩy; `Chiều chạy` lấy theo chiều lịch nền (chủ dự án chốt 2026-10-20). */
 FbmSync.KEEPALIVE_SCAN_LABEL = 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)';
-/** Kiểu quét của lượt mà mỗi tiến trình nền mở; Giữ phiên không mở lượt nào. */
+/** Kiểu quét của lượt mà mỗi tiến trình nền mở (Giữ phiên là lượt `keepalive`: chỉ đếm khách, hoặc đẩy bản ghi vừa sửa khi cổng chặng đẩy mở). */
 FbmSync.SCHEDULE_SCANS = { customerFull: 'full', activityFull: 'activity_bulk', detail: 'detail', heartbeat: 'keepalive' };
-/** Giờ đến hạn của một tiến trình; `0` là chưa từng chạy xong nên đến hạn ngay. Tiến trình đang chờ thử lại sau lỗi thì đến hạn muộn nhất là giờ thử lại. Đọc chu kỳ hiện hành nên đổi chu kỳ là có hiệu lực ngay, không cần đặt lại mốc. */
-FbmSync.scheduleDueAt = function (kind, schedule, props) {
-  var done = Number((props || FbmSync.props()).getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0);
-  var dueAt = done ? done + schedule[kind].minutes * 60 * 1000 : 0;
-  return Math.max(dueAt, FbmSync.scheduleRetryRead(kind).retryAt);
+
+/** Sổ tiến trình: mỗi tiến trình `{ doneAt, failures, retryAt }` đọc từ khóa chạy xong và khóa thử lại. Đọc một lần mỗi lời gọi rồi truyền cho các công cụ tính. */
+FbmSync.processBookRead = function () {
+  var props = FbmSync.props(), book = {};
+  Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) {
+    var retry = FbmSync.documentPropertyJson(FbmSync.SCHEDULE_RETRY_KEYS[kind], 'lần thử lại của ' + FbmSync.SCHEDULE_LABELS[kind]) || {};
+    book[kind] = { doneAt: Number(props.getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0), failures: Math.max(0, Math.floor(Number(retry.failures) || 0)), retryAt: Math.max(0, Number(retry.retryAt) || 0) };
+  });
+  return book;
 };
-FbmSync.scheduleRetryRead = function (kind) {
-  var saved = FbmSync.documentPropertyJson(FbmSync.SCHEDULE_RETRY_KEYS[kind], 'lần thử lại của ' + FbmSync.SCHEDULE_LABELS[kind]) || {};
-  return { failures: Math.max(0, Math.floor(Number(saved.failures) || 0)), retryAt: Math.max(0, Number(saved.retryAt) || 0) };
+/** Giờ đến hạn của một tiến trình; `0` là chưa từng chạy xong nên đến hạn ngay. Tiến trình đang chờ thử lại sau lỗi thì đến hạn muộn nhất là giờ thử lại. Đọc chu kỳ hiện hành nên đổi chu kỳ là có hiệu lực ngay. */
+FbmSync.processDueAt = function (kind, schedule, book) {
+  var entry = book[kind], dueAt = entry.doneAt ? entry.doneAt + schedule[kind].minutes * 60 * 1000 : 0;
+  return Math.max(dueAt, entry.retryAt);
 };
-/** Tiến trình bật và đã đến hạn, chưa chạy trong chuỗi này, theo ưu tiên: Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, cuối cùng Giữ phiên. */
-FbmSync.scheduleDueKinds = function (now, ran, schedule) {
-  var props = FbmSync.props(), skip = ran || [];
+/**
+ * Tiến trình bật và đã đến hạn, theo ưu tiên (Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, cuối cùng Giữ phiên).
+ * `pollAt`: giờ bắt đầu lần hỏi đang chạy chuỗi; tiến trình đã chạy xong từ giờ đó không chạy lại trong cùng lần hỏi, nên chuỗi luôn dừng dù chu kỳ ngắn hơn thời gian chạy. Tiến trình vừa lỗi có giờ thử lại ở tương lai nên cũng không chạy lại.
+ */
+FbmSync.processDue = function (now, schedule, book, pollAt) {
   return Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) {
-    return schedule[kind].enabled && skip.indexOf(kind) < 0 && FbmSync.scheduleDueAt(kind, schedule, props) <= now;
+    return schedule[kind].enabled && FbmSync.processDueAt(kind, schedule, book) <= now && !(pollAt && book[kind].doneAt >= pollAt);
   }).sort(function (a, b) { return schedule[a].priority - schedule[b].priority; });
 };
-/** Tiến trình vừa chạy hết lượt: ghi giờ chạy xong và bỏ lần thử lại sau lỗi. Chỉ đường kết thúc thành công gọi hàm này. */
-FbmSync.scheduleMarkDone = function (kind, now) {
-  var at = Number(now || Date.now()), props = FbmSync.props();
-  props.setProperty(FbmSync.SCHEDULE_DONE_KEYS[kind], String(at));
-  if (props.getProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind])) { props.deleteProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind]); }
-  return at;
-};
-/** Tiến trình nền kết thúc lỗi hoặc tạm dừng: dời giờ thử lại của riêng nó và ghi Log; không ghi giờ chạy xong, nên thử lại tới hạn là chạy lại. */
-FbmSync.scheduleMarkFailed = function (kind, now, code) {
-  var at = Number(now || Date.now()), failures = FbmSync.scheduleRetryRead(kind).failures + 1;
+/** Số phút chờ trước lần thử lại thứ `failures` (lỗi liền nhau): nhân đôi từ `SETTINGS.FBM_SCHEDULE_RETRY_BASE_MINUTES` tới trần `SETTINGS.FBM_SCHEDULE_RETRY_MAX_MINUTES`. */
+FbmSync.retryDelay = function (failures) {
   var base = Number(SETTINGS.FBM_SCHEDULE_RETRY_BASE_MINUTES), cap = Number(SETTINGS.FBM_SCHEDULE_RETRY_MAX_MINUTES);
-  var minutes = Math.min(cap, base * Math.pow(2, Math.min(failures - 1, 30)));
-  FbmSync.props().setProperty(FbmSync.SCHEDULE_RETRY_KEYS[kind], JSON.stringify({ failures: failures, retryAt: at + minutes * 60 * 1000 }));
-  if (typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: FbmSync.SCHEDULE_LABELS[kind] + ' chạy nền không xong' + (code ? ' (mã ' + code + ')' : '') + ', lỗi liền ' + failures + ' lần; thử lại sau ' + minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: failures, retryMinutes: minutes } });
+  return Math.min(cap, base * Math.pow(2, Math.min(Math.max(1, failures) - 1, 30)));
+};
+/**
+ * Ghi kết quả một lượt của tiến trình nền vào sổ: `done` ghi giờ chạy xong và bỏ lần thử lại; `failed` dời giờ thử lại của riêng tiến trình đó (không ghi giờ chạy xong, nên tới hạn là chạy lại). Trả `{ failures, minutes }` để người điều phối ghi Log.
+ * Chỉ ghi khi tiến trình chạy hết lượt hoặc lượt đã đóng lỗi: lượt hỏng giữa chừng không ghi gì nên tiến trình vẫn quá hạn và lần hỏi sau chạy lại.
+ */
+FbmSync.processBookMark = function (kind, outcome, now, book) {
+  var at = Number(now), entry = book[kind];
+  if (outcome === 'done') {
+    FbmSync.propertyJsonWrite(FbmSync.SCHEDULE_DONE_KEYS[kind], at);
+    if (entry.failures || entry.retryAt) { FbmSync.propertyJsonWrite(FbmSync.SCHEDULE_RETRY_KEYS[kind], null); }
+    return { failures: 0, minutes: 0 };
   }
+  var failures = entry.failures + 1, minutes = FbmSync.retryDelay(failures);
+  FbmSync.propertyJsonWrite(FbmSync.SCHEDULE_RETRY_KEYS[kind], { failures: failures, retryAt: at + minutes * 60 * 1000 });
   return { failures: failures, minutes: minutes };
 };
 /** Dòng vết của lịch nền: chỉ ra Sheet `Log` khi `LOG_TRACE` phủ `fbm_sync`, để biết mỗi lần Extension hỏi GAS đã quyết gì. */
 FbmSync.scheduleTrace = function (action, reason, detail) {
-  if (typeof logTrace === 'function') { logTrace({ source: 'fbm_sync', action: action, outcome: 'trace', reason: reason, detail: detail || {} }); }
+  logTrace({ source: 'fbm_sync', action: action, outcome: 'trace', reason: reason, detail: detail || {} });
 };
 /** Câu "sớm nhất là X, còn N phút" cho dòng vết lần hỏi chưa có việc. */
-FbmSync.scheduleNextText = function (now, schedule) {
-  var props = FbmSync.props(), best = '', bestAt = 0;
+FbmSync.scheduleNextText = function (now, schedule, book) {
+  var best = '', bestAt = 0;
   Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) {
-    var at = FbmSync.scheduleDueAt(kind, schedule, props);
+    var at = FbmSync.processDueAt(kind, schedule, book);
     if (schedule[kind].enabled && (!best || at < bestAt)) { best = kind; bestAt = at; }
   });
   return best ? 'sớm nhất là ' + FbmSync.SCHEDULE_LABELS[best] + ', còn ' + Math.max(0, Math.ceil((bestAt - now) / 60000)) + ' phút' : 'không có tiến trình nào đang bật';
 };
-FbmSync.scheduleNextAt = function (schedule) {
-  var props = FbmSync.props();
-  var times = Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return FbmSync.scheduleDueAt(kind, schedule, props); });
+FbmSync.scheduleNextAt = function (schedule, book) {
+  var times = Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return FbmSync.processDueAt(kind, schedule, book); });
   return times.length ? Math.min.apply(null, times) : 0;
 };
-/**
- * Mở chuỗi nền của lần hỏi này: chọn tiến trình đến hạn đầu tiên, chưa ghi giờ chạy xong nào (chỉ ghi khi tiến trình chạy hết lượt).
- * Chuỗi nằm trong state (`chain`) để lượt chuyền bị cắt lát thì lần hỏi sau chạy tiếp. Chuỗi còn sót mà không còn lượt nào chạy là chuỗi đã gãy (lỗi, lượt tay chen ngang) nên bị thay bằng chuỗi mới; tiến trình dở chạy lại vì chưa có giờ chạy xong mới.
- */
-FbmSync.schedulerPickDue = function (now, options) {
-  var at = Number(now || Date.now()), opt = options || {}, schedule = FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)), state = FbmSync.stateRead();
-  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled') || schedule.enabled === false) { return { ok: false, code: 'BACKGROUND_DISABLED' }; }
-  if (FbmSync.runInProgress(state)) {
-    FbmSync.scheduleTrace('schedule_skip', 'Extension hỏi lịch nền: đang có lượt chạy, không mở thêm.', { phase: String(state.phase || '') });
-    return { ok: false, code: 'SYNC_BUSY' };
-  }
-  // Chuỗi còn sót mà lượt nền của tiến trình đang chạy dở đã kết thúc lỗi hay tạm dừng (kể cả bị bỏ dở rồi thu hồi): tiến trình đó lỗi, dời lần thử lại của riêng nó để lần hỏi này chạy các tiến trình khác. Lượt tay chen ngang không phải lỗi của tiến trình nền nên chỉ bỏ chuỗi.
-  if (state.chain && state.chain.current && state.chain.current !== state.scheduledScan) {
-    if (state.origin === 'background' && ['error', 'paused'].indexOf(String(state.phase || '')) >= 0) { FbmSync.scheduleMarkFailed(state.chain.current, at, state.lastFailureCode); }
-    state.chain = null; FbmSync.stateWrite(state);
-  }
-  if (state.scheduledScan) { return { ok: true, kind: String(state.scheduledScan), existing: true }; }
-  var due = FbmSync.scheduleDueKinds(at, [], schedule);
-  // Mở Chrome là tùy chọn người dùng thấy được: được một lần Giữ phiên ngay, không sinh loạt việc bù.
-  if (!due.length && opt.startup === true && settingsValue(FbmSync.SETTING_SECTIONS.extension, 'runOnStartup') && schedule.heartbeat.enabled) { due = ['heartbeat']; }
-  if (!due.length) {
-    FbmSync.scheduleTrace('schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; ' + FbmSync.scheduleNextText(at, schedule) + '.');
-    if (state.chain) { state.chain = null; FbmSync.stateWrite(state); }
-    return { ok: false, code: 'NO_PROCESS_DUE' };
-  }
-  state.scheduledScan = due[0];
-  state.scheduledDirection = schedule.direction;
-  state.chain = { current: due[0], ran: [], direction: schedule.direction, startedAt: at };
-  state.message = 'Đã chọn tiến trình nền ' + due[0] + '.';
-  FbmSync.stateWrite(state);
-  return { ok: true, kind: due[0] };
-};
-/** Mở một tiến trình của chuỗi. Giữ phiên do `keepaliveStart` quyết; các tiến trình khác là một lượt nền thường, tự kết thúc bằng bước đếm. */
-FbmSync.chainStart = function (kind) {
-  var state = FbmSync.stateRead(), schedule = FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)), direction = state.chain && state.chain.direction || schedule.direction;
-  state.chain = Object.assign({ ran: [], direction: direction }, state.chain || {}, { current: kind });
-  state.scheduledScan = '';
-  if (kind === 'heartbeat') {
-    FbmSync.stateWrite(state);
-    return FbmSync.keepaliveStart(direction);
-  }
-  FbmSync.stateWrite(state);
-  var options = { mode: direction, scan: FbmSync.SCHEDULE_SCANS[kind] || 'full', origin: 'background' };
-  if (kind === 'detail') { options.detail = schedule.detail; }
-  return FbmSync.start(options);
-};
-/**
- * Nơi duy nhất quyết thân của Giữ phiên, cho cả hai đường cấp (`chainStart` và `fbmSyncHeartbeatRequest`). Chiều lịch nền có ghi FBM và cổng chặng đẩy mở thì mở lượt Chỉ đẩy nền `keepalive`: request đầu của lượt là bước kiểm phiên nên vẫn giữ phiên, cuối lượt đếm khách theo chiều lịch nền. Còn lại (cổng đóng, chiều Lấy) phát request đếm như cũ.
- * Cổng quyết ở đây được chuyển vào lượt nên bước kiểm dữ liệu ShinCRM không quyết lại.
- */
-FbmSync.keepaliveStart = function (direction) {
-  var state = FbmSync.stateRead();
-  if (FbmSync.canWriteFbm(direction)) {
-    var options = { mode: 'push', scan: 'keepalive', origin: 'background', scheduleMode: direction };
-    var gate = FbmSync.pushGateCheck(state, options);
-    if (gate.open) { return FbmSync.start(Object.assign(options, { pushGate: gate })); }
-    state = FbmSync.stateRead();
-  }
-  state.scheduledScan = 'heartbeat'; state.scheduledDirection = direction; state.cursor = { kind: 'heartbeat' };
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.cursorStartEnvelope(state), status: FbmSync.statusView() };
-};
-/**
- * Tiến trình hiện tại của chuỗi vừa chạy xong: ghi giờ chạy xong của nó rồi mở tiến trình đến hạn kế tiếp chưa chạy trong chuỗi.
- * Mỗi tiến trình theo lịch chạy tối đa một lần mỗi chuỗi nên chuỗi luôn dừng dù chu kỳ ngắn hơn thời gian chạy; Quét nhanh do bước đếm gọi nằm trong lượt của tiến trình đang chạy nên không tính.
- */
-FbmSync.chainAdvance = function () {
-  var schedule = FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)), sync = settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled');
-  for (var guard = 0; guard <= Object.keys(FbmSync.SCHEDULE_DONE_KEYS).length; guard += 1) {
-    var state = FbmSync.stateRead(), chain = state.chain, at = Date.now();
-    if (!chain || !chain.current) { return null; }
-    FbmSync.scheduleMarkDone(chain.current, at);
-    chain.ran = (chain.ran || []).concat([chain.current]); chain.current = '';
-    var next = sync && schedule.enabled ? FbmSync.scheduleDueKinds(at, chain.ran, schedule)[0] : '';
-    state.chain = next ? chain : null; state.scheduledScan = ''; state.nextRunAt = FbmSync.scheduleNextAt(schedule);
-    FbmSync.stateWrite(state);
-    if (!next) { return null; }
-    var started = FbmSync.chainStart(next);
-    // Tiến trình xong ngay không cần request (không có gì để đọc) thì xét tiếp; dừng lỗi thì chuỗi gãy và lần hỏi sau chạy lại.
-    if (started && started.request) { return started; }
-    var after = FbmSync.stateRead();
-    if (after.phase !== 'done' || !after.chain || after.chain.current !== next) { return started; }
-  }
-  return null;
-};
-/** Cuối mỗi lượt nền (sau bước đếm): lượt xong thì chuỗi chạy tiếp tiến trình kế. Lượt tay, lượt lỗi hay tạm dừng không đẩy chuỗi. */
-FbmSync.chainTail = function (result) {
-  if (!result || result.request) { return result; }
-  var state = FbmSync.stateRead();
-  if (state.origin !== 'background' || !state.chain || !state.chain.current) { return result; }
-  // Lượt dừng ở xung đột đã chạy hết phần đọc, chỉ chờ người dùng chọn: tính là chạy xong để lần hỏi sau không chạy lại liên tục; chuỗi dừng tới khi xung đột được xử lý.
-  if (state.phase === 'conflict') {
-    FbmSync.scheduleMarkDone(state.chain.current, Date.now());
-    state.chain = null; state.scheduledScan = ''; state.nextRunAt = FbmSync.scheduleNextAt(FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background))); FbmSync.stateWrite(state);
-    return result;
-  }
-  if (state.phase !== 'done') { return result; }
-  var next = FbmSync.chainAdvance();
-  return Object.assign({}, result, { ok: true, request: next && next.request || null, status: FbmSync.statusView() });
-};
-
-function fbmSyncLockResult(code, message) {
-  return { ok: false, code: String(code || 'BUSY'), request: null, message: String(message || 'GAS đang xử lý một request khác; chưa cấp request FBM mới.'), status: FbmSync.statusView() };
-}
-
-/**
- * Lần hỏi của Extension: GAS tự quyết việc từ ô lượt. Có lượt tay đang giữ chỗ cho đúng máy hỏi thì phát request đầu của lượt đó; không thì chọn việc nền đến hạn. Extension chỉ chuyển nguyên envelope tới tab FBM. Chạy trong khóa của cửa lệnh (lệnh `heartbeat`).
- * `trigger` là lý do Extension hỏi (`alarm`, `startup`, `run_now`...); `run_now` là Sidebar đánh thức sau khi mở lượt tay nên không mở việc nền. `trail` là vết request gần nhất của Extension.
- */
-function fbmSyncHeartbeatRequest(options) {
-  var opt = options || {}, source = String(opt.trigger || 'alarm');
-  // Đọc ô lượt một lần cho cả lần hỏi: kiểm danh tính và ghi hộp đen ở dưới không đổi ô lượt.
-  // Áp điều kiện dừng trước mọi việc, kể cả khi công tắc tắt: lượt bị Dừng hoặc tắt đồng bộ mà không còn lát nào chạy (Extension đã tắt) được đóng ở đây.
-  var state = FbmSync.stopPendingApply().state, now = Date.now();
-  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: true, noop: true, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
-  if (FbmSync.pickupAwaits(state, opt.machineId, now)) {
-    FbmSync.requestWatchTrail(opt.trail);
-    return FbmSync.runSlice(function () { return FbmSync.envelopeReissue(state, ''); }, state);
-  }
-  // Chỗ giữ quá hạn đóng ở lần hỏi của bất kỳ máy nào, kể cả khi nền tắt: không thì Sidebar thấy lượt "đang chạy" mãi.
-  if (FbmSync.pickupHeld(state) && now >= Number(state.deadlineAt || 0)) { state = FbmSync.recoverStaleRun(state, now, { abandoned: true }).state; }
-  if (source === 'run_now') { return { ok: true, noop: true, code: 'NO_RUN_AWAITING', request: null, status: FbmSync.statusView() }; }
-  if (['alarm', 'sidebar_open'].indexOf(source) >= 0 && !settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled')) { return { ok: true, noop: true, code: 'BACKGROUND_DISABLED', request: null, status: FbmSync.statusView() }; }
-  if (typeof FbmSync.identityPreflight === 'function') {
-    var identity = FbmSync.identityPreflight('background');
-    if (identity.blocking) { return { ok: true, noop: true, code: identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', request: null, message: identity.message, status: FbmSync.statusView() }; }
-  }
-  FbmSync.requestWatchTrail(opt.trail);
-  var session = state.session || {}, cursor = state.cursor || {};
-  var activePhase = FbmSync.ACTIVE_PHASES && FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
-  if (state.activeRequestId && now < Number(state.deadlineAt || 0)) {
-    return fbmSyncLockResult('REQUEST_IN_FLIGHT', 'Đã có request FBM đang chờ response; không cấp request heartbeat chồng.');
-  }
-  // Lượt dở không còn request nào chờ trong hạn (Extension bị tắt giữa chừng, response mất): kết thúc có Log rồi mở lượt mới, không gửi lại request của lượt cũ (09/02 Phần 3 "Mỗi lần hỏi nền là một lượt mới").
-  if (state.runId && activePhase) { FbmSync.recoverStaleRun(state, now, { abandoned: true }); }
-  // Chọn tiến trình đến hạn trước, để nhịp hỏi kỹ thuật không tự mở việc mỗi lần.
-  var picked = FbmSync.schedulerPickDue(now, { startup: source === 'startup' });
-  if (!picked.ok) {
-    return { ok: true, noop: true, code: picked.code || 'NO_PROCESS_DUE', request: null, status: FbmSync.statusView() };
-  }
-  // Đọc lại sau khi chọn: ghi bản đọc trước đó sẽ xóa mất tiến trình vừa chọn và lịch nền không bao giờ khởi động.
-  state = FbmSync.stateRead();
-  state.cursor = { kind: 'heartbeat' };
-  // Dấu "phiên hết hạn" của lượt đã kết thúc không còn đáng tin: bỏ dấu, response của request đếm khách quyết định phiên sống hay chết (09/06).
-  if (!FbmSync.runInProgress(state)) { FbmSync.sessionGateForgetStale(state); }
-  FbmSync.stateWrite(state);
-  // Chuỗi mở bằng chính request đầu của tiến trình đến hạn, kể cả Giữ phiên (`keepaliveStart` quyết đếm hay đẩy); chỉ Quét nhanh do bước đếm gọi còn mở bằng request đếm khách ở dưới.
-  if (state.chain && state.scheduledScan && state.scheduledScan === state.chain.current) {
-    var opened = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan)), openedRequest = opened && opened.request || null, openedState = FbmSync.stateRead();
-    if (!openedRequest) { return { ok: !!(opened && opened.ok), code: opened && opened.code || 'CHAIN_START_EMPTY', request: null, status: FbmSync.statusView(), error: opened && opened.error }; }
-    var openedEnvelope = openedRequest.protocol ? openedRequest : FbmSync.nextEnvelope(openedRequest);
-    var openedCode = openedState.scheduledScan === 'heartbeat' && typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(openedEnvelope, openedState) : 'CHAIN_REQUEST_READY';
-    return { ok: true, code: openedCode, request: openedEnvelope, status: FbmSync.statusView() };
-  }
-  var heartbeatEnvelope = FbmSync.cursorStartEnvelope(state), currentState = FbmSync.stateRead();
-  return { ok: true, code: typeof FbmSync.sessionGateRequestCode === 'function' ? FbmSync.sessionGateRequestCode(heartbeatEnvelope, currentState) : 'HEARTBEAT_REQUEST_READY', request: heartbeatEnvelope, status: FbmSync.statusView() };
-}
-FbmSync.heartbeatRequest = fbmSyncHeartbeatRequest;
-
-function fbmSyncHeartbeatLocked(rawResponse, options) {
-  var state = FbmSync.stateRead(), cursor = state.cursor || {}, result = FbmSync.protocol.assertSuccess(rawResponse), request = null, started = null;
-  // Sau heartbeat, mọi request của phiên nền dùng đúng bộ xử lý continuation chung.
-  // Worker chỉ chuyển envelope nên không cần và không được biết cursor nào đang chạy.
-  if (cursor.kind !== 'heartbeat') { return FbmSync.continueRun(rawResponse); }
-  // Heartbeat không được tự suy ra phiên từ shape dữ liệu. Lỗi HTTP/parse đi qua
-  // continuation chung để 401/403 được probe và mọi lỗi khác fail-closed.
-  if (!result.ok) { return FbmSync.continueRun(rawResponse); }
-  state.activeRequestId = '';
-  state.deadlineAt = 0;
-  state.lastProgressAt = Date.now();
-  if (typeof FbmSync.sessionGateResponseStarted === 'function') { FbmSync.sessionGateResponseStarted(state); }
-  FbmSync.stateWrite(state);
-  var countTotal = FbmSync.customerCountTotal(rawResponse);
-  if ((FbmSync.protocol.hasHeartbeatData && !FbmSync.protocol.hasHeartbeatData(rawResponse)) || countTotal === null) {
-    state.phase = 'error'; state.cursor = {}; state.lastFailureCode = 'HEARTBEAT_RESPONSE_INVALID'; state.lastError = 'Heartbeat FBM không trả dữ liệu Customer đúng định dạng; đã dừng để probe phiên ở lượt sau.'; state.message = state.lastError; state.retryable = false; state.scheduledScan = '';
-    FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.lastError, 'heartbeat_invalid_response'); }
-    return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-  }
-  state.session = state.session || {};
-  state.session.lastHeartbeatAt = Date.now();
-  var heartbeatDirection = state.scheduledDirection || settingsValue(FbmSync.SETTING_SECTIONS.background, 'direction');
-  // Thân của Giữ phiên là bước đếm: lệch mốc thì Quét nhanh chạy ngay dù công tắc Quét nhanh tắt; chiều Chỉ đẩy chỉ giữ phiên (09/02 mục 8).
-  // Các tiến trình khác tự kết thúc bằng bước đếm, nên ở đây request đếm chỉ mở phiên cho chúng.
-  if (state.scheduledScan === 'heartbeat') {
-    var recount = FbmSync.customerCountApplies(heartbeatDirection) && FbmSync.customerCountChanged(countTotal);
-    state.scheduledScan = recount ? 'recount' : '';
-    state.message = recount ? FbmSync.RECOUNT_MESSAGE : 'Heartbeat FBM OK.';
-  }
-  FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + countTotal + ' khách' + (state.scheduledScan === 'recount' ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: countTotal });
-  state.cursor = {};
-  FbmSync.stateWrite(state);
-  state = FbmSync.stateRead();
-  if (result.ok && FbmSync.runInProgress(state)) {
-    request = FbmSync.requestForCursor(state);
-  } else if (result.ok && state.scheduledScan === 'recount') {
-    state.scheduledScan = ''; FbmSync.stateWrite(state);
-    started = FbmSync.recountStart(heartbeatDirection, 'background');
-    request = started && started.request ? started.request : null;
-  } else if (result.ok && state.chain && state.scheduledScan && state.scheduledScan === state.chain.current) {
-    started = FbmSync.chainTail(FbmSync.chainStart(state.scheduledScan));
-    request = started && started.request ? started.request : null;
-  } else if (result.ok && state.chain && state.chain.current === 'heartbeat') {
-    started = FbmSync.chainAdvance();
-    request = started && started.request ? started.request : null;
-  }
-  var status = FbmSync.statusView();
-  if (!result.ok) { return { ok: false, code: result.code || 'HEARTBEAT_FAILED', status: result.status || 0, error: result.bug && result.bug.Message || state.lastError, request: null, statusView: status }; }
-  return { ok: true, request: request ? (request.protocol ? request : FbmSync.nextEnvelope(request)) : null, status: status };
-}
-
 
 /**
  * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.

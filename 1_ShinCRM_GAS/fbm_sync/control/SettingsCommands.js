@@ -116,3 +116,20 @@ FbmSync.settingsView = function () {
   });
   return view;
 };
+
+/** Lệnh `assign_background_machine` (trong khóa): giao máy Sidebar đang mở chạy nền (`machineId` Extension máy đó tự sinh, `name` Sidebar dựng để người dùng nhận ra máy). Thay máy cũ nếu có; ghi Log vì đổi máy là đổi nơi đồng bộ nền chạy. */
+FbmSync.backgroundMachineAssignCommand = function (input) {
+  var machineId = String(input.machineId || '');
+  if (!machineId) { var missing = new Error('Chưa có mã máy Extension: máy này chưa cài Extension ShinCRM hoặc Extension chưa chạy.'); missing.code = 'MACHINE_ID_REQUIRED'; throw missing; }
+  var previous = FbmSync.backgroundMachineRead(), machine = FbmSync.backgroundMachineWrite(FbmSync.machineAssigned(machineId, input.name, Date.now()));
+  logEvent({ source: 'fbm_sync', action: 'background_machine_assign', outcome: LOG_OK, reason: 'Giao máy "' + machine.name + '" chạy đồng bộ nền' + (previous.machineId && previous.machineId !== machineId ? ' thay máy "' + previous.name + '".' : '.'), detail: { machineId: machine.machineId, fromMachineId: previous.machineId } });
+  return { ok: true, status: FbmSync.statusView() };
+};
+
+/** Lệnh `release_background_machine` (trong khóa): gỡ máy chạy nền; từ lần hỏi kế, không máy nào chạy nền tới khi giao máy mới. */
+FbmSync.backgroundMachineReleaseCommand = function () {
+  var previous = FbmSync.backgroundMachineRead();
+  FbmSync.backgroundMachineWrite(null);
+  logEvent({ source: 'fbm_sync', action: 'background_machine_release', outcome: LOG_WARN, reason: previous.machineId ? 'Đã gỡ máy "' + previous.name + '" khỏi chạy nền; chưa máy nào chạy đồng bộ nền.' : 'Gỡ máy chạy nền khi chưa giao máy nào.', detail: { machineId: previous.machineId } });
+  return { ok: true, status: FbmSync.statusView() };
+};
