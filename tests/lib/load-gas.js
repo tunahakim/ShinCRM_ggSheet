@@ -151,6 +151,13 @@ function napServer(hopCat, ...duongDans) {
   if (typeof hopCat.sheetReadHeader !== 'function') {
     TEP_TANG_SHEET.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
   }
+  // Công tắc, ngưỡng, phạm vi và nhịp của đồng bộ đọc qua cổng cài đặt, nên mọi hộp nạp tệp `fbm_sync` cần cổng và phần cài đặt của đồng bộ, như bản thật.
+  if (duongDans.some((duongDan) => duongDan.indexOf('fbm_sync/') === 0) && typeof hopCat.settingsValues !== 'function') {
+    // Hàm giả test đã gắn vào hộp trước đó thắng bản thật của tệp nạp kèm, như khi test gắn giả sau khi nạp.
+    const truoc = ['settingsValue', 'settingsDefaultsChecked'].filter((ten) => typeof hopCat[ten] === 'function').map((ten) => [ten, hopCat[ten]]);
+    hopFbm.TEP_CAI_DAT_FBM.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
+    truoc.forEach(([ten, ham]) => { hopCat[ten] = ham; });
+  }
   duongDans.forEach((duongDan) => {
     hopFbm.capTruocTep(hopCat, duongDan, duongDans);
     vm.runInContext(docTep(duongDan), hopCat, { filename: duongDan });

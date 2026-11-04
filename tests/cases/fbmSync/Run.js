@@ -125,8 +125,8 @@ async function chay(so) {
   const lenhTat = tat.F.controlDispatch('set_master', { enabled: false });
   const dong = tat.F.stateRead(), ketThuc = tat.logs.filter((line) => line.action === 'sync_session_finished' && line.cycleId === runTat)[0] || {};
   check(so, 'tắt công tắc tổng khi request đang bay: lượt đóng ngay (tạm dừng, giữ runId), request chuyển sang closedRequestId, dòng kết thúc lượt mang lý do tắt đồng bộ', [
-    !!dangBay, lenhTat.code, dong.phase, dong.runId === runTat, tat.F.runInProgress(dong), dong.closedRequestId === dangBay, String(ketThuc.reason || '').indexOf('tắt đồng bộ') >= 0, tat.data[tat.F.MASTER_SWITCH_KEY]
-  ], [true, 'SYNC_STOPPED', 'paused', true, false, true, true, 'false']);
+    !!dangBay, lenhTat.code, dong.phase, dong.runId === runTat, tat.F.runInProgress(dong), dong.closedRequestId === dangBay, String(ketThuc.reason || '').indexOf('tắt đồng bộ') >= 0, tat.hop.settingsValue(tat.F.SETTING_SECTIONS.master, 'enabled')
+  ], [true, 'SYNC_STOPPED', 'paused', true, false, true, true, false]);
   const khoaBan = hopCoLuot(), runBan = khoaBan.F.stateRead().runId;
   khoaBan.khoa.ban = true;
   const lenhBan = khoaBan.F.controlDispatch('set_master', { enabled: false }), conMo = khoaBan.F.runInProgress(khoaBan.F.stateRead());

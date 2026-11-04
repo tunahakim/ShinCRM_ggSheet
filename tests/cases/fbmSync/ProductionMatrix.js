@@ -1,5 +1,6 @@
 /** Ma trận offline cho kỳ đồng bộ nhiều Customer/Activity và lỗi vận chuyển. */
 const { section, check } = require('../../lib/assert');
+const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require('../../lib/load-gas');
 
 function propertyStore() {
@@ -431,7 +432,6 @@ async function chay(so) {
   const gridResponse = (requestId, rows) => ({ trace: [{ requestId, stage: 'fetch' }], d: { TotalRowCount: rows.length, Rows: rows.map((row) => conflictGridFields.map((field) => row[field] === undefined ? '' : row[field])), ViewPage: { Fields: conflictGridFields.map((AliasName) => ({ AliasName })) } } });
   const nameDiff = (dto) => ((dto && dto.fields) || []).filter((item) => /Tên/.test(String(item.left)))[0] || {};
   const cf = makeSync(), CF = cf.hop.FbmSync;
-  CF.masterEnabled = () => true;
   const cfState = CF.runOpen({ phase: 'pull_customer' });
   const cfGate = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true } }, warnings: [] };
   cfState.mode = 'read'; CF.readCategoryGate = () => cfGate; CF.stateWrite(cfState);
@@ -451,7 +451,6 @@ async function chay(so) {
 
   // Xung đột không khóa đồng bộ: mỗi kỳ pull so ba chiều lại với baseline cũ. Bốn khách: FBM đổi cho khớp ShinCRM, FBM quay về gốc, ShinCRM quay về gốc, vẫn khác nhau.
   const rv = makeSync(), RV = rv.hop.FbmSync;
-  RV.masterEnabled = () => true;
   const rvState = RV.runOpen({ phase: 'pull_customer' });
   rvState.mode = 'read'; RV.readCategoryGate = () => cfGate; RV.stateWrite(rvState);
   const rvIds = [1, 2, 3, 4];
@@ -575,7 +574,6 @@ async function chay(so) {
 
   // FBM-053: đọc xác nhận lệch nhưng bản đọc lại đã khớp mọi trường thì không còn gì để người dùng chọn.
   const sm = makeSync(), SM = sm.hop.FbmSync;
-  SM.masterEnabled = () => true;
   const smState = SM.runOpen({ phase: 'pull_customer' }); smState.mode = 'read'; SM.readCategoryGate = () => cfGate; SM.stateWrite(smState);
   SM.pullWrite('customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên gốc 1'), {})]);
   sm.local.customer[0].companyName = 'Tên Shin 1';
@@ -590,7 +588,6 @@ async function chay(so) {
 
   // FBM-033: bản ghi đầu hàng đợi không đọc được trên FBM thì rời hàng đợi, không chặn các xung đột phía sau.
   const un = makeSync(), UN = un.hop.FbmSync;
-  UN.masterEnabled = () => true;
   const unState = UN.runOpen({ phase: 'pull_customer' }); unState.mode = 'read'; UN.readCategoryGate = () => cfGate; UN.stateWrite(unState);
   const unIds = [1, 2, 3, 4];
   UN.pullWrite('customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên gốc ' + n), {})));
@@ -653,10 +650,10 @@ async function chay(so) {
   napServer(dpDown.hop, 'fbm_sync/auth/AutoLogin.js');
   ddProps.getProperty = () => { throw new Error('Service invoked too many times: properties'); };
   check(so, 'FBM-025/026/028: dịch vụ DocumentProperties lỗi thì state, hash chờ xác nhận, cấu hình đăng nhập và công tắc tổng đều ném DOCUMENT_PROPERTIES_READ_FAILED, công tắc không mở theo mặc định',
-    [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pendingPushesRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => DD.masterEnabled())],
+    [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pendingPushesRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))],
     ['DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED']);
   ddProps.getProperty = ddGet;
-  check(so, 'FBM-028: Spreadsheet chưa có công tắc tổng vẫn coi là bật; chỉ "false" rõ ràng mới khóa', [DD.masterEnabled(), (DD.setMasterEnabled(false), DD.masterEnabled())], [true, false]);
+  check(so, 'FBM-028: Spreadsheet chưa có công tắc tổng vẫn coi là bật; chỉ "false" rõ ràng mới khóa', [dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'), (datCongTac(dpDown.hop, false), dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))], [true, false]);
 
   const secretEnvelope = '{"ciphertext":"BI-MAT-ENVELOPE","password":"mat-khau-that"';
   dpData.FBM_LOGIN_CONFIG_V1 = secretEnvelope;
@@ -671,7 +668,6 @@ async function chay(so) {
   const activityGrid = (requestId, rows) => ({ trace: [{ requestId, stage: 'fetch' }], d: { TotalRowCount: rows.length, Rows: rows.map((row) => activityGridFields.map((field) => row[field] === undefined ? '' : row[field])), ViewPage: { Fields: activityGridFields.map((AliasName) => ({ AliasName })) } } });
   const fbmActivity = (details, endDate) => ({ id: 'FBM-A1', ma_kh: 'ALT00001', ten_cv: 'Gọi điện', details, end_date: endDate });
   const ac = makeSync(), AC = ac.hop.FbmSync;
-  AC.masterEnabled = () => true;
   AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', userId: '2037', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   const acState = AC.runOpen({ phase: 'pull_activity' }); acState.mode = 'read';
   AC.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });

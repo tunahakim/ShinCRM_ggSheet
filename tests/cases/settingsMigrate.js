@@ -7,7 +7,7 @@
 const { dungHop, ghiO, TEP_NEN } = require('../lib/dung-hop');
 const { section, check, checkThrows, ghiLoiNap } = require('../lib/assert');
 
-const TEP = TEP_NEN.concat(['fbm_sync/state/PullDefaults.js', 'server/settings/SettingsMigrate.js']);
+const TEP = TEP_NEN.concat(['fbm_sync/transport/Budget.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/state/FbmSettingsMigrate.js', 'fbm_sync/state/PullDefaults.js', 'server/settings/SettingsMigrate.js']);
 const MA_CONFIG = ['@CFG_THAM_SO', '@CFG_THAM_SO_GIA_TRI', '@CFG_COT_MA', '@CFG_COT_KIEU', '@CFG_SORT_COL', '@CFG_SORT_LEVEL', '@CFG_NGAM_DINH_MA_COT', '@CFG_NGAM_DINH_GIA_TRI'];
 
 /** Hộp có sheet `Config` đời cũ: `hang` là các dòng theo mã cột, ghi từ hàng 4. */

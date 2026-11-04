@@ -1,6 +1,7 @@
 /** Kiểm tra chiều push, khóa, owner và log. */
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
+const { datPhan } = require('../../lib/fbm/cai-dat-thu');
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
@@ -8,6 +9,8 @@ async function chay(so) {
   section("FBM sync — push");
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
   napServer(pushed, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  // Ngoài ca phạm vi thử bên dưới, hộp này đẩy mọi dòng có việc: lưu qua cổng cài đặt rằng không giới hạn phạm vi khách.
+  datPhan(pushed, 'run', { scopeLimited: false });
   // pushCandidates không còn nuốt lỗi đọc state, nên hộp thử phải có state và sổ lỗi đẩy dù rỗng.
   pushed.FbmSync.stateRead = () => ({ metadata: {} });
   pushed.FbmSync.pushFailuresRead = () => ({ hashes: {}, details: {} });

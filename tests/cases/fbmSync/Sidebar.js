@@ -2,6 +2,7 @@
 const { napClient, taoHopCat } = require('../../lib/load-gas');
 const { domGia } = require('../../lib/dom-gia');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
+const { goiCaiDat } = require('../../lib/sidebar/fbm-cai-dat');
 
 function taoBoTest() {
   const dom = domGia();
@@ -50,7 +51,7 @@ function taoBoTest() {
   };
   hop.fbmSyncPaintError = null;
   napClient(hop,
-    'client/ui/icons.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
+    'client/ui/icons.html', 'client/ui/fieldInvalid.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
     'client/schema/sync/screens/run.html', 'client/schema/sync/screens/account.html', 'client/schema/sync/screens/results.html', 'client/schema/sync/screens/settings.html', 'client/schema/sync/screens/index.html',
     'client/schema/sync/results/status.html', 'client/schema/sync/results/issues.html', 'client/schema/sync/results/audit.html', 'client/schema/sync/results/conflict.html',
     'client/sync/fbmSyncUiSchema.html', 'client/sync/fbmSyncConfigEditor.html',
@@ -106,13 +107,13 @@ async function testSharedShellLifecycle(so) {
   const openCalls = [];
   hop.callServer = (name) => {
     openCalls.push(name);
-    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: { approvalThreshold: 7 }, login: { configured: false } }); }
+    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: goiCaiDat({ fbm_run: { approvalThreshold: 7 } }), login: { configured: false } }); }
     return Promise.resolve({ ok: true });
   };
 
   await hop.syncPanelToggle();
   check(so, 'Mở màn Đồng bộ FBM chỉ gọi GAS một lần và nạp đủ bốn phần của gói',
-    [openCalls, hop.FBM_SYNC_CLIENT.statusReady, hop.FBM_SYNC_CLIENT.identityDraft.userId, hop.FBM_SYNC_CLIENT.syncSettings.approvalThreshold, hop.FBM_SYNC_CLIENT.loginStatus.configured, hop.FBM_SYNC_CLIENT.loginPasswordMode],
+    [openCalls, hop.FBM_SYNC_CLIENT.statusReady, hop.FBM_SYNC_CLIENT.identityDraft.userId, hop.FBM_SYNC_CLIENT.syncSettings.fbm_run.approvalThreshold, hop.FBM_SYNC_CLIENT.loginStatus.configured, hop.FBM_SYNC_CLIENT.loginPasswordMode],
     [['fbmGetSyncStatus'], true, 'u-1', 7, false, 'draft']);
   check(so, 'mo FBM dung chung header body va an info footer cua man truoc',
     [hop.FBM_SYNC_CLIENT.active,
@@ -381,7 +382,7 @@ async function chay(so) {
   const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
   check(so, 'Nút đăng nhập thử dùng RowGroup và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-row-group', 1, 'button']);
   hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.syncSettings = { account: { customerPrefix: 'ALT', customerCodeLength: '8' } };
+  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_account: { customerPrefix: 'ALT', customerCodeLength: '8' } });
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   check(so, 'Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since'), content.textContent.indexOf('Mốc ngày Activity') >= 0], ['ALT', '8', null, false]);
   hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true };
@@ -569,14 +570,14 @@ async function chay(so) {
   const preflightOnly = render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: { preflightIssues: [{ blocking: false, code: 'WARN_ONLY', message: 'Cảnh báo' }] }, counts: {} });
   check(so, 'Results không hiện tiêu đề chi tiết bản ghi khi chỉ có cảnh báo preflight', preflightOnly.textContent.indexOf('Chi tiết bản ghi') >= 0, false);
 
-  hop.FBM_SYNC_CLIENT.syncSettings = { accountName: 'A', approvalThreshold: 10 };
+  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat();
   const growBefore = hop.inputsGrowAll; let growCalls = 0;
   hop.inputsGrowAll = () => { growCalls += 1; return 0; };
   render(hop, content, hop.fbmSyncRenderSettings, idle);
   hop.inputsGrowAll = growBefore;
   check(so, 'Màn Cài đặt Đồng bộ vẽ xong thì kéo lại chiều cao ô nhiều dòng, để danh sách khách chỉ định hiện đủ dòng ngay sau khi lưu mà không cần gõ phím', growCalls > 0, true);
-  hop.FBM_SYNC_CLIENT.syncSettings = { background: { direction: 'read', enabled: true, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 }, detail: { enabled: true, minutes: 60, customersPerRun: 50 } } };
-  const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks(hop.FBM_SYNC_CLIENT.syncSettings);
+  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_background: { heartbeatMinutes: 5, customerFullMinutes: 60, activityFullEnabled: false, activityFullMinutes: 30, detailEnabled: true, detailMinutes: 60, detailCustomersPerRun: 50 } });
+  const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks();
   const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
   const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
   const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
@@ -596,7 +597,7 @@ async function chay(so) {
   const loginParent = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-parent-row');
   check(so, 'login policy groups retry interval under retry toggle', [loginParent.role, loginPolicyChildren.role, retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].role, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['row', 'box', 'shin-row-group shin-sync-login-policy-retry-group', 2, 'row', 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
   check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
-  hop.FBM_SYNC_CLIENT.syncSettings = { approvalThreshold: 10, scopeLimited: true, scopeCodes: ['ALT00010', 'CUS-020061'], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 };
+  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_run: { approvalThreshold: 10, scopeLimited: true, scopeCodes: ['ALT00010', 'CUS-020061'], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 } });
   render(hop, content, hop.fbmSyncRenderSettings, idle);
   const scopeBox = dom.document.getElementById('fbm-sync-setting-scope-codes');
   check(so, 'Cài đặt chung có một ô danh sách khách chỉ định, mỗi dòng một mã, không còn hai ô mã thử theo chiều',
@@ -625,19 +626,20 @@ async function chay(so) {
   const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
   const scopeLines = [{ code: 'ALT00010', kind: 'fbm', status: 'matched', customerId: 'CUS-020061', fbmCode: 'ALT00010' }, { code: 'ALT00099', kind: 'fbm', status: 'fbm_new', customerId: '', fbmCode: 'ALT00099' }];
   const settingsCalls = [];
-  hop.callServer = (name, args) => { settingsCalls.push([name, args && args[0], args && args[2]]); if (name === 'fbmSaveSettings' && args[0] === 'sync') { gapSaves.push(args[1]); } return Promise.resolve({ ok: true, settings: args && args[1], scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
+  hop.callServer = (name, args) => { settingsCalls.push([name, Object.keys(args[0]).sort(), args[1]]); if (name === 'fbmSaveSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: goiCaiDat({ fbm_run: Object.assign({}, args[0].fbm_run, { requestGapMinSeconds: 1, requestGapMaxSeconds: 2.5 }) }), scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
   hop.fbmSyncStatusOnce = () => Promise.reject(new Error('Lưu cài đặt chung không được hỏi lại trạng thái.'));
   const savedNotices = [], noticeSetter = hop.fbmSyncSetSettingsNotice;
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
   await hop.fbmSyncSaveSyncSettings(null);
   hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce; hop.fbmSyncSetSettingsNotice = noticeSetter;
   check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
-    [gapSaves[0] && gapSaves[0].scopeLimited, gapSaves[0] && gapSaves[0].scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
+    [gapSaves[0] && gapSaves[0].fbm_run.scopeLimited, gapSaves[0] && gapSaves[0].fbm_run.scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
     [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
-  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS; công tắc tổng không đổi thì gửi null', settingsCalls, [['fbmSaveSettings', 'sync', null]]);
+  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS gửi gói { fbm_master, fbm_run } cùng cờ confirmLow tắt', settingsCalls, [['fbmSaveSettings', ['fbm_master', 'fbm_run'], false]]);
+  check(so, 'Lưu cài đặt chung gửi nguyên chuỗi trong ô và công tắc tổng cùng gói', [gapSaves[0].fbm_run.approvalThreshold, gapSaves[0].fbm_master.enabled], ['10', true]);
   check(so, 'Dòng mã FBM mang cảnh báo độ dài hiện thêm độ dài đã cài sau câu mã chưa có trên Sheet',
     /ALT0010: mã FBM chưa có trên Sheet.*\(8 ký tự\)/.test(hop.fbmSyncSettingsScopeLinesText([{ code: 'ALT0010', kind: 'fbm', status: 'fbm_new', lengthExpected: 8 }])), true);
-  check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].requestGapMinSeconds, gapSaves[0] && gapSaves[0].requestGapMaxSeconds], [1, '1', '2.5']);
+  check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].fbm_run.requestGapMinSeconds, gapSaves[0] && gapSaves[0].fbm_run.requestGapMaxSeconds], [1, '1', '2.5']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
   hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };

@@ -9,7 +9,7 @@ function hopDangNhap() {
   const logs = [];
   const { hop } = workflowGas({ logEvent: (line) => logs.push(Object.assign({ open: F.runInProgress(F.stateRead()) }, line)), LOG_WARN: 'warn' });
   const F = hop.FbmSync;
-  F.loginConfigSave({ credentialRef: MA_THONG_TIN, enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt' } });
+  F.loginConfigSave({ credentialRef: MA_THONG_TIN, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt' } });
   return { F, logs };
 }
 

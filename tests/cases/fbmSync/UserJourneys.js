@@ -3,6 +3,7 @@
  * Sidebar, sau đó kiểm lệnh công khai gửi sang GAS và trạng thái người dùng thấy.
  */
 const { section, check } = require('../../lib/assert');
+const { goiCaiDat } = require('../../lib/sidebar/fbm-cai-dat');
 const { taoBoTest } = require('./Sidebar');
 
 function tick() { return new Promise((resolve) => setTimeout(resolve, 0)); }
@@ -217,8 +218,8 @@ async function chay(so) {
   hop.fbmSyncConfigFinishEdit('connection');
 
   hop.FBM_SYNC_CLIENT.subscreen = 'settings';
-  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 };
-  hop.FBM_SYNC_CLIENT.syncSettings = { extension: { pollMinutes: 5, runOnStartup: true }, background: { direction: 'read', heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 }, detail: { enabled: false, minutes: 60, customersPerRun: 50} } };
+  hop.FBM_SYNC_CLIENT.loginStatus = { configured: false };
+  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_background: { activityFullEnabled: true, activityFullMinutes: 30, detailMinutes: 60, detailCustomersPerRun: 50 } });
   hop.FBM_SYNC_CLIENT.lastStatus = idle();
   hop.fbmSyncPaint(idle());
   const settingsRoot = content.children[0];
@@ -251,6 +252,53 @@ async function chay(so) {
   click(dom, dom.document.getElementById('fbm-sync-config-extension-cancel'));
   pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
   check(so, 'hủy cấu hình Extension khôi phục giá trị GAS và khóa lại ô nhập', [pollMinutes.value, pollMinutes.disabled, !!dom.document.getElementById('fbm-sync-config-extension-edit')], ['5', true, true]);
+  // Lưu cài đặt FBM: GAS báo ô sai thì tô đúng ô, hỏi xác nhận lịch dày, phần khóa hỏng chỉ còn nút đặt về mặc định.
+  const keepCall = hop.callServer, keepNotice = hop.fbmSyncSetSettingsNotice, keepDecision = hop.uiDecisionOpen, keepSettings = hop.FBM_SYNC_CLIENT.syncSettings, sent = [], notices = [];
+  hop.fbmSyncSetSettingsNotice = (card, kind, text) => { notices.push([card, kind, text]); };
+  hop.callServer = (name, args) => { sent.push([name, args[0], args[1]]); return Promise.resolve({ ok: false, code: 'SETTINGS_INVALID', problems: [{ section: 'fbm_extension', field: 'pollMinutes', label: 'Chu kỳ hỏi GAS', reason: 'Chu kỳ hỏi GAS phải từ 1 đến 60 phút.' }] }); };
+  click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
+  const badPoll = dom.document.getElementById('fbm-extension-poll-minutes');
+  badPoll.value = '0';
+  click(dom, dom.document.getElementById('fbm-sync-save-extension'));
+  await tick(); await tick();
+  check(so, 'GAS báo ô sai: gửi nguyên chuỗi ô, tô đỏ đúng ô, gộp lý do vào thông báo của card và vẫn ở chế độ sửa',
+    [sent, badPoll.classList.contains('shin-input-error'), notices.map((item) => [item[0], item[1]]), notices[0] && notices[0][2].indexOf('phải từ 1 đến 60 phút') >= 0, hop.fbmSyncConfigIsEditing('extension')],
+    [[['fbmSaveSettings', { fbm_extension: { pollMinutes: '0', runOnStartup: true } }, false]], true, [['extension', 'error']], true, true]);
+  hop.fbmSyncConfigCancelEdit('extension', true);
+  let lowAsked = 0;
+  sent.length = 0; notices.length = 0;
+  hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(true); };
+  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve(sent.length === 1 ? { ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' } : { ok: true, settings: goiCaiDat(), status: idle() }); };
+  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
+  click(dom, dom.document.getElementById('fbm-sync-save-background'));
+  await tick(); await tick(); await tick();
+  check(so, 'Lịch nền dày: GAS hỏi xác nhận, đồng ý thì gửi lại cùng gói kèm confirmLow rồi thoát chế độ sửa',
+    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.map((item) => item[1])], [1, [['fbmSaveSettings', false], ['fbmSaveSettings', true]], false, ['success']]);
+  sent.length = 0; notices.length = 0; lowAsked = 0;
+  hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(false); };
+  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve({ ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' }); };
+  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
+  click(dom, dom.document.getElementById('fbm-sync-save-background'));
+  await tick(); await tick(); await tick();
+  check(so, 'Lịch nền dày mà người dùng quay lại sửa: chỉ một lần gửi, không ghi, vẫn ở chế độ sửa',
+    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.length], [1, [['fbmSaveSettings', false]], true, 0]);
+  hop.fbmSyncConfigCancelEdit('background', true);
+  hop.fbmSyncSetSettingsNotice = keepNotice;
+  hop.FBM_SYNC_CLIENT.syncSettings = Object.assign(goiCaiDat({ fbm_extension: null }), { corrupt: [{ section: 'fbm_extension', label: 'Nhịp hỏi GAS của Extension', message: 'Khóa cài đặt bị hỏng.' }] });
+  hop.fbmSyncPaint(idle());
+  const resetButton = dom.document.getElementById('fbm-sync-reset-fbm_extension');
+  check(so, 'Phần cài đặt khóa hỏng: hiện lỗi kèm nút Đặt về mặc định, ô để trống và không sửa được',
+    [!!resetButton, resetButton && resetButton.textContent, dom.document.getElementById('fbm-sync-settings-extension-notice-region').textContent.indexOf('Khóa cài đặt bị hỏng.') >= 0, dom.document.getElementById('fbm-extension-poll-minutes').value, !!content.querySelector('#fbm-sync-config-extension-edit')],
+    [true, 'Đặt về mặc định', true, '', false]);
+  sent.length = 0;
+  hop.callServer = (name, args) => { sent.push([name, args[0]]); return Promise.resolve({ ok: true, settings: goiCaiDat(), status: idle() }); };
+  click(dom, resetButton);
+  await tick(); await tick(); await tick();
+  check(so, 'Bấm Đặt về mặc định gọi GAS đúng phần, nạp lại cài đặt GAS trả và bỏ lời báo lỗi',
+    [sent, hop.FBM_SYNC_CLIENT.syncSettings.fbm_extension.pollMinutes, !!content.querySelector('#fbm-sync-reset-fbm_extension'), dom.document.getElementById('fbm-extension-poll-minutes').value],
+    [[['fbmResetSettings', 'fbm_extension']], 5, false, '5']);
+  hop.callServer = keepCall; hop.uiDecisionOpen = keepDecision; hop.FBM_SYNC_CLIENT.syncSettings = keepSettings;
+  hop.fbmSyncPaint(idle());
   click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
   pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
   pollMinutes.value = '17';
@@ -270,7 +318,7 @@ async function chay(so) {
   ['fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail'].forEach((id) => click(dom, dom.document.getElementById(id)));
   click(dom, dom.document.getElementById('fbm-sync-save-background'));
   hop.fbmSyncConfigFinishEdit('background');
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'policy-credential', enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30, public: { usernameHint: 'USERA' } };
+  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'policy-credential', public: { usernameHint: 'USERA' } };
   click(dom, dom.document.getElementById('fbm-sync-config-loginPolicy-edit'));
   ['fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'].forEach((id) => click(dom, dom.document.getElementById(id)));
   check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);

@@ -1,12 +1,13 @@
 /**
  * Mọi lệnh trong bảng lệnh chạy qua đúng cửa lệnh `controlDispatch` như Sidebar và relay gọi thật, không ném và không để lọt bí mật phiên ngoài phong bì request. Các ca khác gọi thẳng hàm bên trong nên không thấy cửa ra; thiếu ca này thì nơi tạo kết quả thêm trường mới không ai biết cho tới khi người dùng bấm nút.
- * Bảng ca phải phủ đủ bảng lệnh, mọi loại lượt của `start` và mọi mục của `save_settings`: thêm lệnh, loại lượt hay mục cài đặt mà quên ca thì test đỏ.
+ * Bảng ca phải phủ đủ bảng lệnh, mọi loại lượt của `start` và mọi phần cài đặt của đồng bộ (trừ ngầm định kéo FBM, cần Category, và công tắc tổng, đi qua `set_master`): thêm lệnh, loại lượt hay phần cài đặt mà quên ca thì test đỏ.
  */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 
 /** Hộp cát đủ tệp cho mọi lệnh (lưu cài đặt chung đổi mã ra khách qua cổng mã, `trace_read` đọc sổ bước). */
-const HOP = { extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/diagnostic/Trace.js'], LOG_WARN: 'warn' };
+const HOP = { extraFiles: ['server/gate/IdGate.js', 'fbm_sync/diagnostic/Trace.js'], LOG_WARN: 'warn' };
 
 /** Mở lượt nhận dạng rồi để máy A nhận phong bì, cho các lệnh cần lượt đang chờ response. */
 function luotDangCho(FbmSync) {
@@ -35,18 +36,19 @@ const CA = [
   { lenh: 'approve_push', ten: 'approve_push không có gì chờ', payload: { machineId: 'may-A' } },
   { lenh: 'open_conflict', ten: 'open_conflict không có xung đột', payload: { machineId: 'may-A' } },
   { lenh: 'confirm_conflict', ten: 'confirm_conflict không có xung đột', payload: { entity: 'customer', id: 'CUS-1', choice: 'shin' } },
-  { lenh: 'save_settings', muc: 'sync', ten: 'lưu cài đặt chung', payload: { section: 'sync', value: { approvalThreshold: 5, scopeLimited: true, scopeCodes: 'ALT00010' }, master: true } },
-  { lenh: 'save_settings', muc: 'sync', ten: 'lưu cài đặt chung sai ngưỡng', payload: { section: 'sync', value: { approvalThreshold: -1 } } },
-  { lenh: 'save_settings', muc: 'sync', ten: 'lưu cài đặt chung sai mã khách', payload: { section: 'sync', value: { scopeCodes: 'ALT 00010!' } } },
-  { lenh: 'save_settings', muc: 'sync', ten: 'lưu cài đặt chung sai khoảng cách request', payload: { section: 'sync', value: { requestGapMinSeconds: 5, requestGapMaxSeconds: 1 } } },
-  { lenh: 'save_settings', muc: 'account', ten: 'lưu cấu hình tài khoản', payload: { section: 'account', value: { customerPrefix: 'ALT', customerCodeLength: '8' } } },
-  { lenh: 'save_settings', muc: 'account', ten: 'lưu cấu hình tài khoản thiếu cặp', payload: { section: 'account', value: { customerPrefix: 'ALT', customerCodeLength: '' } } },
-  { lenh: 'save_settings', muc: 'extension', ten: 'lưu nhịp Extension', payload: { section: 'extension', value: { pollMinutes: 5, runOnStartup: true } } },
-  { lenh: 'save_settings', muc: 'extension', ten: 'lưu nhịp Extension sai', payload: { section: 'extension', value: { pollMinutes: 'x', runOnStartup: true } } },
-  { lenh: 'save_settings', muc: 'schedule', ten: 'lưu lịch nền', payload: (F) => ({ section: 'schedule', value: F.backgroundScheduleRead() }) },
-  { lenh: 'save_settings', muc: 'schedule', ten: 'lưu lịch nền sai', payload: (F) => ({ section: 'schedule', value: Object.assign({}, F.backgroundScheduleRead(), { heartbeat: { minutes: '', enabled: true } }) }) },
-  { lenh: 'save_settings', muc: 'login_policy', ten: 'lưu chính sách tự đăng nhập', payload: { section: 'login_policy', value: { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 30 } } },
-  { lenh: 'save_settings', muc: 'auto_login', ten: 'bật tắt tự đăng nhập', payload: { section: 'auto_login', value: false } },
+  { lenh: 'save_settings', phan: 'run', ten: 'lưu tham số phiên', payload: { patches: { fbm_run: { approvalThreshold: 5, scopeLimited: true, scopeCodes: 'ALT00010' }, fbm_master: { enabled: true } } } },
+  { lenh: 'save_settings', phan: 'run', ten: 'lưu tham số phiên sai ngưỡng', payload: { patches: { fbm_run: { approvalThreshold: -1 } } } },
+  { lenh: 'save_settings', phan: 'run', ten: 'lưu tham số phiên sai mã khách', payload: { patches: { fbm_run: { scopeCodes: 'ALT 00010!' } } } },
+  { lenh: 'save_settings', phan: 'run', ten: 'lưu tham số phiên sai khoảng nghỉ request', payload: { patches: { fbm_run: { requestGapMinSeconds: 5, requestGapMaxSeconds: 1 } } } },
+  { lenh: 'save_settings', phan: 'account', ten: 'lưu cấu hình tài khoản', payload: { patches: { fbm_account: { customerPrefix: 'ALT', customerCodeLength: '8' } } } },
+  { lenh: 'save_settings', phan: 'account', ten: 'lưu cấu hình tài khoản thiếu cặp', payload: { patches: { fbm_account: { customerPrefix: 'ALT', customerCodeLength: '' } } } },
+  { lenh: 'save_settings', phan: 'extension', ten: 'lưu nhịp Extension', payload: { patches: { fbm_extension: { pollMinutes: 5, runOnStartup: true } } } },
+  { lenh: 'save_settings', phan: 'extension', ten: 'lưu nhịp Extension sai', payload: { patches: { fbm_extension: { pollMinutes: 'x', runOnStartup: true } } } },
+  { lenh: 'save_settings', phan: 'background', ten: 'lưu lịch nền', payload: { patches: { fbm_background: { heartbeatMinutes: 5, customerFullMinutes: 60 } } } },
+  { lenh: 'save_settings', phan: 'background', ten: 'lưu lịch nền chạy dày chưa xác nhận', payload: { patches: { fbm_background: { customerFullEnabled: true, customerFullMinutes: 1 } } } },
+  { lenh: 'save_settings', phan: 'background', ten: 'lưu lịch nền sai', payload: { patches: { fbm_background: { heartbeatMinutes: 'x' } } } },
+  { lenh: 'save_settings', phan: 'loginPolicy', ten: 'lưu chính sách tự đăng nhập', payload: { patches: { fbm_login_policy: { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 30 } } } },
+  { lenh: 'reset_settings', phan: 'run', ten: 'đặt tham số phiên về mặc định', payload: { section: 'fbm_run' } },
   { lenh: 'set_master', ten: 'set_master', payload: { enabled: true } },
   { lenh: 'set_background', ten: 'set_background', payload: { enabled: false } },
   { lenh: 'save_identity_binding', ten: 'save_identity_binding', payload: { binding: {} } },
@@ -68,7 +70,7 @@ async function chay(so) {
   const mau = workflowGas(HOP).hop.FbmSync;
   const thieu = Object.keys(mau.COMMANDS).filter((lenh) => !CA.some((ca) => ca.lenh === lenh))
     .concat(Object.keys(mau.START_KINDS).filter((kind) => !CA.some((ca) => ca.lenh === 'start' && ca.payload.kind === kind)).map((kind) => 'start ' + kind))
-    .concat(Object.keys(mau.SETTINGS_SAVERS).filter((muc) => !CA.some((ca) => ca.muc === muc)).map((muc) => 'save_settings ' + muc));
+    .concat(Object.keys(mau.SETTING_SECTIONS).filter((phan) => phan !== 'pullDefaults' && phan !== 'master' && !CA.some((ca) => ca.phan === phan)).map((phan) => 'cài đặt ' + phan));
   check(so, 'bảng ca phủ đủ mọi lệnh, mọi loại lượt của start và mọi mục cài đặt', thieu, []);
 
   const lo = [], nem = [];
@@ -76,7 +78,7 @@ async function chay(so) {
     const { hop } = workflowGas(HOP);
     const F = hop.FbmSync, logs = [];
     hop.logEvent = (line) => { logs.push(line); };
-    F.setMasterEnabled(true);
+    datCongTac(hop, true);
     try {
       if (ca.chuan) { ca.chuan(F); }
       const payload = typeof ca.payload === 'function' ? ca.payload(F) : (ca.payload || {});

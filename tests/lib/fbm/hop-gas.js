@@ -60,7 +60,9 @@ function capPhienThu(hopCat) {
  */
 function capDauDaySach(hopCat) {
   const F = hopCat.FbmSync;
-  if (typeof F.syncSettingsRead !== 'function') { F.syncSettingsRead = () => ({ approvalThreshold: 10, scopeLimited: false, scopeCodes: [] }); }
+  // Phạm vi mặc định của cài đặt thật là giới hạn theo danh sách khách; hộp chặng đẩy không có Sheet khách nên lưu qua cổng thật rằng không giới hạn.
+  const luu = hopCat.settingsSave({ fbm_run: { scopeLimited: false } });
+  if (!luu.ok) { throw new Error('Hộp thử không đặt được phạm vi: ' + JSON.stringify(luu.problems)); }
   // Tài khoản đã liên kết đọc bằng hàm thật của Identity.js (kho trống thì chưa liên kết); không cấp hàm giả để hàm bị đổi tên là test hỏng ngay.
   if (typeof F.boundIdentity !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/Identity.js'), hopCat, { filename: 'fbm_sync/reconcile/Identity.js' }); }
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
@@ -90,4 +92,7 @@ function capSauNap(hopCat, duongDans) {
   if (duongDans.indexOf('fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }
 
-module.exports = { capTruocTep, capSauTep, capSauNap, TEP_KHUNG_LUOT, TRANG_FBM_THU };
+/** Cổng cài đặt chung cùng phần cài đặt và phạm vi của đồng bộ: mọi hộp chạy lượt đồng bộ cần, vì công tắc, ngưỡng và khoảng nghỉ đọc qua cổng. */
+const TEP_CAI_DAT_FBM = ['server/sheet/CellBudget.js', 'server/data/SettingsSections.js', 'server/settings/SettingsKinds.js', 'server/settings/SettingsGate.js', 'server/settings/SettingsService.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/state/Scope.js'];
+
+module.exports = { capTruocTep, capSauTep, capSauNap, TEP_KHUNG_LUOT, TEP_CAI_DAT_FBM, TRANG_FBM_THU };

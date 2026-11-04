@@ -4,6 +4,7 @@ const path = require('path');
 const { taoHopCat } = require('../lib/load-gas');
 const { napTheoSidebar } = require('../lib/sidebar/nap-sidebar');
 const { domGia } = require('../lib/dom-gia');
+const { goiCaiDat } = require('../lib/sidebar/fbm-cai-dat');
 const { section, check } = require('../lib/assert');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -369,7 +370,7 @@ function testCoordinatorFailureMatrix(so) {
 
 function testFbmAdapterUseCaseMatrix(so) {
   const bo = taoBoTest(), hop = bo.hop;
-  hop.FBM_SYNC_CLIENT = { configEdits: {}, syncSettings: { account: {}, extension: {}, background: {} }, loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {} };
+  hop.FBM_SYNC_CLIENT = { configEdits: {}, syncSettings: goiCaiDat(), loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {} };
   hop.FBM_SYNC_SETTINGS_SCHEMA = { defaults: { approvalThreshold: 100, pollMinutes: 5, retryMinutes: 30 } };
   hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };
   const keys = ['connection', 'accountSettings', 'module', 'relay', 'extension', 'background', 'loginPolicy'];
@@ -400,11 +401,7 @@ function testFbmAdapterUseCaseMatrix(so) {
 async function testAllFbmSurfaceActionMatrix(so) {
   const bo = taoBoTest(), hop = bo.hop;
   hop.FBM_SYNC_CLIENT = {
-    configEdits: {}, syncSettings: {
-      account: {}, extension: {}, background: {
-        heartbeat: {}, customerFull: {}, activityFull: {}, detail: {}
-      }
-    }, loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {}
+    configEdits: {}, syncSettings: goiCaiDat(), loginStatus: {}, identityStatus: { binding: {} }, lastStatus: {}
   };
   hop.FBM_SYNC_SETTINGS_SCHEMA = { defaults: { approvalThreshold: 100, pollMinutes: 5, retryMinutes: 30 } };
   hop.FBM_SYNC_UI_SCHEMA = { config: { actionIdPrefix: 'config-', actionCancel: 'cancel', actionSave: 'save', actionEdit: 'edit', tooltips: {} } };

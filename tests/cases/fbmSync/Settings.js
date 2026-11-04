@@ -1,178 +1,165 @@
-const { napServer, TEP_KHUNG_LUOT, taoHopCat } = require('../../lib/load-gas');
+/**
+ * Cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu (ô gửi nguyên chuỗi, GAS kiểm, cả gói hoặc không gì), phạm vi khách chỉ định, xác nhận lịch dày, khóa hỏng có lối đặt về mặc định, hàm chuyển một lần từ khóa kho đời cũ.
+ *
+ * Nhánh hỏng âm thầm được kiểm kỹ nhất: lưu không đạt mà vẫn ghi một phần, công tắc tổng đổi khi tham số phiên sai, khóa hỏng rơi về mặc định rồi bị lưu đè, hàm chuyển ghi nửa chừng hoặc đè cài đặt mới.
+ */
 const { section, check } = require('../../lib/assert');
+const { dungHop, TEP_NEN } = require('../../lib/dung-hop');
+const { trongLanGoi } = require('../../lib/gas/lan-goi');
+const { docLog } = require('../../lib/gas/doc-log');
+
+const TEP_LENH_CAI_DAT = ['fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
+const KHACH_SHEET = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
+
+/** Hộp có cổng cài đặt và phần cài đặt FBM thật; các việc đi kèm (dừng lượt, trạng thái) được thay bằng bản ghi lại thứ tự gọi. */
+function dungCaiDatFbm(props) {
+  const nen = dungHop({ sheets: ['Log'], props: props, tep: TEP_NEN.concat(TEP_LENH_CAI_DAT) });
+  const F = nen.hop.FbmSync, buoc = [];
+  F.readLocal = (entity) => (entity === 'customer' ? KHACH_SHEET.map((k) => Object.assign({}, k)) : []);
+  F.statusView = () => ({ phase: 'idle' });
+  F.stopPendingApply = () => { buoc.push('stop'); };
+  F.runStopCommand = (why) => { buoc.push('runStop:' + why); return { code: 'SYNC_DISABLED' }; };
+  F.currentSpreadsheetId = () => 'sheet-thu';
+  const luu = (patches, confirmLow) => trongLanGoi(nen.hop, () => F.settingsSaveCommand({ patches: patches, confirmLow: confirmLow }));
+  const loi = (fn) => { try { trongLanGoi(nen.hop, fn); return 'không ném'; } catch (err) { return err.code; } };
+  const dongLog = (hanhDong) => docLog(nen).filter((row) => row.join('|').indexOf(hanhDong) >= 0);
+  return { nen, hop: nen.hop, F, buoc, luu, loi, dongLog };
+}
+
+function kiemLenhLuu(so) {
+  const { nen, F, buoc, luu, loi, dongLog } = dungCaiDatFbm();
+  const view = trongLanGoi(nen.hop, () => F.settingsView());
+  check(so, 'tệp chưa cấu hình: mỗi phần đọc ra mặc định đã khai (phạm vi giới hạn với danh sách rỗng, nên không quét toàn bộ khách thật), không ghi khóa nào',
+    [view.fbm_master, view.fbm_run, view.fbm_extension, view.corrupt, Object.keys(nen.props).filter((k) => k.indexOf('SETTINGS:fbm_') === 0)],
+    [{ enabled: true }, { approvalThreshold: 10, scopeLimited: true, scopeCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 }, { pollMinutes: 5, runOnStartup: true }, [], []]);
+
+  const byFbm = luu({ fbm_run: { approvalThreshold: '0', scopeCodes: 'ALT00010\nALT00010, ALT00099' } });
+  const scopeByFbm = trongLanGoi(nen.hop, () => F.scope());
+  luu({ fbm_run: { scopeCodes: 'CUS-020061' } });
+  const scopeByShin = trongLanGoi(nen.hop, () => F.scope());
+  check(so, 'ô gửi nguyên chuỗi: ngưỡng 0 hợp lệ, danh sách mã tách và bỏ trùng; khách nhập bằng mã FBM hay mã ShinCRM đều vào cả hai chiều',
+    [byFbm.ok, byFbm.settings.fbm_run.approvalThreshold, byFbm.settings.fbm_run.scopeCodes, [scopeByFbm.fbm, scopeByFbm.shin], [scopeByShin.fbm, scopeByShin.shin]],
+    [true, 0, ['ALT00010', 'ALT00099'], [['ALT00010', 'ALT00099'], ['CUS-020061']], [['ALT00010'], ['CUS-020061']]]);
+  check(so, 'lưu danh sách trả kết quả đổi mã từng dòng: mã → khách, mã FBM chưa có trên Sheet',
+    byFbm.scopeLines.map((line) => [line.code, line.status, line.customerId]),
+    [['ALT00010', 'matched', 'CUS-020061'], ['ALT00099', 'fbm_new', '']]);
+
+  luu({ fbm_run: { approvalThreshold: '' } });
+  check(so, 'ô để trống là chưa đặt: kho giữ rỗng, giá trị hiệu lực là mặc định đã khai',
+    [JSON.parse(nen.props['SETTINGS:fbm_run']).approvalThreshold, nen.hop.settingsValue('fbm_run', 'approvalThreshold')],
+    ['', 10]);
+
+  const truoc = nen.props['SETTINGS:fbm_run'];
+  const ngoai = luu({ fbm_run: { requestGapMaxSeconds: '9999' } });
+  const hoNho = luu({ fbm_run: { requestGapMinSeconds: '5', requestGapMaxSeconds: '2' } });
+  const chu = luu({ fbm_run: { approvalThreshold: 'mười' } });
+  check(so, 'giá trị ngoài khoảng, ràng buộc giữa hai trường, chữ ở ô số: trả invalid nêu đúng ô, không ghi gì, có dòng Log',
+    [[ngoai.code, ngoai.problems[0].field], hoNho.problems[0].field, chu.problems[0].field, nen.props['SETTINGS:fbm_run'] === truoc, dongLog('settings_save').length],
+    [['SETTINGS_INVALID', 'requestGapMaxSeconds'], 'requestGapMaxSeconds', 'approvalThreshold', true, 3]);
+
+  const goiSai = luu({ fbm_run: { approvalThreshold: '-1' }, fbm_master: { enabled: false } });
+  check(so, 'lưu tham số phiên kèm công tắc tổng: tham số sai thì công tắc giữ nguyên và không dừng lượt',
+    [goiSai.ok, nen.hop.settingsValue('fbm_master', 'enabled'), buoc], [false, true, []]);
+  const goiDat = luu({ fbm_run: { approvalThreshold: '4' }, fbm_master: { enabled: false } });
+  check(so, 'cả gói đạt thì ghi cả hai và công tắc vừa tắt áp điều kiện dừng ngay, trả cài đặt và trạng thái mới',
+    [goiDat.ok, nen.hop.settingsValue('fbm_run', 'approvalThreshold'), nen.hop.settingsValue('fbm_master', 'enabled'), buoc, goiDat.status.phase], [true, 4, false, ['stop'], 'idle']);
+
+  const giu = nen.props['SETTINGS:fbm_run'];
+  const thieu = luu({ fbm_run: { scopeCodes: 'ALT00010, CUS-029999' } });
+  const nhay = luu({ fbm_run: { scopeCodes: "ALT'1, Mã có dấu" } });
+  const nhieu = luu({ fbm_run: { scopeCodes: Array.from({ length: 41 }, (_, i) => 'A' + i).join(',') } });
+  check(so, 'mã ShinCRM không có trên Sheet, mã có dấu nháy hay ký tự lạ (đi thẳng vào điều kiện grid FBM), quá 40 mã: từ chối, nêu mã, danh sách đang lưu giữ nguyên',
+    [thieu.problems[0].reason.indexOf('CUS-029999') >= 0, nhay.problems[0].field, nhieu.problems[0].field, nen.props['SETTINGS:fbm_run'] === giu],
+    [true, 'scopeCodes', 'scopeCodes', true]);
+
+  luu({ fbm_account: { customerPrefix: 'ALT', customerCodeLength: '8' } });
+  const logTruoc = dongLog('settings_save').length;
+  const lech = luu({ fbm_run: { scopeCodes: 'ALT0010, ALT00099' } });
+  check(so, 'mã FBM đúng tiền tố mà khác độ dài đã cài vẫn lưu, dòng đó mang cảnh báo độ dài và Log có một dòng cảnh báo',
+    [lech.ok, lech.scopeLines.map((line) => [line.code, line.lengthExpected || 0]), dongLog('settings_save').length - logTruoc], [true, [['ALT0010', 8], ['ALT00099', 0]], 1]);
+  const taiKhoanThieu = luu({ fbm_account: { customerCodeLength: '' } });
+  check(so, 'tiền tố và độ dài mã khách FBM phải đủ cả hai hoặc trống cả hai',
+    [taiKhoanThieu.ok, taiKhoanThieu.problems[0].field],
+    [false, 'customerCodeLength']);
+
+  luu({ fbm_run: { scopeLimited: false } });
+  check(so, 'bỏ giới hạn thì phạm vi là null (đọc và ghi toàn bộ) dù danh sách còn mã, lưu riêng một trường giữ nguyên trường khác',
+    [trongLanGoi(nen.hop, () => F.scope()), nen.hop.settingsValue('fbm_run', 'scopeCodes')], [null, ['ALT0010', 'ALT00099']]);
+
+  const day = luu({ fbm_background: { customerFullMinutes: '5' } });
+  const dayKho = nen.props['SETTINGS:fbm_background'];
+  const dayDat = luu({ fbm_background: { customerFullMinutes: '5' } }, true);
+  check(so, 'lịch nền chạy dày chưa xác nhận thì hỏi lại, chưa ghi; xác nhận rồi mới lưu',
+    [day.code, dayKho, dayDat.ok, nen.hop.settingsValue('fbm_background', 'customerFullMinutes')], ['SCHEDULE_LOW_CONFIRM', undefined, true, 5]);
+
+  check(so, 'lệnh lưu chỉ chạm được phần của đồng bộ FBM',
+    loi(() => F.settingsSaveCommand({ patches: { core_ops: {} } })),
+    'SETTINGS_SECTION_UNKNOWN');
+  buoc.length = 0;
+  const tat = trongLanGoi(nen.hop, () => F.masterSwitchCommand(false));
+  check(so, 'tắt công tắc tổng ghi qua cổng cài đặt rồi đi đúng tiến trình Dừng',
+    [tat.ok, nen.hop.settingsValue('fbm_master', 'enabled'), buoc],
+    [true, false, ['runStop:master']]);
+}
+
+function kiemKhoaHong(so) {
+  const { nen, F, luu, loi, dongLog } = dungCaiDatFbm({ 'SETTINGS:fbm_run': '{"approvalThreshold":' });
+  const view = trongLanGoi(nen.hop, () => F.settingsView());
+  check(so, 'khóa hỏng: phần đó là null kèm dòng lỗi có nút đặt về mặc định, phần khác vẫn đọc được, có dòng Log',
+    [view.fbm_run, view.corrupt.map((c) => c.section), view.fbm_master, dongLog('settings_read').length], [null, ['fbm_run'], { enabled: true }, 1]);
+  check(so, 'khóa hỏng không rơi về mặc định rồi bị lưu đè: lưu phần đó ném lỗi, khóa giữ nguyên',
+    [loi(() => F.settingsSaveCommand({ patches: { fbm_run: { approvalThreshold: '3' } } })), loi(() => F.scope()), nen.props['SETTINGS:fbm_run']], ['DOCUMENT_PROPERTY_CORRUPT', 'DOCUMENT_PROPERTY_CORRUPT', '{"approvalThreshold":']);
+  const reset = trongLanGoi(nen.hop, () => F.settingsResetCommand({ section: 'fbm_run' }));
+  check(so, 'đặt về mặc định xóa khóa hỏng, trả cài đặt mới không còn lỗi và ghi Log',
+    [reset.ok, nen.props['SETTINGS:fbm_run'], reset.settings.fbm_run.approvalThreshold, reset.settings.corrupt, dongLog('settings_reset').length], [true, undefined, 10, [], 1]);
+  check(so, 'sau khi đặt lại thì lưu bình thường', luu({ fbm_run: { approvalThreshold: '3' } }).ok, true);
+}
+
+const KHOA_CU = {
+  FBM_SYNC_ENABLED: 'false',
+  FBM_SYNC_SETTINGS_V1: JSON.stringify({ approvalThreshold: 3, scopeLimited: false, scopeCodes: ['ALT00010'], requestGapMinSeconds: 1, requestGapMaxSeconds: 2 }),
+  FBM_ACCOUNT_SETTINGS_V1: JSON.stringify({ customerPrefix: 'ALT', customerCodeLength: '8' }),
+  FBM_SYNC_EXTENSION_CONFIG_V1: JSON.stringify({ pollMinutes: 7, runOnStartup: false }),
+  // Thiếu `activityFull`: code cũ đọc tiến trình thiếu là bật, nên giá trị chuyển sang phải là bật dù mặc định mới là tắt.
+  FBM_SYNC_BACKGROUND_SCHEDULE_V1: JSON.stringify({ enabled: false, direction: 'write', heartbeat: { enabled: true, minutes: 5, priority: 100 }, customerFull: { enabled: false, minutes: 90, priority: 10 }, detail: { enabled: true, minutes: 45, priority: 30, customersPerRun: 12 } }),
+  FBM_LOGIN_CONFIG_V1: JSON.stringify({ enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 15, credentialRef: 'ref-thu-1234', public: { usernameHint: 'nguoi-dung-thu' }, lastError: '' })
+};
+
+function kiemChuyenMotLan(so) {
+  const { nen, hop } = dungCaiDatFbm(Object.assign({}, KHOA_CU));
+  const kq = hop.fbmSettingsMigrate();
+  check(so, 'hàm chuyển: sáu khóa cũ sang sáu phần, giá trị hiệu lực giữ đúng cách code cũ đọc',
+    [kq.ok, kq.sources, kq.sections, hop.settingsValues('fbm_master'), hop.settingsValues('fbm_run'), hop.settingsValues('fbm_account'), hop.settingsValues('fbm_extension'), hop.settingsValues('fbm_login_policy')],
+    [true, 6, 6, { enabled: false }, { approvalThreshold: 3, scopeLimited: false, scopeCodes: ['ALT00010'], requestGapMinSeconds: 1, requestGapMaxSeconds: 2 }, { customerPrefix: 'ALT', customerCodeLength: 8 }, { pollMinutes: 7, runOnStartup: false }, { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 15 }]);
+  const nen2 = hop.settingsValues('fbm_background');
+  check(so, 'lịch nền: tiến trình thiếu trong kho cũ chuyển sang là bật, chu kỳ thiếu lấy mặc định',
+    [nen2.enabled, nen2.direction, nen2.customerFullEnabled, nen2.customerFullMinutes, nen2.activityFullEnabled, nen2.activityFullMinutes, nen2.detailMinutes, nen2.detailCustomersPerRun], [false, 'write', false, 90, true, 480, 45, 12]);
+  const dangNhap = JSON.parse(nen.props.FBM_LOGIN_CONFIG_V1);
+  check(so, 'xóa khóa cũ; cấu hình đăng nhập chỉ bỏ phần chính sách, giữ credential',
+    [['FBM_SYNC_ENABLED', 'FBM_SYNC_SETTINGS_V1', 'FBM_ACCOUNT_SETTINGS_V1', 'FBM_SYNC_EXTENSION_CONFIG_V1', 'FBM_SYNC_BACKGROUND_SCHEDULE_V1'].filter((k) => nen.props[k] !== undefined), Object.keys(dangNhap).sort()],
+    [[], ['credentialRef', 'lastError', 'public']]);
+  check(so, 'chạy lại khi không còn khóa cũ thì báo không có gì để chuyển',
+    /không có gì/.test(hop.fbmSettingsMigrate().report[0]),
+    true);
+
+  const sai = dungCaiDatFbm(Object.assign({}, KHOA_CU, { FBM_SYNC_EXTENSION_CONFIG_V1: JSON.stringify({ pollMinutes: 99 }) }));
+  let loiSai = '';
+  try { sai.hop.fbmSettingsMigrate(); } catch (err) { loiSai = err.message; }
+  check(so, 'một giá trị cũ không đạt thì không chuyển gì, khóa cũ còn nguyên, lỗi nêu đúng ô',
+    [/Nhịp hỏi GAS/.test(loiSai), Object.keys(sai.nen.props).filter((k) => k.indexOf('SETTINGS:fbm_') === 0), sai.nen.props.FBM_SYNC_SETTINGS_V1 === KHOA_CU.FBM_SYNC_SETTINGS_V1], [true, [], true]);
+
+  const daCo = dungCaiDatFbm(Object.assign({}, KHOA_CU, { 'SETTINGS:fbm_run': JSON.stringify({ approvalThreshold: 20 }) }));
+  let loiDaCo = '';
+  try { daCo.hop.fbmSettingsMigrate(); } catch (err) { loiDaCo = err.message; }
+  check(so, 'phần mới đã có giá trị khác thì chặn, không đè cài đặt người dùng vừa đặt ở màn mới',
+    [/kho mới đã có/.test(loiDaCo), daCo.nen.props['SETTINGS:fbm_run'], daCo.nen.props.FBM_SYNC_ENABLED], [true, JSON.stringify({ approvalThreshold: 20 }), 'false']);
+}
 
 function chay(so) {
-  section('FBM sync - tham số DocumentProperties');
-  const data = {};
-  const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
-  const settingsLog = [];
-  const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent: (event) => { settingsLog.push(event); } });
-  napServer(hop, 'server/gate/IdGate.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js', 'fbm_sync/reconcile/Fingerprint.js');
-  const first = hop.FbmSync.accountSettingsRead();
-  first.customerPrefix = 'SỬA-BẢN-SAO';
-  const syncFirst = hop.FbmSync.syncSettingsRead();
-  check(so, 'kho chưa có cài đặt FBM thì đọc ra bản sao mặc định, không ghi gì và sửa bản sao không đổi mặc định',
-    [Object.keys(data).length, hop.FbmSync.accountSettingsRead(), syncFirst, syncFirst === hop.FbmSync.SYNC_SETTINGS_DEFAULT],
-    [0, { customerPrefix: '', customerCodeLength: '' }, { approvalThreshold: 10, scopeLimited: true, scopeCodes: [], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 }, false]);
-  check(so, 'luu cau hinh tai khoan FBM hop le', [hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' }).ok, hop.FbmSync.accountSettingsRead()], [true, { customerPrefix: 'ALT', customerCodeLength: '8' }]);
-  const invalidAccount = hop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '' });
-  check(so, 'cau hinh tai khoan FBM chan cap thieu', [invalidAccount.ok, invalidAccount.code], [false, 'FBM_CUSTOMER_CODE_CONFIG_INCOMPLETE']);
-  data.FBM_ACCOUNT_SETTINGS_V1 = JSON.stringify({ customerPrefix: 'ALT', customerCodeLength: '8', activitySince: '2026-01-01' });
-  check(so, 'Kho cũ còn mốc ngày Activity: lần đọc trả cấu hình không có mốc và ghi lại kho không còn khóa đó', [hop.FbmSync.accountSettingsRead(), data.FBM_ACCOUNT_SETTINGS_V1.indexOf('activitySince') < 0], [{ customerPrefix: 'ALT', customerCodeLength: '8' }, true]);
-  const invalid = hop.FbmSync.syncSettingsSave({ approvalThreshold: -1 });
-  check(so, 'nguong phe duyet am bi tu choi truoc khi ghi DocumentProperties', [invalid.ok, invalid.code, data.FBM_SYNC_SETTINGS_V1], [false, 'FBM_APPROVAL_THRESHOLD_INVALID', undefined]);
-  const invalidText = hop.FbmSync.syncSettingsSave({ approvalThreshold: 'khong-phai-so' });
-  check(so, 'nguong phe duyet khong phai so bi tu choi', [invalidText.ok, invalidText.code], [false, 'FBM_APPROVAL_THRESHOLD_INVALID']);
-  const saved = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0 });
-  check(so, 'luu nguong phe duyet hop le va cho phep nguong 0', [saved.ok, Object.keys(saved.settings), saved.settings.approvalThreshold, hop.FbmSync.syncSettingsRead().approvalThreshold], [true, ['approvalThreshold', 'scopeLimited', 'scopeCodes', 'requestGapMinSeconds', 'requestGapMaxSeconds'], 0, 0]);
-
-  const sheetCustomers = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
-  hop.FbmSync.readLocal = (entity) => entity === 'customer' ? sheetCustomers.map((item) => Object.assign({}, item)) : [];
-  check(so, 'Phạm vi mặc định giới hạn với danh sách rỗng, nên tệp chưa cấu hình không quét toàn bộ', [hop.FbmSync.SYNC_SETTINGS_DEFAULT.scopeLimited, hop.FbmSync.SYNC_SETTINGS_DEFAULT.scopeCodes], [true, []]);
-  const byFbm = hop.FbmSync.syncSettingsSave({ approvalThreshold: 0, scopeLimited: true, scopeCodes: 'ALT00010\nALT00010, ALT00099' });
-  const scopeByFbm = hop.FbmSync.scope();
-  hop.FbmSync.syncSettingsSave({ scopeCodes: 'CUS-020061' });
-  const scopeByShin = hop.FbmSync.scope();
-  check(so, 'Khách đã ghép cặp nhập bằng mã FBM hay mã ShinCRM đều vào cả hai chiều (lấy lọc grid theo mã FBM, đẩy lọc theo mã ShinCRM), nên lượt hai chiều chạy đủ hai chiều cho khách đó',
-    [byFbm.ok, byFbm.settings.scopeCodes, [scopeByFbm.fbm, scopeByFbm.shin], [scopeByShin.fbm, scopeByShin.shin]],
-    [true, ['ALT00010', 'ALT00099'], [['ALT00010', 'ALT00099'], ['CUS-020061']], [['ALT00010'], ['CUS-020061']]]);
-  check(so, 'Lưu danh sách trả kết quả đổi mã từng dòng: mã → khách, mã FBM chưa có trên Sheet', byFbm.scopeLines.map((line) => [line.code, line.status, line.customerId]), [['ALT00010', 'matched', 'CUS-020061'], ['ALT00099', 'fbm_new', '']]);
-  const oddLogBefore = settingsLog.length, oddLength = hop.FbmSync.syncSettingsSave({ scopeCodes: 'ALT0010, ALT00099' });
-  check(so, 'Mã FBM đúng tiền tố mà khác độ dài đã cài vẫn được lưu nhưng dòng đó mang cảnh báo độ dài và Log có một dòng cảnh báo; mã đúng độ dài không bị đánh dấu',
-    [oddLength.ok, oddLength.settings.scopeCodes, oddLength.scopeLines.map((line) => [line.code, line.lengthExpected || 0]), settingsLog.slice(oddLogBefore).map((event) => [event.action, /ALT0010\b/.test(event.reason), /ALT00099/.test(event.reason)])],
-    [true, ['ALT0010', 'ALT00099'], [['ALT0010', 8], ['ALT00099', 0]], [['sync_settings_save', true, false]]]);
-  check(so, 'Cài đặt tài khoản thiếu tiền tố hoặc độ dài thì không cảnh báo độ dài', hop.FbmSync.scopeLengthMark([{ code: 'ALT1', status: 'fbm_new' }], { customerPrefix: '', customerCodeLength: '' })[0].lengthExpected, undefined);
-  const newShin = hop.FbmSync.syncSettingsSave({ scopeCodes: 'CUS-020062' }).settings && hop.FbmSync.scope();
-  check(so, 'Khách mới tạo ở ShinCRM chưa có mã FBM: chỉ vào chiều ghi, grid Customer lọc ra rỗng chứ không quét toàn bộ', [newShin.fbm, newShin.shin], [[], ['CUS-020062']]);
-  const logBefore = settingsLog.length;
-  const missing = hop.FbmSync.syncSettingsSave({ scopeCodes: 'ALT00010, CUS-029999' });
-  check(so, 'Mã ShinCRM không có trên Sheet Customer bị từ chối lưu, nêu đúng mã, có dòng Log, danh sách đang lưu giữ nguyên',
-    [missing.ok, missing.code, String(missing.message).indexOf('CUS-029999') >= 0, settingsLog.slice(logBefore).map((event) => [event.action, event.reason]), hop.FbmSync.syncSettingsRead().scopeCodes],
-    [false, 'FBM_SCOPE_CODE_NOT_FOUND', true, [['sync_settings_save', 'FBM_SCOPE_CODE_NOT_FOUND']], ['CUS-020062']]);
-  const quoteCode = hop.FbmSync.syncSettingsSave({ scopeCodes: ["ALT'1", 'Mã có dấu'] });
-  check(so, 'Mã có dấu nháy hoặc ký tự lạ bị từ chối trước khi ghi, nên không lọt vào điều kiện grid FBM', [quoteCode.ok, quoteCode.code, hop.FbmSync.syncSettingsRead().scopeCodes], [false, 'FBM_SCOPE_CODE_INVALID', ['CUS-020062']]);
-  const tooMany = hop.FbmSync.syncSettingsSave({ scopeCodes: Array.from({ length: hop.FbmSync.SCOPE_CODES_MAX + 1 }, (_, i) => 'A' + i) });
-  check(so, 'Danh sách khách chỉ định vượt 40 mã bị từ chối', [hop.FbmSync.SCOPE_CODES_MAX, tooMany.ok, tooMany.code], [40, false, 'FBM_SCOPE_CODES_TOO_MANY']);
-  hop.FbmSync.syncSettingsSave({ scopeLimited: false, scopeCodes: ['ALT00010'] });
-  check(so, 'Bỏ giới hạn thì phạm vi là null (đọc và ghi toàn bộ) dù danh sách còn mã', [hop.FbmSync.scope(), hop.FbmSync.scopeLimited()], [null, false]);
-  hop.FbmSync.syncSettingsSave({ approvalThreshold: 3 });
-  check(so, 'Lưu riêng ngưỡng chấp thuận giữ nguyên công tắc phạm vi và danh sách đang lưu', [hop.FbmSync.syncSettingsRead().scopeLimited, hop.FbmSync.syncSettingsRead().scopeCodes], [false, ['ALT00010']]);
-
-  const quotaData = {};
-  let quotaFull = false;
-  const quotaLogs = [];
-  const quotaProps = {
-    getProperty: (key) => quotaData[key] || null,
-    setProperty: (key, value) => {
-      if (quotaFull) { throw new Error('DocumentProperties quota exceeded'); }
-      quotaData[key] = String(value);
-    },
-    deleteProperty: (key) => { delete quotaData[key]; }
-  };
-  const quotaHop = taoHopCat({
-    FbmSync: {},
-    PropertiesService: { getDocumentProperties: () => quotaProps },
-    logEvent: (event) => quotaLogs.push(event),
-    LOG_ERROR: 'error'
-  });
-  napServer(quotaHop, 'server/gate/IdGate.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
-  quotaHop.FbmSync.stateWrite({ runId: 'before-quota', cursor: { pageIndex: 2, pageValue: ['2026-09-20', 'CUS-000002'] }, metadata: { customerErrors: { total: 1, recent: [{ customer: 'CUS-000001', reason: 'x'.repeat(200) }] } } });
-  const previousState = quotaData.FBM_SYNC_STATE_V1;
-  quotaFull = true;
-  let quotaError = null;
-  try {
-    quotaHop.FbmSync.stateWrite({ runId: 'too-large', cursor: { pageIndex: 3 }, metadata: { customerErrors: { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) } } });
-  } catch (error) { quotaError = error; }
-  const quotaCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
-  const syncQuota = quotaCode(() => quotaHop.FbmSync.syncSettingsSave({ approvalThreshold: 4 }));
-  const accountQuota = quotaCode(() => quotaHop.FbmSync.accountSettingsSave({ customerPrefix: 'ALT', customerCodeLength: '8' }));
-  check(so, 'DocumentProperties đầy giữ nguyên state cursor/conflict, không ghi dở JSON; cổng kho ném lỗi có mã kèm khóa hỏng, không tự ghi Log', [quotaError && quotaError.code, quotaData.FBM_SYNC_STATE_V1 === previousState, syncQuota, accountQuota, quotaError && quotaError.detail.property, quotaLogs.length], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'FBM_SYNC_STATE_V1', 0]);
-
-  const brokenData = { FBM_ACCOUNT_SETTINGS_V1: '{"customerPrefix":"ALT"', FBM_SYNC_SETTINGS_V1: '{"approvalThreshold":' };
-  const brokenProps = { getProperty: (key) => brokenData[key] || null, setProperty: (key, value) => { brokenData[key] = String(value); } };
-  const brokenHop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => brokenProps } });
-  napServer(brokenHop, 'server/gate/IdGate.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/SyncSettings.js', 'fbm_sync/state/AccountSettings.js');
-  const brokenCode = (work) => { try { work(); return 'không ném'; } catch (error) { return error.code; } };
-  check(so, 'FBM-025: cài đặt tài khoản/đồng bộ JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về giá trị cũ rồi ghi đè cài đặt người dùng',
-    [brokenCode(() => brokenHop.FbmSync.accountSettingsRead()), brokenCode(() => brokenHop.FbmSync.syncSettingsRead()), brokenData.FBM_ACCOUNT_SETTINGS_V1, brokenData.FBM_SYNC_SETTINGS_V1],
-    ['DOCUMENT_PROPERTY_CORRUPT', 'DOCUMENT_PROPERTY_CORRUPT', '{"customerPrefix":"ALT"', '{"approvalThreshold":']);
-  brokenData.FBM_SYNC_BACKGROUND_SCHEDULE_V1 = '{"enabled":false';
-  brokenData.FBM_SYNC_EXTENSION_CONFIG_V1 = '[5]';
-  napServer(brokenHop, 'fbm_sync/state/Scheduler.js');
-  check(so, 'lịch đồng bộ nền và nhịp Extension JSON hỏng thì ném DOCUMENT_PROPERTY_CORRUPT, không rơi về lịch mặc định (đang tắt thành bật) rồi ghi đè',
-    [brokenCode(() => brokenHop.FbmSync.backgroundScheduleRead()), brokenCode(() => brokenHop.FbmSync.extensionConfigRead()), brokenData.FBM_SYNC_BACKGROUND_SCHEDULE_V1],
-    ['DOCUMENT_PROPERTY_CORRUPT', 'DOCUMENT_PROPERTY_CORRUPT', '{"enabled":false']);
-
-  // FBM-044: đóng phiên mà state đầy đủ không ghi được thì ghi bản rút gọn để màn đồng bộ thoát khỏi pha đang chạy.
-  const escData = {}, escLogs = [];
-  const escProps = { getProperty: (key) => escData[key] || null, setProperty: (key, value) => { escData[key] = String(value); }, deleteProperty: (key) => { delete escData[key]; } };
-  const escHop = taoHopCat({ FbmSync: { transportValue: (value) => value }, PropertiesService: { getDocumentProperties: () => escProps }, logEvent: (event) => escLogs.push(event), LOG_ERROR: 'error', LOG_WARN: 'warn', runEntryPoint: (name, source, fn) => fn() });
-  napServer(escHop, ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'server/service/FbmSyncService.js');
-  const bloated = { total: 120, recent: Array.from({ length: 120 }, (_, index) => ({ customer: 'CUS-' + String(index).padStart(6, '0'), reason: 'x'.repeat(200) })) };
-  escHop.FbmSync.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
-  let closedError = null;
-  try { escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { customerErrors: bloated } })); } catch (error) { closedError = error; }
-  const escSaved = escHop.FbmSync.stateRead();
-  check(so, 'FBM-044: đóng phiên mà state phình quá giới hạn thì lưu bản rút gọn ở phase lỗi, giữ cursor, rồi vẫn ném lỗi kèm bản rút gọn để cửa lệnh ghi Log; cổng kho không tự ghi Log',
-    [escSaved.phase, escSaved.runId, escSaved.cursor.kind, escSaved.metadata.customerErrors === undefined ? 0 : escSaved.metadata.customerErrors.recent.length, escSaved.message.indexOf('bản rút gọn') > 0, closedError && closedError.code, closedError && closedError.minimal.cursorKept, escLogs.length],
-    ['error', 'r-push', 'push_wait', 0, true, 'FBM_DOCUMENT_PROPERTIES_QUOTA', true, 0]);
-  let midRunError = null;
-  try { escHop.FbmSync.stateWrite(Object.assign(escHop.FbmSync.stateRead(), { phase: 'push', metadata: { customerErrors: bloated } })); } catch (error) { midRunError = error; }
-  check(so, 'FBM-044: lát giữa chừng ghi state hỏng vẫn ném lỗi, không lặng lẽ thay bằng bản rút gọn', [midRunError && midRunError.code, escHop.FbmSync.stateRead().phase], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 'error']);
-
-  // State hỏng: status trả snapshot kẹt kèm cờ mở nút đặt lại thay vì ném; đặt lại xóa riêng state phiên.
-  escData.FBM_SYNC_STATE_V1 = '{"phase":"push"';
-  escData.FBM_SYNC_PENDING_PUSHES_V1 = '{"activity:ACT-1":{"hash":"h"}}';
-  escLogs.length = 0;
-  napServer(escHop, 'fbm_sync/report/Report.js', 'fbm_sync/control/ControlPort.js');
-  Object.assign(escHop.FbmSync, { identityStatus: () => ({ status: 'BOUND' }), settingsView: () => ({}), loginConfigPublic: () => ({ configured: true }) });
-  const stuck = escHop.FbmSync.statusRead().status;
-  check(so, 'FBM-044: state hỏng thì status trả "kẹt" kèm nút đặt lại và ghi Log, không ném lỗi', [stuck.code, stuck.resetOffered, stuck.phase, escLogs.some((event) => event.action === 'state_stuck')], ['SYNC_STATE_STUCK', true, 'error', true]);
-  const escReset = escHop.FbmSync.stateReset();
-  check(so, 'FBM-044: đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log', [escReset.ok, escData.FBM_SYNC_STATE_V1, escData.FBM_SYNC_PENDING_PUSHES_V1, escHop.FbmSync.stateRead().phase, escLogs.some((event) => event.action === 'state_reset')], [true, undefined, '{"activity:ACT-1":{"hash":"h"}}', 'idle', true]);
-
-  // Lưu mục cài đặt `sync` kèm công tắc tổng: một lệnh, lưu cài đặt (đã kiểm) trước rồi mới đổi công tắc, tắt thì áp điều kiện dừng trong cùng khóa, cài đặt sai thì công tắc giữ nguyên, luôn trả status mới.
-  const saveOrder = [];
-  const saveHop = taoHopCat({ FbmSync: {
-    setMasterEnabled: (enabled) => { saveOrder.push(['set_master', enabled]); return { ok: true, enabled }; },
-    stopPendingApply: () => { saveOrder.push(['stop']); return { stopped: false }; },
-    syncSettingsSave: (settings) => { saveOrder.push(['save', settings.approvalThreshold]); return settings.approvalThreshold < 0 ? { ok: false, code: 'FBM_SYNC_SETTINGS_INVALID', field: 'approvalThreshold' } : { ok: true, settings }; },
-    statusView: () => ({ phase: 'idle', masterEnabled: false })
-  } });
-  napServer(saveHop, 'fbm_sync/control/ControlPort.js');
-  const luuChung = (value, master) => saveHop.FbmSync.commandSaveSettings({ section: 'sync', value, master });
-  const withMaster = luuChung({ approvalThreshold: 2 }, false);
-  const withoutMaster = luuChung({ approvalThreshold: 3 }, null);
-  luuChung({ approvalThreshold: 4 }, true);
-  const invalidSettings = luuChung({ approvalThreshold: -1 }, true);
-  check(so, 'Lưu cài đặt chung: lưu cài đặt trước rồi đổi công tắc tổng, tắt thì áp điều kiện dừng ngay, null thì không đụng công tắc; kết quả mang status mới',
-    [saveOrder, withMaster.ok, withMaster.status, withoutMaster.status.phase],
-    [[['save', 2], ['set_master', false], ['stop'], ['save', 3], ['save', 4], ['set_master', true], ['save', -1]], true, { phase: 'idle', masterEnabled: false }, 'idle']);
-  check(so, 'Lưu cài đặt chung: cài đặt sai thì trả lỗi kèm status và công tắc tổng giữ nguyên (không có lệnh đổi công tắc)', [invalidSettings.ok, invalidSettings.code, invalidSettings.status.phase, saveOrder.filter((step) => step[0] === 'set_master').length], [false, 'FBM_SYNC_SETTINGS_INVALID', 'idle', 2]);
-
-  // Gói đọc của màn đồng bộ: bốn phần đọc qua đúng hàm đọc của từng nơi sở hữu, một lời gọi; một phần ném lỗi thì cả gói ném để Sidebar báo.
-  const bundleReads = [];
-  let identityFails = false;
-  const bundleHop = taoHopCat({ FbmSync: {
-    statusView: () => { bundleReads.push('status'); return { phase: 'idle', masterEnabled: true }; },
-    identityStatus: () => { bundleReads.push('identity'); if (identityFails) { throw new Error('Không đọc được liên kết.'); } return { status: 'BOUND' }; },
-    currentSpreadsheetId: () => 'sheet-1',
-    syncSettingsPublic: () => ({ approvalThreshold: 5 }),
-    accountSettingsPublic: () => ({}), extensionConfigPublic: () => ({}), backgroundSchedulePublic: () => ({}),
-    loginConfigPublic: () => { bundleReads.push('login'); return { configured: true }; }
-  } });
-  napServer(bundleHop, 'fbm_sync/control/ControlPort.js');
-  const bundle = bundleHop.FbmSync.statusRead();
-  identityFails = true;
-  let bundleError = null;
-  try { bundleHop.FbmSync.statusRead(); } catch (error) { bundleError = error.message; }
-  check(so, 'Gói đọc màn Đồng bộ FBM trả đủ bốn phần trong một lời gọi; phần liên kết lỗi thì cả gói ném lỗi',
-    [bundleReads.slice(0, 3), bundle.ok, bundle.status.phase, bundle.identity.status, bundle.settings.approvalThreshold, bundle.settings.spreadsheetId, bundle.login.configured, bundleError],
-    [['status', 'identity', 'login'], true, 'idle', 'BOUND', 5, 'sheet-1', true, 'Không đọc được liên kết.']);
-  escHop.FbmSync.stateWrite({ runId: 'r-live', phase: 'pull_customer' });
-  const refused = escHop.FbmSync.stateReset();
-  const staleAllowed = escHop.FbmSync.stateReset(Date.now() + escHop.FbmSync.STALE_RUN_MS + 1000);
-  check(so, 'FBM-044: phiên đang chạy bình thường thì từ chối đặt lại, phiên treo quá hạn thì cho', [refused.code, staleAllowed.ok, escData.FBM_SYNC_STATE_V1], ['SYNC_RESET_RUNNING', true, undefined]);
+  section('FBM sync - cài đặt qua cổng chung');
+  kiemLenhLuu(so);
+  kiemKhoaHong(so);
+  kiemChuyenMotLan(so);
 }
 
 module.exports = { chay };

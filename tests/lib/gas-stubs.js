@@ -86,7 +86,9 @@ function taoStubsGas(options) {
           }
         }
         return bytes;
-      }
+      },
+      /** Chỉ có `getBytes`, mã hóa UTF-8 như Google: chữ có dấu nhiều byte, nên phép chặn trần 9 KB một khóa đếm đúng như trên kho thật. */
+      newBlob: (value) => ({ getBytes: () => Array.from(Buffer.from(String(value), 'utf8')) })
     },
 
     Logger: { log: (line) => daLog.push(String(line)) },

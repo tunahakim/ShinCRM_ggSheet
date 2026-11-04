@@ -1,6 +1,7 @@
 /** Kiểm nộp lặp qua relay: lần nộp đầu GAS đã xử lý nhưng câu trả lời mất trên đường về, Extension thử lại cùng thân. GAS phát lại request đang chờ chứ không coi là response cũ, và không chạy lại nghiệp vụ. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 
 function maLoi(fn) {
   try { const result = fn(); return String(result && result.code || ''); } catch (error) { return String(error && error.code || ''); }
@@ -12,7 +13,7 @@ async function chay(so) {
   const FbmSync = hop.FbmSync;
   const logs = [];
   hop.logEvent = (line) => { logs.push(line); };
-  FbmSync.setMasterEnabled(true);
+  datCongTac(hop, true);
   // Bộ xử lý nghiệp vụ giả đi qua đúng hai cổng thật: nhận ra response (`requestAnswered`) rồi cấp request kế (`nextEnvelope`); đếm số lần chạy để biết nộp lặp có chạy lại nghiệp vụ không.
   let nghiepVu = 0;
   FbmSync.continue = function (response) {

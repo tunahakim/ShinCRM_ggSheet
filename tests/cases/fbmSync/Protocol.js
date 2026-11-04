@@ -54,17 +54,6 @@ async function chay(so) {
   check(so, 'chi Shin thay doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, Object.assign({}, local, { companyName: 'shin' }), same, 'customer').shinChanged, true);
   check(so, 'chi FBM thay doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, local, Object.assign({}, same, { companyName: 'fbm' }), 'customer').fbmChanged, true);
   check(so, 'parse malformed tra loi co cau truc', !!hop.FbmSync.protocol.parse('{').parseError, true);
-
-  const emptyConfig = taoHopCat({ FbmSync: {} });
-  napServer(emptyConfig, 'fbm_sync/schema/FbmFields.js');
-  emptyConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: '' });
-  let thresholdError = null;
-  try { emptyConfig.FbmSync.approvalThreshold(); } catch (error) { thresholdError = error.code; }
-  check(so, 'ngưỡng chấp thuận sai kiểu ném lỗi có mã, không rơi về mặc định', thresholdError, 'FBM_APPROVAL_THRESHOLD_INVALID');
-  const zeroConfig = taoHopCat({ FbmSync: {} });
-  napServer(zeroConfig, 'fbm_sync/schema/FbmFields.js');
-  zeroConfig.FbmSync.syncSettingsRead = () => ({ approvalThreshold: 0 });
-  check(so, 'nguong chấp thuận 0 vẫn được giữ nguyên', zeroConfig.FbmSync.approvalThreshold(), 0);
 }
 
 module.exports = { chay };

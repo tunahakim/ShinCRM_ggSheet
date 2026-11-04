@@ -2,6 +2,7 @@
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
+const { datLichNen } = require('../../lib/fbm/cai-dat-thu');
 
 const PHUT = 60000;
 
@@ -12,7 +13,7 @@ function chuoiHarness(lich, options) {
   h.flow.hop.__now = () => clock.now;
   vm.runInContext('Date.now = function () { return __now(); };', h.flow.hop);
   h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  h.F.backgroundScheduleSave(Object.assign({ enabled: true, direction: 'read', confirmLow: true }, lich));
+  datLichNen(h.flow.hop, Object.assign({ enabled: true, direction: 'read' }, lich));
   const xong = [], advance = h.F.scheduleMarkDone;
   h.F.scheduleMarkDone = function (kind) { xong.push(kind); return advance.apply(this, arguments); };
   /** Hỏi một lần sau `phut` phút; mỗi request FBM tốn `moiRequest` mili-giây. Trả các tiến trình chạy xong trong lần hỏi đó. */

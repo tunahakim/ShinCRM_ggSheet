@@ -1,6 +1,7 @@
 /** Kiểm đường mở lượt tay: Sidebar chỉ nhận `runId`, lần hỏi (`heartbeat`) của Extension đúng máy nhận lượt qua relay; máy khác, lần hỏi thứ hai, chỗ giữ quá hạn và response đến sau khi lượt đóng không chạm nhầm ô lượt. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datCongTac, datNen } = require('../../lib/fbm/cai-dat-thu');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }
@@ -12,7 +13,7 @@ async function chay(so) {
   const FbmSync = hop.FbmSync;
   const logs = [];
   hop.logEvent = (line) => { logs.push(line); };
-  FbmSync.setMasterEnabled(true);
+  datCongTac(hop, true);
   const anh = () => JSON.stringify(documentProperties.data);
   // Extension chỉ hỏi: Sidebar đánh thức (`run_now`) hoặc chuông (`alarm`); GAS tự quyết lần hỏi nhận lượt nào.
   const hoi = (machineId, trigger) => FbmSync.controlDispatch('heartbeat', { trigger: trigger || 'run_now', machineId }, 'relay');
@@ -26,7 +27,7 @@ async function chay(so) {
   check(so, 'start trên kênh Sidebar trả runId và giãn cách thử lại, không trả phong bì; ô lượt giữ chỗ nhận cho đúng máy', [
     started.ok, typeof started.runId, started.runId === held.runId, Object.prototype.hasOwnProperty.call(started, 'request'), started.relayRetryMs, held.activeRequestId, held.driverMachineId, held.deadlineAt > Date.now()
   ], [true, 'string', true, false, FbmSync.BUDGET.relayRetryMs, 'pickup:' + held.runId, 'may-A', true]);
-  check(so, 'chỗ giữ đủ một nhịp chuông của Extension, để tin đánh thức mất thì lần hỏi theo chuông vẫn nhận lượt; status báo lượt đang chờ nhận', [held.deadlineAt - Date.now() >= FbmSync.extensionConfigRead().pollMinutes * 60000, FbmSync.statusView().awaitingPickup], [true, true]);
+  check(so, 'chỗ giữ đủ một nhịp chuông của Extension, để tin đánh thức mất thì lần hỏi theo chuông vẫn nhận lượt; status báo lượt đang chờ nhận', [held.deadlineAt - Date.now() >= hop.settingsValue(FbmSync.SETTING_SECTIONS.extension, 'pollMinutes') * 60000, FbmSync.statusView().awaitingPickup], [true, true]);
 
   const beforeForeign = anh();
   const foreign = hoi('may-B');
@@ -89,11 +90,10 @@ async function chay(so) {
   const lostRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
   const lost = FbmSync.stateRead();
   FbmSync.stateWrite(Object.assign(lost, { deadlineAt: Date.now() - 1000 }));
-  const background = FbmSync.backgroundEnabled;
-  FbmSync.backgroundEnabled = () => false;
+  datNen(hop, false);
   logs.length = 0;
   const lateAsk = hoi('may-B', 'alarm');
-  FbmSync.backgroundEnabled = background;
+  datNen(hop, true);
   const lostState = FbmSync.stateRead(), lostLog = logs.find((line) => line.action === 'stale_run');
   check(so, 'chỗ giữ quá hạn: chuông máy khác (nền tắt) đóng lượt RUN_PICKUP_EXPIRED, không phát request, Log nói Extension máy được giao không hỏi GAS', [lateAsk.request || null, lostState.runId === lostRun.runId, lostState.phase, lostState.lastFailureCode, !!lostLog && /không hỏi GAS lần nào/.test(lostLog.reason)], [null, true, 'error', 'RUN_PICKUP_EXPIRED', true]);
   const lateOwner = hoi('may-A');

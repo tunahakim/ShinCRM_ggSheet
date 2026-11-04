@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
+const { datCongTac, datNen, datPhan, docPhan, datLichNen, docLichNen } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const { workflowGas, khoDongBo } = require('../../lib/fbm/hop-dong-bo');
@@ -287,7 +288,7 @@ async function chay(so) {
 
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', enabled: true, envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
   const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
   const afterLogin = noiDangNhap(loginFlow.hop, {
     ok: true, status: 200, body: JSON.stringify({ d: true }),
@@ -336,73 +337,72 @@ async function chay(so) {
   ], [[false, true, false, true], [false, false, true, true]]);
 
   const scheduleFlow = workflowGas();
-  check(so, 'cau hinh Extension mac dinh mot nhip 5 phut va startup bat', [scheduleFlow.hop.FbmSync.extensionConfigPublic().pollMinutes, scheduleFlow.hop.FbmSync.extensionConfigPublic().runOnStartup], [5, true]);
-  const scheduleDefaults = scheduleFlow.hop.FbmSync.backgroundScheduleDefault();
+  const SH = scheduleFlow.hop, SF = SH.FbmSync, NEN = SF.SETTING_SECTIONS.background;
+  check(so, 'cau hinh Extension mac dinh mot nhip 5 phut va startup bat', [docPhan(SH, 'extension').pollMinutes, docPhan(SH, 'extension').runOnStartup], [5, true]);
+  const scheduleDefaults = docLichNen(SH);
   check(so, 'Lịch nền mặc định theo bảng tiến trình: Giữ phiên 5 phút, Quét nhanh 60 phút bật, Lấy toàn bộ giao dịch 8 giờ tắt, Vòng xoay 30 phút 30 khách tắt', [scheduleDefaults.heartbeat.minutes, scheduleDefaults.customerFull.enabled, scheduleDefaults.customerFull.minutes, scheduleDefaults.activityFull.enabled, scheduleDefaults.activityFull.minutes, scheduleDefaults.detail.enabled, scheduleDefaults.detail.minutes, scheduleDefaults.detail.customersPerRun], [5, true, 60, false, 480, false, 30, 30]);
-  const savedExtension = scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: false });
-  check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.ok, savedExtension.pollMinutes, savedExtension.runOnStartup, scheduleFlow.hop.FbmSync.backgroundSchedulePublic().heartbeat.minutes], [true, 15, false, 5]);
-  const savedSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: false, minutes: 10 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 } });
-  check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.ok, savedSchedule.schedule.heartbeat.enabled, savedSchedule.schedule.heartbeat.minutes, savedSchedule.schedule.activityFull.enabled], [true, false, 10, false]);
-  // Công tắc lịch nền chỉ có một nơi lưu: tắt qua cổng điều khiển thì card cũng thấy tắt và lịch nền không cấp việc, bật lại từ card thì cổng điều khiển cũng thấy bật.
-  const switchOff = scheduleFlow.hop.FbmSync.setBackgroundEnabled(false);
-  const offCard = scheduleFlow.hop.FbmSync.backgroundSchedulePublic().enabled;
-  const offPick = scheduleFlow.hop.FbmSync.schedulerPickDue(Date.now() + 7 * 24 * 3600 * 1000);
-  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ enabled: true });
-  check(so, 'công tắc lịch nền chỉ một nơi lưu, tắt ở cổng điều khiển thì card và lịch nền cùng tắt', [switchOff.enabled, offCard, offPick.code, scheduleFlow.hop.FbmSync.backgroundEnabled(), scheduleFlow.documentProperties.getProperty('FBM_SYNC_BACKGROUND_ENABLED')], [false, false, 'BACKGROUND_DISABLED', true, null]);
-  const disabledSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ enabled: false });
-  check(so, 'luu lich nen dong bo ca cong tac lich va co BACKGROUND_SWITCH_KEY', [disabledSchedule.ok, disabledSchedule.schedule.enabled, scheduleFlow.hop.FbmSync.backgroundEnabled()], [true, false, false]);
-  const directionSchedule = scheduleFlow.hop.FbmSync.backgroundScheduleSave({
+  const savedExtension = datPhan(SH, 'extension', { pollMinutes: 15, runOnStartup: false });
+  check(so, 'cau hinh Extension cho phep doi nhip nhung khong doi lich nghiep vu', [savedExtension.pollMinutes, savedExtension.runOnStartup, docLichNen(SH).heartbeat.minutes], [15, false, 5]);
+  const savedSchedule = datLichNen(SH, { heartbeat: { enabled: false, minutes: 10 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 30 } });
+  check(so, 'GAS luu cong tac va chu ky tung tien trinh nen', [savedSchedule.heartbeat.enabled, savedSchedule.heartbeat.minutes, savedSchedule.activityFull.enabled], [false, 10, false]);
+  // Công tắc lịch nền chỉ có một nơi lưu (phần cài đặt lịch nền): tắt thì card thấy tắt và lịch nền không cấp việc, bật lại thì mọi nơi đọc cùng thấy bật.
+  const switchOff = datNen(SH, false);
+  const offCard = docLichNen(SH).enabled;
+  const offPick = SF.schedulerPickDue(Date.now() + 7 * 24 * 3600 * 1000);
+  datNen(SH, true);
+  check(so, 'công tắc lịch nền chỉ một nơi lưu, tắt thì card và lịch nền cùng tắt', [switchOff.enabled, offCard, offPick.code, docPhan(SH, 'background').enabled, scheduleFlow.documentProperties.getProperty('FBM_SYNC_BACKGROUND_ENABLED')], [false, false, 'BACKGROUND_DISABLED', true, null]);
+  const directionSchedule = datLichNen(SH, {
     enabled: true, direction: 'write',
     heartbeat: { enabled: true, minutes: 5 },
     customerFull: { enabled: true, minutes: 480 },
     activityFull: { enabled: false, minutes: 1440 },
-    detail: { enabled: true, minutes: 60, customersPerRun: 50, minDelaySeconds: 0.5, maxDelaySeconds: 2 }
+    detail: { enabled: true, minutes: 60, customersPerRun: 50 }
   });
-  check(so, 'Lịch nền lưu chiều hai chiều và số khách mỗi phiên; khoảng nghỉ cũ của lịch nền bị bỏ, không còn lưu', [directionSchedule.schedule.direction, directionSchedule.schedule.detail.enabled, directionSchedule.schedule.detail.customersPerRun, 'minDelaySeconds' in directionSchedule.schedule.detail, 'maxDelaySeconds' in scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail, scheduleFlow.hop.FbmSync.backgroundEnabled()], ['write', true, 50, false, false, true]);
+  check(so, 'Lịch nền lưu chiều hai chiều và số khách mỗi phiên', [directionSchedule.direction, directionSchedule.detail.enabled, directionSchedule.detail.customersPerRun, docPhan(SH, 'background').enabled], ['write', true, 50, true]);
   const cursorTruoc = scheduleFlow.hop.FbmSync.detailCursorRead();
   scheduleFlow.documentProperties.setProperty(scheduleFlow.hop.FbmSync.DETAIL_CURSOR_KEY, JSON.stringify({ pageIndex: 1, pageValue: ['2026-09-16', '2026-09-16T10:00:00', '50', 'CUS-50'] }));
   const cursorKieuCu = scheduleFlow.hop.FbmSync.detailCursorRead();
   scheduleFlow.hop.FbmSync.detailCursorWrite(42);
   check(so, 'Cursor Vòng xoay là số CUS: chưa có hoặc còn kiểu khóa trang FBM cũ thì là -1 (bắt đầu từ CUS nhỏ nhất), ghi 42 đọc lại 42', [cursorTruoc, cursorKieuCu, scheduleFlow.hop.FbmSync.detailCursorRead()], [-1, -1, 42]);
-  const nhieuKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 300 } });
-  const loiSoKhach = scheduleFlow.hop.FbmSync.backgroundScheduleSave({ detail: { enabled: true, minutes: 60, customersPerRun: 0 } });
-  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối', [nhieuKhach.schedule.detail.customersPerRun, scheduleFlow.hop.FbmSync.backgroundScheduleRead().detail.customersPerRun, loiSoKhach], [300, 300, { ok: false, code: 'SCHEDULE_INVALID', invalid: [{ field: 'detail.customersPerRun', reason: 'Số khách mỗi lượt vòng xoay phải là số nguyên từ 1 trở lên.' }], message: 'Chưa lưu lịch đồng bộ nền.' }]);
+  const nhieuKhach = datLichNen(SH, { detail: { enabled: true, minutes: 60, customersPerRun: 300 } });
+  const loiSoKhach = SH.settingsSave({ [NEN]: { detailCustomersPerRun: 0 } });
+  check(so, 'Số khách mỗi phiên Vòng xoay không còn trần 50: lưu 300 đọc lại 300; 0 bị từ chối và không đổi số đã lưu', [nhieuKhach.detail.customersPerRun, docLichNen(SH).detail.customersPerRun, loiSoKhach.ok], [300, 300, false]);
   {
-    const F = workflowGas().hop.FbmSync, truoc = JSON.stringify(F.backgroundScheduleRead());
-    const trong = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '' }, customerFull: { enabled: true, minutes: '1.5' }, detail: { enabled: true, minutes: 60, customersPerRun: ' ' } });
-    check(so, 'Lịch nền: ô trống hoặc không phải số nguyên không ngầm thay số nào, trả đủ từng ô sai để Sidebar tô đỏ và không lưu gì',
-      [trong.code, trong.invalid, JSON.stringify(F.backgroundScheduleRead()) === truoc],
-      ['SCHEDULE_INVALID', [{ field: 'heartbeat.minutes', reason: 'Chưa nhập chu kỳ Giữ phiên FBM.' }, { field: 'customerFull.minutes', reason: 'Chu kỳ Quét nhanh phải là số nguyên từ 0 đến 10080 phút.' }, { field: 'detail.customersPerRun', reason: 'Chưa nhập số khách mỗi lượt vòng xoay.' }], true]);
-    const thap = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '0' }, customerFull: { enabled: true, minutes: '5' }, activityFull: { enabled: false, minutes: '1' } });
+    const H = workflowGas().hop, F = H.FbmSync, truoc = JSON.stringify(docPhan(H, 'background'));
+    const trong = F.settingsSaveCommand({ patches: { [NEN]: { heartbeatMinutes: 'abc', customerFullMinutes: -3, detailCustomersPerRun: 0 } } });
+    check(so, 'Lịch nền: ô không phải số nguyên hoặc ngoài khoảng cho phép thì trả đủ từng ô sai để Sidebar tô đỏ và không lưu gì',
+      [trong.code, trong.problems.map((p) => p.field).sort(), JSON.stringify(docPhan(H, 'background')) === truoc],
+      ['SETTINGS_INVALID', ['customerFullMinutes', 'detailCustomersPerRun', 'heartbeatMinutes'], true]);
+    const thap = F.settingsSaveCommand({ patches: { [NEN]: { heartbeatEnabled: true, heartbeatMinutes: '0', customerFullEnabled: true, customerFullMinutes: '5', activityFullEnabled: false, activityFullMinutes: '1' } } });
     check(so, 'Lịch nền: tiến trình khác Giữ phiên đang bật mà chu kỳ dưới 30 phút thì hỏi lại, chưa lưu; Giữ phiên 0 và tiến trình tắt không bị hỏi',
-      [thap.code, /Quét nhanh 5 phút/.test(thap.message), /Giữ phiên|Lấy toàn bộ/.test(thap.message), JSON.stringify(F.backgroundScheduleRead()) === truoc],
+      [thap.code, /Quét nhanh 5 phút/.test(thap.message), /Giữ phiên|Lấy toàn bộ/.test(thap.message), JSON.stringify(docPhan(H, 'background')) === truoc],
       ['SCHEDULE_LOW_CONFIRM', true, false, true]);
-    const dongY = F.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '0' }, customerFull: { enabled: true, minutes: '5' }, confirmLow: true });
+    const dongY = F.settingsSaveCommand({ patches: { [NEN]: { heartbeatEnabled: true, heartbeatMinutes: '0', customerFullEnabled: true, customerFullMinutes: '5' } }, confirmLow: true });
     check(so, 'Lịch nền: người dùng xác nhận thì lưu, chu kỳ 0 được giữ là 0 khi đọc lại',
-      [dongY.ok, F.backgroundScheduleRead().heartbeat.minutes, F.backgroundScheduleRead().customerFull.minutes], [true, 0, 5]);
+      [dongY.ok, docLichNen(H).heartbeat.minutes, docLichNen(H).customerFull.minutes], [true, 0, 5]);
     const now = Date.UTC(2026, 9, 16, 8, 0);
     F.scheduleMarkDone('heartbeat', now);
     {
       const hop = workflowGas().hop, vet = [];
       hop.logTrace = (entry) => vet.push(entry);
-      hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
+      datLichNen(hop, { heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
       hop.FbmSync.scheduleMarkDone('heartbeat', Date.now()); hop.FbmSync.scheduleMarkDone('customerFull', Date.now());
       const hoi = hop.FbmSync.schedulerPickDue(Date.now() + 60000);
       check(so, 'LOG_TRACE: lần Extension hỏi mà chưa có việc ghi một dòng vết nói tiến trình nào sớm nhất và còn bao lâu',
         [hoi.code, vet.map((v) => [v.source, v.action, v.reason])], ['NO_PROCESS_DUE', [['fbm_sync', 'schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; sớm nhất là Giữ phiên FBM, còn 4 phút.']]]);
     }
     {
-      const G = workflowGas().hop.FbmSync, T = Date.UTC(2026, 9, 16, 9, 0), PHUT = 60000;
-      G.backgroundScheduleSave({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: '30' }, activityFull: { enabled: false }, detail: { enabled: false }, confirmLow: true });
-      const chuaTungChay = G.scheduleDueKinds(T, []);
+      const GH = workflowGas().hop, G = GH.FbmSync, T = Date.UTC(2026, 9, 16, 9, 0), PHUT = 60000;
+      datLichNen(GH, { heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: '30' }, activityFull: { enabled: false }, detail: { enabled: false } });
+      const chuaTungChay = G.scheduleDueKinds(T, [], docLichNen(GH));
       G.scheduleMarkDone('customerFull', T);
       check(so, 'Lịch nền: chưa từng chạy xong thì đến hạn ngay; chu kỳ tính từ giờ chạy xong, 29 phút sau chưa đến hạn, 30 phút sau đến hạn',
-        [chuaTungChay, G.scheduleDueKinds(T + 29 * PHUT, []), G.scheduleDueKinds(T + 30 * PHUT, [])], [['customerFull'], [], ['customerFull']]);
-      G.backgroundScheduleSave({ customerFull: { enabled: true, minutes: '60' } });
-      const sau60 = [G.props().getProperty(G.SCHEDULE_DONE_KEYS.customerFull), G.scheduleDueKinds(T + 30 * PHUT, [])];
-      G.backgroundScheduleSave({ customerFull: { enabled: true, minutes: '10' }, confirmLow: true });
+        [chuaTungChay, G.scheduleDueKinds(T + 29 * PHUT, [], docLichNen(GH)), G.scheduleDueKinds(T + 30 * PHUT, [], docLichNen(GH))], [['customerFull'], [], ['customerFull']]);
+      datLichNen(GH, { customerFull: { enabled: true, minutes: '60' } });
+      const sau60 = [G.props().getProperty(G.SCHEDULE_DONE_KEYS.customerFull), G.scheduleDueKinds(T + 30 * PHUT, [], docLichNen(GH))];
+      datLichNen(GH, { customerFull: { enabled: true, minutes: '10' } });
       check(so, 'Lịch nền: lưu cài đặt không đụng giờ chạy xong; đổi chu kỳ có hiệu lực ngay tính từ lần chạy xong cũ',
-        [sau60, G.scheduleDueKinds(T + 10 * PHUT, [])], [[String(T), []], ['customerFull']]);
+        [sau60, G.scheduleDueKinds(T + 10 * PHUT, [], docLichNen(GH))], [[String(T), []], ['customerFull']]);
       G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'conflict', scheduledScan: '', chain: { current: 'customerFull', ran: [], direction: 'read' } });
       G.props().setProperty(G.SCHEDULE_DONE_KEYS.customerFull, '1');
       G.chainTail({ ok: true, request: null });
@@ -410,7 +410,7 @@ async function chay(so) {
         [Number(G.props().getProperty(G.SCHEDULE_DONE_KEYS.customerFull)) > 1, G.stateRead().chain, G.stateRead().phase], [true, null, 'conflict']);
     }
     check(so, 'Chu kỳ 0: ghi giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
-      [Number(F.props().getProperty(F.SCHEDULE_DONE_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, []).indexOf('heartbeat') >= 0], [now, true]);
+      [Number(F.props().getProperty(F.SCHEDULE_DONE_KEYS.heartbeat)), F.scheduleDueKinds(now + 1, [], docLichNen(H)).indexOf('heartbeat') >= 0], [now, true]);
   }
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
@@ -713,15 +713,15 @@ async function chay(so) {
   const noDue = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'alarm' });
   check(so, 'scheduler GAS khong cap heartbeat khi khong co lich den han', [noDue.ok, noDue.code, noDue.request], [true, 'NO_PROCESS_DUE', null]);
   scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, scheduledScan: '' });
-  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
+  datLichNen(SH, { heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', String(now));
   scheduleFlow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
   const heartbeatLowest = scheduleFlow.hop.FbmSync.schedulerPickDue(now);
   check(so, 'scheduler GAS chi chon giu phien khi khong co tien trinh du lieu den han', [heartbeatLowest.ok, heartbeatLowest.kind], [true, 'heartbeat']);
-  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 0 }).ok, scheduleFlow.hop.FbmSync.backgroundScheduleSave({ customerFull: { minutes: 10081 } }).invalid[0].field], [false, 'customerFull.minutes']);
-  scheduleFlow.hop.FbmSync.extensionConfigSave({ pollMinutes: 15, runOnStartup: true });
-  scheduleFlow.hop.FbmSync.backgroundScheduleSave({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
+  check(so, 'cau hinh scheduler tu choi chu ky ngoai gioi han', [SH.settingsSave({ fbm_extension: { pollMinutes: 0 } }).ok, SH.settingsSave({ [NEN]: { customerFullMinutes: 10081 } }).problems[0].field], [false, 'customerFullMinutes']);
+  datPhan(SH, 'extension', { pollMinutes: 15, runOnStartup: true });
+  datLichNen(SH, { heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: true, minutes: 30 } });
   const startup = scheduleFlow.hop.FbmSync.heartbeatRequest({ source: 'startup' });
   check(so, 'Chrome startup co the hoi GAS ngay mot luot Giu phien theo cau hinh; chua co dau lan day sach nen Giu phien mo luot chi day, request dau la buoc kiem phien', [startup.ok, startup.code, startup.request && startup.request.meta.kind, scheduleFlow.hop.FbmSync.stateRead().scan, scheduleFlow.hop.FbmSync.stateRead().chain.current], [true, 'CHAIN_REQUEST_READY', 'session_probe', 'keepalive', 'heartbeat']);
   // Giữ phiên có đẩy (C2): một chỗ quyết cho hai đường cấp; cổng mở thì mở lượt Chỉ đẩy nền `keepalive`, đếm và Quét nhanh bù theo chiều lịch nền.
@@ -729,7 +729,7 @@ async function chay(so) {
     const opt = options || {}, flow = workflowGas({ extraFiles: ['fbm_sync/diagnostic/Trace.js'] }), F = flow.hop.FbmSync, traces = [];
     F.scheduleTrace = (action) => traces.push(action);
     F.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
-    F.backgroundScheduleSave({ direction, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30, customersPerRun: 30 } });
+    datLichNen(flow.hop, { direction, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30, customersPerRun: 30 } });
     flow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
     flow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
     if (opt.cleanMark) { flow.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(F.pushCleanNow())); }
@@ -762,11 +762,11 @@ async function chay(so) {
         read.result.request && read.result.request.meta.kind, read.state.scheduledScan, read.traces.filter((a) => a === 'push_gate_closed').length],
       ['session_probe', 'HEARTBEAT_REQUEST_READY', 'heartbeat', 'session_probe', 'full', 1, 'session_probe', 'heartbeat', 0]);
   }
-  const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js', 'fbm_sync/state/SyncSettings.js'] });
-  waitFlow.hop.FbmSync.syncSettingsSave({ scopeLimited: false });
-  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
+  const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js'] });
+  datPhan(waitFlow.hop, 'run', { scopeLimited: false });
+  datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
   waitFlow.hop.FbmSync.start({ mode: 'read' });
-  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
+  datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
   waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
   const gapGrid = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
@@ -775,10 +775,10 @@ async function chay(so) {
   check(so, 'Lượt chạy tay chụp khoảng cách giữa hai request FBM vào state đầu lượt và gửi kèm mọi envelope; đổi cài đặt giữa lượt chỉ áp lượt sau; hạn Extension cộng khoảng nghỉ dài nhất, trừ gói lấy từ RAM tab',
     [JSON.stringify(waitFlow.hop.FbmSync.stateRead().requestGap), JSON.stringify(gapGrid.meta.requestGap), gapGrid.meta.timeoutMs, gapChunk.meta.timeoutMs],
     ['{"minMs":1000,"maxMs":3000}', '{"minMs":1000,"maxMs":3000}', gapBudget.tabReadyMs + gapBudget.fetchMs + 3000, gapBudget.tabReadyMs + gapBudget.fetchMs]);
-  const gapInvalid = waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 4, requestGapMaxSeconds: 2 });
-  const gapTooLong = waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 0, requestGapMaxSeconds: gapBudget.requestGapMaxSeconds + 1 });
-  check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.code, gapTooLong.code], ['FBM_REQUEST_GAP_INVALID', 'FBM_REQUEST_GAP_INVALID']);
-  waitFlow.hop.FbmSync.syncSettingsSave({ requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
+  const gapInvalid = waitFlow.hop.settingsSave({ fbm_run: { requestGapMinSeconds: 4, requestGapMaxSeconds: 2 } });
+  const gapTooLong = waitFlow.hop.settingsSave({ fbm_run: { requestGapMinSeconds: 0, requestGapMaxSeconds: gapBudget.requestGapMaxSeconds + 1 } });
+  check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.ok, gapTooLong.ok], [false, false]);
+  datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
   waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
   const gapNone = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
   check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
@@ -1205,7 +1205,7 @@ async function chay(so) {
   masterOff.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
-  masterOff.hop.FbmSync.setMasterEnabled(false);
+  datCongTac(masterOff.hop, false);
   const masterStopped = masterOff.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
@@ -1233,7 +1233,7 @@ async function chay(so) {
   ], [1, '', true, true]);
 
   const disabled = workflowGas();
-  disabled.hop.FbmSync.masterEnabled = () => false;
+  datCongTac(disabled.hop, false);
   const blocked = disabled.hop.FbmSync.start({ mode: 'read' });
   check(so, 'cong tac tong tat: GAS khong cap envelope FBM moi', [blocked.ok, blocked.code, blocked.request || null], [false, 'SYNC_DISABLED', null]);
 
@@ -1266,7 +1266,7 @@ async function chay(so) {
     cancelNow.status.phase, cancelState.activeRequestId, JSON.stringify(cancelState.cursor), cancelState.closedRequestId === cancellingStarted.request.id
   ], ['paused', '', '{}', true]);
 
-  const reloaded = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
+  const reloaded = workflowGas();
   const orphan = reloaded.hop.FbmSync.stateRead();
   orphan.runId = 'cancelled-orphan'; orphan.phase = 'checking_session'; orphan.cursor = { kind: 'identity_user_grid' };
   orphan.activeRequestId = 'orphan-request';
@@ -1283,7 +1283,7 @@ async function chay(so) {
   // State do bản cũ ghi (chưa có schemaVersion) mà đang giữa lượt: dù request còn trong hạn, lượt phải dừng và báo chạy lại, dấu chờ đẩy ở khóa riêng còn nguyên.
   for (const [phase, cursorKind] of [['pull_activity', 'activity_grid'], ['awaiting_approval', 'push_plan'], ['push', 'push_wait']]) {
     const nhatKy = [];
-    const cu = workflowGas({ logEvent: (row) => nhatKy.push(row), extraFiles: ['fbm_sync/state/SyncSettings.js'] });
+    const cu = workflowGas({ logEvent: (row) => nhatKy.push(row)});
     const legacy = cu.hop.FbmSync.stateDefault();
     delete legacy.schemaVersion; legacy.version = 1;
     Object.assign(legacy, { runId: 'legacy-run', phase, cursor: { kind: cursorKind }, activeRequestId: 'req-dang-bay', deadlineAt: Date.now() + 60000, updatedAt: Date.now(), startedAt: Date.now() });

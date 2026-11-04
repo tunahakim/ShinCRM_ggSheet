@@ -1,6 +1,7 @@
 /** Kiểm cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng, relay chỉ gọi được lệnh của relay, mã giao thức lệch bị chặn, khóa bận không lọt, `status` chỉ đọc. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }
@@ -8,14 +9,14 @@ function loi(fn) {
 
 async function chay(so) {
   section('FBM sync — cửa lệnh');
-  const { hop, documentProperties, scriptLock } = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
+  const { hop, documentProperties, scriptLock } = workflowGas();
   const FbmSync = hop.FbmSync;
-  FbmSync.setMasterEnabled(true);
+  datCongTac(hop, true);
 
   check(so, 'lệnh không có trong bảng thì từ chối với COMMAND_UNKNOWN, không có nhánh mặc định', [loi(() => FbmSync.controlDispatch('get_master_switch', {})), loi(() => FbmSync.controlDispatch('transport_failure', {})), loi(() => FbmSync.controlDispatch('', {}))], ['COMMAND_UNKNOWN', 'COMMAND_UNKNOWN', 'COMMAND_UNKNOWN']);
   check(so, 'relay chỉ được gọi heartbeat và continue', Object.keys(FbmSync.COMMANDS).filter((name) => FbmSync.relayCommandAllowed(name)).sort(), ['continue', 'heartbeat']);
   check(so, 'loại lượt lạ của lệnh start thì từ chối', loi(() => FbmSync.controlDispatch('start', { kind: 'bulk', machineId: 'may-A' })), 'SYNC_START_KIND_UNKNOWN');
-  check(so, 'mục cài đặt lạ thì từ chối', loi(() => FbmSync.controlDispatch('save_settings', { section: 'all', value: {} })), 'SETTINGS_SECTION_UNKNOWN');
+  check(so, 'phần cài đặt không thuộc đồng bộ FBM thì từ chối', loi(() => FbmSync.controlDispatch('save_settings', { patches: { core_ops: {} } })), 'SETTINGS_SECTION_UNKNOWN');
 
   // Cổng relay: khóa đúng nhưng lệnh ngoài danh sách, mã giao thức lệch hoặc Sheet khác thì ném lỗi có mã trước khi chạm state.
   const contract = FbmSync.protocol.contract;

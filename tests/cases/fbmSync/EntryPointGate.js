@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datCongTac, datNen } = require('../../lib/fbm/cai-dat-thu');
 
 const SECRETS = ['COOKIE_MAU', 'AUTH_KHACH_MAU', 'AUTH_GIAO_DICH_MAU'];
 /** Hàm phải chạy được với ô lượt mẫu, không được phép ném lỗi môi trường giả. */
@@ -16,10 +17,10 @@ function entryPointNames() {
 async function chay(so) {
   section('FBM sync — cửa ra Sidebar và tham số lệnh start');
   const names = entryPointNames();
-  const { hop } = workflowGas({ extraFiles: ['fbm_sync/state/SyncSettings.js'] });
+  const { hop } = workflowGas();
   const seed = () => {
     // Hàm trước có thể đổi công tắc hay để lại request đang bay: dựng lại nền sạch cho mỗi hàm.
-    hop.FbmSync.setMasterEnabled(true); hop.FbmSync.setBackgroundEnabled(true);
+    datCongTac(hop, true); datNen(hop, true);
     const state = hop.FbmSync.stateRead();
     state.session = Object.assign(state.session, { cookie: SECRETS[0], customerAuthorized: SECRETS[1], activityAuthorized: SECRETS[2] });
     state.runId = 'run-mau'; state.origin = 'manual'; state.phase = 'pull_customer'; state.cursor = { kind: 'customer_grid' }; state.activeRequestId = '';
