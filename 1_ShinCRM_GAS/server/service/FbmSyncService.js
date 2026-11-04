@@ -22,6 +22,9 @@ function fbmSetMasterSwitch(enabled) { return fbmCommandRun('fbmSetMasterSwitch'
 function fbmSaveIdentityBinding(binding) { return fbmCommandRun('fbmSaveIdentityBinding', 'save_identity_binding', { binding: binding || {} }); }
 function fbmSaveConnection(config) { return fbmCommandRun('fbmSaveConnection', 'save_credential', config || {}); }
 function fbmRepairLoginUsername(input) { return fbmCommandRun('fbmRepairLoginUsername', 'repair_login_username', input || {}); }
+/** Giao máy Sidebar đang mở chạy đồng bộ nền: `input` là `{ machineId, name }`, mã do Extension máy đó sinh. */
+function fbmAssignBackgroundMachine(input) { return fbmCommandRun('fbmAssignBackgroundMachine', 'assign_background_machine', input || {}); }
+function fbmReleaseBackgroundMachine() { return fbmCommandRun('fbmReleaseBackgroundMachine', 'release_background_machine', {}); }
 function fbmGetRelayConfig() { return fbmCommandRun('fbmGetRelayConfig', 'relay_config', {}); }
 function fbmRotateRelayKey() { return fbmCommandRun('fbmRotateRelayKey', 'relay_rotate_key', {}); }
 function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return fbmCommandRun('fbmLogRelaySwitchDecision', 'relay_switch_log', { decision: decision, fromSpreadsheetId: fromSpreadsheetId }); }

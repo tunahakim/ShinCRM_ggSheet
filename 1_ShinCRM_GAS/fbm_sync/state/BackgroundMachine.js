@@ -73,8 +73,8 @@ FbmSync.MACHINE_REFUSED_TEXT = {
 FbmSync.machineView = function (machine, now, silentMinutes, backgroundOn) {
   var silent = FbmSync.machineSilent(machine, now, silentMinutes), notice = null;
   var takeoverRecent = !!machine.takeover && Number(now) - machine.takeover.at < Number(SETTINGS.FBM_MACHINE_TAKEOVER_NOTICE_HOURS) * 3600000;
-  if (backgroundOn && !machine.machineId) { notice = { code: 'MACHINE_NOT_ASSIGNED', text: 'Đồng bộ nền đang bật nhưng chưa giao máy nào chạy nền nên chưa máy nào chạy.' }; }
-  else if (backgroundOn && silent) { notice = { code: 'MACHINE_SILENT', text: 'Máy chạy nền "' + machine.name + '" không hỏi GAS quá ' + silentMinutes + ' phút; đồng bộ nền đang không chạy.' }; }
-  else if (takeoverRecent) { notice = { code: 'BACKGROUND_MACHINE_TAKEOVER', text: 'Máy "' + machine.name + '" đã tự nhận chạy nền thay máy "' + machine.takeover.fromName + '" (máy đó im quá ngưỡng).' }; }
+  if (backgroundOn && !machine.machineId) { notice = { code: 'MACHINE_NOT_ASSIGNED', level: 'warning', text: 'Đồng bộ nền đang bật nhưng chưa giao máy nào chạy nền nên chưa máy nào chạy.' }; }
+  else if (backgroundOn && silent) { notice = { code: 'MACHINE_SILENT', level: 'warning', text: 'Máy chạy nền "' + machine.name + '" không hỏi GAS quá ' + silentMinutes + ' phút; đồng bộ nền đang không chạy.' }; }
+  else if (takeoverRecent) { notice = { code: 'BACKGROUND_MACHINE_TAKEOVER', level: 'info', text: 'Máy "' + machine.name + '" đã tự nhận chạy nền thay máy "' + machine.takeover.fromName + '" (máy đó im quá ngưỡng).' }; }
   return { assigned: !!machine.machineId, machineId: machine.machineId, name: machine.name, assignedAt: machine.assignedAt, lastAskAt: machine.lastAskAt, silent: silent, silentMinutes: Number(silentMinutes), takeover: machine.takeover, notice: notice };
 };
