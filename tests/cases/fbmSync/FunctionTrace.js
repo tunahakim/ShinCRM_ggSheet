@@ -124,7 +124,7 @@ function chay(so) {
     [nemNen, nenHb.nen.FbmSync.stateRead().phase], ['Lỗi lát nền', 'error']);
 
   const client = dungState();
-  napServer(client.nen, 'fbm_sync/report/Report.js');
+  napServer(client.nen, 'fbm_sync/report/Report.js', 'server/log/ClientError.js');
   client.nen.FbmSync.statusView = () => ({ phase: client.nen.FbmSync.stateRead().phase, lastError: client.nen.FbmSync.stateRead().lastError });
   const maPhien = String(client.nen.FbmSync.stateRead().runId || '');
   const truocLa = client.dong.length;

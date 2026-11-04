@@ -22,6 +22,7 @@ const NHOM_CA = [
   require('./cases/settings'),
   require('./cases/logMask'),
   require('./cases/logGate'),
+  require('./cases/clientError'),
   require('./cases/entryPoint'),
   require('./cases/triggerSetup'),
   require('./cases/noticeGate'),
