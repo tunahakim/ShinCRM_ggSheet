@@ -28,7 +28,7 @@ function fbmSyncCorruptBlocks(sections) {
   return blocks;
 }
 function fbmSyncSetSettingsNotice(scope, kind, message) {
-  var allowed = ['module', 'relay', 'extension', 'background', 'login'];
+  var allowed = ['module', 'relay', 'extension', 'background', 'machine', 'login'];
   if (allowed.indexOf(scope) < 0) { return null; }
   FBM_SYNC_CLIENT.settingsNotices = FBM_SYNC_CLIENT.settingsNotices || {};
   var notice = { kind: kind || 'info', message: String(message || '') };
@@ -37,8 +37,9 @@ function fbmSyncSetSettingsNotice(scope, kind, message) {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId] && document.getElementById(targetId)) { fbmSyncRenderTarget(targetId, fbmSyncSettingsNoticeBlocks(scope)); }
   return notice;
 }
+/** Chữ của lượt nền (GAS đánh dấu bằng `origin`) hiện ở card lịch nền để người dùng thấy lịch vừa chạy gì. */
 function fbmSyncSettingsSchedulerNotice(status) {
-  if (!status || !status.message || (!status.scheduledScan && status.origin !== 'background' && String(status.message).indexOf(FBM_SYNC_SETTINGS_SCHEMA.notice.scheduler) < 0 && String(status.message).indexOf(FBM_SYNC_SETTINGS_SCHEMA.notice.heartbeat) < 0)) { return null; }
+  if (!status || !status.message || status.origin !== 'background') { return null; }
   return { kind: status.phase === 'error' ? FBM_SYNC_SETTINGS_SCHEMA.notice.errorKind : FBM_SYNC_SETTINGS_SCHEMA.notice.infoKind, message: String(status.message) };
 }
 function fbmSyncRelayStateBlocks() {
@@ -72,6 +73,39 @@ function fbmSyncSettingsBackgroundBlocks() {
     processesHelp: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: backgroundSchema.processesHelp }),
     actions: fbmSyncConfigButtonRow('background', { edit: FBM_SYNC_SETTINGS_SCHEMA.background.edit, save: FBM_SYNC_SETTINGS_SCHEMA.background.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.background.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
+}
+/**
+ * Khối máy chạy nền: máy GAS đang giao, lần hỏi cuối, lời báo GAS trả (`backgroundMachine.notice`), nút giao máy này và nút gỡ.
+ * Máy này là máy nào thì hỏi Extension (`fbmSyncLocalMachineLoad`); hỏi không được là máy chưa cài hoặc Extension chưa chạy, báo rõ và khóa nút giao.
+ */
+function fbmSyncSettingsMachineBlocks(status) {
+  var schema = FBM_SYNC_SETTINGS_SCHEMA.machine, machine = status && status.backgroundMachine, local = FBM_SYNC_CLIENT.localMachine || {};
+  var mine = !!machine && !!local.machineId && local.machineId === machine.machineId, busy = FBM_SYNC_CLIENT.machineBusy === true;
+  var notice = fbmSyncSettingsNoticeBlocks('machine');
+  if (machine && machine.notice) { notice.push(Notice({ kind: machine.notice.level, text: machine.notice.text })); }
+  if (local.error) { notice.push(Notice({ kind: FBM_SYNC_SETTINGS_SCHEMA.notice.errorKind, text: schema.noExtension + local.error })); }
+  var state = !machine ? [Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: schema.loading })]
+    : !machine.assigned ? [Text({ text: schema.none })]
+    : [Text({ text: schema.nameLabel + machine.name + (mine ? schema.thisMachine : '') }), Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: schema.lastAskLabel + (machine.lastAskAt ? fieldLogicNow(new Date(machine.lastAskAt)) : schema.lastAskNever) })];
+  return FBM_SYNC_SETTINGS_UI.layout.machine({
+    notice: notice,
+    state: state,
+    help: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: schema.help }),
+    actions: [
+      Button({ id: schema.assignId, label: schema.assign, className: uiResolveActionClass('edit', 'button'), disabled: busy || mine || !local.machineId }),
+      Button({ id: schema.releaseId, label: schema.release, className: uiResolveActionClass('cancel', 'button'), disabled: busy || !(machine && machine.assigned) })
+    ]
+  });
+}
+function fbmSyncSettingsMachineCard(status) {
+  return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.machine, [], fbmSyncSettingsMachineBlocks(status));
+}
+/** Vẽ lại riêng khối máy nền (mã máy Extension vừa đọc xong, lệnh giao/gỡ đang chạy); màn khác đang mở thì thôi. */
+function fbmSyncSettingsMachineRepaint() {
+  var regionId = FBM_SYNC_SETTINGS_SCHEMA.regions.machine;
+  if (typeof RENDER_INDEX === 'undefined' || !RENDER_INDEX.nodes[regionId] || !document.getElementById(regionId)) { return false; }
+  fbmSyncRenderTarget(regionId, [fbmSyncSettingsMachineCard(FBM_SYNC_CLIENT.lastStatus)]);
+  return true;
 }
 function fbmSyncSettingsLoginBlocks(loginPolicy) {
   loginPolicy = fbmSyncConfigDraft('loginPolicy', loginPolicy || {});
@@ -140,6 +174,7 @@ function fbmSyncSettingsScopeLinesText(lines) {
   }).join('\n');
 }
 function fbmSyncRenderSettings(panel, status) {
+  fbmSyncLocalMachineLoad();
   var loginPolicy = fbmSyncSettingsSection('fbm_login_policy') || {};
   var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
   return fbmSyncAppendBox(panel, FBM_SYNC_SETTINGS_UI.rootClass, FBM_SYNC_SETTINGS_SCHEMA.rootId, FBM_SYNC_SETTINGS_UI.layout.screen({
@@ -147,6 +182,7 @@ function fbmSyncRenderSettings(panel, status) {
     relay: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.relay, FBM_SYNC_SETTINGS_UI.layout.relayCard(fbmSyncConfigTitleActions('relay'), fbmSyncSettingsNoticeBlocks('relay'), fbmSyncRelayStateBlocks(), fbmSyncConfigButtonRow('relay', { edit: FBM_SYNC_SETTINGS_SCHEMA.relay.edit, save: FBM_SYNC_SETTINGS_SCHEMA.relay.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.relay.rotateId, disabled: !!FBM_SYNC_CLIENT.running }))),
     extension: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.extension, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks())),
     background: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.background, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks())),
+    machine: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.machine, fbmSyncSettingsMachineCard(status)),
     loginPolicy: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(loginPolicy)))
   }).elements);
 }
@@ -209,6 +245,7 @@ function fbmSyncPatchSettings(panel, status) {
   fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.backgroundNotice, fbmSyncSettingsNoticeBlocks('background', schedulerNotice));
   fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.loginNotice, fbmSyncSettingsNoticeBlocks('login'));
   fbmSyncRenderTarget(FBM_SYNC_SETTINGS_SCHEMA.regions.relayState, fbmSyncRelayStateBlocks());
+  fbmSyncSettingsMachineRepaint();
   return true;
 }
 </script>

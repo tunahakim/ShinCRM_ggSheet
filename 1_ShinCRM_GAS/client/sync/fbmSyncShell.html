@@ -167,6 +167,7 @@ function fbmSyncToggleMaster() {
   var ticket = fbmSyncStatusTicket();
   return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không đổi được công tắc đồng bộ.'); }
+    fbmSyncExtensionWakeConfig();
     return fbmSyncStatusFromResult(result, ticket);
   }).catch(function (error) {
     var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled });

@@ -153,6 +153,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── fbmSyncUiSchema.html   Compatibility bridge cho renderer Sync cũ; schema màn hình nằm ở client\schema\sync\.
 │   │   ├── fbmSyncConfigEditor.html Điều phối trạng thái xem/sửa, bản nháp và action dùng chung cho card cấu hình FBM.
 │   │   ├── fbmSyncShell.html      Shell header, menu nội bộ, công tắc tổng và kiểu bố cục module.
+│   │   ├── fbmSyncMachine.html    Máy chạy nền phía Sidebar: mã máy Extension, lệnh giao/gỡ máy, đánh thức Extension khi cài đặt đổi, lời báo máy nền.
 │   │   ├── screens\\account.html   Màn Tài khoản FBM, nhận diện, auto-login và relay.
 │   │   ├── screens\\run.html       Màn Chạy đồng bộ, dropdown hướng dữ liệu và pipeline.
 │   │   ├── screens\\results.html   Màn Kết quả & xử lý, tab tổng hợp/xung đột/nghiệm thu.
@@ -311,6 +312,7 @@ tests\
 │   │   ├── nap-sidebar.js        Nạp tệp client theo thứ tự include() của client/Sidebar.html; tệp ngoài Sidebar thì nổ.
 │   │   ├── hop-lien-ket.js       Hộp cho tầng liên kết client/link: đồng hồ, hẹn giờ, DOM giả, callServer trả ngay.
 │   │   ├── fbm-cai-dat.js        Gói cài đặt FBM đúng dạng GAS trả cho Sidebar, dùng chung cho test màn đồng bộ.
+│   │   ├── bo-dong-bo.js         Sidebar Đồng bộ FBM thật trong hộp cát với DOM giả, renderer giả và đồng hồ giả không tự nổ.
 │   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
@@ -429,6 +431,7 @@ tests\
     │   ├── SiteAccess.js           Kiểm Extension chỉ hỏi Chrome quyền trang khi nạp script vào tab FBM hoặc gọi GAS đã hỏng, và báo mã riêng nêu tên trang bị chặn.
     │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
+    │   ├── SidebarMachine.js       Kiểm khối máy chạy nền ở Cài đặt phiên, lệnh giao/gỡ máy, đánh thức Extension lý do config, lời báo máy nền và nhịp hỏi GAS khi máy không chở lượt.
     │   ├── EntryPointGate.js       Kiểm cửa ra của mọi hàm fbm* về Sidebar không mang cookie/token phiên, và lệnh start giữ nguyên identity nháp của Kiểm liên kết.
     │   ├── StaticRules.js          Quét mã FBM theo quy tắc kiến trúc cứng (state, lỗi im lặng, typeof hàm, phase, DocumentProperties, popup, kind, số cứng, logEvent, baseline) với danh sách ngoại lệ chỉ được co lại.
     │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.

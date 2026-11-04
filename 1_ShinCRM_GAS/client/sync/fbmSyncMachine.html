@@ -1,0 +1,71 @@
+<script>
+/*
+ * Máy chạy nền phía Sidebar: đọc mã máy của Extension máy này, gửi lệnh giao/gỡ máy chạy nền, đánh thức Extension khi cài đặt đổi và đưa lời báo máy nền của GAS vào thông báo chung.
+ * GAS quyết máy nào chạy nền và khi nào báo; tệp này chỉ chuyển lệnh của người dùng và hiện điều GAS trả.
+ */
+/** Tên máy gửi kèm lệnh giao: loại máy theo trình duyệt cộng sáu ký tự cuối mã máy, đủ để người dùng nhận ra máy ở màn này và trong Log. */
+function fbmSyncMachineName(machineId) {
+  var schema = FBM_SYNC_SETTINGS_SCHEMA.machine, agent = String(navigator.userAgent || '');
+  var platform = schema.platforms.filter(function (item) { return agent.indexOf(item.match) >= 0; })[0];
+  return (platform ? platform.label : schema.platformUnknown) + ' · ' + String(machineId).slice(-6);
+}
+/** Mã máy của Extension máy này, hỏi một lần mỗi lần mở màn đồng bộ. Hỏi không được thì giữ chữ lỗi để khối máy nền báo máy chưa cài hoặc Extension chưa chạy. */
+function fbmSyncLocalMachineLoad() {
+  if (FBM_SYNC_CLIENT.localMachine) { return FBM_SYNC_CLIENT.localMachine.flight || Promise.resolve(FBM_SYNC_CLIENT.localMachine); }
+  var flight = fbmSyncExtensionRpc('CRM_FBM_MACHINE_ID', {}, 'đọc mã máy').then(function (machine) {
+    return { machineId: String(machine && machine.machineId || ''), error: '' };
+  }, function (error) {
+    return { machineId: '', error: String(error && error.message || error) };
+  }).then(function (local) {
+    FBM_SYNC_CLIENT.localMachine = local;
+    fbmSyncSettingsMachineRepaint();
+    return local;
+  });
+  FBM_SYNC_CLIENT.localMachine = { machineId: '', error: '', flight: flight };
+  return flight;
+}
+/**
+ * Cài đặt đồng bộ vừa đổi (lưu cài đặt, công tắc tổng, giao máy nền): Extension máy này có thể đang tắt chuông vì GAS từng trả lời máy này không chạy nền hoặc nền đang tắt. Đánh thức với lý do `config` để GAS trả nhịp chuông mới. Máy không có Extension thì không có gì để đánh thức.
+ */
+function fbmSyncExtensionWakeConfig() {
+  return fbmSyncLocalMachineLoad().then(function (local) {
+    if (!local.machineId) { return null; }
+    return fbmSyncExtensionWake([], 'config');
+  }).catch(function (error) { fbmSyncLogClientError(error, 'Không đánh thức được Extension nhận cài đặt mới.', 'extension_wake'); });
+}
+/** Lệnh giao hoặc gỡ máy chạy nền: khóa hai nút trong lúc chờ GAS, báo kết quả ở khối máy nền, vẽ status GAS trả. */
+function fbmSyncBackgroundMachineCommand(serverName, args, doneText) {
+  var schema = FBM_SYNC_SETTINGS_SCHEMA.machine, ticket = fbmSyncStatusTicket();
+  FBM_SYNC_CLIENT.machineBusy = true;
+  fbmSyncSettingsMachineRepaint();
+  return callServer(serverName, args).then(function (result) {
+    if (!result || result.ok === false) { throw new Error(result && (result.message || result.error || result.code) || schema.failed); }
+    fbmSyncSetSettingsNotice('machine', 'success', doneText);
+    fbmSyncStatusFromResult(result, ticket);
+    return fbmSyncExtensionWakeConfig();
+  }).catch(function (error) {
+    fbmSyncSetSettingsNotice('machine', 'error', schema.failed + ': ' + String(error && error.message || error));
+    fbmSyncPaintError(error, schema.failed + '.', 'background_machine');
+  }).then(function () {
+    FBM_SYNC_CLIENT.machineBusy = false;
+    fbmSyncSettingsMachineRepaint();
+  });
+}
+/** Nút "Dùng máy này chạy nền": GAS giao máy có mã Extension này; máy này vừa thành máy nền nên đánh thức Extension bật lại chuông. */
+function fbmSyncAssignBackgroundMachine() {
+  var local = FBM_SYNC_CLIENT.localMachine || {};
+  return fbmSyncBackgroundMachineCommand('fbmAssignBackgroundMachine', [{ machineId: local.machineId, name: fbmSyncMachineName(local.machineId) }], FBM_SYNC_SETTINGS_SCHEMA.machine.assigned);
+}
+function fbmSyncReleaseBackgroundMachine() {
+  var confirm = FBM_SYNC_SETTINGS_SCHEMA.machine.releaseConfirm;
+  return uiDecisionOpen(confirm).then(function (go) {
+    return go ? fbmSyncBackgroundMachineCommand('fbmReleaseBackgroundMachine', [], FBM_SYNC_SETTINGS_SCHEMA.machine.released) : null;
+  });
+}
+/** Lời báo máy chạy nền của GAS đi vào thông báo chung của Sidebar để người dùng vẫn thấy sau khi rời màn đồng bộ. Status không mang khối máy nền thì giữ nguyên. */
+function fbmSyncMachineNotice(status) {
+  if (status.backgroundMachine === undefined) { return; }
+  var notice = status.backgroundMachine && status.backgroundMachine.notice;
+  noticeSet('fbmBackgroundMachine', notice ? { line: notice.text, blocks: [{ variant: notice.level === 'info' ? 'normal' : notice.level, title: FBM_SYNC_SETTINGS_SCHEMA.cards.machine, lines: [notice.text], hint: FBM_SYNC_SETTINGS_SCHEMA.machine.noticeHint }] } : null);
+}
+</script>

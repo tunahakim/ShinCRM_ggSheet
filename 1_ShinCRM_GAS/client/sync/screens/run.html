@@ -75,8 +75,14 @@ function fbmSyncRunScopeBlocks() {
   if (settings.scopeLimited === false || !Array.isArray(settings.scopeCodes)) { return []; }
   return [Notice({ kind: 'warning', text: settings.scopeCodes.length ? schema.on + settings.scopeCodes.join(', ') + '.' : schema.empty })];
 }
+/** Lời báo máy chạy nền GAS trả (chưa giao máy, máy giao im quá ngưỡng, máy vừa tự nhận) kèm nút mở thẳng khối máy nền ở Cài đặt phiên. */
+function fbmSyncRunMachineBlocks(status) {
+  var notice = status && status.backgroundMachine && status.backgroundMachine.notice, schema = FBM_SYNC_RUN_SCHEMA.machine;
+  if (!notice) { return []; }
+  return [Notice({ kind: notice.level, text: notice.text }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.settingsId, label: schema.settings, className: uiResolveActionClass('edit', 'button'), data: { 'sync-screen': 'settings', 'sync-settings-target': 'machine' } }))];
+}
 function fbmSyncRunDetailsBlocks(status) {
-  var reset = fbmSyncRunScopeBlocks().concat(fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));
+  var reset = fbmSyncRunScopeBlocks().concat(fbmSyncRunMachineBlocks(status), fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));
   if (!fbmSyncRunHasSnapshot(status)) { return reset; }
   var awaiting = status.phase === 'awaiting_approval';
   return reset.concat(awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
