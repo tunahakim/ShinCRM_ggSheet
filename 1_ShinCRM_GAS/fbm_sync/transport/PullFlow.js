@@ -500,7 +500,7 @@ FbmSync.continueStep = function (rawResponse) {
       if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, pageMissing ? 'session_probe_page_missing' : gridMismatch ? 'session_probe_mismatch' : 'session_probe_page_mismatch'); }
       return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
     }
-    FbmSync.sessionIdentityVerify(state, probedIdentity);
+    FbmSync.sessionVerifiedApply(state, probedIdentity);
     if (state.scan === 'identity_probe') {
       state.metadata = state.metadata || {};
       state.metadata.identityProbe = probedRuntime;

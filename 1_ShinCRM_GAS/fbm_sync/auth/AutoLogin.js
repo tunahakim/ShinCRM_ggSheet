@@ -53,18 +53,8 @@ FbmSync.loginConfigRepairUsername = function (input) {
 /* Xóa credential cũ nhưng giữ nguyên chính sách retry/auto-open; đổi identity không được dùng lại mật khẩu A. */
 FbmSync.loginConfigClearCredential = function () {
   var current = FbmSync.loginConfigRead(), saved = {
-    enabled: false,
-    autoOpenTab: current.autoOpenTab === true,
-    retryEnabled: current.retryEnabled !== false,
-    retryMinutes: Number(current.retryMinutes || 30),
-    configured: false,
-    credentialRef: '',
-    envelope: null,
-    public: {},
-    lastAttemptAt: Number(current.lastAttemptAt || 0),
-    lastLoginAt: Number(current.lastLoginAt || 0),
-    nextRetryAt: 0,
-    lastError: ''
+    enabled: false, autoOpenTab: current.autoOpenTab === true, retryEnabled: current.retryEnabled !== false, retryMinutes: Number(current.retryMinutes || 30),
+    configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: 0, lastError: ''
   };
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(saved));
   return FbmSync.loginConfigPublic();
@@ -102,11 +92,11 @@ FbmSync.autoLoginAttemptOptions = function (state, cursor) {
 
 FbmSync.autoLoginCanAttempt = function (now, options) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED' }; }
+  if (!FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED' }; }
   if (!value.enabled || !value.configured) { return { ok: false, code: 'AUTO_LOGIN_NOT_CONFIGURED' }; }
   // Chặn cả lượt người dùng bấm: mỗi lần bấm Đồng bộ là một lần gửi lại mật khẩu FBM đã báo sai, đủ nhiều lần là khóa tài khoản.
   if (value.loginHalted) { return { ok: false, code: 'AUTO_LOGIN_HALTED' }; }
-  // Chu kỳ chờ chỉ áp sau lần thử chưa thành công (tài liệu 06): lần trước đăng nhập được mà phiên rơi sau đó thì phải được đăng nhập lại ngay.
+  // Chu kỳ chờ chỉ áp sau lần thử chưa thành công (tài liệu 06); phiên xác minh được thì khóa đã gỡ.
   if (options && options.manual === true) { return { ok: true, credentialRef: value.credentialRef }; }
   var last = Number(value.lastAttemptAt || 0), lastFailed = last > 0 && Number(value.lastLoginAt || 0) < last;
   if (!value.retryEnabled && lastFailed) { return { ok: false, code: 'AUTO_LOGIN_RETRY_DISABLED' }; }
@@ -132,9 +122,10 @@ FbmSync.autoLoginBlockMessage = function (code, blocked) {
   return messages[String(code || '')] || messages.AUTO_LOGIN_NOT_CONFIGURED;
 };
 
+/** Lý do đường truyền ghi sẵn lúc thử: lượt hỏng giữa đường không về tới bước ghi lý do mà khóa chờ đã đặt. FBM trả lời thì ghi đè. */
 FbmSync.autoLoginMarkAttempt = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
-  value.lastAttemptAt = at;
+  value.lastAttemptAt = at; value.lastError = FbmSync.LOGIN_REPLIES.transport.text;
   value.nextRetryAt = at + Math.max(1, Number(value.retryMinutes || 30)) * 60 * 1000;
   FbmSync.props().setProperty(FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY, String(at));
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
@@ -143,12 +134,17 @@ FbmSync.autoLoginMarkAttempt = function (now) {
 
 FbmSync.autoLoginMarkSuccess = function (now) {
   var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
-  value.lastLoginAt = at;
-  value.nextRetryAt = 0;
-  value.lastError = '';
-  value.loginHalted = false;
+  value.lastLoginAt = at; value.nextRetryAt = 0; value.lastError = ''; value.loginHalted = false;
   FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
   return at;
+};
+
+/** Bước duy nhất đánh dấu phiên đã xác minh đúng tài khoản (sau đăng nhập, đầu lượt). Phiên chạy được là bằng chứng mới nhất nên gỡ mọi khóa, kể cả sai mật khẩu (có thể đã đổi trên FBM). Chỉ ghi khi đang khóa. */
+FbmSync.sessionVerifiedApply = function (state, identity) {
+  FbmSync.sessionIdentityVerify(state, identity);
+  var value = FbmSync.loginConfigRead();
+  if (Number(value.lastAttemptAt || 0) > Number(value.lastLoginAt || 0) || value.loginHalted || String(value.lastError || '')) { FbmSync.autoLoginMarkSuccess(); }
+  return state;
 };
 
 /** `halt`: FBM đã trả lời từ chối mà thử lại cũng không khá hơn (sai mật khẩu, câu trả lời chưa gặp), nên ngừng tự đăng nhập tới khi lưu lại thông tin hoặc đăng nhập thử được (09/01 "Ba kết quả của một lượt đăng nhập"). */
@@ -199,7 +195,7 @@ FbmSync.loginForceRequest = function () {
   var state = FbmSync.stateRead(), saved = FbmSync.loginConfigRead();
   if (state.loginForceOffered !== true) { return { ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'Chỉ hủy phiên cũ được ngay sau khi FBM vừa từ chối đăng nhập.' }; }
   if (!saved.configured || !saved.credentialRef) { return { ok: false, code: 'LOGIN_CREDENTIAL_REF_INVALID', message: 'Chưa có thông tin đăng nhập đã lưu để đăng nhập.' }; }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'login_force_requested', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { runId: String(state.runId || '') } }); }
+  logEvent({ source: 'fbm_sync', action: 'login_force_requested', outcome: typeof LOG_WARN === 'undefined' ? 'warn' : LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { runId: String(state.runId || '') } });
   return FbmSync.loginTestRequest(saved.credentialRef, null, { force: true });
 };
 
@@ -293,9 +289,9 @@ FbmSync.loginAuthorizeContinue = function (state, cursor, response) {
   var authorized = FbmSync.extractAuthorized(response);
   if (!authorized) {
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'LOGIN_IDENTITY_AUTHORIZE_FAILED'; state.lastError = 'FBM không trả mã xác thực để kiểm tra tài khoản sau đăng nhập.'; state.message = state.lastError; FbmSync.stateWrite(state);
-    // Ghi lý do vào cấu hình đăng nhập để thông báo chờ chu kỳ của lần bấm sau nói được vì sao lần trước hỏng.
-    if (!cursor.testOnly && FbmSync.autoLoginMarkFailure) { FbmSync.autoLoginMarkFailure(state.lastError); }
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure', null, FbmSync.loginResponseFacts(response)); }
+    // Lời báo chờ chu kỳ của lần sau nói được vì sao lần này hỏng.
+    if (!cursor.testOnly) { FbmSync.autoLoginMarkFailure(state.lastError); }
+    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure', null, FbmSync.loginResponseFacts(response));
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   state.session.customerAuthorized = authorized;
@@ -310,7 +306,7 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   if (!identity.ok) {
     FbmSync.sessionIdentityClear(state);
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = identity.code || 'LOGIN_IDENTITY_INCOMPLETE'; state.lastError = identity.message || 'Không đọc đủ nhận diện tài khoản FBM sau đăng nhập.'; state.message = state.lastError; FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure'); }
+    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_failure');
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   var runtime = { spreadsheetId: FbmSync.currentSpreadsheetId(), userId: identity.userId, username: identity.username, accountName: identity.accountName };
@@ -325,41 +321,40 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
   if (pageCheck.status === 'missing') {
     FbmSync.sessionIdentityClear(state);
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'FBM_PAGE_IDENTITY_MISSING'; state.lastError = 'Đăng nhập xong nhưng đã tải lại trang FBM vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản.'; state.message = state.lastError; FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_page_missing'); }
+    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_page_missing');
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   if (pageCheck.status === 'mismatch') { match = { status: 'REBIND_REQUIRED' }; }
   if (match.status !== 'BOUND') {
     FbmSync.sessionIdentityClear(state);
-    if (!cursor.testOnly && FbmSync.loginConfigSetEnabled) { FbmSync.loginConfigSetEnabled(false); }
+    if (!cursor.testOnly) { FbmSync.loginConfigSetEnabled(false); }
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'LOGIN_IDENTITY_MISMATCH'; state.lastError = cursor.testOnly
       ? 'Đăng nhập thử thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận.'
       : 'Đăng nhập thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận; tự động đăng nhập đã được tắt.';
     state.message = state.lastError; FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_mismatch'); }
+    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_mismatch');
     return { ok: false, code: state.lastFailureCode, request: null, identity: runtime, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
-  FbmSync.sessionIdentityVerify(state, identity);
-  // Ghi thành công một lần cho cả ba mục đích (tự động, thử, ép), trước khi rẽ nhánh: đăng nhập được đúng tài khoản là mật khẩu đúng, khóa chờ chống khóa tài khoản không còn lý do giữ.
-  FbmSync.autoLoginMarkSuccess();
+  // Một lần cho cả ba mục đích (tự động, thử, ép), trước khi rẽ nhánh.
+  FbmSync.sessionVerifiedApply(state, identity);
   state.lastFailureCode = '';
   state.lastError = '';
   state.retryable = false;
   if (cursor.purpose === 'force') {
     FbmSync.runClose(state, 'done', { message: 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' }); FbmSync.stateWrite(state);
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: typeof LOG_OK === 'undefined' ? 'ok' : LOG_OK, reason: state.message, detail: { runId: String(state.runId || '') } }); }
+    logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: typeof LOG_OK === 'undefined' ? 'ok' : LOG_OK, reason: state.message, detail: { runId: String(state.runId || '') } });
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
   }
   if (cursor.testOnly || cursor.purpose === 'test') {
     FbmSync.runClose(state, 'done', { message: 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' }); FbmSync.stateWrite(state);
     return { ok: true, code: 'LOGIN_OK', request: null, identity: runtime, status: FbmSync.statusView(), message: state.message };
   }
-  if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'auto_login', 'ok', {}); }
+  FbmSync.businessStepFinish(state, 'auto_login', 'ok', {});
   FbmSync.stateWrite(state);
   var resumed = FbmSync.loginResumeRequest(state);
   if (!resumed) {
     state.phase = 'error'; state.lastFailureCode = 'AUTO_LOGIN_RESUME_FAILED'; state.lastError = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.'; state.message = state.lastError; FbmSync.stateWrite(state);
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_resume_failure'); }
+    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_resume_failure');
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
   return { ok: true, code: cursor.resumeHeartbeat ? 'AUTO_LOGIN_OK' : '', request: resumed, status: FbmSync.statusView() };
@@ -377,7 +372,7 @@ FbmSync.beginAutoLogin = function (state, failedCursor, options) {
   FbmSync.autoLoginMarkAttempt();
   state.cursor = { kind: 'login', credentialRef: allowed.credentialRef, purpose: 'auto', manual: attempt.manual, resumeCursor: Object.assign({}, resumeCursor), resumePhase: String(gate.resumePhase || state.phase || ''), resumeEntity: String(gate.resumeEntity || state.entity || ''), resumeHeartbeat: opt.heartbeat === true || resumeCursor.kind === 'heartbeat' };
   state.phase = 'checking_session'; state.entity = ''; state.session.expired = true; state.message = 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...'; state.lastFailureCode = 'AUTO_LOGIN_STARTED';
-  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'auto_login', { mode: state.mode, scan: state.scan }); }
+  FbmSync.businessStepStart(state, 'auto_login', { mode: state.mode, scan: state.scan });
   FbmSync.sessionIdentityClear(state);
   FbmSync.stateWrite(state);
   return FbmSync.sessionSystemRequest('login', { credentialRef: allowed.credentialRef, testOnly: false });
