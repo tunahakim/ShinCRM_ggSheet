@@ -3,6 +3,8 @@ const NHOM = [
   require("./fbmSync/Control"),
   require("./fbmSync/CommandResults"),
   require("./fbmSync/RunPickup"),
+  require("./fbmSync/Heartbeat"),
+  require("./fbmSync/RunGuards"),
   require("./fbmSync/Run"),
   require("./fbmSync/Slice"),
   require("./fbmSync/RelayResubmit"),

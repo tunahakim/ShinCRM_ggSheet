@@ -423,6 +423,8 @@ tests\
     │   ├── Run.js                  Kiểm `state/Run.js` và `state/RunStop.js`: nhãn lượt, Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
     │   ├── Slice.js                Kiểm `state/Slice.js`: hai công cụ sửa hai trường trong một lát đều còn, ghi kho một lần, bản khác bị chặn `SLICE_FOREIGN_STATE`, lỗi giữa lát, ghi kho hỏng, lát lồng.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
+    │   ├── Heartbeat.js            Kiểm lần hỏi GAS của Extension theo bảng quyết nhịp nền: công tắc tắt, máy không được giao tắt chuông, chỉ kiểm, lượt bận, lượt bỏ dở kèm hộp đen, tự nhận máy nền, sổ tiến trình khi lượt nền đóng.
+    │   ├── RunGuards.js            Kiểm rào ô lượt dùng chung: câu hộp đen Extension, nhãn lượt trong Log theo tiến trình nền, RUN_LEFT_OPEN, dừng lượt nền và response đến muộn, pha "đang chạy".
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
     │   ├── SiteAccess.js           Kiểm Extension chỉ hỏi Chrome quyền trang khi nạp script vào tab FBM hoặc gọi GAS đã hỏng, và báo mã riêng nêu tên trang bị chặn.
     │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
