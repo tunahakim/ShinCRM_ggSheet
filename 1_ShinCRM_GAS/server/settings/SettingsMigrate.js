@@ -14,14 +14,14 @@ var SETTINGS_MIGRATE_PARAMS = {
   FBM_VERIFY_STATUS_DEFAULT: { section: 'defaults_fbm_pull', entity: 'customer', field: 'verifyStatus' }
 };
 
-/** Tham số FBM đời cũ: `fbm_sync` đã chuyển chúng vào DocumentProperties riêng từ trước, nên chỉ bỏ qua được khi khóa của FBM đã có; chưa có thì chặn để không mất giá trị. `FBM_SPREADSHEET_ID` là phép đối chiếu đã bỏ. */
+/** Tham số FBM đời cũ: `fbm_sync` đã chuyển chúng vào DocumentProperties riêng từ trước (khóa riêng đời cũ, hoặc phần cài đặt FBM sau khi chạy `fbmSettingsMigrate`), nên chỉ bỏ qua được khi một trong các khóa đó đã có; chưa có thì chặn để không mất giá trị. `FBM_SPREADSHEET_ID` là phép đối chiếu đã bỏ. */
 var SETTINGS_MIGRATE_FBM_LEGACY = {
-  FBM_SYNC_APPROVAL_THRESHOLD: 'FBM_SYNC_SETTINGS_V1',
-  FBM_MA_KH_PREFIX: 'FBM_ACCOUNT_SETTINGS_V1',
-  FBM_MA_KH_TIEN_TO: 'FBM_ACCOUNT_SETTINGS_V1',
-  FBM_MA_KH_LENGTH: 'FBM_ACCOUNT_SETTINGS_V1',
-  FBM_MA_KH_DO_DAI: 'FBM_ACCOUNT_SETTINGS_V1',
-  FBM_SPREADSHEET_ID: ''
+  FBM_SYNC_APPROVAL_THRESHOLD: ['FBM_SYNC_SETTINGS_V1', 'SETTINGS:fbm_run'],
+  FBM_MA_KH_PREFIX: ['FBM_ACCOUNT_SETTINGS_V1', 'SETTINGS:fbm_account'],
+  FBM_MA_KH_TIEN_TO: ['FBM_ACCOUNT_SETTINGS_V1', 'SETTINGS:fbm_account'],
+  FBM_MA_KH_LENGTH: ['FBM_ACCOUNT_SETTINGS_V1', 'SETTINGS:fbm_account'],
+  FBM_MA_KH_DO_DAI: ['FBM_ACCOUNT_SETTINGS_V1', 'SETTINGS:fbm_account'],
+  FBM_SPREADSHEET_ID: []
 };
 
 /** Công cụ đọc: cả sheet `Config` thành các cặp cột theo mã hàng 1. Trả `{ pairs(keyCode, valueCode) → [[khóa, giá trị]] }` theo thứ tự hàng. */
@@ -75,9 +75,9 @@ function settingsMigratePlan(config, storedKeys) {
     if (target) { plan.sections[target.section][target.field] = name === 'LOG_TRACE' && !value ? 'off' : value; return; }
     if (counterOf[name]) { if (value) { plan.counters[counterOf[name]] = value; } return; }
     if (Object.prototype.hasOwnProperty.call(SETTINGS_MIGRATE_FBM_LEGACY, name)) {
-      var fbmKey = SETTINGS_MIGRATE_FBM_LEGACY[name];
-      if (!value || !fbmKey || storedKeys[fbmKey]) { plan.ignored.push(name + (value ? ' = "' + value + '"' : '') + (fbmKey ? ' (FBM đã lưu cài đặt riêng)' : ' (đã bỏ)')); return; }
-      plan.problems.push('Tham số FBM ' + name + ' = "' + value + '" chưa được chuyển sang cài đặt FBM (' + fbmKey + '): mở Cài đặt phiên FBM lưu một lần rồi chạy lại.');
+      var fbmKeys = SETTINGS_MIGRATE_FBM_LEGACY[name];
+      if (!value || !fbmKeys.length || fbmKeys.some(function (key) { return storedKeys[key]; })) { plan.ignored.push(name + (value ? ' = "' + value + '"' : '') + (fbmKeys.length ? ' (FBM đã lưu cài đặt riêng)' : ' (đã bỏ)')); return; }
+      plan.problems.push('Tham số FBM ' + name + ' = "' + value + '" chưa được chuyển sang cài đặt FBM (' + fbmKeys.join(' hoặc ') + '): mở Cài đặt phiên FBM lưu một lần rồi chạy lại.');
       return;
     }
     if (value) { plan.problems.push('Tham số lạ ' + name + ' = "' + value + '": không biết chuyển đi đâu.'); }
@@ -123,10 +123,8 @@ function settingsMigrateFromConfig() {
     }
 
     documentLockRun(function () {
-      Object.keys(checked).forEach(function (name) {
-        var saved = settingsSave(name, checked[name]);
-        if (!saved.ok) { throw new Error('Lưu phần ' + name + ' không đạt: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
-      });
+      var saved = settingsSave(checked);
+      if (!saved.ok) { throw new Error('Lưu cài đặt không đạt: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
       Object.keys(plan.counters).forEach(function (entity) { idGateAdoptCounter(entity, plan.counters[entity]); });
     });
 

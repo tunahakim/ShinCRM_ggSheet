@@ -5,22 +5,41 @@
  */
 
 /**
- * Lưu một phần cài đặt: trong một lần cầm khóa tài liệu thì đọc giá trị đang lưu, phủ phần thay đổi, đọc Category khi phần cần, kiểm, ghi, rồi phát tín hiệu nạp lại `config` qua hậu xử lý chung của mọi lượt ghi.
+ * Lưu một hay nhiều phần cài đặt trong một gói `{ tên phần: phần thay đổi }`: trong một lần cầm khóa tài liệu thì đọc giá trị đang lưu của từng phần, phủ phần thay đổi, đọc Category một lần khi có phần cần, kiểm hết mọi phần, rồi mới ghi. Một phần không đạt thì cả gói không ghi gì, nên không có nửa gói đã lưu.
  *
- * Trả `{ ok: true, values }` hoặc `{ ok: false, problems }` (không ghi gì). Không đạt không phải lỗi hệ thống: bên gọi hiện từng dòng cho người dùng sửa.
+ * Trả `{ ok: true, values: { tên phần: giá trị } }` hoặc `{ ok: false, problems }` (mỗi dòng `{ section, field, label, reason }`). Không đạt không phải lỗi hệ thống: bên gọi hiện từng dòng cho người dùng sửa. Phần có `sidebarConfig` nằm trong gói `config` của Sidebar nên lưu xong phát tín hiệu nạp lại qua hậu xử lý chung.
  */
-function settingsSave(sectionName, patch) {
-  var section = settingsSection(sectionName);
+function settingsSave(patches) {
+  var sections = Object.keys(patches || {}).map(settingsSection);
+  if (!sections.length) { throw new Error('settingsSave cần ít nhất một phần cài đặt.'); }
+  var reload = sections.some(function (section) { return section.sidebarConfig === true; });
   // Thiếu hậu xử lý nạp lại thì dừng trước khi ghi, để không có cài đặt đã lưu mà Sidebar không được báo.
-  writeCommitAssertAvailable();
+  if (reload) { writeCommitAssertAvailable(); }
   return documentLockRun(function () {
-    var values = Object.assign(settingsRead(section), patch || {});
-    var checked = settingsValidate(section, values, settingsNeedsCategory(section) ? { category: categoryReadAll() } : {});
-    if (!checked.ok) { return { ok: false, problems: checked.problems }; }
-    settingsWrite(section, checked.values);
-    writeCommitAfterSuccess({ source: 'user', surface: 'config', entity: 'config' });
-    return { ok: true, values: checked.values };
+    var category = null, values = {}, problems = [];
+    sections.forEach(function (section) {
+      var needsCategory = settingsNeedsCategory(section);
+      if (needsCategory && !category) { category = categoryReadAll(); }
+      var checked = settingsValidate(section, Object.assign(settingsRead(section), patches[section.name] || {}), needsCategory ? { category: category } : {});
+      checked.problems.forEach(function (p) { problems.push(Object.assign({ section: section.name }, p)); });
+      values[section.name] = checked.values;
+    });
+    if (problems.length) { return { ok: false, problems: problems }; }
+    sections.forEach(function (section) { settingsWrite(section, values[section.name]); });
+    if (reload) { writeCommitAfterSuccess({ source: 'user', surface: 'config', entity: 'config' }); }
+    return { ok: true, values: values };
   }, 'Đang có thao tác khác giữ khóa tệp; thử lưu cài đặt lại sau ít giây.');
+}
+
+/** Đặt một phần về mặc định (xóa khóa): lối thoát khi khóa hỏng. Trong khóa tài liệu như mọi lần ghi cài đặt. */
+function settingsReset(sectionName) {
+  var section = settingsSection(sectionName);
+  if (section.sidebarConfig === true) { writeCommitAssertAvailable(); }
+  return documentLockRun(function () {
+    settingsClear(section);
+    if (section.sidebarConfig === true) { writeCommitAfterSuccess({ source: 'user', surface: 'config', entity: 'config' }); }
+    return { ok: true, section: section.name };
+  }, 'Đang có thao tác khác giữ khóa tệp; thử đặt lại cài đặt sau ít giây.');
 }
 
 /**
@@ -98,7 +117,7 @@ function shinLogTraceOff() {
   return runEntryPoint('shinLogTraceOff', 'core', function () {
     var patch = {};
     patch[LOG_TRACE_SETTING] = 'off';
-    var saved = settingsSave('core_ops', patch);
+    var saved = settingsSave({ core_ops: patch });
     if (!saved.ok) { throw new Error('Không tắt được LOG_TRACE: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
     settingsLogTraceNotice('off');
     return saved;

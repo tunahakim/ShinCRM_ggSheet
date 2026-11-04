@@ -82,7 +82,7 @@ FbmSync.connectionSave = function (input) {
     var loginResult;
     if (mode === 'save') {
       if (typeof FbmSync.loginConfigSave !== 'function') { throw new Error('Kho credential chưa được nạp.'); }
-      loginResult = FbmSync.loginConfigSave({ enabled: credential.enabled !== false, credentialRef: credential.credentialRef, envelope: credential.envelope, public: credential.public || {} });
+      loginResult = FbmSync.loginConfigSave({ credentialRef: credential.credentialRef, envelope: credential.envelope, public: credential.public || {} });
       if (!loginResult || loginResult.ok === false) { throw new Error(loginResult && (loginResult.message || loginResult.code) || 'Không lưu được credential.'); }
     } else if (mode === 'clear' && typeof FbmSync.loginConfigClearCredential === 'function') {
       loginResult = FbmSync.loginConfigClearCredential();

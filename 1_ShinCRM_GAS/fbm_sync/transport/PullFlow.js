@@ -13,7 +13,7 @@ FbmSync.startRun = function (options) {
   var opt = options || {};
   // Tra dãy chặng trước mọi việc: mức quét lạ ném `SYNC_UNKNOWN_SCAN` khi lượt cũ chưa bị đụng tới.
   var plan = FbmSync.runPlanOfStart(opt.scan, opt.pack);
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) {
+  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
     return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
   }
   var current = FbmSync.stateRead();
@@ -54,13 +54,13 @@ FbmSync.startRun = function (options) {
   // Kiểm tra liên kết đối chiếu bản nháp người dùng đang xem trên Sidebar; không gửi bản nháp thì đối chiếu liên kết đã lưu.
   state.identityTarget = state.scan === 'identity_check' ? (opt.identity && typeof opt.identity === 'object' ? FbmSync.identityNormalize(opt.identity) : FbmSync.boundIdentity()) : null;
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
-  state.requestGap = typeof FbmSync.requestGapMs === 'function' ? FbmSync.requestGapMs(FbmSync.syncSettingsRead()) : null;
+  state.requestGap = FbmSync.requestGapMs(settingsValues(FbmSync.SETTING_SECTIONS.run));
   if (state.scan === 'activity_bulk') { state.mode = 'read'; }
   // Lượt Giữ phiên chạy mode `push` nhưng đếm khách và Quét nhanh bù theo chiều lịch nền; cổng đã quyết ở `keepaliveStart`.
   state.scheduleMode = state.scan === 'keepalive' ? FbmSync.modeOf(opt.scheduleMode) : '';
   state.pushGate = opt.pushGate || null;
   FbmSync.countTailMark(state);
-  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(Number(opt.detail && opt.detail.customersPerRun || FbmSync.backgroundScheduleDefault().detail.customersPerRun))) : 0; }
+  if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(opt.detail && opt.detail.customersPerRun || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))) : 0; }
   // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).
   if (typeof FbmSync.preflightGates === 'function') {
     var gates = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightGates({ mode: state.mode, origin: state.origin, scan: state.scan }); });
@@ -126,7 +126,7 @@ FbmSync.preflightApply = function (state, preflight) {
     return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
   }
   var count = Number(preflight.candidateCount || 0);
-  if (FbmSync.canWriteFbm(state.mode) && count > 0 && count >= FbmSync.approvalThreshold() && state.metadata.approvalGranted !== true) {
+  if (FbmSync.canWriteFbm(state.mode) && count > 0 && count >= settingsValue(FbmSync.SETTING_SECTIONS.run, 'approvalThreshold') && state.metadata.approvalGranted !== true) {
     state.phase = 'awaiting_approval'; state.entity = '';
     state.cursor = { kind: 'push_approval', candidateCount: count };
     state.message = 'Có ' + count + ' bản ghi thay đổi; cần người dùng chấp thuận trước khi ghi FBM.';

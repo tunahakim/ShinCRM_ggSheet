@@ -4,8 +4,8 @@
  * Bọc tạm hàm toàn cục và hàm `FbmSync` bằng bộ đếm rồi trả lại nguyên bản trong `finally`. Mỗi kịch bản xóa bản chụp Sheet trước khi chạy để số đọc Sheet là của riêng kịch bản đó.
  */
 
-var SETTINGS_READ_PROBE_GLOBALS = ['categoryReadAll', 'settingsRead', 'settingsDefaultsChecked', 'entityReadAll', 'entityReadAllCombined', 'sheetReadWhole', 'sheetReadTop', 'sheetReadRows', 'sheetReadDataRows', 'sheetReadColumnValues', 'categoryReadColumns', 'documentPropertyJson'];
-var SETTINGS_READ_PROBE_FBM = ['syncSettingsRead', 'accountSettingsRead', 'extensionConfigRead', 'backgroundScheduleRead', 'masterEnabled', 'loginConfigRead', 'scope', 'readLocal', 'documentPropertyJson', 'stateRead'];
+var SETTINGS_READ_PROBE_GLOBALS = ['categoryReadAll', 'settingsRead', 'settingsValues', 'settingsDefaultsChecked', 'entityReadAll', 'entityReadAllCombined', 'sheetReadWhole', 'sheetReadTop', 'sheetReadRows', 'sheetReadDataRows', 'sheetReadColumnValues', 'categoryReadColumns', 'documentPropertyJson'];
+var SETTINGS_READ_PROBE_FBM = ['loginConfigRead', 'scope', 'readLocal', 'documentPropertyJson', 'stateRead'];
 
 function fbmProbeSettingsReads() {
   var scenarios = {

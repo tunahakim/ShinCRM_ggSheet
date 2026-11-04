@@ -72,14 +72,41 @@ var SETTINGS_KINDS = {
       return field.options.indexOf(text) >= 0 ? { value: text } : { reason: 'chỉ nhận một trong các giá trị: ' + field.options.join(', ') + '.' };
     }
   },
+  /** Số nguyên trong khoảng `min`..`max` (`max` tùy chọn). Ô trống là chưa đặt (`''`), giá trị hiệu lực lấy `default` của trường nếu có. */
   number: {
     empty: function () { return ''; },
-    // Nhận cả khuôn người Việt gõ (`500.000`): bỏ dấu chấm, phẩy, khoảng trắng trước khi đọc, vì `parseInt('500.000')` là 500.
+    // Nhận cả khuôn người Việt gõ (`500.000`): bỏ dấu chấm, phẩy, khoảng trắng trước khi đọc, vì `parseInt('500.000')` là 500. Số đã là kiểu number (kho cũ, hàm chuyển) thì không bóc dấu, để 0.5 không thành 5.
     check: function (value, field) {
-      var digits = settingsKindText(value).replace(/[.,\s]/g, '');
+      var digits = typeof value === 'number' ? String(value) : settingsKindText(value).replace(/[.,\s]/g, '');
       if (digits === '') { return { value: '' }; }
-      if (!/^[0-9]+$/.test(digits) || Number(digits) < field.min) { return { reason: 'phải là số nguyên từ ' + field.min + ' trở lên, hoặc để trống.' }; }
+      var hasMax = typeof field.max === 'number';
+      if (!/^[0-9]+$/.test(digits) || Number(digits) < field.min || (hasMax && Number(digits) > field.max)) {
+        return { reason: 'phải là số nguyên từ ' + field.min + (hasMax ? ' đến ' + field.max : ' trở lên') + ', hoặc để trống.' };
+      }
       return { value: Number(digits) };
+    }
+  },
+  /** Bật/tắt. Nhận `true`/`false` hoặc chữ `'true'`/`'false'` (ô gửi nguyên chuỗi); trống là chưa đặt, giá trị hiệu lực lấy `default` của trường. */
+  boolean: {
+    empty: function () { return ''; },
+    check: function (value) {
+      if (value === true || value === false) { return { value: value }; }
+      var text = settingsKindText(value);
+      if (text === '') { return { value: '' }; }
+      if (text === 'true' || text === 'false') { return { value: text === 'true' }; }
+      return { reason: 'chỉ nhận bật hoặc tắt.' };
+    }
+  },
+  /** Danh sách mã: nhận mảng hoặc chuỗi ngăn bởi dấu phẩy, chấm phẩy, khoảng trắng, xuống dòng; bỏ trùng, giữ thứ tự người dùng nhập. Mỗi mã khớp `pattern`, tối đa `maxItems` mã; `patternHint` nói bằng lời mã đúng trông thế nào. */
+  codeList: {
+    empty: function () { return []; },
+    check: function (value, field) {
+      var list = Array.isArray(value) ? value : settingsKindText(value).split(/[\s,;]+/), seen = {}, codes = [];
+      list.forEach(function (item) { var code = settingsKindText(item); if (code && !seen[code]) { seen[code] = true; codes.push(code); } });
+      var bad = codes.filter(function (code) { return !field.pattern.test(code); });
+      if (bad.length) { return { reason: field.patternHint + ' Mã sai: ' + bad.join(', ') + '.' }; }
+      if (codes.length > field.maxItems) { return { reason: 'tối đa ' + field.maxItems + ' mã.' }; }
+      return { value: codes };
     }
   },
   text: {

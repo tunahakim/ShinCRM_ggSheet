@@ -2,25 +2,29 @@
  * Dựng phạm vi và dữ liệu cho phiên đo của `FbmPerfProbe.js`: thu phạm vi đồng bộ về vài khách thử, xóa vài dòng Activity để lượt Lấy đi nhánh ghi Sheet, chỉnh múi giờ tệp DEV. Chỉ DEV; dùng chung bộ nhớ Cache và thời hạn của bộ đo.
  */
 
-/** Phạm vi đo có giới hạn: giới hạn phạm vi với tối đa `FbmSync.SCOPE_CODES_MAX` mã FBM (`fbmCustomerCode`); khách đã ghép cặp thì GAS tự đổi ra cả mã ShinCRM cho chiều ghi. Ưu tiên khách đã có giao dịch trong Sheet Activity để đo cả nhánh ghi Sheet, bù bằng khách cuối Sheet Customer đã có FBM ID. Chỉ đọc FBM nên an toàn; cất cài đặt cũ để `fbmPerfTestScopeOff` trả lại. */
+/** Phạm vi đo có giới hạn: giới hạn phạm vi với tối đa `maxItems` của trường `scopeCodes` mã FBM (`fbmCustomerCode`); khách đã ghép cặp thì GAS tự đổi ra cả mã ShinCRM cho chiều ghi. Ưu tiên khách đã có giao dịch trong Sheet Activity để đo cả nhánh ghi Sheet, bù bằng khách cuối Sheet Customer đã có FBM ID. Chỉ đọc FBM nên an toàn; cất cài đặt cũ để `fbmPerfTestScopeOff` trả lại. */
 function fbmPerfTestScopeOn() {
-  var before = FbmSync.syncSettingsRead(), codes = [], withActivity = {};
+  var before = settingsValues(FbmSync.SETTING_SECTIONS.run), scopeField = settingsSection(FbmSync.SETTING_SECTIONS.run).fields.scopeCodes, codes = [], withActivity = {};
   FbmSync.readLocal('activity').forEach(function (record) { var id = String(record.customerId || '').trim(); if (id) { withActivity[id] = true; } });
-  var customers = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmId || '').trim() && FbmSync.SCOPE_CODE_PATTERN.test(String(record.fbmCustomerCode || '').trim()); });
+  var customers = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmId || '').trim() && scopeField.pattern.test(String(record.fbmCustomerCode || '').trim()); });
   var ordered = customers.filter(function (record) { return withActivity[String(record.id || '').trim()]; }).concat(customers.slice().reverse());
   ordered.forEach(function (record) {
     var id = String(record.fbmCustomerCode).trim();
-    if (codes.length < FbmSync.SCOPE_CODES_MAX && codes.indexOf(id) < 0) { codes.push(id); }
+    if (codes.length < scopeField.maxItems && codes.indexOf(id) < 0) { codes.push(id); }
   });
   if (!fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS')) { fbmPerfCache().put('FBM_PERF_PREVIOUS_SETTINGS', JSON.stringify({ scopeLimited: before.scopeLimited, scopeCodes: before.scopeCodes }), FBM_PERF_TTL_SECONDS); }
-  var saved = FbmSync.syncSettingsSave({ scopeLimited: true, scopeCodes: codes });
-  return saved.ok ? 'Đã giới hạn phạm vi ' + codes.length + ' mã FBM (' + Object.keys(withActivity).length + ' khách có giao dịch trong Sheet).' : 'LỖI ' + saved.code + ': ' + saved.message;
+  var patches = {};
+  patches[FbmSync.SETTING_SECTIONS.run] = { scopeLimited: true, scopeCodes: codes };
+  var saved = settingsSave(patches);
+  return saved.ok ? 'Đã giới hạn phạm vi ' + codes.length + ' mã FBM (' + Object.keys(withActivity).length + ' khách có giao dịch trong Sheet).' : 'LỖI ' + saved.problems.map(function (p) { return p.reason; }).join(' ');
 }
 function fbmPerfTestScopeOff() {
   var raw = fbmPerfCache().get('FBM_PERF_PREVIOUS_SETTINGS');
   if (!raw) { return 'Không còn bản cài đặt cũ trong Cache; hãy sửa phạm vi đồng bộ bằng tay ở Sidebar.'; }
-  var saved = FbmSync.syncSettingsSave(JSON.parse(raw));
-  return saved.ok ? 'Đã trả phạm vi đồng bộ và danh sách khách chỉ định về như trước khi đo.' : 'LỖI ' + saved.code + ': ' + saved.message;
+  var patches = {};
+  patches[FbmSync.SETTING_SECTIONS.run] = JSON.parse(raw);
+  var saved = settingsSave(patches);
+  return saved.ok ? 'Đã trả phạm vi đồng bộ và danh sách khách chỉ định về như trước khi đo.' : 'LỖI ' + saved.problems.map(function (p) { return p.reason; }).join(' ');
 }
 
 /** Số dòng Activity của khách thử bị xóa khỏi Sheet DEV để lượt Lấy kế tiếp đi nhánh ghi giao dịch mới (`fbmPerfDropScopeActivities`). */

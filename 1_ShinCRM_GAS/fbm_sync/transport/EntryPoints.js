@@ -83,7 +83,7 @@ FbmSync.relayKeyEnsure = function (rotate) {
 /** Cấp relay config của đúng Spreadsheet hiện tại; không để Extension tự đoán địa chỉ GAS. Đổi khóa (`rotate`) thì Sidebar phải nhận ACK Extension trước khi coi là hoàn tất. */
 FbmSync.relayConfig = function (rotate) {
   var url = FbmSync.relayUrlRequired(PropertiesService.getScriptProperties());
-  return { ok: true, url: url, key: FbmSync.relayKeyEnsure(rotate === true), spreadsheetId: FbmSync.currentSpreadsheetId(), extension: FbmSync.extensionConfigPublic(), masterEnabled: FbmSync.masterEnabled(), backgroundEnabled: FbmSync.backgroundEnabled() };
+  return { ok: true, url: url, key: FbmSync.relayKeyEnsure(rotate === true), spreadsheetId: FbmSync.currentSpreadsheetId(), extension: settingsValues(FbmSync.SETTING_SECTIONS.extension), masterEnabled: settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled'), backgroundEnabled: settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled') };
 };
 /** Ghi Log lựa chọn của người dùng khi Extension đang đồng bộ nền cho Sheet khác: chuyển sang Sheet này hay giữ Sheet cũ. */
 FbmSync.relaySwitchDecisionLog = function (decision, fromSpreadsheetId) {

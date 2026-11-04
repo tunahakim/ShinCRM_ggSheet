@@ -8,7 +8,7 @@ FbmSync.CUSTOMER_PAGE_ROWS = 50;
 FbmSync.scriptSettings = function () {
   var currentState = FbmSync.stateRead() || {}, session = currentState.session || {};
   var identity = FbmSync.sessionVerifiedIdentity(currentState);
-  var accountSettings = typeof FbmSync.accountSettingsRead === 'function' ? FbmSync.accountSettingsRead() : {};
+  var accountSettings = settingsValues(FbmSync.SETTING_SECTIONS.account);
   return {
     baseUrl: 'https://fbo.com.vn:8888',
     cookie: String(session.cookie || ''),
@@ -57,7 +57,7 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
     }
     var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
     if (scope) {
-      // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua SCOPE_CODE_PATTERN nên không có dấu nháy.
+      // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua khuôn của trường `scopeCodes` nên không có dấu nháy.
       var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
       payload.externalKey.push({ Name: 'ma_kh in (' + inList + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false });
     }

@@ -62,7 +62,7 @@ FbmSync.stopVerdict = function (state, fresh) {
   if (!FbmSync.runInProgress(state)) { return ''; }
   var flag = FbmSync.stopFlagRead(fresh);
   if (FbmSync.stopFlagFor(state, flag)) { return flag.verdict; }
-  return FbmSync.masterEnabled() ? '' : 'disabled';
+  return settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled') ? '' : 'disabled';
 };
 
 /**
@@ -78,20 +78,6 @@ FbmSync.stopPendingApply = function (fresh) {
   return { state: FbmSync.stateWrite(state), stopped: true };
 };
 
-/** Ghi công tắc tổng, không chạm ô lượt. Đóng lượt khi tắt là việc của người điều phối gọi nó: `masterSwitchCommand` (ngoài khóa), lưu cài đặt (đang cầm khóa nên gọi thẳng `stopPendingApply`; khóa không lấy lồng được). */
-FbmSync.setMasterEnabled = function (enabled) {
-  var value = enabled === true;
-  FbmSync.documentPropertySet(FbmSync.MASTER_SWITCH_KEY, value ? 'true' : 'false', 'công tắc tổng');
-  return { ok: true, enabled: value };
-};
-/**
- * Người điều phối của `set_master`, chạy ngoài khóa: ghi công tắc rồi, khi tắt, đi đúng tiến trình Dừng với kết luận `disabled`.
- * Lượt đang mở đóng ngay kể cả khi có request đang bay (request đó không thu hồi được, response về sau bị bỏ); khóa bận thì lát đang chạy thấy cờ trước khi phát request kế (`SYNC_STOP_PENDING`).
- */
-FbmSync.masterSwitchCommand = function (enabled) {
-  var value = FbmSync.setMasterEnabled(enabled).enabled, stop = value ? null : FbmSync.runStopCommand('master');
-  return { ok: true, enabled: value, code: stop ? stop.code : '', status: FbmSync.statusView() };
-};
 /**
  * Lối thoát cuối khi kho state hỏng (FBM-044): chỉ xóa state phiên. Hash chờ xác nhận ở khóa riêng và trạng thái "đang đẩy" trên Sheet vẫn còn,
  * nên lệnh tạo mất phản hồi vẫn được tra lại ở phiên sau, không tạo trùng. Phiên còn chạy bình thường thì từ chối, người dùng dùng "Dừng đồng bộ".

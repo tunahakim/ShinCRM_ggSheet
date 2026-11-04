@@ -220,11 +220,11 @@ FbmSync.pushListClear = function () { FbmSync.shardListWrite(FbmSync.PUSH_LIST_P
  */
 FbmSync.PUSH_CLEAN_KEY = 'FBM_SYNC_PUSH_CLEAN_V1';
 FbmSync.pushCleanNow = function () {
-  var hashes = FbmSync.pushFailuresRead().hashes, settings = FbmSync.syncSettingsRead();
+  var hashes = FbmSync.pushFailuresRead().hashes, run = settingsValues(FbmSync.SETTING_SECTIONS.run);
   return {
     rev: Number(reloadJournalRead().rev),
     failures: Object.keys(hashes).sort().map(function (key) { return key + '=' + hashes[key]; }).join('|'),
-    scope: settings.scopeLimited === false ? '' : 'limited:' + (settings.scopeCodes || []).join(','),
+    scope: run.scopeLimited === false ? '' : 'limited:' + run.scopeCodes.join(','),
     account: FbmSync.boundIdentity().accountName
   };
 };

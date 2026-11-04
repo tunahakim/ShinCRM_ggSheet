@@ -1,19 +1,6 @@
 /** Hop dong request va retry an toan cho transport FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Khóa tổng của module; Spreadsheet cũ chưa có thuộc tính được coi là bật. */
-FbmSync.MASTER_SWITCH_KEY = 'FBM_SYNC_ENABLED';
-FbmSync.masterEnabled = function () {
-  // Chưa có thuộc tính thì coi là bật (Spreadsheet có trước công tắc). Đọc lỗi thì ném lên: công tắc an toàn không được hỏng theo hướng mở (FBM-028).
-  var value;
-  try { value = FbmSync.props().getProperty(FbmSync.MASTER_SWITCH_KEY); } catch (err) {
-    var failure = new Error('Không đọc được công tắc đồng bộ FBM; đã dừng để an toàn, thử lại sau ít phút.');
-    failure.code = 'DOCUMENT_PROPERTIES_READ_FAILED';
-    throw failure;
-  }
-  return value !== 'false';
-};
-
 // FBM có thể đặt dấu nháy trong script trang dưới dạng \" hoặc ". GAS cấp pattern,
 // Extension chỉ áp dụng nguyên trạng nên không được để hai nơi tự giữ pattern riêng.
 FbmSync.PAYLOAD_COOKIE_CAPTURE_PATTERN = String.raw`\\?['"]cookie\\?['"]\s*[:=]\s*\\?['"]([^'"\\]+FHN_CRM_App)\\?['"]`;
@@ -59,8 +46,8 @@ FbmSync.sessionGateToken = function () {
   return 'sg_' + Utilities.getUuid().replace(/[^A-Za-z0-9_-]/g, '');
 };
 FbmSync.sessionGatePolicy = function () {
-  var value = typeof FbmSync.loginConfigRead === 'function' ? FbmSync.loginConfigRead() : {};
-  return { autoLogin: value.enabled === true && value.configured === true, autoOpenTab: value.autoOpenTab === true };
+  var policy = settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy);
+  return { autoLogin: policy.enabled && FbmSync.loginConfigRead().configured === true, autoOpenTab: policy.autoOpenTab };
 };
 FbmSync.sessionGateMeta = function (state) {
   state.metadata = state.metadata || {};
@@ -400,7 +387,7 @@ FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
   if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
   // Đang tắt thì không cấp request kế tiếp; lượt đang mở đóng qua cùng cổng với lệnh Dừng.
-  if (!FbmSync.masterEnabled()) {
+  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
     FbmSync.stopPendingApply(true);
     return null;
   }
@@ -506,7 +493,7 @@ FbmSync.envelopeHold = function (request) {
   }
   state.activeRequestId = FbmSync.PICKUP_PREFIX + state.runId;
   state.activeRequestSig = FbmSync.requestSig(request);
-  state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now(), FbmSync.extensionConfigRead().pollMinutes);
+  state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now(), settingsValue(FbmSync.SETTING_SECTIONS.extension, 'pollMinutes'));
   state.driverMachineId = machineId;
   FbmSync.stateWrite(state);
   return { pickup: true, runId: String(state.runId) };

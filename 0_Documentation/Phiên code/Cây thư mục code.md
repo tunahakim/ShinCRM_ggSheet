@@ -250,6 +250,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\ActivityBatch.js Lô giao dịch nhiều khách một lần gọi GAS: kế hoạch lô trong cursor, vị trí trang ở khóa riêng, lỗi từng khách.
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
+    ├── control\SettingsCommands.js Lệnh cài đặt của cửa lệnh (`save_settings`, `set_master`, `set_background`, `reset_settings`) và gói cài đặt cho màn đồng bộ, đều đi qua cổng cài đặt chung.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\RequestWatch.js     Canh request GAS phát cho Extension trong một lời gọi: request đang chờ, đã trả lời, nộp lặp; request quá hạn bị bỏ thì ghi phát hiện, bước đóng lời gọi của phạm vi `fbm_sync` ghi Log.
     ├── state\Run.js              Mở và đóng Lượt (`runOpen` và nhãn lượt, `runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`, thu hồi lượt quá hạn).
@@ -257,8 +258,9 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\Slice.js            Khung lát: `runSlice` (giữ một bản ô lượt mỗi lát và ghi kho một lần ở `sliceClose`, áp cờ dừng, đóng lượt bị bỏ ngỏ, lỗi một đường), `sliceContinue` cho lệnh `continue`, `replyAdmit` (phép kiểm chung của mọi kết quả và lỗi nộp về: thu hồi lượt quá hạn, bỏ response không thuộc request đang chờ, dừng khi lệch mã hợp đồng), bảng `CURSOR_TABLE` chọn bộ xử lý theo cursor, `transportFailureRun` khi Extension không gửi được request.
     ├── state\RunPlan.js          Dãy chặng của từng kiểu lượt (`RUN_PLANS`), `runPlanOf` tra bảng và ném `SYNC_UNKNOWN_SCAN` khi kiểu hay mức quét lạ, `runPlanNext` đi tiếp trong dãy.
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
-    ├── state\SyncSettings.js     Tham số vận hành FBM trong DocumentProperties.
-    ├── state\AccountSettings.js  Cấu hình gắn tài khoản FBM: tiền tố/độ dài mã khách và mốc Activity.
+    ├── state\Scope.js           Phạm vi khách của lượt (`scope`, `scopeResolve`) và khoảng nghỉ giữa hai request FBM (`requestGapMs`); mọi tham số khác đọc qua cổng cài đặt chung.
+    ├── state\FbmSettings.js     Khai các phần cài đặt của đồng bộ FBM (công tắc tổng, tham số phiên, tài khoản, Extension, lịch nền, tự đăng nhập) cho cổng cài đặt chung và dựng lịch nền dạng theo tiến trình.
+    ├── state\FbmSettingsMigrate.js Chuyển cài đặt FBM từ các khóa kho cũ sang khóa của cổng cài đặt chung, một lần.
     ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
     ├── state\Scheduler.js        Lịch heartbeat/quét, không gọi FBM trực tiếp.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
@@ -306,6 +308,7 @@ tests\
 │   ├── sidebar\                  Mảnh nạp tệp client của Sidebar.
 │   │   ├── nap-sidebar.js        Nạp tệp client theo thứ tự include() của client/Sidebar.html; tệp ngoài Sidebar thì nổ.
 │   │   ├── hop-lien-ket.js       Hộp cho tầng liên kết client/link: đồng hồ, hẹn giờ, DOM giả, callServer trả ngay.
+│   │   ├── fbm-cai-dat.js        Gói cài đặt FBM đúng dạng GAS trả cho Sidebar, dùng chung cho test màn đồng bộ.
 │   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
@@ -313,6 +316,7 @@ tests\
 │   ├── fbm\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
+│   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
@@ -477,7 +481,8 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
 
 ## 2_ShinCRM_Extension
 
-    tests/cases/fbmSync/Settings.js  Kiểm migration và validation tham số phiên trong DocumentProperties.
+    tests/cases/fbmSync/Settings.js  Kiểm cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu, khóa hỏng, hàm chuyển một lần từ khóa đời cũ.
+    tests/cases/fbmSync/StateStore.js  Kiểm kho trạng thái phiên đồng bộ khi DocumentProperties đầy hoặc hỏng.
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.

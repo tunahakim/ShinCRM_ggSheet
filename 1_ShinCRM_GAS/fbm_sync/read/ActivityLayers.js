@@ -296,7 +296,7 @@ FbmSync.activityRotationRing = function (start) {
 
 /** Mở chặng Vòng xoay: N khách theo lô `activityBatchCustomers` qua cửa ghi. Không có khách nào đủ điều kiện thì trả `null`, không đọc FBM. */
 FbmSync.activityRotationBegin = function (state) {
-  var start = FbmSync.detailCursorRead(), limit = Math.max(1, Number(state.detailCustomerLimit || FbmSync.backgroundScheduleDefault().detail.customersPerRun)), total = Math.min(limit, FbmSync.activityRotationRing(start).length);
+  var start = FbmSync.detailCursorRead(), limit = Math.max(1, Number(state.detailCustomerLimit || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))), total = Math.min(limit, FbmSync.activityRotationRing(start).length);
   state.progress = { done: 0, total: total };
   return FbmSync.gateOpen(state, { layer: 'rotation', rotation: { start: start, limit: limit, taken: 0, last: -1 } }, 'Đang đọc giao dịch của ' + total + ' khách theo vòng xoay...');
 };

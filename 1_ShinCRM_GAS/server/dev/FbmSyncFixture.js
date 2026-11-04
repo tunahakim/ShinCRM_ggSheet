@@ -26,16 +26,16 @@ function fbmDevSetVerifyStatusDefault() {
   var values = categoryReadAll().categories[DATA_SCHEMA.customer.verifyStatus.source] || [];
   var value = values.filter(function (item) { return String(item).normalize('NFC').toLowerCase().indexOf('chưa'.normalize('NFC')) === 0; })[0] || values[0] || '';
   if (!value) { throw new Error('Category chưa có giá trị Xác thực nào để chọn làm ngầm định.'); }
-  var saved = settingsSave('defaults_fbm_pull', { values: { customer: { verifyStatus: value } } });
+  var saved = settingsSave({ defaults_fbm_pull: { values: { customer: { verifyStatus: value } } } });
   if (!saved.ok) { throw new Error('Không lưu được ngầm định kéo FBM: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
-  return { ok: true, value: saved.values.values.customer.verifyStatus };
+  return { ok: true, value: saved.values.defaults_fbm_pull.values.customer.verifyStatus };
 }
 
 /** Đặt ngưỡng chấp thuận đẩy về mặc định của code qua đúng cửa lưu cài đặt đồng bộ mà Sidebar dùng. */
 function fbmDevResetApprovalThreshold() {
-  var saved = FbmSync.syncSettingsSave({ approvalThreshold: FbmSync.SYNC_SETTINGS_DEFAULT.approvalThreshold });
-  if (!saved.ok) { throw new Error(saved.message); }
-  return { approvalThreshold: saved.settings.approvalThreshold };
+  var saved = settingsSave({ fbm_run: { approvalThreshold: '' } });
+  if (!saved.ok) { throw new Error(saved.problems.map(function (p) { return p.reason; }).join(' ')); }
+  return { approvalThreshold: settingsValue('fbm_run', 'approvalThreshold') };
 }
 
 var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
@@ -43,9 +43,9 @@ var FBM_FAKE_DELETED_CODE = 'ALTFAKE01';
 var FBM_DEV_DEFAULT_TEST_CODES = ['ALT00010', 'CUS-020061'];
 /** Đặt phạm vi khách chỉ định qua đúng cửa lưu cài đặt mà Sidebar dùng, để dò DEV không có đường tắt riêng. */
 function fbmDevSetTestCodes(codes) {
-  var saved = FbmSync.syncSettingsSave({ scopeLimited: true, scopeCodes: codes });
-  if (!saved.ok) { throw new Error(saved.message); }
-  return saved.settings.scopeCodes;
+  var saved = settingsSave({ fbm_run: { scopeLimited: true, scopeCodes: codes } });
+  if (!saved.ok) { throw new Error(saved.problems.map(function (p) { return p.reason; }).join(' ')); }
+  return saved.values.fbm_run.scopeCodes;
 }
 /** Dò luồng "mã bị xóa" (FBM-048): nhân bản khách ALT00010 thành dòng mang ID/mã FBM không tồn tại và tạm thu phạm vi live về mã giả. Chỉ đọc form FBM, không ghi FBM. */
 function fbmSeedFakeDeletedCustomer() {
@@ -66,8 +66,7 @@ function fbmSeedFakeDeletedCustomer() {
 function fbmEndFakeDeletedCustomer() {
   var fakes = FbmSync.readLocal('customer').filter(function (record) { return String(record.fbmCustomerCode || '').trim() === FBM_FAKE_DELETED_CODE; });
   if (fakes.length) { fbmFixtureSave('customer', fakes.map(function (record) { return { id: record.id, recordStatus: 'deleted' }; }), 'pull'); }
-  fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
-  return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: FbmSync.syncSettingsRead().scopeCodes };
+  return { ok: true, softDeleted: fakes.map(function (record) { return record.id + ': ' + record.syncStatus; }), scope: fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES) };
 }
 /** Dò luồng xung đột (G10.7): sửa Website của ALT00010 bên ShinCRM và thay baseline bằng giá trị giả, nên lượt kéo thấy cả hai phía khác baseline và khác nhau. Không ghi FBM. */
 function fbmSeedConflict() {
@@ -141,7 +140,7 @@ function fbmProbeCreateCustomer() {
     syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', fbmSyncPermission: record.fbmSyncPermission || '',
     permission: FbmSync.syncPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
     categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate), canonical: FbmSync.canonical('customer', record, gate),
-    scope: FbmSync.syncSettingsRead().scopeCodes, candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
+    scope: settingsValue('fbm_run', 'scopeCodes'), candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
   };
 }
 /** Mở phạm vi ghi thử cho đúng khách được phép tạo thật, cạnh mã FBM `ALT00010`. */
@@ -190,13 +189,11 @@ function fbmScopeCreatedCustomer() {
   var record = FbmSync.readLocal('customer').filter(function (item) { return String(item.id || '') === FBM_TEST_CREATE_CUSTOMER_ID; })[0];
   var code = record ? String(record.fbmCustomerCode || '').trim() : '';
   if (!code) { return { ok: false, reason: FBM_TEST_CREATE_CUSTOMER_ID + ' chưa có mã FBM trên Sheet DEV.' }; }
-  fbmDevSetTestCodes([code]);
-  return { ok: true, scope: FbmSync.syncSettingsRead().scopeCodes };
+  return { ok: true, scope: fbmDevSetTestCodes([code]) };
 }
 /** Trả phạm vi live về mặc định của DEV. */
 function fbmScopeDefaultCustomer() {
-  fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES);
-  return { ok: true, scope: FbmSync.syncSettingsRead().scopeCodes };
+  return { ok: true, scope: fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES) };
 }
 
 /** Ghi dữ liệu thử qua Cửa bản ghi với chủ `fbm`: dữ liệu thử đặt thẳng giá trị đã biết, không cần đọc lại dòng. Chỉ DEV. */

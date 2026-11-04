@@ -19,9 +19,10 @@ FbmSync.COMMANDS = {
   approve_push: { lock: true, slice: true, drives: true, run: function () { return fbmSyncApprovePush(); } },
   open_conflict: { lock: true, drives: true, run: function () { return FbmSync.openConflict(); } },
   confirm_conflict: { lock: true, run: function (input) { return FbmSync.confirmConflict(input.entity, input.id, input.choice, input.merged, input.fbmValues, input.shinValues, input.snapshot); } },
-  save_settings: { lock: true, run: function (input) { return FbmSync.commandSaveSettings(input); } },
+  save_settings: { lock: true, run: function (input) { return FbmSync.settingsSaveCommand(input); } },
+  reset_settings: { lock: true, run: function (input) { return FbmSync.settingsResetCommand(input); } },
   set_master: { run: function (input) { return FbmSync.masterSwitchCommand(input.enabled === true); } },
-  set_background: { lock: true, run: function (input) { return FbmSync.setBackgroundEnabled(input.enabled === true); } },
+  set_background: { lock: true, run: function (input) { return FbmSync.backgroundSwitchCommand(input.enabled === true); } },
   save_identity_binding: { lock: true, run: function (input) { return FbmSync.bindingWrite(input.binding || {}); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
   repair_login_username: { lock: true, run: function (input) { return FbmSync.loginConfigRepairUsername(input); } },
@@ -188,30 +189,6 @@ FbmSync.continueGuard = function (input, state) {
   return null;
 };
 
-/** Mỗi lần lưu chỉ một mục cài đặt; mục lạ thì từ chối. Mục `sync` kèm `master` (true/false) đổi công tắc tổng sau khi lưu cài đặt đạt, để cài đặt sai không đổi được công tắc. */
-FbmSync.SETTINGS_SAVERS = {
-  sync: function (value) { return FbmSync.syncSettingsSave(value); },
-  account: function (value) { return FbmSync.accountSettingsSave(value); },
-  extension: function (value) { return FbmSync.extensionConfigSave(value); },
-  schedule: function (value) { return FbmSync.backgroundScheduleSave(value); },
-  login_policy: function (value) { return FbmSync.loginConfigPolicySave(value); },
-  auto_login: function (value) { return FbmSync.loginConfigSetEnabled(value === true); }
-};
-FbmSync.commandSaveSettings = function (input) {
-  var section = String(input.section || '');
-  if (!Object.prototype.hasOwnProperty.call(FbmSync.SETTINGS_SAVERS, section)) {
-    var unknown = new Error('Mục cài đặt đồng bộ FBM "' + section + '" không có trong danh sách lưu được.');
-    unknown.code = 'SETTINGS_SECTION_UNKNOWN';
-    throw unknown;
-  }
-  var saved = FbmSync.SETTINGS_SAVERS[section](input.value === undefined ? {} : input.value);
-  if (section !== 'sync') { return saved; }
-  if (saved.ok !== false && typeof input.master === 'boolean') {
-    if (!FbmSync.setMasterEnabled(input.master).enabled) { FbmSync.stopPendingApply(); }
-  }
-  return Object.assign({}, saved, { status: FbmSync.statusView() });
-};
-
 /**
  * Gói đọc của màn đồng bộ: trạng thái lượt, liên kết tài khoản, cài đặt và cấu hình đăng nhập trong một lời gọi. Không ghi gì, kể cả khi thấy lượt treo: thu hồi lượt treo là việc của lệnh mở lượt và nhịp nền.
  * Kho state hỏng thì phần trạng thái là bản "kẹt" kèm nút đặt lại, các phần khác vẫn đọc bình thường.
@@ -221,15 +198,6 @@ FbmSync.statusRead = function () {
   try { status = FbmSync.statusView(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } status = FbmSync.stateStuckView(error); FbmSync.storageFailureLog(error, status); }
   return { ok: true, status: status, identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.loginConfigPublic() };
 };
-FbmSync.settingsView = function () {
-  var settings = FbmSync.syncSettingsPublic();
-  settings.spreadsheetId = FbmSync.currentSpreadsheetId();
-  settings.account = FbmSync.accountSettingsPublic();
-  settings.extension = FbmSync.extensionConfigPublic();
-  settings.background = FbmSync.backgroundSchedulePublic();
-  return settings;
-};
-
 /** Đặt lại phiên kẹt rồi trả status mới; bị từ chối thì trả status hiện tại kèm lý do để Sidebar hiện đúng chỗ. */
 FbmSync.controlResetState = function () {
   var reset = FbmSync.stateReset(), status = FbmSync.statusView();

@@ -8,11 +8,11 @@
 function devLogTraceSet(value) {
   var patch = {};
   patch[LOG_TRACE_SETTING] = value || 'off';
-  var saved = settingsSave('core_ops', patch);
+  var saved = settingsSave({ core_ops: patch });
   if (!saved.ok) { throw new Error('Không lưu được LOG_TRACE: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
-  settingsLogTraceNotice(saved.values[LOG_TRACE_SETTING]);
+  settingsLogTraceNotice(saved.values.core_ops[LOG_TRACE_SETTING]);
   var report = [
-    'LOG_TRACE = "' + saved.values[LOG_TRACE_SETTING] + '"',
+    'LOG_TRACE = "' + saved.values.core_ops[LOG_TRACE_SETTING] + '"',
     'Phủ nguồn "sidebar"? ' + logTraceCoversSource('sidebar'),
     'Phủ nguồn "fbm_sync"? ' + logTraceCoversSource('fbm_sync')
   ];

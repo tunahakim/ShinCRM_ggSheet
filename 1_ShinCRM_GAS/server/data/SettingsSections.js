@@ -1,7 +1,7 @@
 /**
  * Bảng khai các phần cài đặt người dùng chỉnh được, và danh sách gom phần của mọi module cho cổng cài đặt. Tài liệu 01 Phần 2.8.
  *
- * Một phần là thuần dữ liệu: `name` (tên phần, cũng là đuôi khóa kho), `owner` (module sở hữu), `label`, `fields` theo tên trường. Mỗi trường có `kind` (một kiểu của `SETTINGS_KINDS`), `label`, `hint` (hướng dẫn cho màn Cài đặt) và thuộc tính riêng của kiểu (`options` + `empty`, `min`, `max`, `entities`).
+ * Một phần là dữ liệu: `name` (tên phần, cũng là đuôi khóa kho), `owner` (module sở hữu), `label`, `fields` theo tên trường; `sidebarConfig: true` khi phần nằm trong gói `config` của Sidebar (lưu xong phải nạp lại); `check` (tùy chọn, thuần) nhận giá trị hiệu lực cả phần, trả danh sách `{ field, reason }` cho ràng buộc giữa các trường. Mỗi trường có `kind` (một kiểu của `SETTINGS_KINDS`), `label`, `hint` (hướng dẫn cho màn Cài đặt), `default` (tùy chọn: giá trị khi để trống, nơi duy nhất giữ mặc định) và thuộc tính riêng của kiểu (`options` + `empty`, `min`, `max`, `entities`, `pattern`, `maxItems`).
  *
  * Ngầm định gõ tay gắn với kênh nhập: mỗi kênh một phần riêng (`defaults_sidebar` của lõi, `defaults_fbm_pull` của `fbm_sync`, sau này kênh bot có phần của bot), cùng kiểu `fieldDefaults` nên cùng một bộ kiểm.
  *
@@ -22,6 +22,7 @@ function coreSettingsSections() {
       name: 'core_ops',
       owner: 'core',
       label: 'Vận hành',
+      sidebarConfig: true,
       fields: {
         [LOG_TRACE_SETTING]: {
           kind: 'select', label: 'Ghi log chi tiết', options: LOG_TRACE_SOURCE_OPTIONS, empty: 'off',
@@ -41,6 +42,7 @@ function coreSettingsSections() {
       name: 'core_data',
       owner: 'core',
       label: 'Dữ liệu',
+      sidebarConfig: true,
       fields: {
         columnTypes: {
           kind: 'columnTypes', label: 'Kiểu cột tự thêm',
@@ -55,6 +57,7 @@ function coreSettingsSections() {
     {
       name: 'defaults_sidebar',
       owner: 'core',
+      sidebarConfig: true,
       label: 'Ngầm định khi nhập trên Sidebar',
       fields: {
         values: {

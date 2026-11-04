@@ -46,7 +46,7 @@ FbmSync.conflictFail = function (code, message) {
 
 /** Mở bản ghi đầu hàng đợi: chỉ phát request đọc bản ghi FBM; diff tính khi response về. */
 FbmSync.openConflict = function () {
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
+  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
   var state = FbmSync.stateRead();
   // Mở xung đột phải đọc FBM qua kênh duy nhất của phiên: lượt nền đang chạy thì để Sidebar hỏi người dùng dừng hay chờ, lượt tay thì báo chờ.
   if (FbmSync.runInProgress(state) && String(state.origin || '') === 'background') { return FbmSync.backgroundRunningResult(); }
@@ -165,7 +165,7 @@ FbmSync.conflictOpened = function (rawResponse) {
  * Mỗi dữ liệu một vai: chọn ShinCRM thì ghi `shinValues`; `snapshot.old` chỉ là mốc so (giá trị Sheet người dùng thấy gần nhất, Sidebar dời khi popup xung đột hiện), không bao giờ là giá trị ghi. Phía ShinCRM kiểm như lưu form: cửa ghi so từng trường được quyết với mốc (tài liệu 06 Phần 4) và trả `conflicts` để Sidebar hỏi bằng đúng popup của form. Phía FBM: hash bản ghép từ ảnh chụp và `fbmValues` phải bằng `snapshot.openedHash`.
  */
 FbmSync.confirmConflict = function (entity, id, choice, merged, fbmValues, shinValues, snapshot) {
-  if (typeof FbmSync.masterEnabled === 'function' && !FbmSync.masterEnabled()) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
+  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể chốt conflict.' }; }
   var state = FbmSync.stateRead(), target = String(id || '').trim();
   if (['customer', 'activity'].indexOf(entity) < 0 || !target) { return FbmSync.conflictFail('CONFLICT_TARGET_INVALID', 'Bản ghi xung đột không hợp lệ.'); }
   if (['fbm', 'shin', 'manual'].indexOf(choice) < 0) { return FbmSync.conflictFail('CONFLICT_CHOICE_INVALID', 'Cách xử lý conflict không hợp lệ.'); }

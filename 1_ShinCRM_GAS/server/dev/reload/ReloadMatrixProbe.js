@@ -257,7 +257,7 @@ function reloadMatrixProbe() {
 
     // Lưu lại phần vận hành với giá trị đang có: đi đúng cổng màn Cài đặt dùng, không đổi giá trị nào nên không cần khôi phục.
     var configBefore = reloadMatrixProbeState();
-    var configResult = settingsSave('core_ops', {});
+    var configResult = settingsSave({ core_ops: {} });
     recordChangesAfterWrite();
     SpreadsheetApp.flush();
     var configAfter = reloadMatrixProbeState();
