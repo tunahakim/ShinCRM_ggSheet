@@ -71,7 +71,7 @@ function fbmSyncPatchRunPack(status) {
 }
 /** Băng cảnh báo phạm vi giới hạn, để người dùng luôn thấy lượt chạy chỉ chạy cho những khách nào. */
 function fbmSyncRunScopeBlocks() {
-  var settings = FBM_SYNC_CLIENT.syncSettings || {}, schema = FBM_SYNC_RUN_SCHEMA.scope;
+  var settings = fbmSyncSettingsSection('fbm_run') || {}, schema = FBM_SYNC_RUN_SCHEMA.scope;
   if (settings.scopeLimited === false || !Array.isArray(settings.scopeCodes)) { return []; }
   return [Notice({ kind: 'warning', text: settings.scopeCodes.length ? schema.on + settings.scopeCodes.join(', ') + '.' : schema.empty })];
 }

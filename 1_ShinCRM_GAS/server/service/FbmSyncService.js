@@ -15,8 +15,9 @@ function fbmGetSyncStatus() { return fbmCommandRun('fbmGetSyncStatus', 'status',
 function fbmGetSyncTrace() { return fbmCommandRun('fbmGetSyncTrace', 'trace_read', {}); }
 /** Lỗi phía Sidebar không gắn với một request: `runId` chỉ có khi lỗi thuộc lượt Sidebar đang tự chạy, GAS mới dừng lượt đó. */
 function fbmLogSyncError(message, clientTrace, action, runId) { return fbmCommandRun('fbmLogSyncError', 'client_error', { message: message, clientTrace: clientTrace, action: action, runId: runId }); }
-/** Mỗi lần lưu một mục cài đặt (`sync`, `account`, `extension`, `schedule`, `login_policy`, `auto_login`); `master` là true/false chỉ khi mục `sync` kèm đổi công tắc tổng. */
-function fbmSaveSettings(section, value, master) { return fbmCommandRun('fbmSaveSettings', 'save_settings', { section: section, value: value, master: master }); }
+/** Lưu cài đặt FBM theo tên phần: `patches` là `{ tênPhần: { trường: chuỗi ô } }`, GAS kiểm và trả `problems`; `confirmLow` chỉ true khi người dùng đã xác nhận lịch nền dày. */
+function fbmSaveSettings(patches, confirmLow) { return fbmCommandRun('fbmSaveSettings', 'save_settings', { patches: patches || {}, confirmLow: confirmLow === true }); }
+function fbmResetSettings(section) { return fbmCommandRun('fbmResetSettings', 'reset_settings', { section: section }); }
 function fbmSetMasterSwitch(enabled) { return fbmCommandRun('fbmSetMasterSwitch', 'set_master', { enabled: enabled === true }); }
 function fbmSaveIdentityBinding(binding) { return fbmCommandRun('fbmSaveIdentityBinding', 'save_identity_binding', { binding: binding || {} }); }
 function fbmSaveConnection(config) { return fbmCommandRun('fbmSaveConnection', 'save_credential', config || {}); }

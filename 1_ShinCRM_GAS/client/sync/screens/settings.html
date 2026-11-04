@@ -13,8 +13,19 @@
 <script>
 function fbmSyncSettingsNoticeBlocks(scope, fallback) {
   var notice = (FBM_SYNC_CLIENT.settingsNotices || {})[scope] || fallback, message = notice && notice.message;
-  if (!message) { return []; }
-  return [Notice({ kind: notice.kind, text: String(message) })];
+  var corrupt = fbmSyncCorruptBlocks(FBM_SYNC_CONFIG_SECTIONS[scope === 'login' ? 'loginPolicy' : scope] || []);
+  if (!message) { return corrupt; }
+  return [Notice({ kind: notice.kind, text: String(message) })].concat(corrupt);
+}
+/** Mỗi phần cài đặt khóa hỏng một lời báo kèm nút đặt về mặc định; GAS đặt lại rồi trả cài đặt mới, Sidebar không tự dựng giá trị. */
+function fbmSyncCorruptBlocks(sections) {
+  var schema = FBM_SYNC_SETTINGS_SCHEMA.corrupt, blocks = [];
+  ((FBM_SYNC_CLIENT.syncSettings || {}).corrupt || []).forEach(function (item) {
+    if (sections.indexOf(item.section) < 0) { return; }
+    blocks.push(Notice({ kind: 'error', text: item.label + ': ' + item.message }));
+    blocks.push(Button({ id: schema.resetIdPrefix + item.section, label: schema.reset, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running, data: { 'sync-reset-section': item.section } }));
+  });
+  return blocks;
 }
 function fbmSyncSetSettingsNotice(scope, kind, message) {
   var allowed = ['module', 'relay', 'extension', 'background', 'login'];
@@ -33,23 +44,23 @@ function fbmSyncSettingsSchedulerNotice(status) {
 function fbmSyncRelayStateBlocks() {
   return [FBM_SYNC_CLIENT.relayConfigured ? Text({ className: uiSyncClass('settings', 'relayPass'), text: FBM_SYNC_SETTINGS_SCHEMA.notice.relayOk }) : Notice({ kind: FBM_SYNC_SETTINGS_SCHEMA.notice.warningKind, text: FBM_SYNC_SETTINGS_SCHEMA.notice.relayMissing })];
 }
-function fbmSyncSettingsExtensionBlocks(settings) {
-  var extension = fbmSyncConfigDraft('extension', settings.extension || { pollMinutes: FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, runOnStartup: true }), pollDisabled = fbmSyncConfigControlDisabled('extension', 'pollMinutes'), startupDisabled = fbmSyncConfigControlDisabled('extension', 'runOnStartup');
+function fbmSyncSettingsExtensionBlocks() {
+  var extension = fbmSyncConfigDraft('extension', fbmSyncSettingsSection('fbm_extension') || {}), pollDisabled = fbmSyncConfigControlDisabled('extension', 'pollMinutes'), startupDisabled = fbmSyncConfigControlDisabled('extension', 'runOnStartup');
   return FBM_SYNC_SETTINGS_UI.layout.extension({
     notice: fbmSyncSettingsNoticeBlocks('extension'),
-    poll: FBM_SYNC_SETTINGS_UI.layout.inlineField(FBM_SYNC_SETTINGS_UI.classes.inlineFieldRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.formLabel, text: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, kind: 'input', inputType: 'number', value: extension.pollMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, placeholder: FBM_SYNC_SETTINGS_SCHEMA.extension.pollPlaceholder, disabled: pollDisabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel })),
+    poll: FBM_SYNC_SETTINGS_UI.layout.inlineField(FBM_SYNC_SETTINGS_UI.classes.inlineFieldRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.formLabel, text: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, kind: 'input', inputType: 'number', value: fbmSyncCellValue(extension.pollMinutes), placeholder: FBM_SYNC_SETTINGS_SCHEMA.extension.pollPlaceholder, disabled: pollDisabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.extension.pollLabel })),
     startup: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.extension.startupLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.extension.startupId, kind: 'toggle', pressed: extension.runOnStartup !== false, className: extension.runOnStartup !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-extension-startup': true }, disabled: startupDisabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.extension.startupLabel })),
     actions: fbmSyncConfigButtonRow('extension', { edit: FBM_SYNC_SETTINGS_SCHEMA.extension.edit, save: FBM_SYNC_SETTINGS_SCHEMA.extension.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.extension.saveId, disabled: !!FBM_SYNC_CLIENT.running })
   });
 }
-function fbmSyncSettingsBackgroundBlocks(settings) {
-  var editing = fbmSyncConfigIsEditing('background'), background = fbmSyncConfigDraft('background', settings.background || {}), parentEnabled = editing ? background.enabled !== false : !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false);
+function fbmSyncSettingsBackgroundBlocks() {
+  var editing = fbmSyncConfigIsEditing('background'), background = fbmSyncConfigDraft('background', fbmSyncSettingsSection('fbm_background') || {}), parentEnabled = editing ? background.enabled !== false : !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false);
   var direction = background.direction || 'read', directionOptions = FBM_SYNC_SETTINGS_SCHEMA.background.directions;
-  var process = FBM_SYNC_SETTINGS_SCHEMA.background.processes.map(function (item) { return [item.key, item.label, item.minutes, item.enabled]; }), backgroundSchema = FBM_SYNC_SETTINGS_SCHEMA.background, defaults = FBM_SYNC_SETTINGS_SCHEMA.defaults;
-  var rows = process.map(function (item) { var spec = background[item[0]] || { enabled: item[3], minutes: item[2] }, toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + '.minutes'), toggleId = backgroundSchema.processPrefix + item[0], minutesId = toggleId + backgroundSchema.minutesSuffix; return FBM_SYNC_SETTINGS_UI.layout.scheduleRow(FBM_SYNC_SETTINGS_UI.classes.scheduleRow, StandaloneControl({ id: toggleId, kind: 'toggle', pressed: spec.enabled !== false, className: spec.enabled !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: backgroundSchema.toggleAria + item[1] }), Text({ className: FBM_SYNC_SETTINGS_UI.classes.kvLabel, text: item[1] }), StandaloneControl({ id: minutesId, kind: 'input', inputType: 'number', value: spec.minutes === undefined || spec.minutes === null ? item[2] : spec.minutes, placeholder: backgroundSchema.minutesPlaceholder, data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: backgroundSchema.minutesAria + item[1] })); });
-  var detail = background.detail || {}, detailSchema = FBM_SYNC_SETTINGS_SCHEMA.background.detail;
+  var process = FBM_SYNC_SETTINGS_SCHEMA.background.processes.map(function (item) { return [item.key, item.label]; }), backgroundSchema = FBM_SYNC_SETTINGS_SCHEMA.background, defaults = FBM_SYNC_SETTINGS_SCHEMA.defaults;
+  var rows = process.map(function (item) { var enabled = background[item[0] + 'Enabled'], minutes = background[item[0] + 'Minutes'], toggleDisabled = fbmSyncConfigControlDisabled('background', item[0] + 'Enabled'), minutesDisabled = fbmSyncConfigControlDisabled('background', item[0] + 'Minutes'), toggleId = backgroundSchema.processPrefix + item[0], minutesId = toggleId + backgroundSchema.minutesSuffix; return FBM_SYNC_SETTINGS_UI.layout.scheduleRow(FBM_SYNC_SETTINGS_UI.classes.scheduleRow, StandaloneControl({ id: toggleId, kind: 'toggle', pressed: enabled !== false, className: enabled !== false ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-process-toggle': item[0] }, disabled: toggleDisabled, ariaLabel: backgroundSchema.toggleAria + item[1] }), Text({ className: FBM_SYNC_SETTINGS_UI.classes.kvLabel, text: item[1] }), StandaloneControl({ id: minutesId, kind: 'input', inputType: 'number', value: fbmSyncCellValue(minutes), placeholder: backgroundSchema.minutesPlaceholder, data: { 'sync-process-minutes': item[0] }, disabled: minutesDisabled, ariaLabel: backgroundSchema.minutesAria + item[1] })); });
+  var detailSchema = FBM_SYNC_SETTINGS_SCHEMA.background.detail;
   var detailControls = FBM_SYNC_SETTINGS_UI.layout.detailControls(FBM_SYNC_SETTINGS_UI.classes.detailControls, [
-    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: detail.customersPerRun || FBM_SYNC_SETTINGS_SCHEMA.defaults.detailCustomers, placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detail.customersPerRun'), ariaLabel: detailSchema.countLabel })),
+    FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: detailSchema.countLabel }), StandaloneControl({ id: detailSchema.countId, kind: 'input', inputType: 'number', value: fbmSyncCellValue(background.detailCustomersPerRun), placeholder: detailSchema.countPlaceholder, disabled: fbmSyncConfigControlDisabled('background', 'detailCustomersPerRun'), ariaLabel: detailSchema.countLabel })),
     Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: detailSchema.countHelp })
   ]);
   return FBM_SYNC_SETTINGS_UI.layout.background({
@@ -69,10 +80,10 @@ function fbmSyncSettingsLoginBlocks(loginPolicy) {
   var toggle = function (id, label, pressed, path) { return FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: label }), StandaloneControl({ id: id, kind: 'toggle', pressed: pressed, className: pressed ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-login-policy': id.replace(FBM_SYNC_SETTINGS_SCHEMA.defaults.policyPrefix, '') }, disabled: fbmSyncConfigControlDisabled('loginPolicy', path), ariaLabel: label })); };
   var retryGroup = FBM_SYNC_SETTINGS_UI.layout.loginRetryGroup(FBM_SYNC_SETTINGS_UI.classes.loginRetryGroup, [
     toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryLabel, loginPolicy.retryEnabled !== false, 'retryEnabled'),
-    StandaloneField(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, kind: 'input', inputType: 'number', value: loginPolicy.retryMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.retryMinutes, placeholder: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesPlaceholder, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'retryMinutes'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel })
+    StandaloneField(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel, { id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, kind: 'input', inputType: 'number', value: fbmSyncCellValue(loginPolicy.retryMinutes), placeholder: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesPlaceholder, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'retryMinutes'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesLabel })
   ]);
   return FBM_SYNC_SETTINGS_UI.layout.loginPolicy({
-    status: [Text({ className: parentEnabled ? 'shin-pass-row' : 'shin-error-message', text: parentEnabled ? 'Đã bật tính năng đăng nhập tự động' : 'Đã tắt tính năng đăng nhập tự động' })],
+    status: fbmSyncConfigSectionCorrupt('loginPolicy') ? [] : [Text({ className: parentEnabled ? 'shin-pass-row' : 'shin-error-message', text: parentEnabled ? 'Đã bật tính năng đăng nhập tự động' : 'Đã tắt tính năng đăng nhập tự động' })],
     notice: fbmSyncSettingsNoticeBlocks('login', parentEnabled && !configured ? { kind: 'warning', message: 'Chưa sẵn sàng: hãy nhập username và mật khẩu ở màn Đăng nhập tự động.' } : null),
     parent: FBM_SYNC_SETTINGS_UI.layout.loginParent(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicyParent, uiClassJoin(FBM_SYNC_SETTINGS_UI.classes.toggleRow, FBM_SYNC_SETTINGS_UI.classes.loginParent), Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-login-policy': 'auto-login' }, disabled: fbmSyncConfigControlDisabled('loginPolicy', 'enabled'), ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentLabel })),
     children: [toggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openLabel, loginPolicy.autoOpenTab === true, 'autoOpenTab'), retryGroup],
@@ -91,11 +102,10 @@ function fbmSyncSetBackgroundDependencyState(parentEnabled) {
   var process = FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys;
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, { disabled: fbmSyncConfigControlDisabled('background', 'direction') });
   process.forEach(function (kind) {
-    var enabled = fbmSyncConfigDraftValue('background', kind + '.enabled', true) === true;
-    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + '.enabled') });
-    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, { disabled: fbmSyncConfigControlDisabled('background', kind + '.minutes') });
+    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + 'Enabled') });
+    fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, { disabled: fbmSyncConfigControlDisabled('background', kind + 'Minutes') });
   });
-  FBM_SYNC_SETTINGS_SCHEMA.defaults.detailSuffixes.forEach(function (suffix) { fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.detailFieldPrefix + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detail.' + ('customersPerRun')) }); });
+  FBM_SYNC_SETTINGS_SCHEMA.defaults.detailSuffixes.forEach(function (suffix) { fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.detailFieldPrefix + suffix, { disabled: fbmSyncConfigControlDisabled('background', 'detailCustomersPerRun') }); });
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.defaults.backgroundSwitchId, { disabled: fbmSyncConfigControlDisabled('background', 'enabled') });
   return parentEnabled !== true;
 }
@@ -105,7 +115,7 @@ function fbmSyncSettingsModuleBlocks(settings, enabled) {
   return FBM_SYNC_SETTINGS_UI.layout.module({
     switch: FBM_SYNC_SETTINGS_UI.layout.toggle(FBM_SYNC_SETTINGS_UI.classes.toggleRow, Text({ className: FBM_SYNC_SETTINGS_UI.classes.toggleCopy, text: parentEnabled ? moduleSchema.enabledOn : moduleSchema.enabledOff }), StandaloneControl({ id: FBM_SYNC_SETTINGS_SCHEMA.defaults.masterId, kind: 'toggle', pressed: parentEnabled, className: parentEnabled ? FBM_SYNC_SETTINGS_UI.classes.toggleOn : FBM_SYNC_SETTINGS_UI.classes.toggleOff, data: { 'sync-master-draft': true }, disabled: fbmSyncConfigControlDisabled('module', 'enabled'), ariaLabel: moduleSchema.enabledAria })),
     notice: fbmSyncSettingsNoticeBlocks('module'),
-    threshold: StandaloneField(moduleSchema.thresholdLabel, { id: moduleSchema.thresholdId, kind: 'input', inputType: 'number', value: draft.approvalThreshold === undefined ? moduleSchema.thresholdPlaceholder : draft.approvalThreshold, placeholder: moduleSchema.thresholdPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: moduleSchema.thresholdLabel }),
+    threshold: StandaloneField(moduleSchema.thresholdLabel, { id: moduleSchema.thresholdId, kind: 'input', inputType: 'number', value: fbmSyncCellValue(draft.approvalThreshold), placeholder: moduleSchema.thresholdPlaceholder, disabled: fbmSyncConfigControlDisabled('module', 'approvalThreshold') || !parentEnabled, ariaLabel: moduleSchema.thresholdLabel }),
     help: Text({ className: FBM_SYNC_SETTINGS_UI.classes.muted, text: moduleSchema.thresholdHelp }),
     requestGap: FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailField, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailLabel, text: moduleSchema.requestGapLabel }), FBM_SYNC_SETTINGS_UI.layout.detailInputs(FBM_SYNC_SETTINGS_UI.classes.detailInputs, [
       fbmSyncSettingsRequestGapField(draft, 'requestGapMinSeconds', moduleSchema.requestGapMinLabel, moduleSchema.requestGapMinId, parentEnabled),
@@ -119,7 +129,7 @@ function fbmSyncSettingsModuleBlocks(settings, enabled) {
   });
 }
 function fbmSyncSettingsRequestGapField(draft, key, label, id, parentEnabled) {
-  return FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: label }), StandaloneControl({ id: id, kind: 'input', inputType: 'number', value: draft[key] === undefined ? 0 : draft[key], placeholder: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapPlaceholder, disabled: fbmSyncConfigControlDisabled('module', key) || !parentEnabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapLabel + ' — ' + label }));
+  return FBM_SYNC_SETTINGS_UI.layout.detailField(FBM_SYNC_SETTINGS_UI.classes.detailInput, Text({ className: FBM_SYNC_SETTINGS_UI.classes.detailInputLabel, text: label }), StandaloneControl({ id: id, kind: 'input', inputType: 'number', value: fbmSyncCellValue(draft[key]), placeholder: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapPlaceholder, disabled: fbmSyncConfigControlDisabled('module', key) || !parentEnabled, ariaLabel: FBM_SYNC_SETTINGS_SCHEMA.module.requestGapLabel + ' — ' + label }));
 }
 /** Kết quả đổi mã ra khách của từng dòng, GAS trả khi lưu danh sách; Sidebar chỉ ghép chữ. */
 function fbmSyncSettingsScopeLinesText(lines) {
@@ -130,13 +140,13 @@ function fbmSyncSettingsScopeLinesText(lines) {
   }).join('\n');
 }
 function fbmSyncRenderSettings(panel, status) {
-  var settings = FBM_SYNC_CLIENT.syncSettings || {}, loginPolicy = FBM_SYNC_CLIENT.loginStatus || {};
+  var loginPolicy = fbmSyncSettingsSection('fbm_login_policy') || {};
   var enabled = !(status && (status.masterEnabled === false || status.enabled === false));
   return fbmSyncAppendBox(panel, FBM_SYNC_SETTINGS_UI.rootClass, FBM_SYNC_SETTINGS_SCHEMA.rootId, FBM_SYNC_SETTINGS_UI.layout.screen({
-    module: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.module, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(Object.assign({}, settings, { enabled: enabled }), enabled))),
+    module: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.module, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(fbmSyncModuleValues(), enabled))),
     relay: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.relay, FBM_SYNC_SETTINGS_UI.layout.relayCard(fbmSyncConfigTitleActions('relay'), fbmSyncSettingsNoticeBlocks('relay'), fbmSyncRelayStateBlocks(), fbmSyncConfigButtonRow('relay', { edit: FBM_SYNC_SETTINGS_SCHEMA.relay.edit, save: FBM_SYNC_SETTINGS_SCHEMA.relay.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.relay.rotateId, disabled: !!FBM_SYNC_CLIENT.running }))),
-    extension: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.extension, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks(settings))),
-    background: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.background, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks(settings))),
+    extension: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.extension, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks())),
+    background: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.background, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks())),
     loginPolicy: FBM_SYNC_SETTINGS_UI.layout.cardRegion(FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(loginPolicy)))
   }).elements);
 }
@@ -147,16 +157,16 @@ function fbmSyncPatchSettings(panel, status) {
   var masterEnabled = !(status && (status.masterEnabled === false || status.enabled === false));
   var backgroundEnabled = !(status && status.backgroundEnabled === false);
   var settingCards = [
-    [FBM_SYNC_SETTINGS_SCHEMA.regions.module, 'module', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, { enabled: masterEnabled }), masterEnabled)); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.module, 'module', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.module, fbmSyncConfigTitleActions('module'), fbmSyncSettingsModuleBlocks(Object.assign(fbmSyncModuleValues(), { enabled: masterEnabled }), masterEnabled)); }],
     [FBM_SYNC_SETTINGS_SCHEMA.regions.relay, 'relay', function () { return FBM_SYNC_SETTINGS_UI.layout.relayCard(fbmSyncConfigTitleActions('relay'), fbmSyncSettingsNoticeBlocks('relay'), fbmSyncRelayStateBlocks(), fbmSyncConfigButtonRow('relay', { edit: FBM_SYNC_SETTINGS_SCHEMA.relay.edit, save: FBM_SYNC_SETTINGS_SCHEMA.relay.save }, { id: FBM_SYNC_SETTINGS_SCHEMA.relay.rotateId, disabled: !!FBM_SYNC_CLIENT.running })); }],
-    [FBM_SYNC_SETTINGS_SCHEMA.regions.extension, 'extension', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks(FBM_SYNC_CLIENT.syncSettings || {})); }],
-    [FBM_SYNC_SETTINGS_SCHEMA.regions.background, 'background', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks(FBM_SYNC_CLIENT.syncSettings || {})); }],
-    [FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, 'loginPolicy', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(FBM_SYNC_CLIENT.loginStatus || {})); }]
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.extension, 'extension', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.extension, fbmSyncConfigTitleActions('extension'), fbmSyncSettingsExtensionBlocks()); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.background, 'background', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.background, fbmSyncConfigTitleActions('background'), fbmSyncSettingsBackgroundBlocks()); }],
+    [FBM_SYNC_SETTINGS_SCHEMA.regions.loginPolicy, 'loginPolicy', function () { return FBM_SYNC_SETTINGS_UI.layout.card(FBM_SYNC_SETTINGS_SCHEMA.cards.loginPolicy, fbmSyncConfigTitleActions('loginPolicy'), fbmSyncSettingsLoginBlocks(fbmSyncSettingsSection('fbm_login_policy') || {})); }]
   ];
   settingCards.forEach(function (item) { var region = document.getElementById(item[0]), editState = fbmSyncConfigState(item[1]); if (region && !fbmSyncInteractiveControlIsEditing(region) && (!editState.editing || editState.needsRender)) { fbmSyncRenderTarget(item[0], [item[2]()]); editState.needsRender = false; } });
   if (!fbmSyncConfigIsEditing('module')) { fbmSyncSetToggleState(FBM_SYNC_SETTINGS_SCHEMA.defaults.masterId, masterEnabled, true); }
   if (!fbmSyncConfigIsEditing('background')) { fbmSyncSetBackgroundSwitchState(backgroundEnabled, true); }
-  var settings = FBM_SYNC_CLIENT.syncSettings || {}, background = settings.background || {}, activeId = String(document.activeElement && document.activeElement.id || '');
+  var run = fbmSyncSettingsSection('fbm_run') || {}, background = fbmSyncSettingsSection('fbm_background') || {}, activeId = String(document.activeElement && document.activeElement.id || '');
   function patchValue(id, value) {
     var node = document.getElementById(id);
     if ((id.indexOf('fbm-extension-') === 0 && fbmSyncConfigIsEditing('extension')) || (id.indexOf('fbm-sync-process-') === 0 && fbmSyncConfigIsEditing('background')) || (id.indexOf('fbm-sync-detail-') === 0 && fbmSyncConfigIsEditing('background')) || (id.indexOf('fbm-sync-login-retry') === 0 && fbmSyncConfigIsEditing('loginPolicy')) || (id.indexOf('fbm-sync-setting-') === 0 && fbmSyncConfigIsEditing('module'))) { return; }
@@ -171,25 +181,25 @@ function fbmSyncPatchSettings(panel, status) {
   }
   if (background.direction !== undefined) { patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, background.direction); }
   FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys.forEach(function (kind) {
-    var item = background[kind] || {}, enabled = item.enabled !== false;
-    patchToggle(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, enabled, fbmSyncConfigControlDisabled('background', kind + '.enabled'));
-    patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, item.minutes);
+    var enabled = background[kind + 'Enabled'] !== false;
+    patchToggle(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, enabled, fbmSyncConfigControlDisabled('background', kind + 'Enabled'));
+    patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, background[kind + 'Minutes']);
     var minutes = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix);
-    if (minutes && activeId !== minutes.id) { minutes.disabled = fbmSyncConfigControlDisabled('background', kind + '.minutes'); }
+    if (minutes && activeId !== minutes.id) { minutes.disabled = fbmSyncConfigControlDisabled('background', kind + 'Minutes'); }
   });
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.countId, background.detail && background.detail.customersPerRun);
-  var extension = settings.extension || {};
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.detail.countId, background.detailCustomersPerRun);
+  var extension = fbmSyncSettingsSection('fbm_extension') || {};
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.extension.pollId, extension.pollMinutes);
   patchToggle(FBM_SYNC_SETTINGS_SCHEMA.defaults.startupId, extension.runOnStartup !== false, fbmSyncConfigControlDisabled('extension', 'runOnStartup'));
-  var login = FBM_SYNC_CLIENT.loginStatus || {}, loginDraft = fbmSyncConfigDraft('loginPolicy', login), loginEnabled = loginDraft.enabled !== false;
+  var login = fbmSyncSettingsSection('fbm_login_policy') || {}, loginDraft = fbmSyncConfigDraft('loginPolicy', login), loginEnabled = loginDraft.enabled !== false;
   patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.parentId, loginEnabled, fbmSyncConfigControlDisabled('loginPolicy', 'enabled'));
   patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.openId, login.autoOpenTab === true, fbmSyncConfigControlDisabled('loginPolicy', 'autoOpenTab'));
   patchToggle(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryId, login.retryEnabled !== false, fbmSyncConfigControlDisabled('loginPolicy', 'retryEnabled'));
   patchValue(FBM_SYNC_SETTINGS_SCHEMA.loginPolicy.retryMinutesId, login.retryMinutes);
   fbmSyncSetLoginPolicyDependencyState(loginEnabled);
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, settings.approvalThreshold);
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId, settings.requestGapMinSeconds);
-  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId, settings.requestGapMaxSeconds);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, run.approvalThreshold);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId, run.requestGapMinSeconds);
+  patchValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId, run.requestGapMaxSeconds);
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.thresholdId, { disabled: !fbmSyncConfigIsEditing('module') || !!FBM_SYNC_CLIENT.running || fbmSyncConfigDraftValue('module', 'enabled', masterEnabled) !== true });
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.module.saveId, { disabled: !!FBM_SYNC_CLIENT.running });
   if (masterEnabled) { fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.body, { disabledDescendants: false, except: [FBM_SYNC_UI_SCHEMA.shell.ids.master] }); }

@@ -509,7 +509,7 @@ function fbmSyncInstall() {
     fbmSyncExtensionRpcReply(data);
   });
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-reset-state, #fbm-sync-force-login, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-scope-limited-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
+    var target = event.target && event.target.closest ? event.target.closest('#fbm-sync-back, #fbm-sync-module-menu, #fbm-sync-master-switch, #fbm-sync-settings-master-switch, #fbm-sync-start, #fbm-sync-approve, #fbm-sync-rotate-relay, #fbm-sync-cancel, #fbm-sync-reset-state, #fbm-sync-force-login, #fbm-sync-open-conflicts, #fbm-sync-conflict-back, #fbm-sync-check-identity, #fbm-sync-probe-identity, #fbm-sync-confirm-identity, #fbm-sync-save-identity, #fbm-sync-auto-login, #fbm-sync-login-edit, #fbm-sync-login-save, #fbm-sync-login-delete, #fbm-sync-login-test, #fbm-sync-open-login-policy, #fbm-sync-save-extension, #fbm-sync-save-background, #fbm-sync-save-login-policy, #fbm-sync-save-settings, [data-sync-config-action], [data-sync-reset-section], [data-sync-screen], [data-sync-results-tab], [data-sync-background-draft], [data-sync-master-draft], [data-sync-scope-limited-draft], [data-sync-extension-startup], [data-sync-process-toggle], [data-sync-login-policy], [data-sync-page], #fbm-sync-conflict-save, [data-fbm-push-retry-all]') : null;
     if (!target) { return; }
     event.preventDefault();
     if (typeof unsavedChangesGuardTransition === 'function' && unsavedChangesGuardTransition({ source: 'fbm', target: target }, function () { return fbmSyncDispatchClickTarget(target); })) { return; }
@@ -520,7 +520,8 @@ function fbmSyncInstall() {
       return;
     }
     if (fbmSyncConfigHandleAction(target)) { return; }
-    if (target.id === 'fbm-sync-master-switch') { fbmSyncToggleMaster();
+    if (target.hasAttribute('data-sync-reset-section')) { fbmSyncResetSettings(target);
+    } else if (target.id === 'fbm-sync-master-switch') { fbmSyncToggleMaster();
     } else if (target.id === 'fbm-sync-module-menu') { FBM_SYNC_CLIENT.navOpen = FBM_SYNC_CLIENT.navOpen !== true; fbmSyncRenderShell(FBM_SYNC_CLIENT.lastStatus || {});
     } else if (target.hasAttribute('data-sync-background-draft')) {
       if (target.disabled) { return; }
@@ -550,7 +551,7 @@ function fbmSyncInstall() {
       var processKind = String(target.getAttribute('data-sync-process-toggle') || ''), processEnabled = target.getAttribute('aria-pressed') !== 'true';
       fbmSyncSetTargetState(target.id, { addClass: [uiSyncToggleClass('settings', processEnabled)], removeClass: [uiSyncToggleClass('settings', !processEnabled)], ariaPressed: processEnabled });
       var processInput = document.getElementById('fbm-sync-process-' + processKind + '-minutes'); if (processInput) { fbmSyncSetTargetState(processInput.id, { disabled: !processEnabled }); }
-      fbmSyncConfigSetDraftValue('background', processKind + '.enabled', processEnabled);
+      fbmSyncConfigSetDraftValue('background', processKind + 'Enabled', processEnabled);
     } else if (target.hasAttribute('data-sync-login-policy')) {
       if (target.disabled) { return; }
       var policy = String(target.getAttribute('data-sync-login-policy') || ''), policyEnabled = target.getAttribute('aria-pressed') !== 'true';
@@ -637,7 +638,7 @@ function fbmSyncInstall() {
     }
     var accountSettings = { 'fbm-account-customer-prefix': 'customerPrefix', 'fbm-account-customer-length': 'customerCodeLength' };
     if (accountSettings[id]) { FBM_SYNC_CLIENT.accountSettingsDraft[accountSettings[id]] = String(target.value || ''); fbmSyncConfigSetDraftValue('accountSettings', accountSettings[id], String(target.value || '')); if (FBM_SYNC_CLIENT.accountSettingsInvalid) { delete FBM_SYNC_CLIENT.accountSettingsInvalid[accountSettings[id]]; } }
-    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detail.customersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-scope-codes': 'module.scopeCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
+    var settingsInput = { 'fbm-extension-poll-minutes': 'extension.pollMinutes', 'fbm-sync-detail-count': 'background.detailCustomersPerRun', 'fbm-sync-login-retry-minutes': 'loginPolicy.retryMinutes', 'fbm-sync-setting-approval-threshold': 'module.approvalThreshold', 'fbm-sync-setting-scope-codes': 'module.scopeCodes', 'fbm-sync-setting-request-gap-min': 'module.requestGapMinSeconds', 'fbm-sync-setting-request-gap-max': 'module.requestGapMaxSeconds' };
     if (settingsInput[id]) {
       var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
@@ -1221,33 +1222,25 @@ function fbmSyncSaveIdentityManual(button) {
   }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncLogClientError(error, status.message, 'identity_manual_save'); fbmSyncSetAccountNotice('identity', 'error', status.message); fbmSyncPaintError(error, status.message, 'identity_manual_save'); return null; }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncSaveAccountSettings(button) {
-  if (button) { button.disabled = true; }
-  var prefix = document.getElementById('fbm-account-customer-prefix'), length = document.getElementById('fbm-account-customer-length');
-  var payload = { customerPrefix: String(prefix && prefix.value || '').trim(), customerCodeLength: String(length && length.value || '').trim() };
-  var incomplete = (!!payload.customerPrefix && !payload.customerCodeLength) || (!payload.customerPrefix && !!payload.customerCodeLength);
-  if (incomplete) {
-    FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: !payload.customerPrefix, customerCodeLength: !payload.customerCodeLength };
-    if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-account-settings-region']) { fbmSyncRenderTarget('fbm-sync-account-settings-region', [fbmSyncAccountSettingsCard()]); }
-    fbmSyncSetAccountNotice('accountSettings', 'error', 'Nhập đủ tiền tố và độ dài mã khách FBM, hoặc xóa cả hai ô để tắt tạo Customer mới.');
-    if (button) { button.disabled = false; }
-    return Promise.resolve(null);
-  }
-  return callServer('fbmSaveSettings', ['account', payload]).then(function (result) {
-    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cấu hình tài khoản FBM.'); }
-    FBM_SYNC_CLIENT.accountSettingsInvalid = {};
-    FBM_SYNC_CLIENT.accountSettingsDraft = {};
-    FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, { account: result.settings || payload });
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('accountSettings'); }
-    fbmSyncSetAccountNotice('accountSettings', 'success', 'Đã lưu cấu hình tài khoản FBM.');
-    return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cấu hình tài khoản FBM.' }));
-  }).catch(function (error) {
-    fbmSyncSetAccountNotice('accountSettings', 'error', 'Không lưu được cấu hình tài khoản FBM: ' + String(error && error.message || error));
-    fbmSyncPaintError(error, 'Không lưu được cấu hình tài khoản FBM.');
-    return null;
-  }).finally(function () { if (button) { button.disabled = false; } });
+  return fbmSyncSettingsSave({
+    key: 'accountSettings', button: button, okText: 'Đã lưu cấu hình tài khoản FBM.', failText: 'Không lưu được cấu hình tài khoản FBM',
+    notify: function (kind, text) { fbmSyncSetAccountNotice('accountSettings', kind, text); },
+    // Ô sai vẽ qua cờ của màn tài khoản để dấu đỏ sống qua lần vẽ lại card.
+    paintProblems: function (problems) {
+      FBM_SYNC_CLIENT.accountSettingsInvalid = {};
+      problems.forEach(function (problem) { FBM_SYNC_CLIENT.accountSettingsInvalid[problem.field] = true; });
+      if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes['fbm-sync-account-settings-region']) { fbmSyncRenderTarget('fbm-sync-account-settings-region', [fbmSyncAccountSettingsCard()]); }
+    },
+    done: function () { FBM_SYNC_CLIENT.accountSettingsInvalid = {}; FBM_SYNC_CLIENT.accountSettingsDraft = {}; return null; }
+  });
 }
+/** Công tắc Tự đăng nhập là một ô của `fbm_login_policy`, đi cùng cửa lưu với mọi cài đặt FBM. */
 function fbmSyncSetAutoLogin(enabled) {
-  return callServer('fbmSaveSettings', ['auto_login', enabled === true]).then(function (result) { FBM_SYNC_CLIENT.loginStatus = result || FBM_SYNC_CLIENT.loginStatus; return fbmSyncStatusOnce(); }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaintError(error, status.message, 'auto_login_save'); return null; });
+  var ticket = fbmSyncStatusTicket();
+  return fbmSyncSettingsSend({ fbm_login_policy: { enabled: enabled === true } }).then(function (result) {
+    if (result.ok === false) { throw new Error(result.message || result.code || 'Không lưu được chính sách tự đăng nhập.'); }
+    return fbmSyncStatusFromResult(result, ticket);
+  }).catch(function (error) { var status = FBM_SYNC_CLIENT.lastStatus || {}; status.message = String(error && error.message || error); fbmSyncPaintError(error, status.message, 'auto_login_save'); return null; });
 }
 function fbmSyncSetBackgroundSwitchState(enabled, disabled) {
   return fbmSyncSetToggleState('fbm-sync-background-switch', enabled, disabled);
@@ -1273,84 +1266,82 @@ function fbmSyncControlValue(id) {
   return node.getAttribute('data-standalone-select') === '1' || node.getAttribute('data-standalone-menu') === '1'
     ? (node.getAttribute('data-value') || '') : String(node.value || '');
 }
-function fbmSyncSaveExtensionSettings(button) {
-  if (button) { button.disabled = true; }
-  var input = document.getElementById('fbm-extension-poll-minutes');
-  return callServer('fbmSaveSettings', ['extension', { pollMinutes: Number(input && input.value || 5), runOnStartup: fbmSyncToggleValue('fbm-sync-run-on-startup') }]).then(function (result) {
-    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được nhịp hỏi GAS.'); }
-    FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.extension = { pollMinutes: result.pollMinutes, runOnStartup: result.runOnStartup };
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('extension'); }
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'success', 'Đã lưu nhịp hỏi GAS của Extension.'); }
-    return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu nhịp hỏi GAS của Extension.' }));
-  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('extension', 'error', 'Không lưu được nhịp hỏi GAS của Extension: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được nhịp hỏi GAS của Extension.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
-}
 /**
- * Lưu card lịch nền. Ô gửi nguyên chuỗi người dùng gõ, kể cả ô trống: GAS kiểm và trả `invalid` để tô đỏ đúng ô như form bản ghi, không lặng lẽ thay bằng số mặc định.
- * Chu kỳ thấp thì GAS trả `SCHEDULE_LOW_CONFIRM` mà chưa lưu; người dùng đồng ý thì gửi lại kèm `confirmLow`.
+ * Cửa gửi duy nhất của mọi cài đặt FBM: `patches` là `{ tênPhần: { trường: giá trị ô } }` với giá trị ô là nguyên chuỗi người dùng gõ (ô trống là chuỗi rỗng = chưa đặt), GAS kiểm và trả `problems` theo `phần.trường`.
+ * Lịch nền dày thì GAS trả `SCHEDULE_LOW_CONFIRM` mà chưa lưu; người dùng đồng ý thì gửi lại kèm `confirmLow`, quay lại sửa thì trả `declined`. Lưu được thì thay gói cài đặt bằng bản GAS trả.
  */
-function fbmSyncSaveBackgroundSettings(button, confirmLow) {
-  if (button) { button.disabled = true; }
-  var fieldIds = FBM_SYNC_CONFIG_UNSAVED_FIELDS.background, schedule = {};
-  ['heartbeat', 'customerFull', 'activityFull', 'detail'].forEach(function (kind) { var input = document.getElementById(fieldIds[kind + '.minutes']); var toggle = document.getElementById(fieldIds[kind + '.enabled']); schedule[kind] = { minutes: input ? String(input.value) : undefined, enabled: toggle ? toggle.getAttribute('aria-pressed') === 'true' : undefined }; });
-  schedule.direction = fbmSyncControlValue('fbm-sync-background-direction') || 'read';
-  schedule.enabled = fbmSyncToggleValue('fbm-sync-background-switch');
-  var detailCount = document.getElementById(fieldIds['detail.customersPerRun']);
-  schedule.detail.customersPerRun = detailCount ? String(detailCount.value) : undefined;
-  schedule.confirmLow = confirmLow === true;
-  fieldInvalidClear(Object.keys(fieldIds).map(function (path) { return fieldIds[path]; }));
-  var reenable = true;
-  return callServer('fbmSaveSettings', ['schedule', schedule]).then(function (result) {
-    if (result && result.code === 'SCHEDULE_INVALID') {
-      fieldInvalidPaint((result.invalid || []).map(function (item) { return fieldIds[item.field]; }));
-      var message = fieldInvalidMessage(result.invalid);
-      fbmSyncSetSettingsNotice('background', 'error', message);
-      return { ok: false, message: message };
-    }
+function fbmSyncSettingsSend(patches, confirmLow) {
+  return callServer('fbmSaveSettings', [patches, confirmLow === true]).then(function (result) {
     if (result && result.code === 'SCHEDULE_LOW_CONFIRM') {
       return uiDecisionOpen({ title: 'Chu kỳ lịch nền thấp', message: result.message, cancelLabel: 'Quay lại sửa', confirmLabel: 'Vẫn lưu' }).then(function (go) {
-        if (!go) { return { ok: false, message: result.message }; }
-        reenable = false;
-        return fbmSyncSaveBackgroundSettings(button, true);
+        return go ? fbmSyncSettingsSend(patches, true) : { ok: false, declined: true, message: result.message };
       });
     }
-    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được lịch đồng bộ nền.'); }
-    FBM_SYNC_CLIENT.syncSettings = FBM_SYNC_CLIENT.syncSettings || {}; FBM_SYNC_CLIENT.syncSettings.background = result.schedule;
-    FBM_SYNC_CLIENT.lastStatus = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { backgroundEnabled: result.schedule.enabled !== false });
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('background'); }
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'success', 'Đã lưu lịch đồng bộ nền.'); }
-    fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu lịch đồng bộ nền.' }));
-    return { ok: true };
-  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('background', 'error', 'Không lưu được lịch đồng bộ nền: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được lịch đồng bộ nền.'); return { ok: false, message: String(error && error.message || error) }; }).finally(function () { if (button && reenable) { button.disabled = false; } });
+    if (result && result.code === 'SETTINGS_INVALID') { return result; }
+    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt FBM.'); }
+    if (!result.settings) { throw new Error('GAS không trả cài đặt sau khi lưu.'); }
+    FBM_SYNC_CLIENT.syncSettings = result.settings;
+    return result;
+  });
 }
-function fbmSyncSaveSyncSettings(button) {
+/**
+ * Lưu một card cấu hình qua `fbmSyncSettingsSend`: ô nào GAS báo sai thì tô đỏ đúng ô đó (id lấy từ bảng ô của card) và gộp lý do vào thông báo của card; đạt thì thoát chế độ sửa và vẽ status GAS trả kèm.
+ * `spec.done` (tùy chọn) trả `{ kind, text }` thay lời báo thành công mặc định; `spec.paintProblems` (tùy chọn) thay cách tô ô sai.
+ */
+function fbmSyncSettingsSave(spec) {
+  var button = spec.button, ticket = fbmSyncStatusTicket(), ids = fbmSyncConfigFieldIds(spec.key);
   if (button) { button.disabled = true; }
-  var thresholdInput = document.getElementById('fbm-sync-setting-approval-threshold');
-  var thresholdValue = thresholdInput ? String(thresholdInput.value || '').trim() : '';
-  var scopeCodesInput = document.getElementById(FBM_SYNC_SETTINGS_SCHEMA.module.scopeCodesId);
-  // GAS tách, bỏ trùng, kiểm ký tự và đổi mã ra khách; client gửi nguyên chuỗi người dùng gõ.
-  var payload = { approvalThreshold: thresholdValue === '' ? '' : Number(thresholdValue), scopeLimited: fbmSyncToggleValue(FBM_SYNC_SETTINGS_SCHEMA.module.scopeLimitedId), scopeCodes: scopeCodesInput ? String(scopeCodesInput.value || '') : '', requestGapMinSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMinId), requestGapMaxSeconds: fbmSyncControlValue(FBM_SYNC_SETTINGS_SCHEMA.module.requestGapMaxId) };
-  var draft = fbmSyncConfigState('module').draft || {}, desiredMaster = draft.enabled !== false, currentMaster = fbmSyncConfigMasterEnabled();
-  // Một lời gọi: GAS đổi công tắc tổng (chỉ khi người dùng đổi), lưu cài đặt rồi trả status mới.
-  var ticket = fbmSyncStatusTicket();
-  return callServer('fbmSaveSettings', ['sync', payload, desiredMaster === currentMaster ? null : desiredMaster]).then(function (result) {
-    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được cài đặt chung.'); }
-    FBM_SYNC_CLIENT.syncSettings = Object.assign({}, FBM_SYNC_CLIENT.syncSettings || {}, result.settings || payload);
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('module'); }
-    var scopeText = fbmSyncSettingsScopeLinesText(result.scopeLines);
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', (result.scopeLines || []).some(function (line) { return line.lengthExpected; }) ? 'warning' : 'success', 'Đã lưu cài đặt chung.' + (scopeText ? '\n' + scopeText : '')); }
-    return fbmSyncStatusFromResult(result, ticket);
-  }).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu cài đặt chung.' })); }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('module', 'error', 'Không lưu được cài đặt chung: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được cài đặt chung.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  fieldInvalidClear(ids);
+  return fbmSyncSettingsSend(fbmSyncConfigPatches(spec.key)).then(function (result) {
+    if (result.declined) { return { ok: false, message: result.message }; }
+    if (result.code === 'SETTINGS_INVALID') {
+      var problems = result.problems || [];
+      if (spec.paintProblems) { spec.paintProblems(problems); } else { fieldInvalidPaint(problems.map(function (problem) { return FBM_SYNC_CONFIG_UNSAVED_FIELDS[spec.key][problem.field]; })); }
+      var message = fieldInvalidMessage(problems);
+      spec.notify('error', message);
+      return { ok: false, message: message };
+    }
+    fbmSyncConfigFinishEdit(spec.key);
+    var done = spec.done && spec.done(result) || { kind: 'success', text: spec.okText };
+    spec.notify(done.kind, done.text);
+    return Promise.resolve(fbmSyncStatusFromResult(result, ticket)).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: spec.okText })); }).then(function () { return { ok: true }; });
+  }).catch(function (error) {
+    spec.notify('error', spec.failText + ': ' + String(error && error.message || error));
+    fbmSyncPaintError(error, spec.failText + '.');
+    return { ok: false, message: String(error && error.message || error) };
+  }).finally(function () { if (button) { button.disabled = false; } });
+}
+function fbmSyncSaveExtensionSettings(button) {
+  return fbmSyncSettingsSave({ key: 'extension', button: button, okText: 'Đã lưu nhịp hỏi GAS của Extension.', failText: 'Không lưu được nhịp hỏi GAS của Extension', notify: function (kind, text) { fbmSyncSetSettingsNotice('extension', kind, text); } });
+}
+function fbmSyncSaveBackgroundSettings(button) {
+  return fbmSyncSettingsSave({ key: 'background', button: button, okText: 'Đã lưu lịch đồng bộ nền.', failText: 'Không lưu được lịch đồng bộ nền', notify: function (kind, text) { fbmSyncSetSettingsNotice('background', kind, text); } });
+}
+/** Tham số phiên và công tắc tổng đi một gói `{ fbm_run, fbm_master }`: phần nào sai thì cả gói không ghi. */
+function fbmSyncSaveSyncSettings(button) {
+  return fbmSyncSettingsSave({
+    key: 'module', button: button, okText: 'Đã lưu cài đặt chung.', failText: 'Không lưu được cài đặt chung', notify: function (kind, text) { fbmSyncSetSettingsNotice('module', kind, text); },
+    done: function (result) {
+      var scopeText = fbmSyncSettingsScopeLinesText(result.scopeLines);
+      return { kind: (result.scopeLines || []).some(function (line) { return line.lengthExpected; }) ? 'warning' : 'success', text: 'Đã lưu cài đặt chung.' + (scopeText ? '\n' + scopeText : '') };
+    }
+  });
 }
 function fbmSyncSaveLoginPolicy(button) {
+  return fbmSyncSettingsSave({ key: 'loginPolicy', button: button, okText: 'Đã lưu chính sách tự đăng nhập.', failText: 'Không lưu được chính sách tự đăng nhập', notify: function (kind, text) { fbmSyncSetSettingsNotice('login', kind, text); } });
+}
+/** Nút "Đặt về mặc định" của phần cài đặt khóa hỏng: GAS đặt lại phần đó rồi trả gói cài đặt và status mới, Sidebar không tự dựng giá trị. */
+function fbmSyncResetSettings(button) {
+  var section = String(button && button.getAttribute('data-sync-reset-section') || ''), ticket = fbmSyncStatusTicket();
   if (button) { button.disabled = true; }
-  var retry = document.getElementById('fbm-sync-login-retry-minutes');
-  return callServer('fbmSaveSettings', ['login_policy', { enabled: fbmSyncToggleValue('fbm-sync-policy-auto-login'), autoOpenTab: fbmSyncToggleValue('fbm-sync-policy-auto-open'), retryEnabled: fbmSyncToggleValue('fbm-sync-policy-retry'), retryMinutes: Number(retry && retry.value || 30) }]).then(function (result) {
-    if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không lưu được chính sách tự đăng nhập.'); }
-    FBM_SYNC_CLIENT.loginStatus = result;
-    if (typeof fbmSyncConfigFinishEdit === 'function') { fbmSyncConfigFinishEdit('loginPolicy'); }
-    if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'success', 'Đã lưu chính sách tự đăng nhập.'); }
-    return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã lưu chính sách tự đăng nhập.' }));
-  }).catch(function (error) { if (typeof fbmSyncSetSettingsNotice === 'function') { fbmSyncSetSettingsNotice('login', 'error', 'Không lưu được chính sách tự đăng nhập: ' + String(error && error.message || error)); } fbmSyncPaintError(error, 'Không lưu được chính sách tự đăng nhập.'); return null; }).finally(function () { if (button) { button.disabled = false; } });
+  return callServer('fbmResetSettings', [section]).then(function (result) {
+    if (!result || result.ok === false || !result.settings) { throw new Error(result && (result.message || result.code) || 'GAS không đặt lại được cài đặt.'); }
+    FBM_SYNC_CLIENT.syncSettings = result.settings;
+    return fbmSyncStatusFromResult(result, ticket);
+  }).then(function () { return fbmSyncPaint(Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, { message: 'Đã đặt cài đặt về mặc định.' })); }).catch(function (error) {
+    fbmSyncPaintError(error, 'Không đặt lại được cài đặt về mặc định.', 'settings_reset');
+    return null;
+  }).finally(function () { if (button) { button.disabled = false; } });
 }
 function fbmSyncLoginCredentialsFromForm() {
   var username = document.getElementById('fbm-login-username'), password = document.getElementById('fbm-login-password');
@@ -1450,7 +1441,7 @@ function fbmSyncSaveConnection(button) {
     encryptPromise = samePending ? Promise.resolve(pending.encrypted) : fbmSyncEncryptCredentials(credentials);
   }
   return encryptPromise.then(function (encrypted) {
-    if (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; credential.credentialRef = encrypted.credentialRef; credential.envelope = encrypted.envelope; credential.public = encrypted.public || {}; credential.enabled = (FBM_SYNC_CLIENT.loginStatus || {}).enabled !== false; }
+    if (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; credential.credentialRef = encrypted.credentialRef; credential.envelope = encrypted.envelope; credential.public = encrypted.public || {}; }
     return callServer('fbmSaveConnection', [{ binding: binding, credential: credential }]);
   }).then(function (saved) {
     if (!saved || saved.ok === false) { throw new Error(saved && (saved.message || saved.code) || 'Không lưu được kết nối tài khoản.'); }

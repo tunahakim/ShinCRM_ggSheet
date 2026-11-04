@@ -19,10 +19,11 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
   background: {
     parentPath: 'enabled',
     dependencies: {
-      'heartbeat.minutes': 'heartbeat.enabled',
-      'customerFull.minutes': 'customerFull.enabled',
-      'activityFull.minutes': 'activityFull.enabled',
-      'detail.customersPerRun': 'detail.enabled'
+      heartbeatMinutes: 'heartbeatEnabled',
+      customerFullMinutes: 'customerFullEnabled',
+      activityFullMinutes: 'activityFullEnabled',
+      detailMinutes: 'detailEnabled',
+      detailCustomersPerRun: 'detailEnabled'
     }
   },
   loginPolicy: {
@@ -34,6 +35,30 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
     }
   }
 };
+
+/** Phần cài đặt GAS nuôi từng card; card chỉ sửa được khi mọi phần của nó đọc được. */
+var FBM_SYNC_CONFIG_SECTIONS = { accountSettings: ['fbm_account'], module: ['fbm_run', 'fbm_master'], extension: ['fbm_extension'], background: ['fbm_background'], loginPolicy: ['fbm_login_policy'] };
+
+/** Giá trị hiệu lực của một phần cài đặt theo gói GAS; `null` khi khóa của phần đó hỏng (ô để trống và khóa, không tự điền mặc định). */
+function fbmSyncSettingsSection(name) {
+  var section = (FBM_SYNC_CLIENT.syncSettings || {})[name];
+  return section === undefined ? null : section;
+}
+
+/** Card đang có phần cài đặt hỏng: không vào sửa được, chỉ đặt lại về mặc định. */
+function fbmSyncConfigSectionCorrupt(key) {
+  var names = FBM_SYNC_CONFIG_SECTIONS[fbmSyncConfigCanonicalKey(key)] || [];
+  return names.some(function (name) { return fbmSyncSettingsSection(name) === null; });
+}
+
+/** Giá trị ô từ cài đặt: chưa có thì để trống, không điền số thay. */
+function fbmSyncCellValue(value) { return value === undefined || value === null ? '' : value; }
+
+/** Các ô của card Cài đặt chung theo đúng dạng bản nháp: tham số phiên từ `fbm_run`, công tắc tổng từ status. */
+function fbmSyncModuleValues() {
+  var run = fbmSyncSettingsSection('fbm_run') || {};
+  return { approvalThreshold: run.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), scopeLimited: run.scopeLimited, scopeCodes: Array.isArray(run.scopeCodes) ? run.scopeCodes.join('\n') : String(run.scopeCodes || ''), requestGapMinSeconds: run.requestGapMinSeconds, requestGapMaxSeconds: run.requestGapMaxSeconds };
+}
 
 function fbmSyncConfigClone(value) {
   if (value === undefined || value === null) { return value; }
@@ -84,7 +109,7 @@ function fbmSyncConfigTitleActions(key) {
     var schema = fbmSyncConfigSchema();
     actions.push(Icon({ id: fbmSyncConfigActionId(key, schema.actionCancel), icon: 'close', className: uiResolveActionClass('cancel', 'icon'), tooltip: schema.tooltips.cancel, data: { 'sync-config-action': schema.actionCancel, 'sync-config-key': key } }));
     actions.push(Icon({ id: fbmSyncConfigActionId(key, schema.actionSave), icon: 'check', className: uiResolveActionClass('save', 'icon'), tooltip: schema.tooltips.save, data: { 'sync-config-action': schema.actionSave, 'sync-config-key': key } }));
-  } else if (!editing) {
+  } else if (!editing && !fbmSyncConfigSectionCorrupt(key)) {
     var editSchema = fbmSyncConfigSchema();
     actions.push(Icon({ id: fbmSyncConfigActionId(key, editSchema.actionEdit), icon: 'pencil', className: uiResolveActionClass('edit', 'icon'), tooltip: editSchema.tooltips.edit, data: { 'sync-config-action': editSchema.actionEdit, 'sync-config-key': key } }));
   }
@@ -100,7 +125,7 @@ function fbmSyncConfigButton(key, labels, options) {
     id: opts.id || fbmSyncConfigActionId(key, 'button'),
     label: label,
     className: className,
-    disabled: !!opts.disabled || (!!FBM_SYNC_CLIENT.running && key !== 'relay'),
+    disabled: !!opts.disabled || (!!FBM_SYNC_CLIENT.running && key !== 'relay') || fbmSyncConfigSectionCorrupt(key),
     data: { 'sync-config-action': editing ? schema.actionSave : schema.actionEdit, 'sync-config-key': key }
   });
 }
@@ -239,9 +264,10 @@ function fbmSyncConfigSetDraftValue(key, path, value) {
 
 function fbmSyncConfigStartEdit(key) {
   key = fbmSyncConfigCanonicalKey(key);
-  var settings = FBM_SYNC_CLIENT.syncSettings || {}, login = FBM_SYNC_CLIENT.loginStatus || {};
+  var login = FBM_SYNC_CLIENT.loginStatus || {};
   var activeKey = fbmSyncConfigEditingKey();
   if (activeKey && activeKey !== key) { return false; }
+  if (fbmSyncConfigSectionCorrupt(key)) { return false; }
   var draft;
   if (key === 'connection') {
     var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
@@ -251,20 +277,20 @@ function fbmSyncConfigStartEdit(key) {
     FBM_SYNC_CLIENT.loginPasswordMode = login.configured === true ? 'saved' : 'draft';
     FBM_SYNC_CLIENT.loginPasswordFocused = false;
   } else if (key === 'accountSettings') {
-    var account = settings.account || {};
+    var account = fbmSyncSettingsSection('fbm_account') || {};
     draft = { customerPrefix: String(account.customerPrefix || ''), customerCodeLength: String(account.customerCodeLength || '') };
     FBM_SYNC_CLIENT.accountSettingsDraft = fbmSyncConfigClone(draft);
   } else if (key === 'module') {
-    draft = { approvalThreshold: settings.approvalThreshold === undefined ? FBM_SYNC_SETTINGS_SCHEMA.defaults.approvalThreshold : settings.approvalThreshold, enabled: fbmSyncConfigMasterEnabled(), scopeLimited: settings.scopeLimited !== false, scopeCodes: (settings.scopeCodes || []).join('\n'), requestGapMinSeconds: settings.requestGapMinSeconds === undefined ? 0 : settings.requestGapMinSeconds, requestGapMaxSeconds: settings.requestGapMaxSeconds === undefined ? 0 : settings.requestGapMaxSeconds };
+    draft = fbmSyncModuleValues();
   } else if (key === 'relay') {
     draft = {};
   } else if (key === 'extension') {
-    draft = fbmSyncConfigClone(settings.extension || { pollMinutes: FBM_SYNC_SETTINGS_SCHEMA.defaults.pollMinutes, runOnStartup: true });
+    draft = fbmSyncConfigClone(fbmSyncSettingsSection('fbm_extension') || {});
   } else if (key === 'background') {
-    draft = fbmSyncConfigClone(settings.background || {});
+    draft = fbmSyncConfigClone(fbmSyncSettingsSection('fbm_background') || {});
     draft.enabled = !(FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.lastStatus.backgroundEnabled === false);
   } else if (key === 'loginPolicy') {
-    draft = { enabled: login.enabled !== false, autoOpenTab: login.autoOpenTab === true, retryEnabled: login.retryEnabled !== false, retryMinutes: login.retryMinutes || FBM_SYNC_SETTINGS_SCHEMA.defaults.retryMinutes };
+    draft = fbmSyncConfigClone(fbmSyncSettingsSection('fbm_login_policy') || {});
   } else { return false; }
   return fbmSyncConfigBeginEdit(key, draft);
 }
@@ -290,11 +316,11 @@ var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
   extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },
   background: {
     enabled: 'fbm-sync-background-switch', direction: 'fbm-sync-background-direction',
-    'heartbeat.minutes': 'fbm-sync-process-heartbeat-minutes', 'heartbeat.enabled': 'fbm-sync-process-heartbeat',
-    'customerFull.minutes': 'fbm-sync-process-customerFull-minutes', 'customerFull.enabled': 'fbm-sync-process-customerFull',
-    'activityFull.minutes': 'fbm-sync-process-activityFull-minutes', 'activityFull.enabled': 'fbm-sync-process-activityFull',
-    'detail.minutes': 'fbm-sync-process-detail-minutes', 'detail.enabled': 'fbm-sync-process-detail',
-    'detail.customersPerRun': 'fbm-sync-detail-count'
+    heartbeatMinutes: 'fbm-sync-process-heartbeat-minutes', heartbeatEnabled: 'fbm-sync-process-heartbeat',
+    customerFullMinutes: 'fbm-sync-process-customerFull-minutes', customerFullEnabled: 'fbm-sync-process-customerFull',
+    activityFullMinutes: 'fbm-sync-process-activityFull-minutes', activityFullEnabled: 'fbm-sync-process-activityFull',
+    detailMinutes: 'fbm-sync-process-detail-minutes', detailEnabled: 'fbm-sync-process-detail',
+    detailCustomersPerRun: 'fbm-sync-detail-count'
   },
   loginPolicy: { enabled: 'fbm-sync-policy-auto-login', autoOpenTab: 'fbm-sync-policy-auto-open', retryEnabled: 'fbm-sync-policy-retry', retryMinutes: 'fbm-sync-login-retry-minutes' }
 };
@@ -304,6 +330,30 @@ var FBM_SYNC_CONFIG_UNSAVED_CARDS = {
   module: 'fbm-sync-module-card-region', relay: 'fbm-sync-relay-card-region', extension: 'fbm-sync-extension-card-region',
   background: 'fbm-sync-background-card-region', loginPolicy: 'fbm-sync-login-policy-card-region'
 };
+
+/** Ô của card thuộc phần cài đặt nào: công tắc tổng ở `fbm_master`, mọi ô còn lại ở phần đầu của card. */
+function fbmSyncConfigFieldSection(key, field) {
+  return key === 'module' && field === 'enabled' ? 'fbm_master' : FBM_SYNC_CONFIG_SECTIONS[key][0];
+}
+
+/** Id các ô của một card, dùng để tô đỏ và bỏ tô. */
+function fbmSyncConfigFieldIds(key) {
+  var map = FBM_SYNC_CONFIG_UNSAVED_FIELDS[key] || {};
+  return Object.keys(map).map(function (field) { return map[field]; });
+}
+
+/** Đọc các ô của một card thành `patches` gửi GAS: nguyên chuỗi người dùng gõ, boolean cho công tắc; ô không còn trên màn thì lấy bản nháp. */
+function fbmSyncConfigPatches(key) {
+  var map = FBM_SYNC_CONFIG_UNSAVED_FIELDS[key], patches = {};
+  Object.keys(map).forEach(function (field) {
+    var value = fbmSyncConfigUnsavedControlValue(map[field]);
+    if (value === undefined) { value = fbmSyncConfigDraftValue(key, field, ''); }
+    var section = fbmSyncConfigFieldSection(key, field);
+    patches[section] = patches[section] || {};
+    patches[section][field] = value;
+  });
+  return patches;
+}
 
 function fbmSyncConfigPathGet(value, path) {
   var result = value;

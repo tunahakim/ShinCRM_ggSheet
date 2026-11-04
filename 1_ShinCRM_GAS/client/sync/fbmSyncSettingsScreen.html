@@ -1,7 +1,8 @@
 <script>
 function fbmSyncAccountNoticeBlocks(scope) {
   var notice = (FBM_SYNC_CLIENT.accountNotices || {})[scope], message = notice && notice.message;
-  return message ? [Notice({ kind: notice && notice.kind, text: String(message) })] : [];
+  var corrupt = scope === 'accountSettings' ? fbmSyncCorruptBlocks(FBM_SYNC_CONFIG_SECTIONS.accountSettings) : [];
+  return (message ? [Notice({ kind: notice && notice.kind, text: String(message) })] : []).concat(corrupt);
 }
 function fbmSyncIdentitySummaryBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {};

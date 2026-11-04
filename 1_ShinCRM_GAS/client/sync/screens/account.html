@@ -20,7 +20,7 @@ function fbmSyncLoginPolicyNavigationBlocks() {
   return [FBM_SYNC_ACCOUNT_UI.layout.singleAction(Button({ id: FBM_SYNC_ACCOUNT_SCHEMA.login.actionIds.policy, label: FBM_SYNC_ACCOUNT_SCHEMA.login.policy, className: uiResolveActionClass('edit', 'button'), disabled: !!FBM_SYNC_CLIENT.running || fbmSyncConfigIsEditing('connection') }))];
 }
 function fbmSyncAccountSettingsBlocks() {
-  var settings = (FBM_SYNC_CLIENT.syncSettings || {}).account || {}, draft = fbmSyncConfigDraft('accountSettings', FBM_SYNC_CLIENT.accountSettingsDraft || {}), invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('accountSettings'), disabled = active || !editing;
+  var settings = fbmSyncSettingsSection('fbm_account') || {}, draft = fbmSyncConfigDraft('accountSettings', FBM_SYNC_CLIENT.accountSettingsDraft || {}), invalid = FBM_SYNC_CLIENT.accountSettingsInvalid || {}, active = !!FBM_SYNC_CLIENT.running, editing = fbmSyncConfigIsEditing('accountSettings'), disabled = active || !editing;
   var value = function (name) { return draft[name] !== undefined ? draft[name] : settings[name] || ''; };
   var fields = FBM_SYNC_ACCOUNT_SCHEMA.account.fields.reduce(function (blocks, field) {
     blocks = blocks.concat(FBM_SYNC_ACCOUNT_UI.layout.fieldHelp(StandaloneField(field.label, { id: field.id, kind: 'input', inputType: field.inputType, value: value(field.key), placeholder: field.placeholder, disabled: disabled, ariaLabel: field.label }, { className: invalid[field.key] ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' }), field.help));
