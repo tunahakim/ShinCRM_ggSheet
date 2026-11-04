@@ -153,7 +153,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 /** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
 var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = 'e2a5073b0ba4';
+var FBM_CONTRACT_VERSION = 'e5ec480fccd9';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -173,7 +173,8 @@ var gasPollAlarmMinutes = 0;
 function scheduleGasPoll(extensionConfig) {
   try {
     if (chrome.alarms && chrome.alarms.create) {
-      var minutes = Math.max(1, Math.min(60, Math.round(Number(extensionConfig && extensionConfig.pollMinutes || 5))));
+      var minutes = Math.round(Number(extensionConfig && extensionConfig.pollMinutes));
+      if (!(minutes >= 1 && minutes <= 60)) { alarmFailure('ALARM_MINUTES_INVALID', new Error('Nhịp hỏi GAS không hợp lệ: ' + String(extensionConfig && extensionConfig.pollMinutes))); return; }
       if (gasPollAlarmKnown && gasPollAlarmMinutes === minutes) { return; }
       var create = function () {
         gasPollAlarmKnown = true;
@@ -207,9 +208,20 @@ function stopGasPoll() {
   return undefined;
 }
 
+/**
+ * Lệnh chuông GAS trả kèm mỗi lần hỏi: `{ minutes }` giữ chuông theo nhịp, `{ stop: true }` tắt chuông vì máy này không chạy nền. Cờ tắt giữ trong kho để worker khởi động lại (Chrome tắt worker rảnh) không tự bật lại chuông; chỉ mở trình duyệt, tải lại Extension, Sidebar đánh thức hoặc cấu hình mới mới xóa cờ (`pollReopen`) và hỏi GAS lại.
+ */
+var FBM_POLL_STOPPED_KEY = 'fbmPollStopped';
+function pollApply(poll) {
+  if (!poll) { return Promise.resolve(); }
+  if (poll.stop) { return storageSet({ [FBM_POLL_STOPPED_KEY]: true }).then(function () { stopGasPoll(); }); }
+  return storageSet({ [FBM_POLL_STOPPED_KEY]: false }).then(function () { scheduleGasPoll({ pollMinutes: poll.minutes }); });
+}
+function pollReopen() { return storageSet({ [FBM_POLL_STOPPED_KEY]: false }); }
+/** Đặt lại chuông theo cấu hình đã lưu, trừ khi GAS đã bảo tắt. */
 function restoreHeartbeatSchedule() {
-  getRelayConfig().then(function (config) {
-    if (config) { scheduleGasPoll(config.extension); } else { stopGasPoll(); }
+  return Promise.all([getRelayConfig(), storageGet(FBM_POLL_STOPPED_KEY)]).then(function (read) {
+    if (read[0] && read[1] !== true) { scheduleGasPoll(read[0].extension); } else { stopGasPoll(); }
   });
 }
 
@@ -414,6 +426,14 @@ function bytesToBase64(bytes) { var text = ''; for (var i = 0; i < bytes.length;
 function base64ToBytes(value) { var text = atob(String(value || '')), bytes = new Uint8Array(text.length); for (var i = 0; i < text.length; i += 1) { bytes[i] = text.charCodeAt(i); } return bytes; }
 function credentialRef() { var bytes = new Uint8Array(12); crypto.getRandomValues(bytes); return 'cred-' + bytesToBase64(bytes).replace(/[+/=]/g, '').slice(0, 16); }
 function storageGet(key) { return new Promise(function (resolve) { chrome.storage.local.get([key], function (result) { resolve(result && result[key] || null); }); }); }
+/** Mã các khóa giải mã mật khẩu FBM Extension máy này đang giữ (chỉ mã, không có khóa): GAS cần biết để chỉ cho máy đăng nhập lại được FBM tự nhận chạy nền. */
+function credentialRefsHeld() {
+  return new Promise(function (resolve) {
+    chrome.storage.local.get(null, function (all) {
+      resolve(Object.keys(all || {}).filter(function (key) { return key.indexOf(CREDENTIAL_VAULT_PREFIX) === 0; }).map(function (key) { return key.slice(CREDENTIAL_VAULT_PREFIX.length); }));
+    });
+  });
+}
 function storageSet(value) { return new Promise(function (resolve, reject) { chrome.storage.local.set(value, function () { var error = chrome.runtime.lastError; if (error) { reject(new Error(error.message)); } else { resolve(true); } }); }); }
 
 /** Mã hóa ngay trên Extension; GAS chỉ nhận ciphertext và metadata cần cho việc hiển thị. */
@@ -556,7 +576,7 @@ function configureRelay(config) {
       return { ok: false, code: 'RELAY_SPREADSHEET_SWITCH_REQUIRED', currentSpreadsheetId: currentSpreadsheetId, error: 'Extension đang đồng bộ nền cho một Sheet khác; chỉ chuyển sang Sheet này khi người dùng xác nhận.' };
     }
     if (relayConfigMatches(saved, normalized)) {
-      scheduleGasPoll(normalized.extension);
+      restoreHeartbeatSchedule();
       return { ok: true, code: 'RELAY_CONFIG_UNCHANGED' };
     }
     return new Promise(function (resolve) {
@@ -568,7 +588,8 @@ function configureRelay(config) {
           relayConfigGeneration += 1;
           chrome.storage.local.remove([FBM_CHAIN_TRAIL_KEY, FBM_FAILURE_CELL_KEY]);
         }
-        scheduleGasPoll(normalized.extension);
+        // Cấu hình mới: bật lại chuông, lần chuông kế hỏi GAS và nhận lệnh chuông mới. Không gọi Web App ngay lúc Sidebar gửi cấu hình.
+        pollReopen().then(function () { scheduleGasPoll(normalized.extension); });
         resolve({ ok: true, code: switching ? 'RELAY_SPREADSHEET_SWITCHED' : 'RELAY_CONFIG_SAVED' });
       });
     });
@@ -646,7 +667,7 @@ function relayCall(config, kind, payload, timeoutMs) {
   if (!Object.prototype.hasOwnProperty.call(RELAY_CALLS, kind)) { return Promise.reject(Object.assign(new Error('Cổng gọi GAS không có việc "' + kind + '".'), { code: 'RELAY_CALL_UNKNOWN' })); }
   var command = RELAY_CALLS[kind].command, attempts = 0;
   return machineIdRead().then(function (machineId) {
-    var withTrail = RELAY_CALLS[kind].trail ? readChainTrail().then(function (trail) { return Object.assign({}, payload, { trail: trail }); }) : Promise.resolve(Object.assign({}, payload));
+    var withTrail = RELAY_CALLS[kind].trail ? Promise.all([readChainTrail(), credentialRefsHeld()]).then(function (read) { return Object.assign({}, payload, { trail: read[0], keyRefs: read[1] }); }) : Promise.resolve(Object.assign({}, payload));
     return withTrail.then(function (body) {
       var sent = { command: command, spreadsheetId: config.spreadsheetId, payload: Object.assign(body, { machineId: machineId }) };
       function attempt() {
@@ -664,7 +685,7 @@ function relayCall(config, kind, payload, timeoutMs) {
     });
   }).then(function (reply) {
     relayRetryLearn(reply && reply.retryMs);
-    return trailClear(reply && reply.trailAck).then(function () { return reply; });
+    return Promise.all([trailClear(reply && reply.trailAck), pollApply(reply && reply.poll)]).then(function () { return reply; });
   });
 }
 
@@ -760,13 +781,20 @@ function relayLoopStart(first) {
 /** Nhịp hỏi GAS (chuông, khởi động Chrome, Sidebar mở). GAS phải cấp envelope trước; không có envelope thì không chạm tab FBM. */
 function fbmHeartbeatNow(source) { return relayLoopStart({ kind: 'ask', payload: { trigger: String(source || 'manual') } }); }
 if (typeof globalThis !== 'undefined') { globalThis.fbmHeartbeatNow = fbmHeartbeatNow; }
-/** Sidebar vừa mở lượt tay: chỉ đánh thức một lần hỏi GAS ngay, GAS tự biết lượt nào đang chờ máy này. Tin đánh thức mất thì lần hỏi theo chuông vẫn nhận lượt; chuông hỏi nền không đổi. */
-function fbmRunNow(retryMs) {
+/**
+ * Sidebar đánh thức Extension hỏi GAS ngay: `run_now` sau khi mở lượt tay (GAS tự biết lượt nào đang chờ máy này; tin mất thì lần hỏi theo chuông vẫn nhận lượt), `config` sau khi lưu cài đặt đồng bộ (GAS trả nhịp chuông mới và báo máy này có chạy nền không). Đánh thức xóa cờ tắt chuông vì người dùng vừa thao tác trên máy này.
+ */
+var WAKE_TRIGGERS = ['run_now', 'config'];
+function fbmRunNow(retryMs, trigger) {
+  var reason = String(trigger || 'run_now');
+  if (WAKE_TRIGGERS.indexOf(reason) < 0) { return Promise.resolve({ ok: false, code: 'WAKE_TRIGGER_UNKNOWN', error: 'Sidebar đánh thức Extension với lý do "' + reason + '" không có trong WAKE_TRIGGERS.' }); }
   relayRetryLearn(retryMs);
   return getRelayConfig().then(function (config) {
     if (!config) { return { ok: false, code: 'RELAY_CONFIG_MISSING', error: 'Thiếu cấu hình relay; hãy mở lại Sidebar để gửi cấu hình cho Extension.' }; }
-    fbmHeartbeatNow('run_now');
-    return { ok: true, accepted: true };
+    return pollReopen().then(function () {
+      fbmHeartbeatNow(reason);
+      return { ok: true, accepted: true };
+    });
   });
 }
 
@@ -801,7 +829,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
   if (message && message.type === 'FBM_RUN_NOW') {
-    fbmRunNow(message.retryMs).then(sendResponse, function (error) { sendResponse({ ok: false, code: String(error && error.code || 'RUN_NOW_FAILED'), error: String(error && error.message || error) }); });
+    fbmRunNow(message.retryMs, message.trigger).then(sendResponse, function (error) { sendResponse({ ok: false, code: String(error && error.code || 'RUN_NOW_FAILED'), error: String(error && error.message || error) }); });
     return true;
   }
   if (message && message.type === 'FBM_BRIDGE_FAILURE') {
@@ -811,15 +839,18 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   return false;
 });
 
-/** Khôi phục alarm khi Extension cài mới; Chrome startup có thể hỏi GAS một lượt. */
-chrome.runtime.onInstalled.addListener(restoreHeartbeatSchedule);
-chrome.runtime.onStartup.addListener(function () {
-  restoreHeartbeatSchedule();
-  getRelayConfig().then(function (config) {
-    if (config && config.extension && config.extension.runOnStartup === true) { return fbmHeartbeatNow('startup'); }
-    return null;
-  }).catch(function (error) { return noteExtensionFailure('startup', error, 1); });
-});
+/**
+ * Mở trình duyệt hoặc cài/tải lại Extension: xóa cờ tắt chuông, đặt lại chuông và hỏi GAS đúng một lần. GAS quyết lần hỏi đó chỉ kiểm máy hay chạy việc (mở trình duyệt chạy việc khi bật "Hỏi GAS khi mở trình duyệt") và trả lệnh chuông.
+ * Chưa có cấu hình relay thì không hỏi (chưa biết GAS nào); Sidebar mở lần đầu gửi cấu hình là lần hỏi `config`.
+ */
+function askOnOpen(trigger) {
+  return pollReopen().then(restoreHeartbeatSchedule).then(getRelayConfig).then(function (config) {
+    return config ? fbmHeartbeatNow(trigger) : null;
+  }).catch(function (error) { return noteExtensionFailure(trigger, error, 1); });
+}
+chrome.runtime.onInstalled.addListener(function () { askOnOpen('install'); });
+chrome.runtime.onStartup.addListener(function () { askOnOpen('startup'); });
+// Worker khởi động lại giữa chừng (Chrome tắt worker rảnh): chỉ đặt lại chuông theo cờ, không hỏi GAS.
 restoreHeartbeatSchedule();
 recoverSheetsBridges();
 /** Gửi request đọc tối thiểu; không gửi thao tác ghi từ alarm. */

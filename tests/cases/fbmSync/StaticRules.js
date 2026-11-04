@@ -221,7 +221,7 @@ const EXCEPTIONS = {
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 7
   },
   hardcodedNumber: {
-    '2_ShinCRM_Extension/background/service_worker.js': 5,
+    '2_ShinCRM_Extension/background/service_worker.js': 4,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 1
   },
   logEvent: {

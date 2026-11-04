@@ -45,10 +45,14 @@ const CONTRACT = {
   relay: {
     body: ['key', 'contract', 'spreadsheetId', 'command', 'payload'],
     commands: ['heartbeat', 'continue'],
-    payload: ['machineId', 'trigger', 'trail', 'response', 'error', 'hop'],
+    payload: ['machineId', 'trigger', 'trail', 'keyRefs', 'response', 'error', 'hop'],
+    // Lý do hỏi (`trigger`) của lệnh `heartbeat`: chuông, mở trình duyệt, Sidebar đánh thức sau khi mở lượt tay hoặc lưu cài đặt, vừa cài/tải lại Extension. `keyRefs`: mã các khóa giải mã mật khẩu FBM Extension máy hỏi đang giữ.
+    triggers: ['alarm', 'startup', 'run_now', 'config', 'install'],
     // Ô lỗi gọi relay trong hộp đen, gửi kèm `trail` ở lần hỏi sau; GAS ghi Log rồi trả `trailAck` = `at` để Extension xóa ô.
     relayFailure: ['at', 'command', 'code', 'httpStatus', 'attempts'],
-    reply: ['ok', 'code', 'error', 'httpStatus', 'request', 'status', 'conflict', 'trailAck', 'retryMs'],
+    reply: ['ok', 'code', 'error', 'httpStatus', 'request', 'status', 'conflict', 'trailAck', 'retryMs', 'poll'],
+    // Lệnh chuông trong trả lời `heartbeat`: `minutes` giữ chuông theo nhịp, `stop` tắt chuông tới lần mở trình duyệt, tải lại Extension, Sidebar đánh thức hoặc cấu hình mới.
+    poll: ['minutes', 'stop', 'code'],
     driverCodes: ['RELAY_MACHINE_ID_REQUIRED', 'RUN_DRIVER_MISMATCH', 'CONTINUE_EMPTY'],
     // Mã giao thức lệch giữa GAS và Extension: bên nhận dừng, Sidebar báo tải lại Extension.
     mismatchCode: 'EXTENSION_PROTOCOL_MISMATCH',
@@ -62,8 +66,8 @@ const CONTRACT = {
     // Mọi trả lời lệnh cùng một dạng; `CRM_FBM_STATUS` mang trạng thái lượt GAS trả qua relay hoặc lỗi Extension (`failure`).
     reply: ['id', 'ok', 'result', 'code', 'error', 'currentSpreadsheetId'],
     status: ['status', 'conflict', 'code', 'error', 'failure', 'done'],
-    // Sidebar mở lượt tay xong thì đánh thức Extension hỏi GAS ngay (`trigger` `run_now`); tin không mang mã lượt, GAS tự biết lượt nào chờ máy này.
-    runNow: ['retryMs'],
+    // Sidebar đánh thức Extension hỏi GAS ngay: `trigger` `run_now` sau khi mở lượt tay (tin không mang mã lượt, GAS tự biết lượt nào chờ máy này), `config` sau khi lưu cài đặt đồng bộ.
+    runNow: ['retryMs', 'trigger'],
     // Cấu hình relay: `switchFrom` là Spreadsheet Extension đang giữ, chỉ gửi sau khi người dùng xác nhận chuyển Sheet ở Sidebar.
     config: ['url', 'key', 'spreadsheetId', 'extension', 'switchFrom'],
     configAck: ['ok', 'code', 'error', 'currentSpreadsheetId'],

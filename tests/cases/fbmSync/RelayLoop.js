@@ -192,9 +192,9 @@ async function cauNoi(so) {
   b.hop.workerReply = (message) => (message.type === 'FBM_RUN_NOW' ? { ok: true, accepted: true } : { ok: false, code: 'RUN_ID_REQUIRED', error: 'thiếu' });
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q1', nonce: 'n-1', sessionId: session, runId: 'L1', retryMs: [5, 10], password: 'khong-chep' });
   const traLoi = b.posts[b.posts.length - 1].data;
-  check(so, 'Lệnh CRM_FBM_RUN_NOW qua bảng lệnh: worker chỉ nhận lịch thử lại (mã lượt, mật khẩu Sidebar gửi kèm bị bỏ); trả lời một dạng kèm nonce và phiên', [
+  check(so, 'Lệnh CRM_FBM_RUN_NOW qua bảng lệnh: worker chỉ nhận lịch thử lại và lý do đánh thức, thiếu lý do là run_now (mã lượt, mật khẩu Sidebar gửi kèm bị bỏ); trả lời một dạng kèm nonce và phiên', [
     b.toWorker[0], [traLoi.action, traLoi.id, traLoi.ok, traLoi.result, traLoi.code, traLoi.nonce, traLoi.sessionId === session], b.posts[b.posts.length - 1].origin
-  ], [{ type: 'FBM_RUN_NOW', retryMs: [5, 10] }, ['CRM_FBM_RUN_NOW_RESULT', 'q1', true, { ok: true, accepted: true }, '', 'n-1', true], b.origin]);
+  ], [{ type: 'FBM_RUN_NOW', retryMs: [5, 10], trigger: 'run_now' }, ['CRM_FBM_RUN_NOW_RESULT', 'q1', true, { ok: true, accepted: true }, '', 'n-1', true], b.origin]);
   const truoc = b.toWorker.length;
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q2', nonce: 'sai', sessionId: session, runId: 'L1' });
   b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q3', nonce: 'n-1', sessionId: 'phien-cu', runId: 'L1' });

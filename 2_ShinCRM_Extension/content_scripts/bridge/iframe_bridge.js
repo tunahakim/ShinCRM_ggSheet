@@ -136,7 +136,7 @@ var BRIDGE_COMMANDS = {
   CRM_FBM_CREDENTIAL_CLEAR: { worker: 'FBM_CLEAR_CREDENTIALS', reply: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', fields: function (data) { return { credentialRef: String(data.credentialRef || '') }; } },
   CRM_FBM_CANCEL: { worker: 'FBM_CANCEL_BATCH', reply: 'CRM_FBM_CANCEL_RESULT', fields: function () { return {}; } },
   CRM_FBM_MACHINE_ID: { worker: 'FBM_MACHINE_ID', reply: 'CRM_FBM_MACHINE_ID_RESULT', fields: function () { return {}; } },
-  CRM_FBM_RUN_NOW: { worker: 'FBM_RUN_NOW', reply: 'CRM_FBM_RUN_NOW_RESULT', fields: function (data) { return { retryMs: Array.isArray(data.retryMs) ? data.retryMs : [] }; } }
+  CRM_FBM_RUN_NOW: { worker: 'FBM_RUN_NOW', reply: 'CRM_FBM_RUN_NOW_RESULT', fields: function (data) { return { retryMs: Array.isArray(data.retryMs) ? data.retryMs : [], trigger: String(data.trigger || 'run_now') }; } }
 };
 
 /** Tin có việc chỉ nhận từ đúng khung Sidebar vừa bắt tay: origin trong allowlist, đúng window, đúng nonce, đúng phiên Extension. */

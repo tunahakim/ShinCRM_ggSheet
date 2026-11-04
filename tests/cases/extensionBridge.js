@@ -276,7 +276,7 @@ async function chay(so) {
   check(so, 'tầng cổng và xác thực không gọi logic đối chiếu Customer của tầng 3', sessionLayerCustomerCalls, []);
   check(so, 'cổng khai báo nhóm request hệ thống và marker phiên trước khi phát request nghiệp vụ', /SESSION_SYSTEM_KINDS/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /sessionIdentityIsVerified/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /requestNeedsGate/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')) && /session_probe/.test(fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8')), true);
   check(so, 'bypass session gate khong nam trong tham so caller', fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8').indexOf('bypass') < 0, true);
-  check(so, 'Extension chi co mot alarm ky thuat gas_poll va khong co alarm theo tien trinh', [workerSource.indexOf("var GAS_POLL_ALARM = 'gas_poll'") >= 0, workerSource.indexOf("'fbm-heartbeat'") < 0, workerSource.indexOf("periodInMinutes: minutes") >= 0, workerSource.indexOf("fbmHeartbeatNow('startup')") >= 0], [true, true, true, true]);
+  check(so, 'Extension chi co mot alarm ky thuat gas_poll va khong co alarm theo tien trinh', [workerSource.indexOf("var GAS_POLL_ALARM = 'gas_poll'") >= 0, workerSource.indexOf("'fbm-heartbeat'") < 0, workerSource.indexOf("periodInMinutes: minutes") >= 0, workerSource.indexOf("askOnOpen('startup')") >= 0], [true, true, true, true]);
   check(so, 'Worker không chạy hai vòng relay song song: lần gọi đến khi vòng khác đang chạy thì nối sau vòng đó (một tab FBM, một người chở)', workerSource.indexOf('var relayLoopFlight = null;') >= 0 && workerSource.indexOf('var previous = relayLoopFlight || Promise.resolve();') >= 0 && workerSource.indexOf('previous.then(function () {') >= 0, true);
   check(so, 'Một người điều phối chuỗi request cho mọi nhịp (Giữ phiên, nhịp nền, lượt tay): một vòng, mọi lần nộp dùng cùng lệnh continue (kết quả hoặc lỗi gửi), request kế tiếp GAS cấp luôn đi lại đúng vòng đó', [
     (workerSource.match(/function relayLoop\(/g) || []).length,
@@ -294,7 +294,7 @@ async function chay(so) {
   check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, chuẩn bị tab, đổi trang theo lệnh GAS, gửi tab, tab trả, gửi GAS, báo lỗi, GAS trả lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop, giờ và mã lỗi', [
     ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'gas_reply_failed', 'chain_finished'].every((stage) => workerSource.indexOf("'" + stage + "'") >= 0),
     ['fbm_tab_preparing', 'fbm_page_reloading'].every((stage) => workerSource.indexOf("note('" + stage + "'") >= 0),
-    workerSource.indexOf("ask: { command: 'heartbeat', trail: true }") >= 0 && workerSource.indexOf('Object.assign({}, payload, { trail: trail })') >= 0,
+    workerSource.indexOf("ask: { command: 'heartbeat', trail: true }") >= 0 && workerSource.indexOf('Object.assign({}, payload, { trail: read[0], keyRefs: read[1] })') >= 0,
     workerSource.indexOf("var trail = { at: Date.now(), stage: String(stage || ''), requestId: String(request && request.id || ''), hop: Number(hop || 0), workerStartedAt: FBM_WORKER_STARTED_AT, code: String(code || ''), httpStatus: Number(httpStatus || 0) };") >= 0
   ], [true, true, true, true]);
   check(so, 'alarm chi tim tab FBM sau khi co relay config', workerSource.indexOf("fbmHeartbeatNow('alarm')") >= 0 && workerSource.indexOf("if (!config) {") >= 0 && workerSource.indexOf('findFbmTab()') >= 0, true);
@@ -431,11 +431,11 @@ async function chay(so) {
       alarms: {
         create(name, info) { relayAlarms += 1; relayAlarm = { name, periodInMinutes: info && info.periodInMinutes }; },
         get(name, done) { done(relayAlarm && relayAlarm.name === name ? relayAlarm : null); },
-        clear: () => Promise.resolve(true),
+        clear: () => { relayAlarm = null; return Promise.resolve(true); },
         onAlarm: { addListener() {} }
       },
       storage: { local: {
-        get(keys, done) { const value = {}; (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = relayStorage[key]; }); done(value); },
+        get(keys, done) { if (keys === null) { done(Object.assign({}, relayStorage)); return; } const value = {}; (Array.isArray(keys) ? keys : [keys]).forEach((key) => { value[key] = relayStorage[key]; }); done(value); },
         set(value, done) { Object.assign(relayStorage, value); if (done) { done(); } },
         remove(keys) { (Array.isArray(keys) ? keys : [keys]).forEach((key) => { delete relayStorage[key]; }); }
       } }
@@ -563,8 +563,25 @@ async function chay(so) {
   const relayNetworkFailure = await workerContext.relayLoop(relayTest, { kind: 'ask', payload: {} });
   check(so, 'relay mat mang ket thuc huu han khong lap vo han, bao ma that', [relayNetworkFailure.ok, relayNetworkFailure.code, relayNetworkFetches], [false, 'RELAY_FETCH_FAILED', 1]);
 
-  // Tin worker còn lại sau khi bỏ kênh execute của Sidebar: mã máy ổn định, Extension không nhận tin execute cũ.
+  // Lệnh chuông GAS trả kèm lần hỏi: máy không chạy nền tắt chuông, cờ tắt sống qua worker khởi động lại; Sidebar đánh thức thì mở lại và theo nhịp GAS trả.
   const hoiMay = (type, extra) => new Promise((resolve) => { workerMessageListener(Object.assign({ type }, extra || {}), null, resolve); });
+  const gasTraLoi = (bodies, reply) => (url, options) => { bodies.push(JSON.parse(options.body)); return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve(JSON.stringify(reply)); } }); };
+  const pollBodies = [];
+  relayStorage['fbmCredentialVault:cred-xyz'] = { ref: 'cred-xyz' };
+  workerContext.fetch = gasTraLoi(pollBodies, { ok: true, request: null, code: 'MACHINE_NOT_ASSIGNED', poll: { stop: true, code: 'MACHINE_NOT_ASSIGNED' } });
+  await workerContext.relayLoop(relayTest, { kind: 'ask', payload: { trigger: 'alarm' } });
+  const alarmSauTat = relayAlarm;
+  await workerContext.restoreHeartbeatSchedule();
+  check(so, 'GAS bảo tắt chuông: Extension xóa chuông, ghi cờ tắt; worker khởi động lại không tự bật lại; lần hỏi mang mã khóa giải mã đang giữ (chỉ mã, không có khóa)',
+    [JSON.stringify(pollBodies[0].payload.keyRefs), relayStorage.fbmPollStopped, alarmSauTat, relayAlarm], ['["cred-xyz"]', true, null, null]);
+  workerContext.fetch = gasTraLoi(pollBodies, { ok: true, request: null, code: 'ASK_CHECK_ONLY', poll: { minutes: 7 } });
+  const daDanhThuc = await hoiMay('FBM_RUN_NOW', { trigger: 'config' });
+  await workerContext.relayLoopFlight;
+  const lyDoLa = await hoiMay('FBM_RUN_NOW', { trigger: 'alarm' });
+  check(so, 'Sidebar đánh thức sau khi lưu cài đặt: xóa cờ tắt, hỏi GAS lý do config, đặt chuông theo nhịp GAS trả; lý do đánh thức lạ bị từ chối',
+    [daDanhThuc.ok, pollBodies[pollBodies.length - 1].payload.trigger, relayStorage.fbmPollStopped, relayAlarm && relayAlarm.periodInMinutes, lyDoLa.code], [true, 'config', false, 7, 'WAKE_TRIGGER_UNKNOWN']);
+
+  // Tin worker còn lại sau khi bỏ kênh execute của Sidebar: mã máy ổn định, Extension không nhận tin execute cũ.
   const may1 = await hoiMay('FBM_MACHINE_ID'), may2 = await hoiMay('FBM_MACHINE_ID');
   check(so, 'FBM_MACHINE_ID trả mã máy tạo một lần và giữ nguyên ở lần hỏi sau', [may1.ok, /^may-/.test(may1.machineId), may2.machineId === may1.machineId, relayStorage.fbmMachineId === may1.machineId], [true, true, true, true]);
   const hopBridge = await hoiMay('FBM_BRIDGE_FAILURE', { code: 'BRIDGE_POST_FAILED', message: 'x' });
