@@ -68,8 +68,8 @@ function capDauDaySach(hopCat) {
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
 }
 
-/** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. */
-const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/RequestWatch.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
+/** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. Nhãn lượt ở `Run.js` đọc tên tiến trình nền của `Scheduler.js` nên sổ tiến trình nạp cùng khung. */
+const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/RequestWatch.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
 
 /** Trước khi chạy một tệp: tệp đồng bộ cần bảng quyền; `Identity.js` đọc liên kết qua cửa JSON của kho trong `State.js` (bản thật luôn có). */
 function capTruocTep(hopCat, duongDan, duongDans) {
@@ -89,7 +89,7 @@ function capSauTep(hopCat, duongDan) {
 function capSauNap(hopCat, duongDans) {
   if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
   if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0 && !(hopCat.FbmSync && hopCat.FbmSync.sessionVerifiedApply)) { vm.runInContext(docTep('fbm_sync/auth/AutoLogin.js'), hopCat, { filename: 'fbm_sync/auth/AutoLogin.js' }); }
-  if (duongDans.indexOf('fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
+  if (duongDans.indexOf('fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }
 
 /** Cổng cài đặt chung cùng phần cài đặt và phạm vi của đồng bộ: mọi hộp chạy lượt đồng bộ cần, vì công tắc, ngưỡng và khoảng nghỉ đọc qua cổng. */

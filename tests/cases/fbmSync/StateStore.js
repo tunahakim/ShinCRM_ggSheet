@@ -9,7 +9,7 @@ const { docLog } = require('../../lib/gas/doc-log');
 
 /** Kho trạng thái phiên: đầy kho thì không ghi dở, đóng phiên ghi bản rút gọn, state hỏng thì status trả "kẹt" kèm nút đặt lại. */
 function kiemKhoTrangThai(so) {
-  const nen = dungHop({ sheets: ['Log'], tep: TEP_NEN.concat(TEP_KHUNG_LUOT, ['fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js']) });
+  const nen = dungHop({ sheets: ['Log'], tep: TEP_NEN.concat(TEP_KHUNG_LUOT, ['fbm_sync/state/RunPlan.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js']) });
   const F = nen.hop.FbmSync, kho = nen.stubs.PropertiesService.getDocumentProperties();
   let day = false;
   ['setProperty', 'setProperties'].forEach((ten) => { const goc = kho[ten]; kho[ten] = function () { if (day) { throw new Error('DocumentProperties quota exceeded'); } return goc.apply(null, arguments); }; });

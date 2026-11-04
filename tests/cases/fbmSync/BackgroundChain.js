@@ -14,8 +14,8 @@ function chuoiHarness(lich, options) {
   vm.runInContext('Date.now = function () { return __now(); };', h.flow.hop);
   h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   datLichNen(h.flow.hop, Object.assign({ enabled: true, direction: 'read' }, lich));
-  const xong = [], advance = h.F.scheduleMarkDone;
-  h.F.scheduleMarkDone = function (kind) { xong.push(kind); return advance.apply(this, arguments); };
+  const xong = [], ghiSo = h.F.processBookMark;
+  h.F.processBookMark = function (kind, outcome) { if (outcome === 'done') { xong.push(kind); } return ghiSo.apply(this, arguments); };
   /** Hỏi một lần sau `phut` phút; mỗi request FBM tốn `moiRequest` mili-giây. Trả các tiến trình chạy xong trong lần hỏi đó. */
   async function hoi(phut, moiRequest, hooks) {
     clock.now += phut * PHUT; xong.length = 0;
@@ -35,8 +35,8 @@ async function chay(so) {
   const tamLan = [];
   for (let i = 0; i < 8; i += 1) { tamLan.push((await doi.hoi(60)).xong); }
   check(so, 'Hỏi 60 phút một lần trong 8 lần: Quét nhanh và Vòng xoay chạy ở cả 8 lần, Lấy toàn bộ giao dịch chạy ít nhất một lần, Giữ phiên chạy sau cùng mỗi lần, không lần nào dừng lỗi', [
-    tamLan.filter((list) => list.indexOf('customerFull') >= 0).length, tamLan.filter((list) => list.indexOf('detail') >= 0).length, tamLan.some((list) => list.indexOf('activityFull') >= 0), tamLan.every((list) => list[list.length - 1] === 'heartbeat'), doi.F.stateRead().phase, doi.F.stateRead().chain
-  ], [8, 8, true, true, 'done', null]);
+    tamLan.filter((list) => list.indexOf('customerFull') >= 0).length, tamLan.filter((list) => list.indexOf('detail') >= 0).length, tamLan.some((list) => list.indexOf('activityFull') >= 0), tamLan.every((list) => list[list.length - 1] === 'heartbeat'), doi.F.stateRead().phase, doi.F.stateRead().process
+  ], [8, 8, true, true, 'done', '']);
   const lanDau = tamLan[0];
   check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần (lần hỏi đầu: chưa tiến trình nào từng chạy xong nên cả bốn đến hạn)', lanDau, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
 
@@ -60,7 +60,7 @@ async function chay(so) {
   // Mỗi request 30 giây (dưới ngưỡng thu hồi phiên treo) nên cả lượt Vòng xoay kéo dài hơn 3 phút, gấp ba chu kỳ.
   const batDau = cham.clock.now + 5 * PHUT;
   const chamLan = await cham.hoi(5, 30000);
-  check(so, 'Vòng xoay chu kỳ 1 phút mà mỗi lần chạy mất hơn 3 phút: chuỗi vẫn dừng, Vòng xoay chạy đúng một lần trong lần hỏi', [cham.clock.now - batDau >= 3 * PHUT, dem(chamLan.xong, 'detail'), chamLan.end.request || null, cham.F.stateRead().phase, cham.F.stateRead().chain], [true, 1, null, 'done', null]);
+  check(so, 'Vòng xoay chu kỳ 1 phút mà mỗi lần chạy mất hơn 3 phút: chuỗi vẫn dừng, Vòng xoay chạy đúng một lần trong lần hỏi', [cham.clock.now - batDau >= 3 * PHUT, dem(chamLan.xong, 'detail'), chamLan.end.request || null, cham.F.stateRead().phase, cham.F.stateRead().process], [true, 1, null, 'done', '']);
 
   // Người dùng chọn dừng lượt nền: lượt nền dừng sau response đang chờ, không ghi giờ chạy xong, lần hỏi kế tiếp chạy lại.
   const chen = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
@@ -123,7 +123,7 @@ async function chay(so) {
   // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
   const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
   boDo.F.customerBaselineWrite(12);
-  boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, chain: { current: 'customerFull', ran: [], direction: 'read', startedAt: boDo.clock.now - 10 * PHUT } });
+  boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
   const sauBoDo = await boDo.hoi(1);
   check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);
 }

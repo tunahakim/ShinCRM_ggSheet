@@ -56,7 +56,8 @@ function chay(so) {
 
   const treo = dungState();
   const truocTreo = treo.dong.length;
-  treo.nen.FbmSync.recoverStaleRun(treo.nen.FbmSync.stateRead(), Date.now() + treo.nen.FbmSync.STALE_RUN_MS + 1000);
+  const oTreo = treo.nen.FbmSync.stateRead();
+  treo.nen.FbmSync.staleRunClose(oTreo, treo.nen.FbmSync.staleRunCheck(oTreo, Date.now() + treo.nen.FbmSync.STALE_RUN_MS + 1000));
   check(so, 'thu hồi phiên treo: bước đang chạy và phiên được đóng với lỗi',
     dongDong(treo.dong.slice(truocTreo)).map((d) => d.split('|').slice(0, 2).join('|')),
     ['pull_customer|error', 'reconcile_customer|warn', 'run|error']);

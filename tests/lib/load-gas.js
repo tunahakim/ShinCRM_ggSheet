@@ -140,7 +140,9 @@ function soBan(hopCat) {
 const TEP_TANG_SHEET = ['server/sheet/SheetReadCopy.js', 'server/sheet/SheetPolicy.js', 'server/sheet/SheetCellWrite.js', 'server/sheet/SheetStructure.js', 'server/sheet/SheetGrid.js', 'server/sheet/SheetRegions.js', 'server/sheet/SheetLocate.js', 'server/sheet/EntityWrite.js'];
 
 /** Nạp một hoặc nhiều tệp `.js` phía máy chủ vào hộp cát, theo đúng thứ tự truyền vào. */
-function napServer(hopCat, ...duongDans) {
+function napServer(hopCat, ...danhSach) {
+  // Khung lượt đã gồm vài tệp mà ca kiểm cũng liệt kê riêng; mỗi tệp chỉ chạy một lần như trên GAS.
+  const duongDans = danhSach.filter((tep, viTri) => danhSach.indexOf(tep) === viTri);
   // Trên GAS mọi tệp chung một không gian tên; cửa kho DocumentProperties và tầng đọc/ghi Sheet là phụ thuộc của gần như mọi tệp server nên luôn nạp trước, như bản thật.
   if (typeof hopCat.documentProps !== 'function' && duongDans.indexOf('server/state/DocumentStore.js') < 0) {
     vm.runInContext(docTep('server/state/DocumentStore.js'), hopCat, { filename: 'server/state/DocumentStore.js' });

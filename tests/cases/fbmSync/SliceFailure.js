@@ -27,10 +27,10 @@ function chay(so) {
     ['error', true, 0]);
 
   const nenHb = dungState();
-  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js');
-  nenHb.nen.fbmSyncHeartbeatLocked = () => { throw new Error('Lỗi lát nền'); };
+  napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js');
+  nenHb.nen.FbmSync.continue = () => { throw new Error('Lỗi lát nền'); };
   nenHb.nen.FbmSync.replyAdmit = () => null;
-  nenHb.nen.FbmSync.statePatch({ cursor: { kind: 'heartbeat' } });
+  nenHb.nen.FbmSync.statePatch({ origin: 'background', process: 'keepalive', cursor: { kind: 'customer_count' } });
   let nemNen = '';
   try { nenHb.nen.FbmSync.controlDispatch('continue', { source: 'relay', response: {} }); } catch (err) { nemNen = err.message; }
   check(so, 'exception ở đường nền (relay nộp kết quả nhịp Giữ phiên): lỗi gốc ném lại và phiên chuyển sang error',
@@ -92,7 +92,7 @@ function chay(so) {
     [2, ['preflight_issue|error|customer|3', 'preflight_issue|warn|activity|1']]);
   // FBM-004: cửa ghi Sheet chặn trang pull thì phiên phải lỗi, không được tổng kết "Hoàn tất", cursor đứng nguyên trang đó.
   const ghi = dungState();
-  napServer(ghi.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(ghi.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   ghi.nen.FbmSync.SYNC_STATUS = { error: 'lỗi' };
   ghi.nen.FbmSync.canWriteSheet = () => true;
   ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};

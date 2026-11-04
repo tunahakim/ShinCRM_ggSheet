@@ -5,6 +5,7 @@ const { executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, g
 const { napServer } = require('../../lib/load-gas');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
+const MAY_NEN = 'may-nen';
 const KHOA_TRANG = ['ngay_gd', 'datetime0', 'xorder', 'stt_rec_kh'];
 
 /** Một Sheet DEV giả, một tab FBM giả giữ RAM giữa các request, và FBM giả phân trang keyset như bản thật. */
@@ -43,6 +44,8 @@ function scanHarness(options) {
   F.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
   F.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] });
   F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  // Máy Extension của harness là máy được giao chạy nền, để lần hỏi theo chuông được chạy việc nền.
+  F.backgroundMachineWrite(F.machineAssigned(MAY_NEN, 'Máy nền thử', Date.now()));
   Object.assign(F.BUDGET, opt.budget || {});
   const customerFields = F.GRID_FIELDS.customer.concat(['ghi_chu_noi_bo']), activityFields = F.GRID_FIELDS.activity;
   const so2 = (i) => String(i).padStart(2, '0');
@@ -151,11 +154,11 @@ function scanHarness(options) {
   /** Một lần Extension hỏi GAS theo alarm `gas_poll` như relay thật: lệnh `heartbeat` hỏi việc, mọi kết quả nộp qua lệnh `continue` tới khi GAS trả `request: null`; trần 200 vòng chỉ để test không treo. */
   async function poll(hooks) {
     const h = hooks || {};
-    let step = F.controlDispatch('heartbeat', { trigger: h.source || 'alarm' }, 'relay');
+    let step = F.controlDispatch('heartbeat', { trigger: h.source || 'alarm', machineId: MAY_NEN }, 'relay');
     for (let used = 0; step && step.request && used < 200; used += 1) {
       const request = step.request, sent = await deliver(request, h);
-      if (sent.fail) { step = F.controlDispatch('continue', { error: { requestId: request.id, code: sent.fail, message: sent.message }, hop: used + 1 }, 'relay'); continue; }
-      step = F.controlDispatch('continue', { response: sent.raw, hop: used + 1 }, 'relay');
+      if (sent.fail) { step = F.controlDispatch('continue', { machineId: MAY_NEN, error: { requestId: request.id, code: sent.fail, message: sent.message }, hop: used + 1 }, 'relay'); continue; }
+      step = F.controlDispatch('continue', { machineId: MAY_NEN, response: sent.raw, hop: used + 1 }, 'relay');
     }
     return step;
   }

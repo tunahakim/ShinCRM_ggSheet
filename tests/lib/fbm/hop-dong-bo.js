@@ -48,7 +48,7 @@ function workflowGas(options) {
     ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/control/ControlPort.js',
     'fbm_sync/control/SettingsCommands.js',
-    'fbm_sync/state/Scheduler.js',
+    'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js',
     'fbm_sync/reconcile/Identity.js',
     'fbm_sync/reconcile/CategoryGate.js',
     'fbm_sync/reconcile/Fingerprint.js',

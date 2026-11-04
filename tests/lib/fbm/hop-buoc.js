@@ -13,7 +13,7 @@ function hopBuoc() {
     PropertiesService: { getDocumentProperties: () => kho },
     logTrace: (entry) => dong.push(entry), logEvent: (entry) => dong.push(entry)
   });
-  napServer(nen, ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
+  napServer(nen, ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js');
   nen.FbmSync.statusView = () => ({ ok: true });
   const st = nen.FbmSync.runOpen({ phase: 'checking_session' });
   nen.FbmSync.businessStepStart(st, 'run', {});

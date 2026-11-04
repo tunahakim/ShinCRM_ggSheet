@@ -31,7 +31,7 @@ async function chay(so) {
 
   const beforeForeign = anh();
   const foreign = hoi('may-B');
-  check(so, 'máy khác được đánh thức thì không nhận lượt của máy A, không mở việc nền, không ghi gì', [foreign.code, foreign.request || null, anh() === beforeForeign], ['NO_RUN_AWAITING', null, true]);
+  check(so, 'máy khác (không phải máy nền) được đánh thức thì không nhận lượt của máy A, không mở việc nền, tắt chuông, không ghi ô lượt', [foreign.code, foreign.request || null, foreign.poll.stop, anh() === beforeForeign], ['MACHINE_NOT_ASSIGNED', null, true, true]);
   const foreignAlarm = hoi('may-B', 'alarm');
   check(so, 'chuông máy khác gặp chỗ giữ còn hạn thì không cướp lượt, không ghi gì', [foreignAlarm.request || null, anh() === beforeForeign], [null, true]);
   const foreignReply = FbmSync.controlDispatch('continue', { machineId: 'may-B', response: { ok: true, status: 200, body: '{}' } }, 'relay');
@@ -45,7 +45,7 @@ async function chay(so) {
 
   const beforeTwice = anh();
   const twice = hoi('may-A');
-  check(so, 'đánh thức lần hai khi lượt đã được nhận: không phát phong bì trùng, không ghi', [twice.code, twice.request || null, anh() === beforeTwice], ['NO_RUN_AWAITING', null, true]);
+  check(so, 'đánh thức lần hai khi lượt đã được nhận: không phát phong bì trùng, không ghi; máy đang chở lượt tay giữ chuông dù không phải máy nền', [twice.code, twice.request || null, !!twice.poll.stop, twice.poll.minutes > 0, anh() === beforeTwice], ['MACHINE_NOT_ASSIGNED', null, false, true, true]);
 
   // Lượt đóng (dừng) rồi response của request cũ mới về: GAS bỏ, không cấp request mới.
   FbmSync.stateWrite(FbmSync.runClose(FbmSync.stateRead(), 'paused', { message: 'Dừng để thử response muộn.' }));
@@ -97,12 +97,12 @@ async function chay(so) {
   const lostState = FbmSync.stateRead(), lostLog = logs.find((line) => line.action === 'stale_run');
   check(so, 'chỗ giữ quá hạn: chuông máy khác (nền tắt) đóng lượt RUN_PICKUP_EXPIRED, không phát request, Log nói Extension máy được giao không hỏi GAS', [lateAsk.request || null, lostState.runId === lostRun.runId, lostState.phase, lostState.lastFailureCode, !!lostLog && /không hỏi GAS lần nào/.test(lostLog.reason)], [null, true, 'error', 'RUN_PICKUP_EXPIRED', true]);
   const lateOwner = hoi('may-A');
-  check(so, 'máy được giao đánh thức muộn sau khi lượt đã đóng thì không nhận gì', [lateOwner.code, lateOwner.request || null], ['NO_RUN_AWAITING', null]);
+  check(so, 'máy được giao đánh thức muộn sau khi lượt đã đóng thì không nhận gì', [lateOwner.code, lateOwner.request || null], ['MACHINE_NOT_ASSIGNED', null]);
 
   // Dừng khi lượt còn giữ chỗ: đóng ngay như mọi lần Dừng.
   FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
   const stopped = hop.FbmSync.runStopCommand('any');
-  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['SYNC_STOPPED', 'paused', '', 'NO_RUN_AWAITING']);
+  check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['SYNC_STOPPED', 'paused', '', 'MACHINE_NOT_ASSIGNED']);
 
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
   check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);

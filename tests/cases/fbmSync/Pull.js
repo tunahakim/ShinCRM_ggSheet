@@ -16,7 +16,7 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) },
     shinOpenBook: () => ({ getId: () => 'sheet-pull-test' })
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
     builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
     builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
@@ -60,7 +60,7 @@ async function chay(so) {
     FbmSync: {
       stateRead: () => readFinishState,
       stateWrite: (next) => { readFinishState = next; return next; },
-      recoverStaleRun: (state) => ({ state, recovered: false }),
+      staleRunCheck: () => null,
       responseRequestId: () => 'read-request', requestAnswered: (state, id) => !!id && String(state.activeRequestId || '') === id,
       protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
@@ -73,11 +73,11 @@ async function chay(so) {
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
   readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
   readFinish.FbmSync.readListClear = () => {};
-  readFinish.FbmSync.recoverStaleRun = (state) => ({ state, recovered: false });
+  readFinish.FbmSync.staleRunCheck = () => null;
   readFinish.FbmSync.customerBaselineWrite = () => {};
   readFinish.FbmSync.activityStageNext = () => null;
   const readFinished = readFinish.FbmSync.continueStep({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });

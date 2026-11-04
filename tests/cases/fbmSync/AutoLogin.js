@@ -7,8 +7,11 @@ const USER_BODY = '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]]
 
 /** Nộp response của lượt nền như `continue` qua lát chung, bỏ phần khóa của cửa lệnh (khóa kiểm ở Control), nhưng kết quả vẫn qua cửa ra `publicResult` như đường thật: gọi thẳng lát thì trường lạ ở đường tự đăng nhập không lộ ra trong test. */
 function noiNen(hop, response) { return hop.FbmSync.publicResult(hop.FbmSync.runSlice(() => hop.FbmSync.continue(response))); }
-/** Lần hỏi của chuông nền, kết quả qua cửa ra `publicResult` như `noiNen`. */
-function hoiNen(hop) { return hop.FbmSync.publicResult(hop.fbmSyncHeartbeatRequest({ trigger: 'alarm' })); }
+/** Lần hỏi của chuông nền từ máy được giao chạy nền, kết quả qua cửa ra `publicResult` như `noiNen`. */
+function hoiNen(hop) {
+  if (hop.FbmSync.backgroundMachineRead().machineId !== 'may-A') { hop.FbmSync.backgroundMachineWrite(hop.FbmSync.machineAssigned('may-A', 'Máy A', Date.now())); }
+  return hop.FbmSync.publicResult(hop.FbmSync.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' }));
+}
 
 async function chay(so) {
   section('FBM sync - auto-login');
@@ -50,7 +53,7 @@ async function chay(so) {
   const heartbeatData = { FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_ACTIVITY_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_DETAIL_SCAN: String(Date.now()) };
   const heartbeatProps = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatProps, getScriptProperties: () => heartbeatProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-test' }) });
-  napServer(heartbeat, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(heartbeat, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   heartbeat.FbmSync.configValue = () => '';
   heartbeat.FbmSync.readLocal = () => [];
   heartbeat.FbmSync.bindingWrite({ spreadsheetId: 'sheet-test', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
@@ -68,8 +71,8 @@ async function chay(so) {
   const authorizeResponse = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: loginResponse.request.id }] } });
   check(so, 'sau authorize GAS cap User grid de xac minh identity', [authorizeResponse.ok, authorizeResponse.request.meta.kind, authorizeResponse.request.body.controller], [true, 'identity_user_grid', 'User']);
   const userResponse = noiNen(heartbeat, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: authorizeResponse.request.id }] } });
-  check(so, 'chi identity khop moi tiep tuc heartbeat', [userResponse.ok, userResponse.code, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'AUTO_LOGIN_OK', 'heartbeat', 'ANHLT', 'Le Tuan Anh']);
-  check(so, 'Giữ phiên đi qua probe rồi cần đăng nhập không bị tính là lượt bấm tay: lần đăng nhập vẫn chịu chu kỳ chờ của chạy nền', autoLoginRequest.request && heartbeat.FbmSync.autoLoginAttemptOptions(Object.assign({}, heartbeat.FbmSync.stateRead(), { origin: 'manual', metadata: { sessionGate: { resumeCursor: { kind: 'heartbeat' } } } }), { kind: 'session_probe' }).manual, false);
+  check(so, 'Chỉ khi tài khoản khớp mới đi tiếp lượt Giữ phiên tới bước đếm khách', [userResponse.ok, userResponse.request.meta.kind, heartbeat.FbmSync.stateRead().session.accountUsername, heartbeat.FbmSync.stateRead().session.accountName], [true, 'customer_count', 'ANHLT', 'Le Tuan Anh']);
+  check(so, 'Giữ phiên là lượt nền: đi qua probe rồi cần đăng nhập không bị tính là lượt bấm tay, lần đăng nhập vẫn chịu chu kỳ chờ của chạy nền', [heartbeat.FbmSync.stateRead().origin, !!autoLoginRequest.request && heartbeat.FbmSync.autoLoginAttemptOptions(heartbeat.FbmSync.stateRead(), { kind: 'session_probe' }).manual], ['background', false]);
   // Gặp thật 2026-10-16 20:33: đăng nhập xong giữa Giữ phiên, response đếm khách về thì GAS trả "hết việc" mà lượt vẫn mở ở checking_session; Quét đầy đủ đến hạn không chạy, lần hỏi sau mới phát hiện lượt bỏ dở.
   heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = '1';
   heartbeat.FbmSync.customerBaselineWrite(1);
@@ -79,11 +82,11 @@ async function chay(so) {
   heartbeat.logEvent = savedResumedLog;
   const resumedState = heartbeat.FbmSync.stateRead();
   check(so, 'Đăng nhập xong giữa Giữ phiên: response đếm khách về thì chuỗi chạy tiếp Quét đầy đủ đến hạn, không trả hết việc khi lượt còn mở', [
-    resumedCount.ok, !!resumedCount.request, resumedState.chain && resumedState.chain.current, resumedState.chain && resumedState.chain.ran.indexOf('heartbeat') >= 0, resumedLogs.some((event) => event.action === 'run_left_open')
+    resumedCount.ok, !!resumedCount.request, resumedState.process, Number(heartbeatData.FBM_SYNC_DONE_HEARTBEAT) > 1, resumedLogs.some((event) => event.action === 'run_left_open')
   ], [true, true, 'customerFull', true, false]);
   // Các ca sau chỉ xét Giữ phiên: bỏ Quét đầy đủ vừa mở khỏi chuỗi.
   heartbeatData.FBM_SYNC_DONE_CUSTOMER_FULL_SCAN = String(Date.now());
-  heartbeat.FbmSync.statePatch({ chain: null, scheduledScan: '' });
+  heartbeat.FbmSync.statePatch({ process: '' });
   // Lượt tay đã tự đăng nhập thì cờ "đã thử đăng nhập" còn sót sau khi lượt xong: dựng lại dấu đó cho ca kế.
   const leftoverState = heartbeat.FbmSync.stateRead();
   heartbeat.FbmSync.sessionGateMeta(leftoverState).loginAttempted = true;
@@ -127,7 +130,7 @@ async function chay(so) {
   const markerMismatch = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/marker-mismatch', body: {}, meta: { kind: 'business_request', requireIdentityProbe: true } });
   check(so, 'marker lệch session bị coi là chưa xác thực và chặn request nghiệp vụ', [markerMismatch.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind], ['session_probe', 'session_probe']);
 
-  heartbeat.FbmSync.statePatch({ runId: 'auto-mismatch', phase: 'checking_session', cursor: { kind: 'login_identity_user', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'heartbeat' } }, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: true, sessionId: 'old-session', identitySessionId: 'old-session' } });
+  heartbeat.FbmSync.statePatch({ runId: 'auto-mismatch', phase: 'checking_session', cursor: { kind: 'login_identity_user', purpose: 'auto', testOnly: false, resumeCursor: { kind: 'customer_count' } }, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: true, sessionId: 'old-session', identitySessionId: 'old-session' } });
   const autoMismatch = heartbeat.FbmSync.loginIdentityContinue(heartbeat.FbmSync.stateRead(), heartbeat.FbmSync.stateRead().cursor, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[9999,"OTHER","Other User"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}' });
   check(so, 'auto-login sai identity fail-closed va xoa marker phien', [autoMismatch.code, heartbeat.FbmSync.stateRead().session.identityVerified, heartbeat.FbmSync.stateRead().session.expired, docPhan(heartbeat, 'loginPolicy').enabled], ['LOGIN_IDENTITY_MISMATCH', false, true, false]);
 
@@ -159,13 +162,13 @@ async function chay(so) {
 
   datPhan(heartbeat, 'loginPolicy', { autoOpenTab: true });
   heartbeat.FbmSync.loginConfigSave({ credentialRef: 'cred-heartbeat-123', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
-  heartbeat.FbmSync.statePatch({ runId: 'no-tab-run', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'tab-request-1', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  heartbeat.FbmSync.statePatch({ runId: 'no-tab-run', phase: 'checking_session', mode: 'read', cursor: { kind: 'customer_count' }, activeRequestId: 'tab-request-1', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const noTabRetry = heartbeat.FbmSync.transportFailureRun({ requestId: 'tab-request-1', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   const retryId = noTabRetry.request && noTabRetry.request.id;
   const noTabFinal = heartbeat.FbmSync.transportFailureRun({ requestId: retryId, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'no-tab chi retry mot lan theo policy va co log loi', [noTabRetry.ok, noTabRetry.code, noTabRetry.request.meta.openFbmContext !== undefined, noTabFinal.ok, noTabFinal.code, heartbeat.FbmSync.stateRead().phase, gateLogs.filter((event) => event.action === 'transport_retry' || event.action === 'transport_failure').length >= 2], [true, 'FBM_TAB_RETRY_REQUEST_READY', true, false, 'FBM_TAB_NOT_FOUND', 'error', true]);
   datPhan(heartbeat, 'loginPolicy', { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
-  heartbeat.FbmSync.statePatch({ runId: 'no-tab-closed', phase: 'checking_session', cursor: { kind: 'heartbeat' }, activeRequestId: 'tab-request-closed', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  heartbeat.FbmSync.statePatch({ runId: 'no-tab-closed', phase: 'checking_session', cursor: { kind: 'customer_count' }, activeRequestId: 'tab-request-closed', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const noTabClosed = heartbeat.FbmSync.transportFailureRun({ requestId: 'tab-request-closed', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'no-tab bi chan ngay khi policy tu mo tab tat', [noTabClosed.ok, noTabClosed.request, noTabClosed.code, heartbeat.FbmSync.stateRead().phase], [false, null, 'FBM_TAB_NOT_FOUND', 'error']);
   check(so, 'log session gate khong chua bi mat hoac payload nhay cam', /password|cookie|envelope|authorized/i.test(JSON.stringify(gateLogs)), false);
@@ -189,7 +192,6 @@ async function chay(so) {
   const throttledAfterFailure = phienChet(throttledProbe);
   check(so, 'login that bai khong tu chay khi chua den lich', [throttledProbe.request && throttledProbe.request.meta.kind, throttledAfterFailure.ok, throttledAfterFailure.code, throttledAfterFailure.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
-  heartbeat.FbmSync.statePatch({ scheduledScan: 'heartbeat' });
   const throttledDueProbe = hoiNen(heartbeat);
   const throttledDue = phienChet(throttledDueProbe);
   check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDueProbe.request && throttledDueProbe.request.meta.kind, throttledDue.ok, throttledDue.code, throttledDue.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
@@ -209,13 +211,13 @@ async function chay(so) {
   check(so, 'probe dau luot khong song moi duoc phep khoi dong mot login', [initialProbeFailure.ok, initialProbeFailure.request.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind], [true, 'login', 'login']);
 
   datPhan(heartbeat, 'loginPolicy', { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
-  heartbeat.FbmSync.statePatch({ runId: 'network-failure', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'network-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  heartbeat.FbmSync.statePatch({ runId: 'network-failure', phase: 'checking_session', mode: 'read', cursor: { kind: 'customer_count' }, activeRequestId: 'network-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const networkFailure = heartbeat.FbmSync.transportFailureRun({ requestId: 'network-request', code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Relay timeout.' });
   check(so, 'loi mang transport ket thuc huu han va van ghi Log khi Sidebar dong', [networkFailure.ok, networkFailure.code, heartbeat.FbmSync.stateRead().phase, gateLogs.some((event) => event.action === 'transport_failure'), gateFlushes > 0], [false, 'FBM_TRANSPORT_UNAVAILABLE', 'error', true, true]);
 
   const savedLoginConfigRead = heartbeat.FbmSync.loginConfigRead;
   heartbeat.FbmSync.loginConfigRead = () => { throw new Error('secret-internal'); };
-  heartbeat.FbmSync.statePatch({ runId: 'gate-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
+  heartbeat.FbmSync.statePatch({ runId: 'gate-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'customer_count' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
   const gateException = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/gate-exception', body: {}, meta: { kind: 'gate_exception_read' } });
   check(so, 'exception noi bo cong fail-closed va ghi loi an toan', [gateException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().lastFailureCode, gateLogs.some((event) => event.action === 'session_gate_exception'), /secret-internal|password|cookie|envelope|authorized/i.test(JSON.stringify(gateLogs))], [null, 'error', 'FBM_SESSION_GATE_EXCEPTION', true, false]);
 
@@ -237,7 +239,7 @@ async function chay(so) {
   try { heartbeat.FbmSync.sessionGateRecordFailure(heartbeat.FbmSync.stateRead(), 'FBM_TAB_NOT_FOUND', 'Không tìm thấy tab FBM.', 'transport_retry'); } catch (error) { gateWriteError = error; }
   heartbeat.FbmSync.stateWrite = savedGateStateWrite;
   check(so, 'FBM-029: cổng phiên ghi state lỗi thì ném FBM_DOCUMENT_PROPERTIES_WRITE_FAILED lên lát, không nuốt', gateWriteError && gateWriteError.code, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED');
-  heartbeat.FbmSync.statePatch({ runId: 'gate-transport-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'heartbeat' }, activeRequestId: 'gate-transport-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  heartbeat.FbmSync.statePatch({ runId: 'gate-transport-exception', phase: 'checking_session', mode: 'read', cursor: { kind: 'customer_count' }, activeRequestId: 'gate-transport-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const gateTransportException = heartbeat.FbmSync.transportFailureRun({ requestId: 'gate-transport-request', code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
   check(so, 'exception cong trong nhanh no-tab cung thu hoi reservation', [gateTransportException, heartbeat.FbmSync.stateRead().phase, heartbeat.FbmSync.stateRead().activeRequestId, heartbeat.FbmSync.stateRead().lastFailureCode], [null, 'error', '', 'FBM_SESSION_GATE_EXCEPTION']);
   heartbeat.FbmSync.loginConfigRead = savedLoginConfigRead;
@@ -323,8 +325,8 @@ async function chay(so) {
   const afterCycleIdentity = noiNen(heartbeat, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: afterCycle.request.id }] } });
   const afterCycleLive = noiNen(heartbeat, { d: { TotalRowCount: 2 }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleIdentity.request && afterCycleIdentity.request.id }] } });
   const unlocked = heartbeat.FbmSync.loginConfigRead();
-  check(so, 'Đang khóa chờ, ngừng tự đăng nhập mà người dùng tự đăng nhập: probe xác minh gỡ hết khóa, đếm khách, lệch mốc thì mở Quét nhanh, không gửi lệnh đăng nhập', [afterCycle.request.meta.kind, afterCycleIdentity.request && afterCycleIdentity.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind, heartbeat.FbmSync.autoLoginCanAttempt().ok, unlocked.loginHalted, unlocked.lastError], ['session_probe', 'heartbeat', true, 'session_probe', true, false, '']);
-  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, scheduledScan: '', chain: null });
+  check(so, 'Đang khóa chờ, ngừng tự đăng nhập mà người dùng tự đăng nhập: probe xác minh gỡ hết khóa, đếm khách, lệch mốc thì mở Quét nhanh, không gửi lệnh đăng nhập', [afterCycle.request.meta.kind, afterCycleIdentity.request && afterCycleIdentity.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind, heartbeat.FbmSync.autoLoginCanAttempt().ok, unlocked.loginHalted, unlocked.lastError], ['session_probe', 'customer_count', true, 'session_probe', true, false, '']);
+  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, process: '' });
   heartbeatData.FBM_SYNC_DONE_HEARTBEAT = '1';
   const afterCycleDead = hoiNen(heartbeat);
   const afterCycleLogin = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
@@ -443,7 +445,7 @@ async function chay(so) {
   const afterWipeData = { FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_ACTIVITY_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_DETAIL_SCAN: String(Date.now()) };
   const afterWipeProps = { getProperty: (key) => afterWipeData[key] || null, setProperty: (key, value) => { afterWipeData[key] = String(value); } };
   const afterWipe = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => afterWipeProps, getScriptProperties: () => afterWipeProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-wipe' }) });
-  napServer(afterWipe, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(afterWipe, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   afterWipe.FbmSync.configValue = () => '';
   afterWipe.FbmSync.readLocal = () => [];
   afterWipe.FbmSync.bindingWrite({ spreadsheetId: 'sheet-wipe', userId: '7777', username: 'WIPE', accountName: 'Tai khoan wipe' });
@@ -457,7 +459,7 @@ async function chay(so) {
   const wipedKeys = JSON.stringify(afterWipeCount.request && afterWipeCount.request.body && afterWipeCount.request.body.externalKey || []);
   check(so, 'Giữ phiên sau lượt bị xóa phiên: request đầu là probe User, sau probe mới dựng request đếm khách, lọc quyền theo mã đọc từ grid User (không theo mã đoán từ cookie)', [
     wipedSession.userId, afterWipeHeartbeat.ok, afterWipeHeartbeat.request && afterWipeHeartbeat.request.meta.kind, afterWipeCount.ok, afterWipeCount.request && afterWipeCount.request.meta.kind, wipedKeys.indexOf("GetCustomerValidate('7777')") >= 0, wipedKeys.indexOf("GetCustomerValidate('9999')") >= 0
-  ], ['', true, 'session_probe', true, 'heartbeat', true, false]);
+  ], ['', true, 'session_probe', true, 'customer_count', true, false]);
 
   // Liên kết phải khớp cả grid User lẫn trang FBM (mã trong payload cookie, tên đầy đủ trong khối menu); hai nơi so với liên kết, không so với nhau.
   const pageRound = (captures) => {
@@ -480,7 +482,7 @@ async function chay(so) {
   const pageReloadedOk = noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '7777', pageAccountName: 'Tai khoan wipe' }, trace: [{ requestId: pageAfterReload.reply.request.id }] } });
   check(so, 'Tải lại trang xong có đủ mã và tên khớp liên kết: phiên được xác minh, Giữ phiên dựng request đếm khách, request không còn lệnh tải lại', [
     pageReloadedOk.ok, pageReloadedOk.request && pageReloadedOk.request.meta.kind, pageReloadedOk.request && pageReloadedOk.request.meta.reloadFbmPage
-  ], [true, 'heartbeat', undefined]);
+  ], [true, 'customer_count', undefined]);
   // Nơi bắt giá trị trên trang: FBM có thể đặt dấu nháy dạng \" trong script, pattern phải bắt cả hai dạng (Nghiên cứu FBM ch02).
   const pageCaptures = afterWipe.FbmSync.payloadCookieTransport().captures, pageHtml = String.raw`<script>x={\"cookie\":\"50202037a947fFHN_CRM_App\"}</script><script>m={"username":"Lê Tuấn Anh","items":[]}</script>`;
   const pagePick = (name) => { const c = pageCaptures.find((item) => item.name === name); const m = pageHtml.match(new RegExp(c.pattern, c.flags)); return m && m[c.group]; };

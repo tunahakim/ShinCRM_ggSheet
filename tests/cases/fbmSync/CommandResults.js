@@ -33,6 +33,8 @@ const CA = [
   { lenh: 'continue', ten: 'continue nộp lỗi', kenh: 'relay', payload: (F) => { const request = luotDangCho(F); return { machineId: 'may-A', error: { requestId: request.id, code: 'FBM_TAB_MISSING', message: 'Không thấy tab FBM.' } }; } },
   { lenh: 'cancel', ten: 'cancel lượt đang chạy', chuan: (F) => { luotDangCho(F); } },
   { lenh: 'stop_background', ten: 'stop_background' },
+  { lenh: 'assign_background_machine', ten: 'giao máy chạy nền', payload: { machineId: 'may-A', name: 'Máy bàn' } },
+  { lenh: 'release_background_machine', ten: 'gỡ máy chạy nền', chuan: (F) => { F.backgroundMachineWrite(F.machineAssigned('may-A', 'Máy bàn', Date.now())); } },
   { lenh: 'approve_push', ten: 'approve_push không có gì chờ', payload: { machineId: 'may-A' } },
   { lenh: 'open_conflict', ten: 'open_conflict không có xung đột', payload: { machineId: 'may-A' } },
   { lenh: 'confirm_conflict', ten: 'confirm_conflict không có xung đột', payload: { entity: 'customer', id: 'CUS-1', choice: 'shin' } },
