@@ -73,8 +73,7 @@ function fbmSettingsSections() {
         detailEnabled: { kind: 'boolean', label: 'Vòng xoay giao dịch', default: false },
         detailMinutes: { kind: 'number', label: 'Chu kỳ Vòng xoay giao dịch (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: 30 },
         detailCustomersPerRun: { kind: 'number', label: 'Số khách mỗi lượt vòng xoay', min: 1, default: 30 },
-        machineSilentMinutes: { kind: 'number', label: 'Máy nền im quá (phút)', min: 1, default: 30, hint: 'Máy được giao chạy nền không hỏi GAS quá số phút này thì Sidebar báo đồng bộ nền đang không chạy.' },
-        machineAutoTakeover: { kind: 'boolean', label: 'Tự nhận máy nền', default: false, hint: 'Bật thì máy vừa mở Chrome tự nhận chạy nền khi máy đang được giao im quá ngưỡng trên và máy này có khóa giải mã mật khẩu FBM.' }
+        machineAutoTakeover: { kind: 'boolean', label: 'Tự nhận máy nền', default: false, hint: 'Bật thì máy vừa mở Chrome tự nhận chạy nền khi máy đang được giao im quá ngưỡng tính theo nhịp hỏi GAS và máy này có khóa giải mã mật khẩu FBM.' }
       }
     },
     {
@@ -106,4 +105,9 @@ FbmSync.scheduleShape = function (values) {
   FbmSync.SCHEDULE_KINDS.forEach(function (kind) { shape[kind] = { enabled: values[kind + 'Enabled'], minutes: values[kind + 'Minutes'], priority: FbmSync.SCHEDULE_PRIORITIES[kind] }; });
   shape.detail.customersPerRun = values.detailCustomersPerRun;
   return shape;
+};
+
+/** Công cụ tính (thuần): số phút máy được giao chạy nền không hỏi GAS thì coi là im. Đi theo "Nhịp hỏi GAS" (giá trị hiệu lực của phần `fbm_extension`) nên không có ô cài đặt riêng; hệ số và khoảng chờ thêm ở `SETTINGS` (`server/config/Settings.js`). */
+FbmSync.machineSilentMinutes = function (extension) {
+  return extension.pollMinutes * Number(SETTINGS.FBM_MACHINE_SILENT_POLLS) + Number(SETTINGS.FBM_MACHINE_SILENT_EXTRA_MINUTES);
 };

@@ -102,6 +102,12 @@ function kiemLenhLuu(so) {
     [true, false, ['runStop:master']]);
 }
 
+function kiemNguongMayIm(so) {
+  const { F } = dungCaiDatFbm();
+  check(so, 'ngưỡng máy nền im đi theo nhịp hỏi GAS: 2 nhịp cộng 15 phút, không dưới 15 phút',
+    [1, 5, 60].map((phut) => F.machineSilentMinutes({ pollMinutes: phut })), [17, 25, 135]);
+}
+
 function kiemKhoaHong(so) {
   const { nen, F, luu, loi, dongLog } = dungCaiDatFbm({ 'SETTINGS:fbm_run': '{"approvalThreshold":' });
   const view = trongLanGoi(nen.hop, () => F.settingsView());
@@ -158,6 +164,7 @@ function kiemChuyenMotLan(so) {
 function chay(so) {
   section('FBM sync - cài đặt qua cổng chung');
   kiemLenhLuu(so);
+  kiemNguongMayIm(so);
   kiemKhoaHong(so);
   kiemChuyenMotLan(so);
 }

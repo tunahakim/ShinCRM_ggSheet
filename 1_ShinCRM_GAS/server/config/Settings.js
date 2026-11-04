@@ -86,6 +86,10 @@ var SETTINGS = {
   /** Chu kỳ lịch nền (phút) dưới mức này thì Sidebar hỏi xác nhận trước khi lưu, trừ Giữ phiên. Không chặn: chỉ nhắc rằng Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay chạy dày thì tốn hạn mức FBM và GAS. Tài liệu 09/08 "Màn hình Cài đặt phiên". */
   FBM_SCHEDULE_LOW_MINUTES: 30,
 
+  /** Máy được giao chạy nền coi là im (Sidebar báo đồng bộ nền không chạy, "Tự nhận máy nền" được nhận thay) khi không hỏi GAS quá: nhịp hỏi GAS × hệ số + khoảng chờ thêm. Hệ số 2 chịu được một lần hỏi bị lỡ hẳn (mạng chập, GAS lỗi) khi nhịp dài; khoảng chờ thêm chịu các trễ ngắn không theo nhịp (máy ngủ, Chrome hoãn alarm, một lần gọi GAS tới 6 phút) khi nhịp ngắn, và cũng là mức sàn của ngưỡng. Chủ dự án chốt 2026-11-04. */
+  FBM_MACHINE_SILENT_POLLS: 2,
+  FBM_MACHINE_SILENT_EXTRA_MINUTES: 15,
+
   /** Tiến trình nền chạy lỗi thì chờ bấy nhiêu phút mới thử lại, nhân đôi mỗi lần lỗi liền nhau tới trần; trong lúc chờ các tiến trình khác (nhất là Giữ phiên) vẫn chạy. Tài liệu 09/02 "Tiến trình lỗi không chặn chuỗi". */
   FBM_SCHEDULE_RETRY_BASE_MINUTES: 5,
   FBM_SCHEDULE_RETRY_MAX_MINUTES: 60,

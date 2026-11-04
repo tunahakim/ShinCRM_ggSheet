@@ -12,7 +12,7 @@ const GOC = {
   fbm_background: {
     enabled: true, direction: 'read', heartbeatEnabled: true, heartbeatMinutes: 5, customerFullEnabled: true, customerFullMinutes: 60,
     activityFullEnabled: false, activityFullMinutes: 480, detailEnabled: false, detailMinutes: 30, detailCustomersPerRun: 30,
-    machineSilentMinutes: 15, machineAutoTakeover: false
+    machineAutoTakeover: false
   },
   fbm_login_policy: { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 },
   defaults_fbm_pull: {}
