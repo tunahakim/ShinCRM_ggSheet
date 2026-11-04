@@ -101,6 +101,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, ghi xuống sheet Log bằng đúng một lệnh, che bí mật, cắt log theo hai trần.
+│   │   ├── ClientError.js        Cổng chung ghi lỗi sinh ở trình duyệt (hết hạn chờ, lỗi phía Sidebar) vào sheet Log, nguồn sidebar. Không tin chuỗi client: cắt độ dài, bỏ khóa lạ.
 │   │   └── ClientTiming.js       Cửa nhận bản đo thời gian ĐO Ở TRÌNH DUYỆT rồi đệm một dòng vết. Máy chủ không tự thấy tiền đi đường, nên số này phải do client gửi. Không tin số client: kẹp trần, bỏ khóa lạ.
 │   ├── notice\
 │   │   └── NoticeGate.js         Cổng thông báo duy nhất: phát, gỡ, bỏ, liệt kê. Mỗi thông báo một khóa NOTICE:<key> trong DocumentProperties; lõi không biết kênh, Sidebar là một adapter.
@@ -228,7 +229,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── saveFlow.html         Đường bấm Lưu: gửi đúng những trường đang có mặt trên form, tô đỏ chỗ cửa ghi trả về, lưu xong thì đóng một lớp form chứ không đóng cả ngăn xếp.
 │   │   └── pendingDelete.html    Xóa có hoàn tác: bấm Xóa không gửi gì, mã vào bộ chờ và dải hoàn tác đếm ngược. Mặt nạ ở tầng hiện, Store không bị sửa cho tới khi máy chủ trả lời.
 │   └── util\
-│       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cửa duy nhất thấy cả hai đầu một vòng gọi, nên phép đo thời gian cũng ở đây. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi.
+│       ├── serverCall.html       Bọc google.script.run thành Promise kèm vạch tiến trình. Cửa duy nhất thấy cả hai đầu một vòng gọi, nên phép đo thời gian cũng ở đây. Cố ý KHÔNG tự hiện lỗi — việc đó của bên gọi. Hết hạn chờ thì tự ghi Log và gắn kết quả ghi vào lỗi.
 │       ├── callTiming.html       Sổ đo từng vòng gọi. Tách tổng thời gian thành ba phần: máy chủ tính toán, tiền đi đường, trình duyệt bung và vẽ.
 │       ├── valueText.html        Giá trị trong RAM thành chuỗi bày vào ô: số có dấu chấm nghìn, chuỗi thời gian thành dạng thẻ input chịu nhận.
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
@@ -303,6 +304,7 @@ tests\
     ├── settings.js               Cổng cài đặt: bảng khai, đọc khi kho rỗng hay hỏng, settingsSave chuẩn hóa và phát tín hiệu, các kiểu trường, ngầm định lệch thì bỏ và có thông báo, LOG_TRACE.
     ├── logMask.js                Luật che bí mật. Sai một lần là bí mật ra sheet, không thu lại được.
     ├── logGate.js                Kỷ luật bộ đệm, "cả lượt một lệnh ghi", và hai trần cắt log.
+    ├── clientError.js            Lỗi sinh ở trình duyệt: hết hạn chờ có dòng Log nêu tên hàm và số ms, màn lỗi chỉ nói "đã ghi" khi máy chủ xác nhận.
     ├── entryPoint.js             Cửa vào Sidebar tự gọi ghi Log theo chuyển trạng thái lỗi.
     ├── noticeGate.js             Cổng thông báo: ghi đè cùng khóa, tự hết, bấm ✕, kho hỏng, trần, che bí mật; quét mã không còn đường báo cũ.
     ├── dateText.js               Hai dạng chuỗi thời gian, và ba luật im lặng khi sai: ô rỗng, ô gõ lạ, precision gõ sai.
