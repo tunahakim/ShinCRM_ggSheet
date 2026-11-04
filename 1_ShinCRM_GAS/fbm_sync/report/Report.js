@@ -181,12 +181,12 @@ FbmSync.logStaleResponse = function (state, responseRequestId, action) {
     : { source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
 };
 /**
- * Sidebar báo một lỗi. Chỉ dừng phiên khi Sidebar nêu đúng mã của phiên đang chạy (`runId`) — tức phiên do chính Sidebar đang chạy hỏng. Lỗi không kèm mã hoặc mã không khớp (lỗi lưu cài đặt, kiểm tra liên kết, phiên nền Extension đang chạy) chỉ ghi Log nguồn `sidebar` với đúng tên thao tác, không đụng phiên: một nút bấm hỏng không được giết phiên nền nó không sở hữu.
+ * Sidebar báo một lỗi. Chỉ dừng phiên khi Sidebar nêu đúng mã của phiên đang chạy (`runId`) — tức phiên do chính Sidebar đang chạy hỏng. Lỗi không kèm mã hoặc mã không khớp (lỗi lưu cài đặt, kiểm tra liên kết, phiên nền Extension đang chạy) chỉ ghi Log qua cổng chung `clientErrorLog` (nguồn `sidebar`, đúng tên thao tác), không đụng phiên: một nút bấm hỏng không được giết phiên nền nó không sở hữu.
  */
 FbmSync.logTransportError = function (message, action, runId) {
   var reason = String(message || 'Không nhận được phản hồi từ Extension.'), before = FbmSync.stateRead();
   if (!runId || String(before.runId || '') !== String(runId)) {
-    if (typeof logEvent === 'function') { logEvent({ source: 'sidebar', action: String(action || 'sidebar_error'), outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: reason }); }
+    clientErrorLog(action, reason);
     return FbmSync.statusView();
   }
   // Chạy trong khóa của cửa lệnh (lệnh `client_error`); khóa bận thì cửa lệnh ghi Log lúc bỏ.

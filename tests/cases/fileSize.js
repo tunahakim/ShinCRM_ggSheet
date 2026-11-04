@@ -20,7 +20,7 @@ const GOC = path.join(__dirname, '..', '..');
 const NGOAI_LE = [
   ['1_ShinCRM_GAS/client/link/selectionPoll.html', 254, 11066, 'giữ', 'bộ thăm dò chọn'],
   ['1_ShinCRM_GAS/client/link/sheetLink.html', 693, 38369, 'UI', 'cầu nối Extension, read plan, điều phối reload, áp ngữ cảnh'],
-  ['1_ShinCRM_GAS/client/ram/bootstrap.html', 255, 13882, 'UI', 'khởi động Sidebar'],
+  ['1_ShinCRM_GAS/client/ram/bootstrap.html', 253, 13850, 'UI', 'khởi động Sidebar'],
   ['1_ShinCRM_GAS/client/ram/refresh.html', 226, 11347, 'giữ', 'áp reload vào RAM'],
   ['1_ShinCRM_GAS/client/ram/store.html', 300, 16906, 'giữ', 'kho RAM'],
   ['1_ShinCRM_GAS/client/save/saveFlow.html', 262, 14231, 'UI', 'luồng lưu form'],

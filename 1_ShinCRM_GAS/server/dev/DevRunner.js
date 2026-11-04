@@ -24,7 +24,7 @@ var DEV_RUNNER_ALLOWED = [
   'devLogTraceOn', 'devLogTraceOff', 'settingsMigrateFromConfig', 'shinSettingsShow', 'shinLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig',
-  'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming',
+  'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming', 'probeClientError',
   'probeSaveGate', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent',
   'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmDriveCommand', 'fbmGetSyncStatus', 'fbmCancelSync', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmSaveConnection', 'fbmRepairLoginUsername', 'fbmSaveSettings'
