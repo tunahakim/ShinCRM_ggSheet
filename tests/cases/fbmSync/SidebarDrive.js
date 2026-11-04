@@ -31,7 +31,7 @@ async function chay(so) {
   await nghi(5);
   check(so, 'Sidebar hỏi mã máy rồi gọi GAS fbmDriveCommand kèm mã máy; GAS mở lượt thì chỉ đánh thức Extension hỏi GAS, kèm lịch thử lại GAS gửi, không chuyển mã lượt', [
     a.rpc.map((item) => item[0]), a.calls[0][0], a.calls[0][1][0], a.calls[0][1][1].machineId, a.calls[0][1][1].kind, a.rpc[1][1], xong
-  ], [['CRM_FBM_MACHINE_ID', 'CRM_FBM_RUN_NOW'], 'fbmDriveCommand', 'start', 'may-A', 'pull', { retryMs: [5000, 15000] }, null]);
+  ], [['CRM_FBM_MACHINE_ID', 'CRM_FBM_RUN_NOW'], 'fbmDriveCommand', 'start', 'may-A', 'pull', { retryMs: [5000, 15000], trigger: 'run_now' }, null]);
   a.hop.fbmSyncStatusReceived({ status: { runId: 'L-khac', phase: 'done' }, done: true });
   a.hop.fbmSyncStatusReceived({ status: { runId: 'L1', phase: 'running' }, done: false });
   await nghi(5);
@@ -97,7 +97,7 @@ async function chay(so) {
   h.hop.FBM_SYNC_RUN_SILENCE_MS = 20;
   const kqH = await h.hop.fbmSyncDrive('start', { kind: 'pull' }, 'đồng bộ');
   check(so, 'Extension im quá hạn: Sidebar hỏi GAS, lượt còn chạy thì chờ tiếp, lượt đã đóng thì kết thúc bằng mã và chữ trong status GAS', [hoi, kqH.ok, kqH.code, kqH.error, h.hop.FBM_SYNC_CLIENT.runWaiter], [2, false, 'RUN_ABANDONED', 'Lượt bị bỏ dở.', null]);
-  check(so, 'Hỏi GAS thấy lượt vẫn chờ Extension nhận (tin đánh thức đầu bị mất): Sidebar đánh thức lại đúng một lần', h.rpc.filter((item) => item[0] === 'CRM_FBM_RUN_NOW').map((item) => item[1]), [{ retryMs: [5000, 15000] }, { retryMs: [] }]);
+  check(so, 'Hỏi GAS thấy lượt vẫn chờ Extension nhận (tin đánh thức đầu bị mất): Sidebar đánh thức lại đúng một lần', h.rpc.filter((item) => item[0] === 'CRM_FBM_RUN_NOW').map((item) => item[1]), [{ retryMs: [5000, 15000], trigger: 'run_now' }, { retryMs: [], trigger: 'run_now' }]);
 }
 
 module.exports = { chay };

@@ -12,6 +12,7 @@ const NHOM = [
   require("./fbmSync/SiteAccess"),
   require("./fbmSync/TransportCore"),
   require("./fbmSync/SidebarDrive"),
+  require("./fbmSync/SidebarMachine"),
   require("./fbmSync/Protocol"),
   require("./fbmSync/Contract"),
   require("./fbmSync/Builders"),

@@ -1,67 +1,7 @@
 /** Smoke test DOM cho toàn bộ màn hình và nhánh thao tác chính của Sidebar Đồng bộ FBM. */
-const { napClient, taoHopCat } = require('../../lib/load-gas');
-const { domGia } = require('../../lib/dom-gia');
+const { taoSidebarDongBo: taoBoTest } = require('../../lib/sidebar/bo-dong-bo');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
 const { goiCaiDat } = require('../../lib/sidebar/fbm-cai-dat');
-
-function taoBoTest() {
-  const dom = domGia();
-  const header = dom.document.createElement('div'); header.id = 'sidebar-header'; dom.root.appendChild(header);
-  const info = dom.document.createElement('div'); info.id = 'sidebar-info'; info.hidden = true; dom.root.appendChild(info);
-  const content = dom.document.createElement('div'); content.id = 'sidebar-body'; dom.root.appendChild(content);
-  const footer = dom.document.createElement('div'); footer.id = 'sidebar-footer'; footer.hidden = true; dom.root.appendChild(footer);
-
-  const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, confirm: () => true, addEventListener: () => {} } });
-  // Hằng của sheetLink.html, bộ test fbmSync không nạp tệp đó.
-  hop.SHEET_LINK_ORIGIN = 'https://docs.google.com';
-  // Dòng thông báo của notices.html; bộ test không nạp tệp đó, test cần xem thông báo thì tự thay hàm này.
-  hop.noticeSet = () => {};
-  hop.FBM_SYNC_CLIENT = {
-    active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
-    subscreen: 'run',
-    identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
-    identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
-    traceEvents: [], installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}
-  };
-  hop.FBM_SYNC_UI_SCHEMA = {
-    screens: [
-      { id: 'run', label: 'Chạy đồng bộ' }, { id: 'account', label: 'Tài khoản FBM' },
-      { id: 'results', label: 'Kết quả & xử lý' },
-      { id: 'settings', label: 'Cài đặt phiên' }
-    ],
-    modes: [
-      { value: 'check', label: 'Kiểm tra an toàn' }, { value: 'read', label: 'Lấy từ FBM → ShinCRM' },
-      { value: 'push', label: 'Đẩy từ ShinCRM → FBM' }, { value: 'write', label: 'Đồng bộ hai chiều' }
-    ]
-  };
-
-  // Renderer giả chỉ tạo cây DOM đủ để kiểm tra màn hình, không thay đổi code sản phẩm.
-  hop.fbmSyncAppendBox = null;
-  hop.renderBlockInto = (parent, node) => {
-    const element = dom.document.createElement(node && node.kind === 'text' ? 'span' : 'div');
-    if (node && node.className) { element.className = node.className; }
-    if (node && node.id) { element.id = node.id; }
-    if (node && node.text !== undefined) { element.textContent = node.text; }
-    return parent.appendChild(element);
-  };
-  hop.fbmSyncAppendBox = (parent, className, id) => {
-    const box = dom.document.createElement('div'); box.className = className || ''; if (id) { box.id = id; }
-    box.classList = { add: (name) => { box.className = (box.className + ' ' + name).trim(); } };
-    return parent.appendChild(box);
-  };
-  hop.fbmSyncPaintError = null;
-  napClient(hop,
-    'client/ui/icons.html', 'client/ui/fieldInvalid.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
-    'client/schema/sync/screens/run.html', 'client/schema/sync/screens/account.html', 'client/schema/sync/screens/results.html', 'client/schema/sync/screens/settings.html', 'client/schema/sync/screens/index.html',
-    'client/schema/sync/results/status.html', 'client/schema/sync/results/issues.html', 'client/schema/sync/results/audit.html', 'client/schema/sync/results/conflict.html',
-    'client/sync/fbmSyncUiSchema.html', 'client/sync/fbmSyncConfigEditor.html',
-    'client/sync/screens/account.html',
-    'client/sync/screens/run.html', 'client/sync/screens/results.html',
-    'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
-    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/ui/popupList.html', 'client/ui/recordDecision.html', 'client/sync/fbmSync.html');
-  hop.FBM_SYNC_CLIENT.active = true;
-  return { hop, dom, screen: dom.root, content };
-}
 
 function render(hop, content, fn, status) {
   content.textContent = '';
@@ -166,7 +106,7 @@ async function testSharedShellLifecycle(so) {
   hop.FBM_SYNC_CLIENT.active = false;
   await hop.syncPanelToggle();
   hop.fbmSyncExtensionRpc = wakeRpc; hop.callServer = wakeCallServer;
-  check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS', wakes, [['CRM_FBM_RUN_NOW', { retryMs: [] }]]);
+  check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS', wakes, [['CRM_FBM_RUN_NOW', { retryMs: [], trigger: 'run_now' }]]);
 }
 
 async function testOwnRunId(so) {

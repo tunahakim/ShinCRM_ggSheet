@@ -112,7 +112,8 @@ function chay(so) {
     'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html',
     'client/sync/fbmSyncAuditScreen.html',
-    'client/sync/fbmSyncShell.html'
+    'client/sync/fbmSyncShell.html',
+    'client/sync/fbmSyncMachine.html'
   ];
   const fbmForbidden = [];
   fbmControllers.forEach((file) => {
