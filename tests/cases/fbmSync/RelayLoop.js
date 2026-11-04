@@ -1,14 +1,7 @@
-/** Kiểm vòng chở lát duy nhất của Extension (`relayLoop`), cửa gọi GAS duy nhất (`relayCall`), cầu nối trạng thái lượt sang Sidebar và `replyPick` trong tab FBM, bằng hành vi thật của tệp Extension chạy trong vm với Chrome giả. */
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+/** Kiểm vòng chở lát duy nhất của Extension (`relayLoop`) và cửa gọi GAS duy nhất (`relayCall`), bằng hành vi thật của service worker chạy trong vm với Chrome giả. */
 const { section, check } = require('../../lib/assert');
-const { workerNap, phongBi, chayLuot, MANIFEST, SHEET } = require('../../lib/fbm/worker-nap');
+const { workerNap, phongBi, chayLuot, SHEET } = require('../../lib/fbm/worker-nap');
 
-const ROOT = path.join(__dirname, '..', '..', '..');
-const BRIDGE_FILE = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'bridge', 'iframe_bridge.js');
-const EXECUTOR_FILE = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
-const SAMPLE_FILE = path.join(ROOT, '0_Documentation', 'Nghiên cứu FBM', 'RequestFBM', 'Lấy trang khách hàng có cả tiêu đề.txt');
 const nghi = (ms) => new Promise((resolve) => setTimeout(resolve, ms || 0));
 
 async function vongLuotTay(so) {
@@ -27,9 +20,15 @@ async function vongLuotTay(so) {
     accepted, nhan.command, nhan.payload.trigger, Object.prototype.hasOwnProperty.call(nhan.payload, 'runId'), typeof nhan.payload.machineId, nhan.payload.machineId.length > 4, nhan.spreadsheetId, nhan.key, nhan.contract === tron.ctx.FBM_CONTRACT_VERSION,
     tron.st.executes.map((item) => item.id), nop.command, nop.payload.hop, nop.payload.response.status, nop.payload.machineId === nhan.payload.machineId, Object.prototype.hasOwnProperty.call(nop.payload, 'runId'), tron.st.bodies.length, ketQua.ok
   ], [{ ok: true, accepted: true }, 'heartbeat', 'run_now', false, 'string', true, SHEET, 'relay-key', true, ['r1'], 'continue', 1, 200, true, false, 2, true]);
-  check(so, 'Mỗi lần GAS trả lời thì chuyển status sang tab Sheets kèm Sheet; chỉ lần GAS không cấp request mới mang done', tron.st.statuses.map((item) => [item.spreadsheetId, item.status.phase, item.done, item.ok]), [[SHEET, 'running', false, true], [SHEET, 'done', true, true]]);
-  check(so, 'Mã máy cất trong kho Extension, lần sau dùng lại đúng mã đó', tron.st.storage.fbmMachineId, nhan.payload.machineId);
-  check(so, 'Hộp đen ghi đủ chuỗi bước của lượt tay', tron.st.trails, ['gas_request_received', 'fbm_tab_preparing:complete', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'chain_finished']);
+  check(so, 'Mỗi lần GAS trả lời thì chuyển status sang tab Sheets kèm Sheet; chỉ lần GAS không cấp request mới mang done',
+    tron.st.statuses.map((item) => [item.spreadsheetId, item.status.phase, item.done, item.ok]),
+    [[SHEET, 'running', false, true], [SHEET, 'done', true, true]]);
+  check(so, 'Mã máy cất trong kho Extension, lần sau dùng lại đúng mã đó',
+    tron.st.storage.fbmMachineId,
+    nhan.payload.machineId);
+  check(so, 'Hộp đen ghi đủ chuỗi bước của lượt tay',
+    tron.st.trails,
+    ['gas_request_received', 'fbm_tab_preparing:complete', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'chain_finished']);
 
   // Không có lượt chờ máy này (lượt đang chờ máy khác, hoặc đã được nhận): GAS không cấp request.
   const lech = workerNap({ gas() { return { ok: true, code: 'NO_RUN_AWAITING', request: null, status: { runId: 'L2', phase: 'running' } }; } });
@@ -70,7 +69,9 @@ async function vongLuotTay(so) {
   const khongLich = workerNap({ gas() { return { ok: true, code: 'NO_RUN_AWAITING', request: null }; } });
   await chayLuot(khongLich.ctx, [5, 10]);
   await chayLuot(khongLich.ctx, []);
-  check(so, 'Đánh thức với lịch thử lại rỗng giữ lịch đã học', [Array.from(khongLich.ctx.relayRetrySchedule), khongLich.st.bodies.length], [[5, 10], 2]);
+  check(so, 'Đánh thức với lịch thử lại rỗng giữ lịch đã học',
+    [Array.from(khongLich.ctx.relayRetrySchedule), khongLich.st.bodies.length],
+    [[5, 10], 2]);
 }
 
 async function tabVaMien(so) {
@@ -92,11 +93,15 @@ async function tabVaMien(so) {
 
   const khongTab = workerNap({ noFbmTab: true, gas(body, lan) { return lan === 1 ? { ok: true, request: phongBi(khongTab.ctx, 'r') } : { ok: true, request: null }; } });
   await chayLuot(khongTab.ctx);
-  check(so, 'Không có tab FBM và GAS không cho mở: nộp FBM_TAB_NOT_FOUND, không gửi request', [khongTab.st.bodies[1].payload.error.code, khongTab.st.executes.length], ['FBM_TAB_NOT_FOUND', 0]);
+  check(so, 'Không có tab FBM và GAS không cho mở: nộp FBM_TAB_NOT_FOUND, không gửi request',
+    [khongTab.st.bodies[1].payload.error.code, khongTab.st.executes.length],
+    ['FBM_TAB_NOT_FOUND', 0]);
 
   const ngoai = voiPhongBi({}, { url: 'https://example.com/steal' });
   await chayLuot(ngoai.ctx);
-  check(so, 'Phong bì có URL ngoài miền FBM: từ chối FBM_URL_OUTSIDE_SITE trước khi tìm tab, không gửi request', [ngoai.st.bodies[1].payload.error.code, ngoai.st.fbmQueries, ngoai.st.executes.length], ['FBM_URL_OUTSIDE_SITE', 0, 0]);
+  check(so, 'Phong bì có URL ngoài miền FBM: từ chối FBM_URL_OUTSIDE_SITE trước khi tìm tab, không gửi request',
+    [ngoai.st.bodies[1].payload.error.code, ngoai.st.fbmQueries, ngoai.st.executes.length],
+    ['FBM_URL_OUTSIDE_SITE', 0, 0]);
 
   const sai = workerNap({ gas() { return { ok: true, request: null }; } }).ctx;
   const req = (extra) => phongBi(sai, 'x', extra);
@@ -108,7 +113,9 @@ async function tabVaMien(so) {
 
   const lechBan = voiPhongBi({}, { contract: 'ban-cu' });
   await chayLuot(lechBan.ctx);
-  check(so, 'Phong bì mang mã hợp đồng khác: nộp EXTENSION_PROTOCOL_MISMATCH, không tìm tab', [lechBan.st.bodies[1].payload.error.code, lechBan.st.fbmQueries], ['EXTENSION_PROTOCOL_MISMATCH', 0]);
+  check(so, 'Phong bì mang mã hợp đồng khác: nộp EXTENSION_PROTOCOL_MISMATCH, không tìm tab',
+    [lechBan.st.bodies[1].payload.error.code, lechBan.st.fbmQueries],
+    ['EXTENSION_PROTOCOL_MISMATCH', 0]);
 }
 
 async function cuaGoiGas(so) {
@@ -125,7 +132,9 @@ async function cuaGoiGas(so) {
   const hoi = workerNap({ gas() { lan2 += 1; if (lan2 === 1) { throw new Error('NETWORK_BLIP'); } return { ok: true, request: null, status: { runId: 'G2', phase: 'done' } }; } });
   const ketQuaHoi = (await chayLuot(hoi.ctx, [5, 10])).ketQua;
   const oHoi = hoi.st.storage.fbmExtensionFailure;
-  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, Sidebar nhận done, lần hỏng vẫn nằm trong ô lỗi để lần hỏi nền sau đưa vào Log (lần hỏng có thể đã tới GAS)', [lan2, JSON.stringify(hoi.st.bodies[0]) === JSON.stringify(hoi.st.bodies[1]), oHoi && [oHoi.command, oHoi.code, oHoi.attempts], ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)], [2, true, ['relay_ask', 'RELAY_FETCH_FAILED', 1], true, [true]]);
+  check(so, 'Gọi GAS hỏng một lần rồi được: lần thử lại mang đúng thân cũ, Sidebar nhận done, lần hỏng vẫn nằm trong ô lỗi để lần hỏi nền sau đưa vào Log (lần hỏng có thể đã tới GAS)',
+    [lan2, JSON.stringify(hoi.st.bodies[0]) === JSON.stringify(hoi.st.bodies[1]), oHoi && [oHoi.command, oHoi.code, oHoi.attempts], ketQuaHoi.ok, hoi.st.statuses.map((item) => item.done)],
+    [2, true, ['relay_ask', 'RELAY_FETCH_FAILED', 1], true, [true]]);
 
   const tabs = [
     { id: 1, url: 'https://docs.google.com/spreadsheets/d/' + SHEET + '/edit#gid=0' },
@@ -133,21 +142,27 @@ async function cuaGoiGas(so) {
     { id: 3, url: 'https://docs.google.com/spreadsheets/d/' + SHEET + '/edit', discarded: true },
     { id: 4, url: 'https://docs.google.com/document/d/' + SHEET + '/edit' }
   ];
-  check(so, 'Phục hồi cầu nối chỉ chạm tab đang thức của đúng Sheet đã cấu hình; chưa cấu hình thì mọi tab Sheet đang thức', [hoi.ctx.sheetsBridgeTabs(tabs, SHEET).map((tab) => tab.id), hoi.ctx.sheetsBridgeTabs(tabs, '').map((tab) => tab.id)], [[1], [1, 2]]);
+  check(so, 'Phục hồi cầu nối chỉ chạm tab đang thức của đúng Sheet đã cấu hình; chưa cấu hình thì mọi tab Sheet đang thức',
+    [hoi.ctx.sheetsBridgeTabs(tabs, SHEET).map((tab) => tab.id), hoi.ctx.sheetsBridgeTabs(tabs, '').map((tab) => tab.id)],
+    [[1], [1, 2]]);
 
   // Worker vừa khởi động, chưa nhận lịch thử lại: không tự đặt con số, hỏng là ghi ô lỗi ngay.
   let lan3 = 0;
   const moi = workerNap({ gas() { lan3 += 1; throw new Error('NETWORK_DOWN'); } });
   await moi.ctx.fbmHeartbeatNow('test');
   await nghi(5);
-  check(so, 'Chưa có lịch thử lại từ GAS: không thử lại, ghi ô lỗi relay_ask một lần', [lan3, moi.st.storage.fbmExtensionFailure && moi.st.storage.fbmExtensionFailure.command], [1, 'relay_ask']);
+  check(so, 'Chưa có lịch thử lại từ GAS: không thử lại, ghi ô lỗi relay_ask một lần',
+    [lan3, moi.st.storage.fbmExtensionFailure && moi.st.storage.fbmExtensionFailure.command],
+    [1, 'relay_ask']);
 
   // Ô lỗi đi lên GAS ở lần hỏi sau; GAS ghi Log rồi trả trailAck thì xóa đúng ô đó.
   const o = { at: 4242, command: 'relay_continue', code: 'RELAY_TIMEOUT', httpStatus: 0, attempts: 3 };
   const ack = workerNap({ storage: { fbmExtensionFailure: o }, gas(body) { return { ok: true, request: null, trailAck: body.payload.trail && body.payload.trail.relayFailure ? body.payload.trail.relayFailure.at : 0 }; } });
   await ack.ctx.fbmHeartbeatNow('test');
   await nghi(5);
-  check(so, 'Lần hỏi mang ô lỗi lên GAS, không mang mã máy vào hộp đen; GAS trả trailAck thì Extension xóa ô', [ack.st.bodies[0].command, ack.st.bodies[0].payload.trail.relayFailure, typeof ack.st.bodies[0].payload.machineId, ack.st.storage.fbmExtensionFailure], ['heartbeat', o, 'string', undefined]);
+  check(so, 'Lần hỏi mang ô lỗi lên GAS, không mang mã máy vào hộp đen; GAS trả trailAck thì Extension xóa ô',
+    [ack.st.bodies[0].command, ack.st.bodies[0].payload.trail.relayFailure, typeof ack.st.bodies[0].payload.machineId, ack.st.storage.fbmExtensionFailure],
+    ['heartbeat', o, 'string', undefined]);
   const moiHon = { at: 5000, command: 'bridge', code: 'BRIDGE_STATUS_POST_FAILED', httpStatus: 0, attempts: 1 };
   const ackCu = workerNap({ storage: { fbmExtensionFailure: moiHon }, gas() { return { ok: true, request: null, trailAck: 4242 }; } });
   await ackCu.ctx.fbmHeartbeatNow('test');
@@ -157,128 +172,23 @@ async function cuaGoiGas(so) {
   // Cầu nối báo hỏng: worker ghi ô lỗi để GAS ghi Log lần hỏi sau.
   const cau = workerNap({ gas() { return { ok: true, request: null }; } });
   const traLoi = await new Promise((resolve) => { cau.st.worker({ type: 'FBM_BRIDGE_FAILURE', code: 'BRIDGE_STATUS_POST_FAILED', message: 'Blocked a frame' }, null, resolve); });
-  check(so, 'Worker nhận FBM_BRIDGE_FAILURE thì ghi ô lỗi bridge kèm mã', [traLoi.ok, cau.st.storage.fbmExtensionFailure.command, cau.st.storage.fbmExtensionFailure.code], [true, 'bridge', 'BRIDGE_STATUS_POST_FAILED']);
+  check(so, 'Worker nhận FBM_BRIDGE_FAILURE thì ghi ô lỗi bridge kèm mã',
+    [traLoi.ok, cau.st.storage.fbmExtensionFailure.command, cau.st.storage.fbmExtensionFailure.code],
+    [true, 'bridge', 'BRIDGE_STATUS_POST_FAILED']);
 
   const thieu = workerNap({ storage: { fbmWebAppUrl: undefined }, gas() { throw new Error('không được gọi'); } });
   delete thieu.st.storage.fbmWebAppUrl;
   const thieuKetQua = await thieu.ctx.fbmRunNow([]);
-  check(so, 'Thiếu cấu hình relay: không hỏi GAS, trả RELAY_CONFIG_MISSING, không gọi GAS', [thieuKetQua.code, thieu.st.bodies.length], ['RELAY_CONFIG_MISSING', 0]);
-}
-
-/** Cầu nối iframe với Chrome giả: `posts` là tin gửi Sidebar, `toWorker` là tin gửi worker. */
-function bridgeNap(spreadsheetId) {
-  const windowListeners = [], runtimeListeners = [], toWorker = [];
-  const hop = {
-    console: { log() {} }, Date, setTimeout, location: { origin: 'https://docs.google.com' },
-    readSpreadsheetId: () => spreadsheetId,
-    chrome: { runtime: { id: 'shincrm-test', lastError: null, getManifest: () => MANIFEST, onMessage: { addListener(fn) { runtimeListeners.push(fn); } }, sendMessage(message, done) { toWorker.push(message); if (hop.workerReply) { done(hop.workerReply(message)); } } } },
-    window: { addEventListener(name, fn) { if (name === 'message') { windowListeners.push(fn); } }, removeEventListener() {} }
-  };
-  vm.createContext(hop);
-  vm.runInContext(fs.readFileSync(BRIDGE_FILE, 'utf8'), hop, { filename: BRIDGE_FILE });
-  const posts = [];
-  const source = { postMessage(data, origin) { if (hop.postThrows) { throw new Error('Blocked a frame with origin'); } posts.push({ data, origin }); } };
-  const origin = 'https://n-abc-0lu-script.googleusercontent.com';
-  const sidebar = (data) => windowListeners[0]({ origin, source, data });
-  const fromWorker = (message) => { let reply; runtimeListeners.forEach((fn) => fn(message, null, (value) => { reply = value; })); return reply; };
-  return { hop, posts, toWorker, sidebar, fromWorker, origin };
-}
-
-async function cauNoi(so) {
-  const b = bridgeNap(SHEET);
-  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1' });
-  const session = b.hop.extensionSessionId;
-  check(so, 'Ping cầu nối trả số bản trong manifest', b.fromWorker({ type: 'CRM_BRIDGE_PING' }), { ready: true, version: MANIFEST.version });
-  b.hop.workerReply = (message) => (message.type === 'FBM_RUN_NOW' ? { ok: true, accepted: true } : { ok: false, code: 'RUN_ID_REQUIRED', error: 'thiếu' });
-  b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q1', nonce: 'n-1', sessionId: session, runId: 'L1', retryMs: [5, 10], password: 'khong-chep' });
-  const traLoi = b.posts[b.posts.length - 1].data;
-  check(so, 'Lệnh CRM_FBM_RUN_NOW qua bảng lệnh: worker chỉ nhận lịch thử lại và lý do đánh thức, thiếu lý do là run_now (mã lượt, mật khẩu Sidebar gửi kèm bị bỏ); trả lời một dạng kèm nonce và phiên', [
-    b.toWorker[0], [traLoi.action, traLoi.id, traLoi.ok, traLoi.result, traLoi.code, traLoi.nonce, traLoi.sessionId === session], b.posts[b.posts.length - 1].origin
-  ], [{ type: 'FBM_RUN_NOW', retryMs: [5, 10], trigger: 'run_now' }, ['CRM_FBM_RUN_NOW_RESULT', 'q1', true, { ok: true, accepted: true }, '', 'n-1', true], b.origin]);
-  const truoc = b.toWorker.length;
-  b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q2', nonce: 'sai', sessionId: session, runId: 'L1' });
-  b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q3', nonce: 'n-1', sessionId: 'phien-cu', runId: 'L1' });
-  check(so, 'Lệnh sai nonce hoặc của phiên Extension cũ không tới worker', b.toWorker.length, truoc);
-
-  const daGui = b.posts.length;
-  const giao = b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: { runId: 'L1', phase: 'done' }, code: '', done: true, extra: 'bo' });
-  const tin = b.posts[b.posts.length - 1].data;
-  check(so, 'Status của đúng Sheet chuyển vào Sidebar với đúng các trường hợp đồng, kèm nonce và phiên', [giao, b.posts.length - daGui, Object.keys(tin).sort(), tin.done, tin.status.runId], [{ delivered: true }, 1, ['action', 'code', 'conflict', 'done', 'error', 'failure', 'nonce', 'ok', 'sessionId', 'status'], true, 'L1']);
-  const khac = b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: 'sheet-khac', status: { runId: 'X' }, done: true });
-  check(so, 'Status của Sheet khác không vào Sidebar này', [khac, b.posts.length - daGui], [{ delivered: false }, 1]);
-
-  b.hop.postThrows = true;
-  const hong = b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: { runId: 'L1' }, done: false });
-  const baoHong = b.toWorker[b.toWorker.length - 1];
-  check(so, 'Cầu nối gửi Sidebar hỏng: trả delivered false, báo worker FBM_BRIDGE_FAILURE kèm mã và chữ lỗi, không im lặng', [hong, baoHong.type, baoHong.code, /Blocked a frame/.test(baoHong.message)], [{ delivered: false }, 'FBM_BRIDGE_FAILURE', 'BRIDGE_STATUS_POST_FAILED', true]);
-  b.hop.postThrows = false;
-  const sauHong = b.toWorker.length;
-  const lanSau = b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: { runId: 'L1' }, done: true });
-  b.sidebar({ action: 'CRM_FBM_RUN_NOW', id: 'q4', nonce: 'n-1', sessionId: session, runId: 'L1' });
-  check(so, 'Kênh đã hỏng coi như đóng: status sau không gửi, lệnh cũ không tới worker cho tới khi Sidebar bắt tay lại', [lanSau, b.toWorker.length - sauHong], [{ delivered: false }, 0]);
-  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-2' });
-  check(so, 'Bắt tay lại thì kênh mở lại', b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: { runId: 'L1' }, done: true }), { delivered: true });
-
-  b.hop.workerReply = null;
-  b.hop.chrome.runtime.sendMessage = (message, done) => { b.hop.chrome.runtime.lastError = { message: 'Extension context invalidated.' }; done(undefined); b.hop.chrome.runtime.lastError = null; };
-  b.sidebar({ action: 'CRM_FBM_MACHINE_ID', id: 'q5', nonce: 'n-2', sessionId: session });
-  const loiWorker = b.posts[b.posts.length - 1].data;
-  check(so, 'Worker không nhận lệnh (Extension vừa tải lại): Sidebar nhận ok false kèm mã EXTENSION_CONTEXT_INVALIDATED, không treo', [loiWorker.action, loiWorker.ok, loiWorker.code], ['CRM_FBM_MACHINE_ID_RESULT', false, 'EXTENSION_CONTEXT_INVALIDATED']);
-}
-
-/** Executor thật trong tab FBM với `fetch` giả trả `response`. */
-function executorNap() {
-  let listener = null;
-  const state = { response: { ok: true, status: 200, text: '{}' } };
-  const context = {
-    console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-    document: { documentElement: { innerHTML: '', textContent: '' } },
-    fetch() { const r = state.response; return Promise.resolve({ ok: r.ok, status: r.status, headers: { get() { return r.contentType || 'application/json'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(r.text).buffer); } }); },
-    chrome: { runtime: { getManifest: () => MANIFEST, onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
-  };
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(EXECUTOR_FILE, 'utf8'), context, { filename: EXECUTOR_FILE });
-  const send = (meta) => new Promise((resolve) => listener({ type: 'FBM_EXECUTE_V2', request: { id: 'e', url: 'https://fbo.com.vn:8888/AppService/x', method: 'POST', bodyText: '{}', meta: Object.assign({ kind: 'customer_grid', fetchMs: 5000 }, meta || {}) } }, null, resolve));
-  return { state, send };
-}
-
-async function chonCot(so) {
-  const raw = fs.readFileSync(SAMPLE_FILE, 'utf8');
-  const sampleText = raw.slice(raw.indexOf('====== response ========') + '====== response ========'.length).trim();
-  const sample = JSON.parse(sampleText).d;
-  const names = sample.ViewPage.Fields.map((field) => field.AliasName);
-  const keep = { fields: [names[3], names[0], 'CotKhongCo', names[1]] };
-  const ex = executorNap();
-  ex.state.response = { ok: true, status: 200, text: sampleText };
-  const reply = await ex.send({ keep });
-  const picked = JSON.parse(reply.result.body).d;
-  const mong = sample.Rows.map((row) => [row[3], row[0], row[1]]);
-  check(so, 'replyPick trên mẫu lưới khách hàng thật (~80 KB): giữ đúng cột GAS liệt kê theo thứ tự GAS, bỏ cột FBM không có, đủ mọi dòng, giữ TotalRowCount, thân nhỏ hẳn và vết ghi reply_picked', [
-    picked.ViewPage.Fields.map((field) => field.AliasName), picked.Rows.length === sample.Rows.length, JSON.stringify(picked.Rows) === JSON.stringify(mong), picked.TotalRowCount, Object.keys(picked).sort(), reply.result.body.length < sampleText.length / 3, reply.result.transport.trace.some((item) => item.stage === 'reply_picked')
-  ], [[names[3], names[0], names[1]], true, true, sample.TotalRowCount, ['Rows', 'TotalRowCount', 'ViewPage'], true, true]);
-
-  const login = '<html><body><form action="Login.aspx"><input name="txtUser"></form></body></html>';
-  ex.state.response = { ok: true, status: 200, text: login, contentType: 'text/html' };
-  const loginReply = await ex.send({ keep });
-  ex.state.response = { ok: false, status: 500, text: sampleText };
-  const loiReply = await ex.send({ keep });
-  ex.state.response = { ok: true, status: 200, text: sampleText };
-  const khongKeep = await ex.send({});
-  const vo = '{"d":{"Rows":"khong-phai-mang","ViewPage":{}}}';
-  ex.state.response = { ok: true, status: 200, text: vo };
-  const voReply = await ex.send({ keep });
-  check(so, 'Không phải lưới thì đi nguyên về GAS: trang đăng nhập, lưới mang HTTP 500, request không có keep, JSON lưới hỏng dạng', [
-    loginReply.result.body === login, loginReply.result.transport.trace.some((item) => item.stage === 'reply_picked'), loiReply.result.body === sampleText, khongKeep.result.body === sampleText, voReply.result.body === vo
-  ], [true, false, true, true, true]);
+  check(so, 'Thiếu cấu hình relay: không hỏi GAS, trả RELAY_CONFIG_MISSING, không gọi GAS',
+    [thieuKetQua.code, thieu.st.bodies.length],
+    ['RELAY_CONFIG_MISSING', 0]);
 }
 
 async function chay(so) {
-  section('FBM sync — vòng chở lát của Extension, cửa gọi GAS, cầu nối trạng thái, replyPick');
+  section('FBM sync — vòng chở lát của Extension, cửa gọi GAS');
   await vongLuotTay(so);
   await tabVaMien(so);
   await cuaGoiGas(so);
-  await cauNoi(so);
-  await chonCot(so);
 }
 
 module.exports = { chay };

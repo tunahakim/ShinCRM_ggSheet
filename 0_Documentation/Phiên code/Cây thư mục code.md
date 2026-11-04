@@ -322,6 +322,7 @@ tests\
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
 │   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
+│   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   ├── view\
@@ -410,7 +411,10 @@ tests\
     │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
-    │   ├── Orchestration.js       Kiểm state, cursor, resume, preflight và luồng nhiều lát.
+    │   ├── Identity.js            Kiểm liên kết tài khoản FBM với Sheet: xem trạng thái không đọc Sheet, hủy liên kết bị chặn khi request đang bay.
+    │   ├── WebAppRelay.js         Kiểm cổng Web App relay của GAS: khóa, Sheet, mã giao thức, danh sách lệnh relay, ghi địa chỉ Web App, Log qua runEntryPoint.
+    │   ├── Orchestration.js       Kiểm state, cursor, resume, luồng nhiều lát, chặn cấu hình đẩy, trigger hẹn giờ cũ còn sót.
+    │   ├── PropertyBuffer.js      Kiểm bộ đệm DocumentProperties: thấy lượt khác ghi trong lúc chờ khóa, lỗi giữa chừng vẫn lưu phần đã ghi.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng; harness chạy lượt tay và lần hỏi nền qua FBM giả.
     │   ├── ActivityScan.js         Kiểm lấy toàn bộ giao dịch: giữ id, gắn cờ chỉ khi đủ, chia khoảng không chồng ngày biên, đọc lại theo id, executor dừng đọc khi quá trần.
@@ -427,7 +431,9 @@ tests\
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── Heartbeat.js            Kiểm lần hỏi GAS của Extension theo bảng quyết nhịp nền: công tắc tắt, máy không được giao tắt chuông, chỉ kiểm, lượt bận, lượt bỏ dở kèm hộp đen, tự nhận máy nền, sổ tiến trình khi lượt nền đóng.
     │   ├── RunGuards.js            Kiểm rào ô lượt dùng chung: câu hộp đen Extension, nhãn lượt trong Log theo tiến trình nền, RUN_LEFT_OPEN, dừng lượt nền và response đến muộn, pha "đang chạy".
-    │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), cầu nối trạng thái sang Sidebar, phép kiểm miền FBM và replyPick trên mẫu lưới thật.
+    │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), phép kiểm miền FBM.
+    │   ├── IframeBridge.js         Kiểm cầu nối iframe: bắt tay Sidebar, chuyển lệnh sang worker, chuyển trạng thái lượt về Sidebar.
+    │   ├── ExecutorReplyPick.js    Kiểm `replyPick` của executor trên mẫu lưới khách thật.
     │   ├── SiteAccess.js           Kiểm Extension chỉ hỏi Chrome quyền trang khi nạp script vào tab FBM hoặc gọi GAS đã hỏng, và báo mã riêng nêu tên trang bị chặn.
     │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
     │   ├── SidebarDrive.js         Kiểm Sidebar mở lượt bằng runId và chờ đúng lượt đó qua tin CRM_FBM_STATUS, kết thúc bằng cờ done, Extension im lặng thì hỏi GAS.
