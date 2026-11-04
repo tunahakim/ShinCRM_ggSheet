@@ -39,7 +39,7 @@ var SETTINGS = {
   /** Hạn giữ log, tính theo ngày. Tài liệu 10 Phần 6. */
   LOG_RETENTION_DAYS: 30,
   /** Trần số dòng của sheet `Log`. Tài liệu 10 Phần 6. */
-  LOG_MAX_ROWS: 5000,
+  LOG_MAX_ROWS: 1000,
   /** Số dòng vết giữ trong vòng đệm RAM. Tài liệu 10 Phần 3. */
   LOG_TRACE_BUFFER: 100,
   /** Tên khóa phải che khi ghi log. Khớp theo chuỗi con, không phân biệt hoa thường. Tài liệu 10 Phần 7. */
