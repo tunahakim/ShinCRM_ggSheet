@@ -270,7 +270,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\BackgroundMachine.js Kho máy chạy nền (một máy được giao), kiểm máy hỏi có được chạy nền không, tự nhận thay máy im, bản xem máy cho Sidebar.
     ├── state\Heartbeat.js        Người điều phối lần hỏi GAS của Extension (`heartbeatRun`): giao lượt tay đang chờ, kiểm máy nền, đóng lượt bỏ dở, mở tiến trình nền đến hạn, trả lệnh giữ/tắt chuông.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
-    ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
+    ├── read\CustomerScan.js      Chặng quét khách theo hợp đồng chung: mỗi gói tính lý do đọc từng khách, đánh dấu danh sách đọc, tiến cursor; gói cuối kiểm đủ số, xét khách vắng, để tổng thành số khách mốc chờ đóng lượt.
+    ├── read\ActivityLayers.js    Kho của lớp giao dịch (danh sách đọc, thứ tự top, khách vắng) và chọn khách cần đọc: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
     ├── write\PushCandidates.js   Phép xét một dòng của chặng đẩy (pushEligible), dựng ứng viên và phép chờ sửa; preflight dùng chung.
     ├── write\FormValues.js       Trích giá trị từ response mở form FBM để dựng lệnh ghi tiếp theo.

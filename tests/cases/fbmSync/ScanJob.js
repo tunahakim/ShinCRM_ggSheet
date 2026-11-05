@@ -184,10 +184,10 @@ async function chay(so) {
   Object.assign(fullRecord, { ten_dclh_tinh: 'Hà Nội', ten_nguon_dm: 'Giới thiệu', website: 'shin.test' });
   const projected = Object.fromEntries(scanCols.map((field) => [field, fullRecord[field]]));
   let missingTenCv = '';
-  try { FF.validateGridFields('customer', scanCols.filter((field) => field !== 'ten_cv')); } catch (error) { missingTenCv = error.message; }
-  check(so, 'Cột việc quét Customer đủ cho hash: hash dòng đã chiếu cột bằng hash dòng đầy đủ; thiếu ten_cv thì validateGridFields dừng', [
+  try { FF.validateGridFields('customer', scanCols.filter((field) => field !== 'ten_cv')); } catch (error) { missingTenCv = error.code + ': ' + error.message.split(';')[0]; }
+  check(so, 'Cột việc quét Customer đủ cho hash: hash dòng đã chiếu cột bằng hash dòng đầy đủ; thiếu ten_cv thì validateGridFields dừng với mã FBM_GRID_SHAPE_CHANGED', [
     FF.hash(projected, 'customer', { map: {} }) === FF.hash(fullRecord, 'customer', { map: {} }), FF.validateGridFields('customer', scanCols), missingTenCv
-  ], [true, true, 'FBM thiếu metadata AliasName: ten_cv']);
+  ], [true, true, 'FBM_GRID_SHAPE_CHANGED: FBM thiếu metadata AliasName: ten_cv']);
 
   // Executor: 3.000 dòng có dấu tiếng Việt (UTF-8 nhiều byte) phải thành nhiều gói, mỗi gói đã serialize không vượt trần; dòng không bị cắt đôi, đúng thứ tự, FBM chỉ bị gọi một lần.
   const executorFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ghi_chu_noi_bo'];
@@ -276,12 +276,13 @@ async function chay(so) {
 
   // Gói lạ (khác việc quét): dừng phiên, không ghi gói đó, Sidebar và Log cùng thấy.
   const stray = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
-  const strayEnd = await stray.run({ edit: (raw, request) => {
+  await stray.run({ afterError: () => null, edit: (raw, request) => {
     if (request.meta.kind !== 'scan_chunk') { return raw; }
     return Object.assign({}, raw, { job: Object.assign({}, raw.job, { jobId: 'viec-khac' }) });
   } });
-  check(so, 'Gói lạ khác jobId: phiên error FBM_SCAN_JOB_MISMATCH, không ghi khách nào vì danh sách chỉ đánh dấu, Log ghi scan_job_mismatch, Sidebar có lời lỗi', [
-    strayEnd.status.phase, strayEnd.status.lastFailureCode, stray.writes.filter((item) => item.entity === 'customer').length, stray.logs.some((event) => event.action === 'scan_job_mismatch' && event.outcome === 'error'), String(strayEnd.status.lastError || '').indexOf('không khớp việc quét') >= 0
+  const strayState = stray.F.stateRead();
+  check(so, 'Gói lạ khác jobId: phiên error FBM_SCAN_JOB_MISMATCH qua đường lỗi chung, không ghi khách nào vì danh sách chỉ đánh dấu, Log có dòng lỗi nêu gói lạ, Sidebar có lời lỗi', [
+    strayState.phase, strayState.lastFailureCode, stray.writes.filter((item) => item.entity === 'customer').length, stray.logs.some((event) => event.outcome === 'error' && JSON.stringify(event).indexOf('không khớp việc quét') >= 0), String(strayState.lastError || '').indexOf('không khớp việc quét') >= 0
   ], ['error', 'FBM_SCAN_JOB_MISMATCH', 0, true, true]);
 
   // Phiên chết giữa lượt (đăng nhập ở thiết bị khác): FBM trả HTTP 200 nhưng Authorized:false, Rows:null và tab không có khối việc quét. Gặp thật 2026-10-16.
@@ -317,12 +318,14 @@ async function chay(so) {
 
   // Lượt thiếu dòng (FBM báo tổng lớn hơn số dòng trả về, hoặc dòng vượt trần không về GAS): không gắn cờ khách nào, phiên lỗi FBM_SCAN_INCOMPLETE.
   const incomplete = scanHarness({ customers: 12, totalExtra: 3, localCustomers: [Object.assign({}, staleCustomer)] });
-  const incompleteEnd = await incomplete.run();
+  await incomplete.run({ afterError: () => null });
+  const incompleteEnd = { status: incomplete.F.stateRead() };
   check(so, 'FBM báo 15 khách mà chỉ trả 12: phiên error FBM_SCAN_INCOMPLETE trước cửa ghi, khách vắng không bị gắn "không thấy bên FBM", chưa ghi khách nào, Log ghi lỗi', [
     incompleteEnd.status.phase, incompleteEnd.status.lastFailureCode, incomplete.local.customer.find((item) => item.fbmId === 'FBM-CU').syncStatus, incomplete.local.customer.length, incomplete.logs.some((event) => event.outcome === 'error' && JSON.stringify(event).indexOf('chỉ nhận 12/15 khách') >= 0)
   ], ['error', 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ', 1, true]);
   const tooBig = scanHarness({ customers: 6, nameLength: 9000, budget: { chunkTargetBytes: 6000, chunkMaxBytes: 12000 }, localCustomers: [Object.assign({}, staleCustomer)] });
-  const tooBigEnd = await tooBig.run();
+  await tooBig.run({ afterError: () => null });
+  const tooBigEnd = { status: tooBig.F.stateRead() };
   check(so, 'Dòng khách vượt trần một gói: Log ghi scan_row_oversize từng dòng, lượt thiếu dòng nên FBM_SCAN_INCOMPLETE và không gắn cờ', [
     tooBig.logs.filter((event) => event.action === 'scan_row_oversize').length, tooBigEnd.status.lastFailureCode, tooBig.local.customer.find((item) => item.fbmId === 'FBM-CU').syncStatus
   ], [6, 'FBM_SCAN_INCOMPLETE', 'đã đồng bộ']);

@@ -16,7 +16,7 @@ async function chay(so) {
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '', setProperty: () => {}, deleteProperty: () => {} }) },
     shinOpenBook: () => ({ getId: () => 'sheet-pull-test' })
   });
-  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'mode tach quyen ghi Sheet khoi quyen ghi FBM', [
     builders.FbmSync.canWriteSheet('check'), builders.FbmSync.canWriteFbm('check'),
     builders.FbmSync.canWriteSheet('read'), builders.FbmSync.canWriteFbm('read'),
@@ -48,7 +48,7 @@ async function chay(so) {
 
   let readFinishState = {
     runId: 'read-run', origin: 'manual', mode: 'read', scan: 'full', phase: 'pull_customer', entity: 'customer',
-    cursor: { kind: 'scan_job', entity: 'customer', jobId: 'read-run:customer:0:0', page: 0, next: 0, chunkCount: 0 }, activeRequestId: 'read-request', deadlineAt: Date.now() + 60000,
+    cursor: { kind: 'customer_scan', entity: 'customer', jobId: 'read-run:customer:0:0', page: 0, next: 0, chunkCount: 0 }, activeRequestId: 'read-request', deadlineAt: Date.now() + 60000,
     lastProgressAt: Date.now(), session: {}, metadata: {},
     counts: { total: 0, completed: 0, succeeded: 0, conflict: 0, skipped: 0, error: 0 }
   };
@@ -62,7 +62,7 @@ async function chay(so) {
       stateWrite: (next) => { readFinishState = next; return next; },
       staleRunCheck: () => null,
       responseRequestId: () => 'read-request', requestAnswered: (state, id) => !!id && String(state.activeRequestId || '') === id,
-      protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
+      protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null }, replyCheck: () => ({ ok: true }), scope: () => null,
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false, sessionGateResponseStarted: () => {},
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
       pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false,
@@ -73,14 +73,14 @@ async function chay(so) {
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })
     }
   });
-  napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
   readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
   readFinish.FbmSync.readListClear = () => {};
   readFinish.FbmSync.staleRunCheck = () => null;
   readFinish.FbmSync.customerBaselineWrite = () => {};
   readFinish.FbmSync.activityStageNext = () => null;
-  const readFinished = readFinish.FbmSync.continueStep({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
+  const readFinished = readFinish.FbmSync.continue({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'Lượt Lấy hết danh sách khách thì gắn khách vắng vào danh sách đọc một lần, không mở chiều đẩy', [readFinished.ok, readFinishState.phase, readFinishMissing, readFinishPushRequests], [true, 'done', 1, 0]);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
@@ -200,7 +200,7 @@ async function chay(so) {
   builders.FbmSync.seenStoreBegin = () => {};
   builders.FbmSync.readLocal = () => [];
   const firstPage = builders.FbmSync.beginCustomerPull(pageState);
-  check(so, 'quét toàn bộ lấy cả danh sách khách bằng một việc quét có số dòng mỗi request theo cấu hình, Extension cắt gói', [pageState.cursor.kind, pageState.cursor.count, firstPage.meta.kind, firstPage.body.count, firstPage.meta.job.chunkMaxBytes], ['scan_job', builders.FbmSync.BUDGET.scanCustomerRows, 'scan_job', builders.FbmSync.BUDGET.scanCustomerRows, builders.FbmSync.BUDGET.chunkMaxBytes]);
+  check(so, 'quét toàn bộ lấy cả danh sách khách bằng một việc quét có số dòng mỗi request theo cấu hình, Extension cắt gói', [pageState.cursor.kind, pageState.cursor.count, firstPage.meta.kind, firstPage.body.count, firstPage.meta.job.chunkMaxBytes], ['customer_scan', builders.FbmSync.BUDGET.scanCustomerRows, 'scan_job', builders.FbmSync.BUDGET.scanCustomerRows, builders.FbmSync.BUDGET.chunkMaxBytes]);
   // Cursor cửa ghi giữ tối đa một lô mã khách. stt_rec_kh của FBM là 'A' + 9 chữ số.
   const pageRows = builders.FbmSync.BUDGET.activityBatchCustomers;
   const fullPage = Array.from({ length: pageRows }, (_, i) => ({ sttRec: 'A' + String(100000000 + i) }));
@@ -229,8 +229,7 @@ async function chay(so) {
   check(so, 'state một trang Customer đầy (cả lô giao dịch của trang) cộng lastError dài nhất dưới 70% trần một khóa kho, không chứa bản xem trước và preflight đầy đủ',
     [stateBytes > 0 && stateBytes < stateHop.FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT * 0.7 ? 'dưới 70%' : stateBytes + ' byte'], ['dưới 70%']);
   // Mẫu số tiến trình là số khách của lượt (FBM đã lọc theo phạm vi), tử số là số khách đã quét xong; số bản ghi nhận được không chen vào.
-  const tienTrinh = { scan: 'full', mode: 'read', metadata: {}, counts: { completed: 0 } };
-  builders.FbmSync.customerScanRecord(tienTrinh, { total: 50, rows: Array.from({ length: 50 }, () => ({})) }, true);
+  const tienTrinh = { scan: 'full', mode: 'read', metadata: {}, counts: { completed: 0 }, progress: { done: 0, total: builders.FbmSync.customerScanRecord(null, Array.from({ length: 50 }, () => ({})), 50, null).total } };
   builders.FbmSync.progressCustomersDone(tienTrinh, 3);
   tienTrinh.counts.completed = 1312;
   check(so, 'tiến trình lượt 50 khách là x/50 theo khách đã quét xong', tienTrinh.progress, { done: 3, total: 50 });
@@ -249,31 +248,25 @@ async function chay(so) {
     [['/Date(915148800000)/', '/Date(1751298801493)/', '000000010624', 'A000069569'], '1999010120250630000000010624A000069569']);
   // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn xét khách vắng thì mọi khách chưa quét tới bị coi là vắng (gặp thật: 1.262/1.312 khách).
   const marked = [];
-  const savedScanEnd = { absent: builders.FbmSync.customerAbsentMark, baseline: builders.FbmSync.customerBaselineWrite, stages: builders.FbmSync.activityStagesContinue };
+  const savedScanEnd = { absent: builders.FbmSync.customerAbsentMark, baseline: builders.FbmSync.customerBaselineWrite };
   builders.FbmSync.customerAbsentMark = () => { marked.push('vắng'); };
   builders.FbmSync.customerBaselineWrite = () => { marked.push('mốc'); };
-  builders.FbmSync.activityStagesContinue = () => { marked.push('cửa ghi'); return { ok: true }; };
-  const scanRun = (pages) => { const st = { runId: 'scan-run', mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice(), st.metadata.customerTotal === undefined ? null : st.metadata.customerTotal]; };
+  const scanOf = (pages, scopeNew) => pages.reduce((scan, grid, i) => builders.FbmSync.customerScanRecord(i === 0 ? null : scan, grid.rows, grid.total, i === 0 ? scopeNew : null), null);
+  const finishOf = (scan) => { const st = { runId: 'scan-run', mode: 'read', metadata: {} }, patch = { metadata: {}, logs: [] }; marked.length = 0; let code = ''; try { builders.FbmSync.customerScanFinish(st, scan, patch); } catch (error) { code = error.code; } return [code, marked.slice(), patch.metadata.customerTotal === undefined ? null : patch.metadata.customerTotal, patch]; };
+  const scanRun = (pages) => finishOf(scanOf(pages)).slice(0, 3);
   const rowsOf = (n) => Array.from({ length: n }, () => ({}));
-  check(so, 'chỉ xét khách vắng và sang cửa ghi khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE, chưa ghi gì',
+  check(so, 'chỉ xét khách vắng khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì chặng ném FBM_SCAN_INCOMPLETE, chưa đánh dấu vắng, chưa có số khách mốc',
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
-    [['error', 'FBM_SCAN_INCOMPLETE', [], null], ['error', 'FBM_SCAN_INCOMPLETE', [], null], ['pull_customer', '', ['vắng', 'cửa ghi'], 60], ['pull_customer', '', ['vắng', 'cửa ghi'], 0]]);
+    [['FBM_SCAN_INCOMPLETE', [], null], ['FBM_SCAN_INCOMPLETE', [], null], ['', ['vắng'], 60], ['', ['vắng'], 0]]);
   // Mốc số khách chỉ ghi khi lượt đóng xong: lượt hỏng sau bước quét khách mà đã ghi mốc thì lần đếm sau thấy khớp, bỏ quét và khách chưa đọc bị bỏ qua.
   const closeWith = (verdict) => { const st = { runId: 'close-run', mode: 'read', phase: 'pull_activity', metadata: { customerTotal: 1312 }, session: {}, cursor: {} }; marked.length = 0; builders.FbmSync.runClose(st, verdict, { message: 'x' }); return [marked.slice(), 'customerTotal' in st.metadata]; };
   check(so, 'mốc số khách chỉ ghi khi lượt đóng xong; lượt lỗi, hủy hay dừng giữa chừng giữ mốc cũ; đóng xong thì số tạm bị xóa để lần đóng kế không ghi lại',
     [closeWith('done'), closeWith('error'), closeWith('cancelled')], [[['mốc'], false], [[], false], [[], false]]);
-  const savedScope = builders.FbmSync.scope;
-  builders.FbmSync.scope = () => ({ codes: ['ALT0010', 'alt00099', 'ALT00010'], fbm: ['ALT0010', 'alt00099', 'ALT00010'], shin: ['CUS-1'], fbmNew: ['ALT0010', 'alt00099'], notFound: [] });
-  const scopeScan = { mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} };
-  marked.length = 0;
-  builders.FbmSync.customerScanRecord(scopeScan, { total: 2, rows: [{ ma_kh: 'ALT00010' }] }, true);
-  builders.FbmSync.customerScanRecord(scopeScan, { total: 0, rows: [{ ma_kh: 'ALT00099' }] }, false);
-  builders.FbmSync.customerScanEnd(scopeScan);
-  builders.FbmSync.scope = savedScope;
-  check(so, 'Mã khách chỉ định chưa có trên Sheet mà danh sách khách FBM không trả về (gộp mọi trang, không phân biệt hoa thường) thành cảnh báo không chặn ở kết quả phiên, phiên vẫn sang cửa ghi',
-    [(scopeScan.metadata.preflightIssues || []).map((item) => [item.code, item.blocking, /ALT0010\b/.test(item.message), /00099/.test(item.message)]), marked.slice()],
-    [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['vắng', 'cửa ghi']]);
-  builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline; builders.FbmSync.activityStagesContinue = savedScanEnd.stages;
+  const scopeFinish = finishOf(scanOf([{ total: 2, rows: [{ ma_kh: 'ALT00010' }] }, { total: 0, rows: [{ ma_kh: 'ALT00099' }] }], ['ALT0010', 'alt00099']));
+  check(so, 'Mã khách chỉ định chưa có trên Sheet mà danh sách khách FBM không trả về (gộp mọi trang, không phân biệt hoa thường) thành cảnh báo không chặn kèm dòng Log, chặng vẫn xét vắng và kết thúc',
+    [(scopeFinish[3].metadata.preflightIssues || []).map((item) => [item.code, item.blocking, /ALT0010\b/.test(item.message), /00099/.test(item.message)]), scopeFinish[3].logs.map((line) => line.action), scopeFinish[1]],
+    [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['scope_code_not_on_fbm'], ['vắng']]);
+  builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline;
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
   builders.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-2', fbmId: 'FBM-2', fbmCustomerCode: 'ALT00011' }];
