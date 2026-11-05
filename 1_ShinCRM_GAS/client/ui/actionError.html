@@ -1,0 +1,43 @@
+<script>
+/*
+ * Cửa báo lỗi thao tác của Sidebar: lỗi của một cú bấm (`client/ui/dispatch.html`), của lệnh xóa và của việc giữ thay đổi chưa lưu đều đi qua đây. Lỗi là chuyện xảy ra một lần nên thông báo ở dòng đáy còn tới khi người dùng bấm ✕ (`ACTIONS.noticeDismiss` với khóa `actionError`) hoặc lỗi thao tác sau thay nó.
+ */
+
+/** Câu nói về sheet Log theo kết quả `callServerErrorLog`. */
+var ACTION_ERROR_LOG_TEXT = {
+  pending: 'Đang ghi lỗi này vào sheet Log…',
+  server: 'Máy chủ đã ghi lỗi này vào sheet Log kèm vết gọi.',
+  logged: 'Đã ghi lỗi này vào sheet Log.',
+  not_logged: 'Chưa ghi được lỗi này vào sheet Log vì máy chủ không nhận lời gọi ghi Log; hãy chụp lại thông báo này.'
+};
+var ACTION_ERROR_SEQ = 0;
+
+/** Thông báo dòng đáy của một lỗi thao tác: chuyện xảy ra một lần nên còn tới khi người dùng bấm ✕ hoặc lỗi thao tác sau thay nó. */
+function actionErrorNotice(message, logState) {
+  return {
+    line: 'Lỗi: ' + message,
+    blocks: [{ variant: 'error', title: 'Thao tác vừa rồi bị lỗi', lines: [message], hint: ACTION_ERROR_LOG_TEXT[logState], button: { label: 'Đóng ✕', action: 'noticeDismiss', value: 'actionError' } }]
+  };
+}
+
+/**
+ * Đưa lỗi của một thao tác tới mắt người dùng và vào sheet `Log`, không dùng hộp thoại bật lên (chặn cả tab Sheet). `err` là `Error` hoặc chữ.
+ * Màn đồng bộ FBM đang giữ khung (dòng đáy ẩn) thì hiện ở thẻ lỗi của màn đó, vốn tự ghi Log; còn lại hiện ở dòng đáy rồi ghi Log qua `callServerErrorLog`, chữ gợi ý nói đúng đã ghi hay chưa.
+ * Vẫn ghi console bản đầy đủ có vết gọi, vì thông báo chỉ có chữ còn lúc tìm nguyên nhân thì cần cả vết.
+ */
+function actionErrorReport(err) {
+  if (typeof console !== 'undefined' && console.error) { console.error(err); }
+  var message = err && err.message ? err.message : String(err);
+  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.active === true && typeof fbmSyncPaintError === 'function') {
+    fbmSyncPaintError(err, message, 'sidebar_action');
+    return null;
+  }
+  var luot = ACTION_ERROR_SEQ += 1;
+  noticeSet('actionError', actionErrorNotice(message, 'pending'));
+  return callServerErrorLog(err, 'sidebar_action').then(function (logState) {
+    // Lỗi sau đã thay hoặc người dùng đã đóng thì không vẽ lại thông báo cũ.
+    if (luot === ACTION_ERROR_SEQ && NOTICES.actionError) { noticeSet('actionError', actionErrorNotice(message, logState)); }
+    return logState;
+  });
+}
+</script>

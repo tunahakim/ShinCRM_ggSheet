@@ -81,6 +81,7 @@ const NHOM_CA = [
   require('./cases/menu'),
   require('./cases/refresh'),
   require('./cases/domUi'),
+  require('./cases/actionError'),
   require('./cases/liveModelReader'),
   require('./cases/bindWatcher'),
   require('./cases/fbmSync'),

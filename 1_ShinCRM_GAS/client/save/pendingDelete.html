@@ -119,7 +119,7 @@ function pendingDeleteFire() {
     }, function (err) {
       pendingDeleteUnmask(ids);
       pendingDeleteRedraw(entity);
-      if (typeof dispatchError === 'function') { dispatchError(err); }
+      actionErrorReport(err);
       return null;
     });
   }, { block: true }).then(function (html) {

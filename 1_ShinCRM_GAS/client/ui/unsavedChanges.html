@@ -179,9 +179,7 @@ function unsavedChangesClose(preserveBusy) {
   if (focus && focus.focus && focus.isConnected !== false) { focus.focus(); }
 }
 
-function unsavedChangesNotifyFailure(error) {
-  if (typeof alert === 'function') { alert(error && error.message ? error.message : 'Không xử lý được thay đổi chưa lưu.'); }
-}
+function unsavedChangesNotifyFailure(error) { return actionErrorReport(error || 'Không xử lý được thay đổi chưa lưu.'); }
 
 function unsavedChangesReadProvider(kind) {
   if (kind === 'fbm' && typeof FBM_SYNC_CLIENT !== 'undefined' && typeof fbmSyncConfigUnsavedProvider === 'function') { return fbmSyncConfigUnsavedProvider(); }

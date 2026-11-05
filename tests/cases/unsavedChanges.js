@@ -16,7 +16,7 @@ function taoBoTest() {
   const hop = taoHopCat({
     document: dom.document,
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
-    alert: (message) => { calls.push({ name: 'alert', message }); }
+    actionErrorReport: (error) => { calls.push({ name: 'error', error }); }
   });
   napTheoSidebar(['client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html'], hop);
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
@@ -152,13 +152,13 @@ async function testLoiVaKhoa(so) {
   rejectSave(new Error('lỗi ghi thử'));
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'save lỗi giữ bản nháp, màu và action chờ, đồng thời báo lỗi',
-    [bo.wrapper.classList.contains('shin-field-changed'), pendingCalls, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'alert').length],
+    [bo.wrapper.classList.contains('shin-field-changed'), pendingCalls, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'error').length],
     [true, 0, true, 1]);
   provider.save = () => { throw new Error('lỗi đồng bộ thử'); };
   hop.unsavedChangesGuard('core', () => { pendingCalls += 1; });
   hop.unsavedChangesResolve('save');
   check(so, 'save ném lỗi đồng bộ không để khóa busy treo',
-    [hop.UNSAVED_CHANGES.busy, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'alert').length],
+    [hop.UNSAVED_CHANGES.busy, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'error').length],
     [false, true, 2]);
 }
 
@@ -294,7 +294,7 @@ function testSurfaceAdapterContract(so) {
   invalidHop.unsavedChangesRegisterSurface('invalid', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }) }));
   const invalidBlocked = invalidHop.unsavedChangesGuardTransition({ source: 'invalid', target: invalid.dom.document.createElement('button') }, () => {});
   check(so, 'Adapter thiếu canRun bị chặn fail-closed thay vì chạy tắt',
-    [invalidBlocked, invalid.calls.filter((item) => item.name === 'alert').length],
+    [invalidBlocked, invalid.calls.filter((item) => item.name === 'error').length],
     [true, 1]);
 }
 
@@ -352,19 +352,19 @@ function testCoordinatorFailureMatrix(so) {
   twoHop.unsavedChangesRegisterSurface('one', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => false }));
   twoHop.unsavedChangesRegisterSurface('two', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => false }));
   check(so, 'hai surface cùng sửa bị chặn fail-closed và báo lỗi thay vì đoán surface',
-    [twoHop.unsavedChangesGuardTransition({ source: 'two', target }, () => {}), twoHop.UNSAVED_CHANGES.dialogOpen, two.calls.filter((item) => item.name === 'alert').length],
+    [twoHop.unsavedChangesGuardTransition({ source: 'two', target }, () => {}), twoHop.UNSAVED_CHANGES.dialogOpen, two.calls.filter((item) => item.name === 'error').length],
     [true, false, 1]);
 
   const readError = taoBoTest(), readHop = readError.hop;
   readHop.unsavedChangesRegisterSurface('broken.read', () => ({ read: () => { throw new Error('READ_FAIL'); } }));
   check(so, 'provider read lỗi bị chặn và báo lỗi rõ',
-    [readHop.unsavedChangesGuardTransition({ source: 'broken.read', target }, () => {}), readError.calls.filter((item) => item.name === 'alert').length],
+    [readHop.unsavedChangesGuardTransition({ source: 'broken.read', target }, () => {}), readError.calls.filter((item) => item.name === 'error').length],
     [true, 1]);
 
   const canRunError = taoBoTest(), canRunHop = canRunError.hop;
   canRunHop.unsavedChangesRegisterSurface('broken.canRun', () => ({ read: () => ({ editing: true, dirty: false, fieldIds: [] }), canRun: () => { throw new Error('CANRUN_FAIL'); } }));
   check(so, 'adapter canRun lỗi bị chặn và báo lỗi rõ',
-    [canRunHop.unsavedChangesGuardTransition({ source: 'broken.canRun', target }, () => {}), canRunError.calls.filter((item) => item.name === 'alert').length],
+    [canRunHop.unsavedChangesGuardTransition({ source: 'broken.canRun', target }, () => {}), canRunError.calls.filter((item) => item.name === 'error').length],
     [true, 1]);
 }
 
@@ -522,7 +522,7 @@ async function testProviderSaveResultMatrix(so) {
   hop.unsavedChangesResolve('save');
   await new Promise((resolve) => setImmediate(resolve));
   check(so, 'FBM save trả ok:false không bị nuốt thành thành công',
-    [blocked, pendingCalls, hop.UNSAVED_CHANGES.provider !== null, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'alert').length],
+    [blocked, pendingCalls, hop.UNSAVED_CHANGES.provider !== null, hop.UNSAVED_CHANGES.pending !== null, bo.calls.filter((item) => item.name === 'error').length],
     [true, 0, true, true, 1]);
 }
 
@@ -675,7 +675,7 @@ async function testSaveFlowPopup(so) {
   const nutA = Array.from(a.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
   await huaA;
   check(so, 'xung đột khi lưu mở popup Sidebar ba lựa chọn, ghi rõ giá trị Sheet, giá trị đang nhập và giá trị lần trước bạn thấy; không còn alert', [
-    moA, a.bo.calls.filter((c) => c.name === 'alert').length, chuA[1], nutA
+    moA, a.bo.calls.filter((c) => c.name === 'error').length, chuA[1], nutA
   ], [true, 0, 'Ghi chú: trên Sheet là "Sheet sửa", bạn đang nhập "của tôi" (lần trước bạn thấy: "cũ")', [
     'Lưu giá trị bạn đang nhập, thay giá trị trên Sheet', 'Dùng giá trị trên Sheet, bỏ giá trị bạn đang nhập', 'Quay lại form, chưa lưu gì'
   ]]);
@@ -706,7 +706,7 @@ async function testSaveFlowPopup(so) {
   const nutD = Array.from(d.bo.dialog.querySelector('.shin-unsaved-actions').querySelectorAll('button')).map((el) => el.textContent);
   const kqD = await huaD;
   check(so, 'trường nhập sai khi lưu mở popup Sidebar một nút quay lại sửa, ô sai tô đỏ, không còn alert', [
-    moD, chuD, nutD, kqD.focusId, d.bo.calls.filter((x) => x.name === 'alert').length, d.ghi.dong
+    moD, chuD, nutD, kqD.focusId, d.bo.calls.filter((x) => x.name === 'error').length, d.ghi.dong
   ], [true, ['Một chỗ cần sửa:', '• Tên không được trống'], ['Quay lại sửa'], 'f-ten', 0, 0]);
 
   const voiMat = (choice) => {
@@ -755,7 +755,7 @@ async function testSaveFlowPopup(so) {
   const moXoa = await bamPopup(xoa.hop, 'cancel');
   const chuXoa = Array.from(xoa.bo ? [] : xoa.dialog.querySelectorAll('.shin-unsaved-message')).map((el) => el.textContent);
   check(so, 'xóa: bỏ khỏi RAM cả mã xóa hẳn lẫn mã đã không còn trên Sheet, ghi đè dòng xóa mềm, báo xóa mềm bằng popup Sidebar không dùng alert', [
-    ram, moXoa, await huaXoa, xoa.calls.filter((c) => c.name === 'alert').length, chuXoa.indexOf('• GD2: Bản ghi đã có ID FBM') >= 0 || chuXoa.join('|').indexOf('GD2: Bản ghi đã có ID FBM') >= 0
+    ram, moXoa, await huaXoa, xoa.calls.filter((c) => c.name === 'error').length, chuXoa.indexOf('• GD2: Bản ghi đã có ID FBM') >= 0 || chuXoa.join('|').indexOf('GD2: Bản ghi đã có ID FBM') >= 0
   ], [['bỏ GD1', 'bỏ GD9', 'ghi GD2'], true, 'vẽ', 0, true]);
   const banLuu = { ok: false, busy: { id: 'KH1', by: 'fbm', reason: 'Đồng bộ đang đẩy bản ghi này lên FBM.' } };
   const f1 = taoLuongLuu(banLuu);

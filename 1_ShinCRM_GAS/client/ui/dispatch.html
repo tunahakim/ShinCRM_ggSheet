@@ -4,7 +4,7 @@
  *
  * Vì sao một tai nghe chứ không gắn từng nút: mỗi lượt vẽ thay sạch ruột bốn vùng, nên nút gắn tai nghe riêng sẽ mất tai nghe ngay lượt vẽ sau. Đặt ở khung thì khung không bao giờ bị vẽ lại, và nút nào mang `data-action` cũng bấm được kể cả nút do `SLOTS` mới sinh ra một giây trước.
  *
- * Tệp này là **chỗ duy nhất** làm ba việc mà mười lăm hành động cố ý không làm: đọc `data-*` thành `payload`, đặt con trỏ theo `focusId` được trả về, và đưa lỗi tới mắt người dùng. Nhờ vậy `actions.html` không chạm DOM và kiểm được offline — `Câu hỏi đêm.md` mục 6.1.
+ * Tệp này là **chỗ duy nhất** làm ba việc mà mười lăm hành động cố ý không làm: đọc `data-*` thành `payload`, đặt con trỏ theo `focusId` được trả về, và chuyển lỗi cho cửa báo lỗi thao tác (`client/ui/actionError.html`). Nhờ vậy `actions.html` không chạm DOM và kiểm được offline — `Câu hỏi đêm.md` mục 6.1.
  */
 
 /** Khung ngoài cùng của sidebar. Không bao giờ bị vẽ lại, nên tai nghe đặt ở đây sống suốt phiên. */
@@ -22,16 +22,6 @@ function dispatchPayload(el) {
   var pick = el.getAttribute('data-pick');
   var value = el.getAttribute('data-value');
   return { pick: pick === null ? '' : pick, value: value === null ? undefined : value };
-}
-
-/**
- * Đưa lỗi tới mắt người dùng. `alert` chứ không phải `console`: người đọc là chủ dự án, và họ không có lý do gì để mở console.
- *
- * Vẫn ghi thêm vào console một bản đầy đủ có vết gọi, vì `alert` chỉ hiện được một dòng chữ còn lúc đi tìm nguyên nhân thì cần cả vết.
- */
-function dispatchError(err) {
-  if (typeof console !== 'undefined' && console.error) { console.error(err); }
-  alert(err && err.message ? err.message : String(err));
 }
 
 /**
@@ -96,7 +86,7 @@ function dispatchBusy(el) {
  */
 function dispatchRunNow(ten, payload, el) {
   if (typeof ACTIONS === 'undefined' || !Object.prototype.hasOwnProperty.call(ACTIONS, ten)) {
-    dispatchError(new Error('Nút vừa bấm gọi hành động "' + ten + '" không có trong bảng ACTIONS. Đây là lỗi bản khai bố cục, không phải bạn làm sai — phép kiểm lúc khởi động lẽ ra phải bắt được nó.'));
+    actionErrorReport(new Error('Nút vừa bấm gọi hành động "' + ten + '" không có trong bảng ACTIONS. Đây là lỗi bản khai bố cục, không phải bạn làm sai — phép kiểm lúc khởi động lẽ ra phải bắt được nó.'));
     return null;
   }
 
@@ -106,7 +96,7 @@ function dispatchRunNow(ten, payload, el) {
     ket = ACTIONS[ten](payload);
   } catch (err) {
     if (xong) { xong(); }
-    dispatchError(err);
+    actionErrorReport(err);
     return null;
   }
 
@@ -116,7 +106,7 @@ function dispatchRunNow(ten, payload, el) {
       return dispatchAfter(giaTri);
     }, function (err) {
       if (xong) { xong(); }
-      dispatchError(err);
+      actionErrorReport(err);
     });
     return ket;
   }
@@ -156,7 +146,7 @@ function dispatchClick(e) {
   if (!el) { return; }
 
   if (moMenu) {
-    try { menuToggle(el); } catch (err) { dispatchError(err); }
+    try { menuToggle(el); } catch (err) { actionErrorReport(err); }
     return;
   }
 

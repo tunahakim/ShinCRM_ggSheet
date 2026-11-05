@@ -13,7 +13,7 @@ var NOTICE_UNDO_ID = 'shin-undo';
 var NOTICE_SCREEN_ROOT_ID = 'shin-notice-screen';
 
 /** Số nhỏ đứng trước ở dòng đáy và trên màn thông báo. Khóa ngoài bảng này là lỗi lập trình. Hoãn nạp đứng đầu vì nó chỉ có khi form đang mở và nói về chính chữ người dùng đang gõ. */
-var NOTICE_PRIORITY = { recordDeferred: 1, viewProblems: 2, extension: 3, fbmExtension: 3.2, fbmBackgroundMachine: 3.3, viewStale: 4 };
+var NOTICE_PRIORITY = { recordDeferred: 1, viewProblems: 2, actionError: 2.2, extension: 3, fbmExtension: 3.2, fbmBackgroundMachine: 3.3, viewStale: 4 };
 
 /** Thứ tự của thông báo GAS theo `level`, xen giữa các việc của Sidebar. */
 var NOTICE_SERVER_PRIORITY = { error: 2.5, warning: 3.5, info: 4.5 };
@@ -90,6 +90,12 @@ function noticeServerApply(list) {
     if (key.indexOf(NOTICE_SERVER_PREFIX) === 0 && !keep[key]) { noticeSet(key, null); }
   });
   return null;
+}
+
+/** Người dùng bỏ một thông báo: khóa trong `NOTICE_PRIORITY` là việc trình duyệt này giữ (lỗi thao tác), bỏ tại chỗ; còn lại là thông báo GAS, GAS bỏ khỏi kho chung rồi trả danh sách mới để vẽ lại ngay. */
+function noticeDismissKey(key) {
+  if (NOTICE_PRIORITY[key]) { return noticeSet(key, null); }
+  return callServer('shinNoticeDismiss', [key]).then(function (result) { return noticeServerApply(result && result.notices); });
 }
 
 function noticeScreenShowing() {

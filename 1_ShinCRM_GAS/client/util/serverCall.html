@@ -13,7 +13,7 @@
  * **Không tự hiện lỗi.** Việc hiện thuộc bên gọi, vì cùng một lỗi thì đường nạp lõi phải vẽ màn chặn cả khung, còn đường
  * nạp gói nền chỉ nên ghi một dòng trong khối thông tin. Một hàm hiện lỗi chung ở đây sẽ hiện sai ở một trong hai ca.
  *
- * Hết hạn chờ là lỗi sinh ở trình duyệt, máy chủ không ném gì nên không có dòng Log nào. Vì vậy nhánh hết hạn tự ghi Log ngay tại đây (tên hàm và số ms) và gắn `Promise` kết quả ghi vào `error.logged`, để bên gọi nói đúng với người dùng là đã ghi hay chưa. Lỗi máy chủ ném thì không có `logged`: `runEntryPoint` đã ghi.
+ * Hết hạn chờ là lỗi sinh ở trình duyệt, máy chủ không ném gì nên không có dòng Log nào. Vì vậy nhánh hết hạn tự ghi Log ngay tại đây (tên hàm và số ms) và gắn `Promise` kết quả ghi vào `error.logged`, để bên gọi nói đúng với người dùng là đã ghi hay chưa. Lỗi máy chủ ném thì không có `logged` mà mang `fromServer`: `runEntryPoint` đã ghi.
  *
  * Hạn chờ mặc định `CALL_SERVER_TIMEOUT_MS`; bên gọi đã tự sở hữu hạn chờ và chẩn đoán riêng truyền `{ timeoutMs: 0 }` để tắt hạn ở đây, nếu không hạn ngắn hơn ở đây sẽ cắt trước và biến một bước GAS chậm nhưng vẫn đang chạy thành lỗi thường.
  *
@@ -63,6 +63,7 @@ function callServer(name, args, options) {
         clearTimeout(timeout);
         if (showProgress) { progressEnd(); }
         callTimingRecord(name, Date.now() - batDau, null);
+        if (err && typeof err === 'object') { err.fromServer = true; }
         reject(err);
       });
 
@@ -78,5 +79,15 @@ function callServer(name, args, options) {
 function callServerLogError(action, message, detail) {
   return callServer('logClientError', [action, message, detail || {}], { silent: true, logTimeout: false })
     .then(function (result) { return !!(result && result.ok === true); }, function () { return false; });
+}
+
+/**
+ * Lỗi bất kỳ Sidebar gặp đã vào sheet `Log` chưa, và nếu chưa thì ghi. Trả `Promise` ra `'server'` (máy chủ ném nên `runEntryPoint` đã ghi), `'logged'` hoặc `'not_logged'`; không bao giờ từ chối.
+ * Ba nguồn lỗi khác nhau: máy chủ ném (`fromServer`), hết hạn chờ (đã tự ghi, kết quả ở `logged`), lỗi sinh ở trình duyệt (ghi ở đây dưới tên `action`).
+ */
+function callServerErrorLog(err, action) {
+  if (err && err.fromServer === true) { return Promise.resolve('server'); }
+  var ghi = err && err.logged ? err.logged : callServerLogError(action, err && err.message ? err.message : String(err), {});
+  return Promise.resolve(ghi).then(function (ok) { return ok ? 'logged' : 'not_logged'; }, function () { return 'not_logged'; });
 }
 </script>
