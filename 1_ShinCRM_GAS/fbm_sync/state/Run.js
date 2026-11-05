@@ -79,10 +79,7 @@ FbmSync.runClose = function (state, verdict, detail) {
   state.activeRequestId = ''; state.deadlineAt = 0; state.current = '';
   // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.
   if (!failed) { state.cursor = {}; state.entity = ''; }
-  // Số khách mốc chỉ ghi khi lượt xong: lượt hỏng sau bước quét khách mà vẫn ghi thì lần đếm sau thấy khớp và bỏ quét, khách chưa đọc bị bỏ qua. Ghi xong xóa để lần đóng lượt kế (đuôi đếm khách) không ghi lại.
-  var customerTotal = state.metadata && state.metadata.customerTotal;
-  if (spec.phase === 'done' && typeof customerTotal === 'number') { FbmSync.customerBaselineWrite(customerTotal); }
-  if (state.metadata) { delete state.metadata.customerTotal; }
+  FbmSync.runMarksCommit(state, spec.phase === 'done');
   if (extra.cursor) { state.cursor = extra.cursor; }
   state.phase = spec.phase;
   state.message = message;
@@ -90,6 +87,24 @@ FbmSync.runClose = function (state, verdict, detail) {
   state.lastFailureCode = String(extra.code || (failed ? 'FBM_SYNC_EXCEPTION' : ''));
   state.retryable = extra.retryable === true;
   return state;
+};
+
+/**
+ * Mốc bền mà chặng đọc chỉ để trong metadata của lượt; chỉ ghi khi lượt xong, vì ghi giữa lượt thì lượt hỏng vẫn đẩy mốc đi và phần chưa đọc bị bỏ qua:
+ * - `customerTotal`: số khách mốc; ghi sớm thì lần đếm sau thấy khớp và bỏ quét.
+ * - `rotationCursor`: vị trí Vòng xoay; ghi sớm thì khách của lô hỏng không bao giờ được đọc lại trong vòng này.
+ */
+FbmSync.RUN_CLOSE_MARKS = {
+  customerTotal: function (value) { FbmSync.customerBaselineWrite(value); },
+  rotationCursor: function (value) { FbmSync.detailCursorWrite(value); }
+};
+/** Ghi các mốc khi `done`, rồi luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. */
+FbmSync.runMarksCommit = function (state, done) {
+  var metadata = state.metadata || {};
+  Object.keys(FbmSync.RUN_CLOSE_MARKS).forEach(function (key) {
+    if (done && typeof metadata[key] === 'number') { FbmSync.RUN_CLOSE_MARKS[key](metadata[key]); }
+    delete metadata[key];
+  });
 };
 
 /** Nơi duy nhất đưa lượt sang lỗi. `message` là chữ người dùng đọc, nên bên gọi tự nêu bước hỏng. */

@@ -18,17 +18,17 @@ FbmSync.gateOpen = function (state, cursorFields, message) {
   }
   state.cursor = Object.assign({ kind: 'activity_grid', customers: [], count: FbmSync.BUDGET.activityCustomerRows }, cursorFields || {});
   state.message = message;
-  FbmSync.activityBatchPlan(state.cursor);
+  FbmSync.activityBatchPlan(state.cursor, state.metadata);
   FbmSync.activityLayerProgress(state);
   FbmSync.stateWrite(state);
   return FbmSync.activityBatchRequest(state);
 };
 
-/** Lấp lô kế khi lô trước đã ghi xong: lớp 3, Vòng xoay hoặc danh sách đọc. Đang ở vòng tra mã thì giữ nguyên. */
-FbmSync.activityBatchPlan = function (cursor) {
+/** Lấp lô kế khi lô trước đã ghi xong: lớp 3, Vòng xoay hoặc danh sách đọc. Đang ở vòng tra mã thì giữ nguyên. `metadata` là của ô lượt, Vòng xoay ghi vị trí đã đọc xong vào đó. */
+FbmSync.activityBatchPlan = function (cursor, metadata) {
   if (cursor.lookup || (cursor.customers || []).length) { return cursor.customers || []; }
   if (cursor.layer === 'top') { FbmSync.activityTopRefill(cursor); }
-  else if (cursor.rotation) { FbmSync.activityRotationRefill(cursor); }
+  else if (cursor.rotation) { FbmSync.activityRotationRefill(cursor, metadata); }
   else { cursor.customers = FbmSync.readListNext(FbmSync.BUDGET.activityBatchCustomers); }
   return cursor.customers;
 };
@@ -318,7 +318,7 @@ FbmSync.gateLookupContinue = function (state, cursor, checks, chunk) {
 
 /** Lô đã ghi xong: lấp lô kế của chặng; hết khách thì trả `{ done: true }` để PullFlow sang chặng sau. */
 FbmSync.gateNextBatch = function (state, imported) {
-  FbmSync.activityBatchPlan(state.cursor);
+  FbmSync.activityBatchPlan(state.cursor, state.metadata);
   FbmSync.activityLayerProgress(state);
   var request = FbmSync.activityBatchRequest(state);
   FbmSync.stateWrite(state);

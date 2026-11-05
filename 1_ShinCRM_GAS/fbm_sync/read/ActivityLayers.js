@@ -274,12 +274,13 @@ FbmSync.activityRotationBegin = function (state) {
 };
 
 /**
- * Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên lưu cursor bền bằng khách cuối của lô đó, rồi lấy lô kế đến khi đủ N. Phiên bị kẹt giữa lô thì phiên sau đọc lại đúng lô đó và vẫn đủ N khách.
- * Khách đọc lỗi đã có dòng Log `activity_customer_failed` và hiện ở Sidebar; cursor vẫn đi qua để một khách hỏng không chặn cả vòng.
+ * Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên khách cuối của lô đó là vị trí đã đọc xong, rồi lấy lô kế đến khi đủ N.
+ * Vị trí chỉ để ở `metadata.rotationCursor`; `runClose` ghi bền khi lượt xong. Lượt hỏng ở lô sau hoặc ở chặng đẩy thì lượt sau đọc lại cả N khách, không khách nào bị bỏ qua mà chưa đọc.
+ * Khách đọc lỗi đã có dòng Log `activity_customer_failed` và hiện ở Sidebar; vị trí vẫn đi qua để một khách hỏng không chặn cả vòng.
  */
-FbmSync.activityRotationRefill = function (cursor) {
+FbmSync.activityRotationRefill = function (cursor, metadata) {
   var rotation = cursor.rotation, taken = Number(rotation.taken || 0);
-  if (Number(rotation.last) >= 0) { FbmSync.detailCursorWrite(rotation.last); }
+  if (Number(rotation.last) >= 0) { metadata.rotationCursor = Number(rotation.last); }
   var ring = FbmSync.activityRotationRing(Number(rotation.start)), end = Math.min(Number(rotation.limit), ring.length, taken + FbmSync.BUDGET.activityBatchCustomers), picked = ring.slice(taken, Math.max(taken, end));
   cursor.customers = picked.map(function (item) { return item.sttRec; });
   rotation.taken = taken + picked.length;
