@@ -378,7 +378,7 @@ FbmSync.pauseForRuntimeLimit = function (state) {
 };
 /**
  * Kênh của lời gọi đang chạy, do cửa lệnh đặt: `relay` (Extension) hoặc `sidebar`. Phong bì chỉ rời GAS qua relay; trên kênh Sidebar `nextEnvelope` giữ chỗ nhận lượt thay vì phát, Extension đến nhận bằng `continue{runId}`.
- * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay.
+ * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay. `logs` gom dòng Log thường của công cụ, cửa lệnh ghi ở cuối lời gọi.
  */
 FbmSync.issueContext = null;
 /** Cổng phát request: kênh Sidebar giữ chỗ nhận lượt; công tắc tổng tắt, hết ngân sách lời gọi hay phiên chưa xác minh thì không phát request này (cổng phiên có thể thay bằng probe hoặc đăng nhập); qua cổng thì `requestIssue`. */

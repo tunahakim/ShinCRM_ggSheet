@@ -70,8 +70,9 @@ FbmSync.controlDispatch = function (command, payload, channel) {
     return spec.slice ? FbmSync.runSlice(function () { return spec.run(input, state); }, state) : spec.run(input, state);
   };
   var run = function () {
-    FbmSync.issueContext = { channel: via, machineId: String(input.machineId || '') };
-    try { return body(); } finally { FbmSync.issueContext = null; }
+    FbmSync.issueContext = { channel: via, machineId: String(input.machineId || ''), logs: [] };
+    // Dòng Log công cụ gửi qua `callLogAdd` ghi ở cuối lời gọi, còn trong khóa, kể cả khi lệnh ném lỗi.
+    try { return body(); } finally { var logs = FbmSync.issueContext.logs; FbmSync.issueContext = null; logs.forEach(function (line) { logEvent(line); }); }
   };
   try {
     result = spec.lock ? FbmSync.withOrchestrationLock(run) : run();

@@ -120,6 +120,15 @@ FbmSync.BUSINESS_STEPS = {
   push_customer: { action: 'push_customer', label: 'quét và đẩy Customer ShinCRM lên FBM' },
   push_activity: { action: 'push_activity', label: 'quét và đẩy Activity ShinCRM lên FBM' }
 };
+/** Gửi một dòng Log thường cho cửa lệnh ghi ở cuối lời gọi; công cụ không tự ghi Log thường. Trả `false` khi không có lời gọi nào qua cửa lệnh để người gọi chọn đường khác. */
+FbmSync.callLogAdd = function (line) {
+  var context = FbmSync.issueContext;
+  if (!context || !context.logs) { return false; }
+  context.logs.push(line);
+  return true;
+};
+/** Bước mà dòng bắt đầu của lượt tay ghi Log thường. */
+FbmSync.BUSINESS_VISIBLE_STARTS = ['run', 'session'];
 /** Các bước của chiều Lấy theo đối tượng, đóng cùng nhau khi chặng của đối tượng đó xong. */
 FbmSync.BUSINESS_PULL_STEPS = {
   customer: ['pull_customer', 'reconcile_customer'],
@@ -167,7 +176,10 @@ FbmSync.businessStepStart = function (state, key, input) {
   // Hủy phiên xóa runId trước khi ghi state; giữ runId riêng để dòng đóng bước vẫn cùng cycleId với dòng mở.
   metadata.businessRunId = String(current.runId);
   if (name !== 'run') { metadata.businessActiveStep = name; }
-  logTrace({ source: 'fbm_sync', action: definition.action + '_started', outcome: 'trace', cycleId: String(current.runId), entity: String(current.entity || ''), reason: 'Bắt đầu ' + definition.label + ' - Input: ' + FbmSync.businessStepInput(Object.assign({}, detail, input || {})), detail: { step: name, input: detail } });
+  var line = { source: 'fbm_sync', action: definition.action + '_started', outcome: 'trace', cycleId: String(current.runId), entity: String(current.entity || ''), reason: 'Bắt đầu ' + definition.label + ' - Input: ' + FbmSync.businessStepInput(Object.assign({}, detail, input || {})), detail: { step: name, input: detail } };
+  // Lượt người dùng bấm thì dòng bắt đầu phiên và bắt đầu kiểm phiên là Log thường, để Sheet Log có điểm đầu của lượt; lượt nền chạy vài phút một lần nên giữ dòng vết.
+  if (FbmSync.BUSINESS_VISIBLE_STARTS.indexOf(name) >= 0 && String(current.origin || '') !== 'background' && FbmSync.callLogAdd(Object.assign({}, line, { outcome: LOG_OK }))) { return true; }
+  logTrace(line);
   flushLogIfTraced('fbm_sync');
   return true;
 };
