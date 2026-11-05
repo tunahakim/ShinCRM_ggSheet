@@ -93,14 +93,15 @@ FbmSync.backgroundTail = function (result) {
   return Object.assign({}, result, { ok: true, request: next && next.request || null, status: FbmSync.statusView() });
 };
 
-/** Máy hỏi chạy nền được hay không, và ghi kho máy: máy được giao ghi lần hỏi cuối; máy tự nhận ghi thành máy được giao kèm Log; máy lạ ghi Log. Trả kết luận của `machineCheck`. */
+/** Máy hỏi chạy nền được hay không, và ghi kho máy: máy được giao ghi lần hỏi cuối; máy tự nhận ghi thành máy được giao kèm Log và thông báo chung (còn tới khi người dùng bấm ✕); máy lạ ghi Log. Trả kết luận của `machineCheck`. */
 FbmSync.machineAskRecord = function (input, now) {
   var extension = settingsValues(FbmSync.SETTING_SECTIONS.extension), machine = FbmSync.backgroundMachineRead();
   var verdict = FbmSync.machineCheck({ master: settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled'), background: settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled'), machine: machine, machineId: input.machineId, now: now, silentMinutes: FbmSync.machineSilentMinutes(extension), autoTakeover: settingsValue(FbmSync.SETTING_SECTIONS.background, 'machineAutoTakeover'), credentialRef: FbmSync.loginConfigRead().credentialRef, keyRefs: input.keyRefs });
   if (verdict.verdict === 'assigned') { machine.lastAskAt = now; FbmSync.backgroundMachineWrite(machine); }
   if (verdict.verdict === 'takeover') {
-    var taken = FbmSync.backgroundMachineWrite(FbmSync.machineTakenOver(machine, input.machineId, now));
-    logEvent({ source: 'fbm_sync', action: 'background_machine_takeover', outcome: LOG_WARN, reason: 'BACKGROUND_MACHINE_TAKEOVER: máy "' + taken.name + '" tự nhận chạy nền thay máy "' + machine.name + '" vì máy đó không hỏi GAS quá ' + FbmSync.machineSilentMinutes(extension) + ' phút.', detail: { code: 'BACKGROUND_MACHINE_TAKEOVER', machineId: taken.machineId, fromMachineId: machine.machineId } });
+    var taken = FbmSync.backgroundMachineWrite(FbmSync.machineTakenOver(input.machineId, now)), text = 'Máy "' + taken.name + '" đã tự nhận chạy nền FBM thay máy "' + machine.name + '" vì máy đó không hỏi GAS quá ' + FbmSync.machineSilentMinutes(extension) + ' phút.';
+    logEvent({ source: 'fbm_sync', action: 'background_machine_takeover', outcome: LOG_WARN, reason: 'BACKGROUND_MACHINE_TAKEOVER: ' + text, detail: { code: 'BACKGROUND_MACHINE_TAKEOVER', machineId: taken.machineId, fromMachineId: machine.machineId } });
+    noticeRaise({ topic: 'fbm_machine_takeover', scope: '', source: 'fbm_sync', title: text, hint: 'Xem lại máy "' + machine.name + '" (tắt máy, Chrome hoặc Extension?). Muốn chạy nền lại trên máy đó thì mở Sidebar ở máy đó và bấm "Dùng máy này chạy nền".' });
   }
   if (verdict.code === 'MACHINE_NOT_ASSIGNED') {
     logEvent({ source: 'fbm_sync', action: 'background_machine_refused', outcome: LOG_WARN, reason: 'Extension máy ' + String(input.machineId).slice(-6) + ' hỏi GAS nhưng không chạy nền: ' + FbmSync.MACHINE_REFUSED_TEXT[verdict.reason] + '; Extension máy đó tắt chuông tới lần mở trình duyệt kế tiếp.', detail: { code: verdict.code, reason: verdict.reason } });

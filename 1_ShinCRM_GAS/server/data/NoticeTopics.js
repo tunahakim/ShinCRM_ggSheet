@@ -21,7 +21,9 @@ var NOTICE_TOPICS = {
   /** Không cài được trigger của chủ tệp (server/entry/TriggerSetup.js). Không phạm vi; gỡ khi chủ tệp mở Sidebar và trigger đủ. */
   trigger_setup: { level: 'error', clear: 'on_success' },
   /** Bảng tra nhanh cú pháp lọc, mở từ lệnh menu. */
-  filter_reference: { level: 'info', clear: 'dismiss' }
+  filter_reference: { level: 'info', clear: 'dismiss' },
+  /** Máy khác vừa tự nhận chạy nền FBM thay máy được giao im quá ngưỡng. Không phạm vi: lần nhận thay sau ghi đè lần trước; còn tới khi người dùng bấm ✕ dù mở Sidebar lúc nào, vì máy được giao im là việc cần xem lại máy đó. */
+  fbm_machine_takeover: { level: 'warning', clear: 'dismiss' }
 };
 
 /** Thứ tự mức độ trong danh sách thông báo: số nhỏ đứng trước. */

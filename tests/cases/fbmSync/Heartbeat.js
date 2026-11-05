@@ -5,14 +5,22 @@
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 const { datCongTac, datNen, datPhan, datLichNen } = require('../../lib/fbm/cai-dat-thu');
+const { taoHopCat, napServer } = require('../../lib/load-gas');
+
+/** Bảng loại thông báo thật, để thông báo đồng bộ phát ra chắc chắn dùng loại đã khai. */
+function loaiThongBao() {
+  const hop = taoHopCat({});
+  napServer(hop, 'server/data/NoticeTopics.js');
+  return hop.NOTICE_TOPICS;
+}
 
 const MAY_A = 'may-A', MAY_B = 'may-B';
 const LICH = { direction: 'write', heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30, customersPerRun: 30 } };
 
 /** Hộp GAS đã gắn tài khoản FBM, lịch nền chỉ còn Giữ phiên đến hạn, máy A được giao chạy nền (trừ khi `giao: false`). */
 function hopNen(options) {
-  const opt = options || {}, logs = [];
-  const flow = workflowGas({ logEvent: (event) => logs.push(event), LOG_WARN: 'warn' });
+  const opt = options || {}, logs = [], notices = [];
+  const flow = workflowGas({ logEvent: (event) => logs.push(event), LOG_WARN: 'warn', noticeRaise: (notice) => { notices.push(notice); return true; } });
   const hop = flow.hop, F = hop.FbmSync;
   F.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   datLichNen(hop, LICH);
@@ -20,7 +28,7 @@ function hopNen(options) {
   flow.documentProperties.setProperty(F.SCHEDULE_DONE_KEYS.heartbeat, '1');
   if (opt.giao !== false) { F.backgroundMachineWrite(F.machineAssigned(MAY_A, 'Máy A', Date.now())); }
   const hoi = (machineId, trigger, extra) => F.controlDispatch('heartbeat', Object.assign({ trigger: trigger || 'alarm', machineId }, extra || {}), 'relay');
-  return { flow, hop, F, logs, hoi };
+  return { flow, hop, F, logs, notices, hoi };
 }
 
 const maCua = (logs, action) => logs.filter((line) => line.action === action);
@@ -119,15 +127,15 @@ function chay(so) {
     F.backgroundMachineWrite(F.machineAssigned(MAY_A, 'Máy A', Date.now() - (silent + 60) * 60000));
   };
   {
-    const { hop, F, logs, hoi } = hopNen();
+    const { hop, F, logs, notices, hoi } = hopNen();
     datMayIm(hop);
     datPhan(hop, 'background', { machineAutoTakeover: true });
     F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-1', username: 'nguoi-thu' });
     const taken = hoi(MAY_B, 'alarm', { keyRefs: ['fbmCredentialVault:khac', 'cred-1'] }), machine = F.backgroundMachineRead(), view = F.statusView().backgroundMachine;
-    const log = maCua(logs, 'background_machine_takeover');
-    check(so, 'tự nhận bật, máy được giao im quá ngưỡng, máy hỏi có khóa giải mã mật khẩu đã lưu: máy hỏi thành máy nền, Log BACKGROUND_MACHINE_TAKEOVER, thông báo nói nhận thay máy nào, chạy tiếp việc đến hạn',
-      [machine.machineId, machine.takeover && machine.takeover.fromName, log.length, log[0] && log[0].detail.code, view.notice && view.notice.code, view.notice && /Máy A/.test(view.notice.text), taken.request && taken.request.meta.kind],
-      [MAY_B, 'Máy A', 1, 'BACKGROUND_MACHINE_TAKEOVER', 'BACKGROUND_MACHINE_TAKEOVER', true, 'session_probe']);
+    const log = maCua(logs, 'background_machine_takeover'), topics = loaiThongBao();
+    check(so, 'tự nhận bật, máy được giao im quá ngưỡng, máy hỏi có khóa giải mã mật khẩu đã lưu: máy hỏi thành máy nền, Log BACKGROUND_MACHINE_TAKEOVER, thông báo chung loại bấm ✕ mới hết nói nhận thay máy nào (không hẹn giờ trong khối máy nền), chạy tiếp việc đến hạn',
+      [machine.machineId, log.length, log[0] && log[0].detail.code, notices.map((n) => n.topic), /Máy A/.test(notices[0] && notices[0].title), topics.fbm_machine_takeover && topics.fbm_machine_takeover.clear, view.notice, taken.request && taken.request.meta.kind],
+      [MAY_B, 1, 'BACKGROUND_MACHINE_TAKEOVER', ['fbm_machine_takeover'], true, 'dismiss', null, 'session_probe']);
   }
   {
     const { hop, F, logs, hoi } = hopNen();

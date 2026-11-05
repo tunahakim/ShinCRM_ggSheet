@@ -10,11 +10,8 @@ FbmSync.MACHINE_NAME_MAX = 60;
 
 /** Máy đang được giao; chưa giao thì `machineId` rỗng. Kho hỏng thì ném (không coi là chưa giao, vì "chưa giao" làm mọi máy dừng nền âm thầm). */
 FbmSync.backgroundMachineRead = function () {
-  var saved = FbmSync.documentPropertyJson(FbmSync.BACKGROUND_MACHINE_KEY, 'máy chạy nền') || {}, takeover = saved.takeover && typeof saved.takeover === 'object' ? saved.takeover : null;
-  return {
-    machineId: String(saved.machineId || ''), name: String(saved.name || ''), assignedAt: Number(saved.assignedAt || 0), lastAskAt: Number(saved.lastAskAt || 0),
-    takeover: takeover ? { fromName: String(takeover.fromName || ''), fromMachineId: String(takeover.fromMachineId || ''), at: Number(takeover.at || 0) } : null
-  };
+  var saved = FbmSync.documentPropertyJson(FbmSync.BACKGROUND_MACHINE_KEY, 'máy chạy nền') || {};
+  return { machineId: String(saved.machineId || ''), name: String(saved.name || ''), assignedAt: Number(saved.assignedAt || 0), lastAskAt: Number(saved.lastAskAt || 0) };
 };
 /** Ghi máy được giao; máy không có mã là gỡ (xóa khóa). */
 FbmSync.backgroundMachineWrite = function (machine) {
@@ -27,13 +24,13 @@ FbmSync.machineNameOf = function (name, machineId) {
   return text || 'Máy ' + String(machineId || '').slice(-6);
 };
 
-/** Bản ghi máy được giao bằng tay (lệnh "Dùng máy này chạy nền"): bỏ dấu tự nhận cũ. */
+/** Bản ghi máy được giao bằng tay (lệnh "Dùng máy này chạy nền"). */
 FbmSync.machineAssigned = function (machineId, name, now) {
-  return { machineId: String(machineId), name: FbmSync.machineNameOf(name, machineId), assignedAt: Number(now), lastAskAt: 0, takeover: null };
+  return { machineId: String(machineId), name: FbmSync.machineNameOf(name, machineId), assignedAt: Number(now), lastAskAt: 0 };
 };
-/** Bản ghi máy vừa tự nhận chạy nền thay máy im quá ngưỡng; giữ tên máy cũ để thông báo nói được nhận thay máy nào. */
-FbmSync.machineTakenOver = function (previous, machineId, now) {
-  return { machineId: String(machineId), name: FbmSync.machineNameOf('', machineId), assignedAt: Number(now), lastAskAt: Number(now), takeover: { fromName: previous.name, fromMachineId: previous.machineId, at: Number(now) } };
+/** Bản ghi máy vừa tự nhận chạy nền thay máy im quá ngưỡng. Chuyện nhận thay báo qua cổng thông báo chung (`fbm_machine_takeover`), không giữ trong kho máy. */
+FbmSync.machineTakenOver = function (machineId, now) {
+  return { machineId: String(machineId), name: FbmSync.machineNameOf('', machineId), assignedAt: Number(now), lastAskAt: Number(now) };
 };
 
 /** Máy được giao im quá ngưỡng: không hỏi GAS từ lúc giao hoặc lần hỏi cuối quá `silentMinutes`. Chưa giao máy thì không có máy nào để im. */
@@ -67,14 +64,12 @@ FbmSync.MACHINE_REFUSED_TEXT = {
 };
 
 /**
- * Bản xem máy chạy nền cho Sidebar: tên, lần hỏi cuối, có im quá ngưỡng không, và thông báo khi đồng bộ nền thật sự không chạy (chưa giao máy, máy giao im) hoặc máy vừa tự nhận. Công tắc nền tắt thì không thông báo: người dùng chủ động tắt.
+ * Bản xem máy chạy nền cho Sidebar: tên, lần hỏi cuối, có im quá ngưỡng không, và thông báo khi đồng bộ nền thật sự không chạy (chưa giao máy, máy giao im). Công tắc nền tắt thì không thông báo: người dùng chủ động tắt. Máy vừa tự nhận thay là chuyện xảy ra một lần nên báo qua cổng thông báo chung, không ở đây.
  * `notice`: `{ code, text }` hoặc `null`; Sidebar hiện bằng `noticeSet` kèm liên kết tới màn cài đặt.
  */
 FbmSync.machineView = function (machine, now, silentMinutes, backgroundOn) {
   var silent = FbmSync.machineSilent(machine, now, silentMinutes), notice = null;
-  var takeoverRecent = !!machine.takeover && Number(now) - machine.takeover.at < Number(SETTINGS.FBM_MACHINE_TAKEOVER_NOTICE_HOURS) * 3600000;
   if (backgroundOn && !machine.machineId) { notice = { code: 'MACHINE_NOT_ASSIGNED', level: 'warning', text: 'Đồng bộ nền đang bật nhưng chưa giao máy nào chạy nền nên chưa máy nào chạy.' }; }
   else if (backgroundOn && silent) { notice = { code: 'MACHINE_SILENT', level: 'warning', text: 'Máy chạy nền "' + machine.name + '" không hỏi GAS quá ' + silentMinutes + ' phút; đồng bộ nền đang không chạy.' }; }
-  else if (takeoverRecent) { notice = { code: 'BACKGROUND_MACHINE_TAKEOVER', level: 'info', text: 'Máy "' + machine.name + '" đã tự nhận chạy nền thay máy "' + machine.takeover.fromName + '" (máy đó im quá ngưỡng).' }; }
-  return { assigned: !!machine.machineId, machineId: machine.machineId, name: machine.name, assignedAt: machine.assignedAt, lastAskAt: machine.lastAskAt, silent: silent, silentMinutes: Number(silentMinutes), takeover: machine.takeover, notice: notice };
+  return { assigned: !!machine.machineId, machineId: machine.machineId, name: machine.name, assignedAt: machine.assignedAt, lastAskAt: machine.lastAskAt, silent: silent, silentMinutes: Number(silentMinutes), notice: notice };
 };
