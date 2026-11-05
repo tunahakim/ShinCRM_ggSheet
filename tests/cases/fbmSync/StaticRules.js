@@ -169,8 +169,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html': 1,
     '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 12,
