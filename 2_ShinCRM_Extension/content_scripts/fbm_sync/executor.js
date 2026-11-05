@@ -281,14 +281,14 @@
     return data ? JSON.stringify({ d: replyPick(data, keep) }) : text;
   }
   /** Cắt gói từ lưới đã qua `replyPick`; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. */
-  function scanChunks(data, job) {
+  function scanChunks(data, job, sourceFields) {
     var wanted = data.ViewPage.Fields.map(fieldName);
     var idPosition = wanted.indexOf(String(job.idField || '')), keep = Array.isArray(job.keepIds) ? {} : null, total = Number(data.TotalRowCount || 0);
     if (keep) { job.keepIds.forEach(function (id) { keep[String(id)] = true; }); }
     var fieldsText = JSON.stringify(wanted.map(function (name) { return { AliasName: name }; }));
     var shell = function (rowsText) { return '{"d":{"Rows":[' + rowsText + '],"ViewPage":{"Fields":' + fieldsText + '},"TotalRowCount":' + total + '}}'; };
     // Phần cố định của một gói: thân rỗng, khối `job` và dấu vết vận chuyển; dư 4 KiB cho trace, mã hợp đồng và wrapper relay.
-    var fixed = quotedLength(shell('')) + utf8Length(JSON.stringify({ ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: '', job: { jobId: job.jobId, chunkIndex: 0, chunkCount: 0, rowCount: 0, keptCount: 0, totalRowCount: total, oversize: [] } })) + 4096;
+    var fixed = quotedLength(shell('')) + utf8Length(JSON.stringify({ ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: '', job: { jobId: job.jobId, chunkIndex: 0, chunkCount: 0, rowCount: 0, keptCount: 0, totalRowCount: total, oversize: [], fields: sourceFields } })) + 4096;
     var target = Number(job.chunkTargetBytes || 0), max = Number(job.chunkMaxBytes || 0), chunks = [], current = [], size = fixed, oversize = [], kept = 0;
     data.Rows.forEach(function (row) {
       var values = Array.isArray(row) ? row : [];
@@ -300,7 +300,7 @@
       current.push(text); size += bytes;
     });
     if (current.length || !chunks.length) { chunks.push(shell(current.join(','))); }
-    return { chunks: chunks, rowCount: data.Rows.length, keptCount: kept, totalRowCount: total, oversize: oversize };
+    return { chunks: chunks, rowCount: data.Rows.length, keptCount: kept, totalRowCount: total, oversize: oversize, fields: sourceFields };
   }
   function scanChunkResult(chunkIndex, trace, request) {
     var job = scanJob, index = Number(chunkIndex);
@@ -310,7 +310,7 @@
       throw gone;
     }
     traceEvent(trace, 'scan_chunk_sent', request, { responseLength: job.chunks[index].length });
-    return { ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: job.chunks[index], job: { jobId: job.jobId, chunkIndex: index, chunkCount: job.chunks.length, rowCount: job.rowCount, keptCount: job.keptCount, totalRowCount: job.totalRowCount, oversize: index === 0 ? job.oversize : [] }, transport: { trace: trace } };
+    return { ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: job.chunks[index], job: { jobId: job.jobId, chunkIndex: index, chunkCount: job.chunks.length, rowCount: job.rowCount, keptCount: job.keptCount, totalRowCount: job.totalRowCount, oversize: index === 0 ? job.oversize : [], fields: index === 0 ? job.fields || null : null }, transport: { trace: trace } };
   }
   function execute(request) {
     if (!request || typeof request !== 'object') {
@@ -353,8 +353,9 @@
           throw unparseable;
         }
         if (data) {
-          var cut = scanChunks(replyPick(data, req.meta.keep), req.meta.job || {});
-          scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize };
+          // Tên cột gốc (trước khi giữ cột) đi kèm gói đầu để GAS đọc các trang không tiêu đề của cùng bảng trong lượt.
+          var cut = scanChunks(replyPick(data, req.meta.keep), req.meta.job || {}, data.ViewPage.Fields.map(fieldName));
+          scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize, fields: cut.fields };
           traceEvent(trace, 'scan_job_cut', req, { responseLength: body.length, code: 'chunks:' + cut.chunks.length });
           var first = scanChunkResult(0, trace, req);
           first.transport = Object.assign({}, captured, first.transport);
