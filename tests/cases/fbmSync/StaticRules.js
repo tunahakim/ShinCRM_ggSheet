@@ -140,15 +140,12 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 14,
-    '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
     '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 12,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/ActivityScan.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 4,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 35,
@@ -214,7 +211,6 @@ const EXCEPTIONS = {
   logEvent: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 2,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
