@@ -42,7 +42,7 @@ async function chay(so) {
   const locDoc = await loc.xoay(5);
   check(so, 'Khách thiếu mã FBM, đã xóa, mang "không thấy bên FBM" hoặc "đã chuyển cho người khác", hoặc "Chờ đồng bộ" bị bỏ qua; Vòng xoay vẫn đọc đủ 5 khách đủ điều kiện', locDoc.doc, [1, 5, 7, 9, 10]);
 
-  // Lỗi giữa lô: cursor bền chỉ ghi khi cả lô đã ghi xong, phiên sau đọc lại đúng lô hỏng và vẫn đủ N khách.
+  // Lỗi giữa lượt: vị trí Vòng xoay chỉ ghi bền khi cả lượt xong (runClose), nên lượt hỏng không đẩy vị trí; lượt sau đọc lại cả N khách của lượt hỏng.
   const loi = await vongHarness();
   await loi.xoay(5);
   const hong = loi.fbmOf(8);
@@ -50,7 +50,7 @@ async function chay(so) {
   const loiDoc = await loi.xoay(5, { fail: (request) => { if (daHong || request.meta.kind !== 'batch' || JSON.stringify(request).indexOf(hong) < 0) { return ''; } daHong = true; return 'SYNC_TRANSPORT_FAILED'; } });
   const cursorSauLoi = loi.F.detailCursorRead(), phaseSauLoi = loi.F.stateRead().phase;
   const sau = await loi.xoay(5);
-  // Ghi Sheet lỗi ở lô chứa CUS 8: cursor chỉ tiến sau khi ghi xong lô.
+  // Ghi Sheet lỗi ở lô chứa CUS 8: vị trí giữ nguyên như trước lượt hỏng.
   let hongGhi = false, hongMa = '';
   const ghi = await vongHarness({
     failWrite: (request) => hongGhi && JSON.stringify(request.records || []).indexOf(hongMa) >= 0,
@@ -62,8 +62,8 @@ async function chay(so) {
   const cursorGhiLoi = ghi.F.detailCursorRead(), phaseGhiLoi = ghi.F.stateRead().phase;
   hongGhi = false;
   const ghiSau = await ghi.xoay(5);
-  check(so, 'Ghi Sheet lỗi ở lô chứa CUS 8: phiên dừng lỗi, cursor giữ CUS 7; phiên sau đọc lại từ CUS 8', [phaseGhiLoi, cursorGhiLoi, ghiSau.doc[0]], ['error', 7, 8]);
-  check(so, 'Lỗi vận chuyển ở lô chứa CUS 8: phiên dừng lỗi, cursor giữ CUS 7; phiên sau đọc lại từ CUS 8 và đủ 5 khách', [loiDoc.doc.indexOf(9) < 0, phaseSauLoi, cursorSauLoi, sau.doc], [true, 'error', 7, [8, 9, 10, 11, 12]]);
+  check(so, 'Ghi Sheet lỗi ở lô chứa CUS 8: phiên dừng lỗi, vị trí Vòng xoay giữ CUS 5 như trước lượt hỏng; lượt sau đọc lại từ CUS 6', [phaseGhiLoi, cursorGhiLoi, ghiSau.doc[0]], ['error', 5, 6]);
+  check(so, 'Lỗi vận chuyển ở lô chứa CUS 8: phiên dừng lỗi, vị trí Vòng xoay giữ CUS 5 (con trỏ vòng xoay không đi khi lượt hỏng); lượt sau đọc lại đủ 5 khách từ CUS 6', [loiDoc.doc.indexOf(9) < 0, phaseSauLoi, cursorSauLoi, sau.doc], [true, 'error', 5, [6, 7, 8, 9, 10]]);
 }
 
 module.exports = { chay };

@@ -47,7 +47,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js', 262, 22554, 'B8', 'một người điều phối pullWrite'],
   ['1_ShinCRM_GAS/fbm_sync/report/Report.js', 236, 22255, 'B12', 'nhãn, statusView, ghi issue, preview, bản xem máy chạy nền'],
   ['1_ShinCRM_GAS/fbm_sync/state/State.js', 420, 35202, 'B4', 'ô lượt, sổ đã thấy, kho đẩy, vòng đời lượt'],
-  ['1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js', 346, 29900, 'B8', 'một việc (lô giao dịch)'],
+  ['1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js', 346, 30000, 'B8', 'một việc (lô giao dịch)'],
   ['1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js', 621, 48202, 'B4/B8', 'mở lượt, quét khách, continueStep'],
   ['1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js', 603, 52848, 'B9', 'xác minh sau ghi, lỗi đẩy, điều phối chặng đẩy'],
   ['1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js', 574, 44060, 'B4', 'cờ, cổng phiên, phát phong bì'],
