@@ -1,6 +1,7 @@
 /** Chốt Log FBM chỉ ghi theo bước nghiệp vụ, không tăng theo số lần gọi hàm/record. */
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
+const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
 const { hopBuoc: dungState, dongDong } = require('../../lib/fbm/hop-buoc');
 
 function chay(so) {
@@ -11,7 +12,7 @@ function chay(so) {
     LOG_OK: 'ok',
     LOG_WARN: 'warn',
     LOG_ERROR: 'error',
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '[]', setProperty: () => {} }) },
+    PropertiesService: taoPropertiesService({}),
     logTrace: (entry) => events.push(entry),
     logEvent: (entry) => events.push(entry)
   });
@@ -26,14 +27,20 @@ function chay(so) {
 
   const preflight = events.filter((event) => event.detail && event.detail.step === 'preflight_hash');
   const reasons = events.map((event) => String(event.reason || '')).join('\n');
-  check(so, '1.000 lần cộng số liệu chỉ tạo đúng một cặp log bước tính hash', [preflight.length, preflight[0].action, preflight[1].action], [2, 'preflight_hash_started', 'preflight_hash_finished']);
-  check(so, 'dòng kết thúc tính hash giữ tổng số thực tế', [preflight[1].detail.result.localRecords, preflight[1].detail.result.changed, preflight[1].detail.result.unchanged, preflight[1].detail.result.candidateCount, reasons.indexOf('1000 bản ghi khác baseline') >= 0], [1000, 1000, 20, 7, true]);
+  check(so, '1.000 lần cộng số liệu chỉ tạo đúng một cặp log bước tính hash',
+    [preflight.length, preflight[0].action, preflight[1].action],
+    [2, 'preflight_hash_started', 'preflight_hash_finished']);
+  check(so, 'dòng kết thúc tính hash giữ tổng số thực tế',
+    [preflight[1].detail.result.localRecords, preflight[1].detail.result.changed, preflight[1].detail.result.unchanged, preflight[1].detail.result.candidateCount, reasons.indexOf('1000 bản ghi khác baseline') >= 0],
+    [1000, 1000, 20, 7, true]);
   check(so, 'tham số bí mật không xuất hiện trong Log bước nghiệp vụ', reasons.indexOf('khong-duoc-ghi') >= 0, false);
 
   hop.FbmSync.businessStepStart(state, 'session', { mode: 'read', scan: 'full' });
   hop.FbmSync.businessStepFinish(state, 'session', 'error', { errors: 1, error: 'FBM không phản hồi probe phiên.' });
   const session = events.filter((event) => event.detail && event.detail.step === 'session');
-  check(so, 'bước lỗi có đủ dòng bắt đầu và kết thúc lỗi', [session.length, session[1].outcome, session[1].detail.result.errors], [2, 'error', 1]);
+  check(so, 'bước lỗi có đủ dòng bắt đầu và kết thúc lỗi',
+    [session.length, session[1].outcome, session[1].detail.result.errors],
+    [2, 'error', 1]);
 
   // FBM-019: mọi đường kết thúc phiên đi qua stateWrite nên bước mở được đóng đúng một lần, và lỗi chỉ quy cho bước đang chạy.
 
@@ -45,7 +52,9 @@ function chay(so) {
   check(so, 'phiên lỗi: bước đang chạy ghi "với lỗi", bước mở khác ghi "Dừng ... vì lỗi ở bước", mỗi bước đóng đúng một lần',
     dongDong(loi.dong.slice(truocLoi)),
     ['pull_customer|error|Kết thúc đọc Customer từ FBM với lỗi', 'reconcile_customer|warn|Dừng đối soát và cập nhật Customer ShinCRM vì lỗi ở bước đọc Customer từ FBM', 'run|error|Kết thúc phiên đồng bộ với lỗi']);
-  check(so, 'phiên lỗi: dòng lỗi của bước mang lý do lỗi', loi.dong.slice(truocLoi)[0].reason.indexOf('Lỗi: Ghi Sheet thất bại') >= 0, true);
+  check(so, 'phiên lỗi: dòng lỗi của bước mang lý do lỗi',
+    loi.dong.slice(truocLoi)[0].reason.indexOf('Lỗi: Ghi Sheet thất bại') >= 0,
+    true);
 
   const huy = dungState();
   const runIdHuy = huy.st.runId, truocHuy = huy.dong.length;

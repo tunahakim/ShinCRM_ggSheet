@@ -330,6 +330,8 @@ tests\
 │   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
 │   │   ├── keo-ve.js             Gọi chặng kéo về như lớp xả đọc gọi (`keoVe` qua cửa ghi `pullPageApply`, `keoLo` qua `pullBatchApply` trên ô lượt): dựng ngữ cảnh lời gọi và xóa mục chờ xác nhận đã khớp như người điều phối.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
+│   │   ├── hop-keo.js            Hộp cát cho chặng kéo về (`hopKeoVe` đủ chặng quét, `hopKeoBien` chỉ cửa ghi kéo về) và bảng danh mục thử `congDanhMucThu`.
+│   │   ├── tab-fbm-gia.js        Tab FBM giả chạy executor thật của Extension (`tabGia`), cùng hàm dựng response lưới và trả lời giả cho phần tử cửa ghi.
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
@@ -416,7 +418,25 @@ tests\
     │   ├── Protocol.js            Kiểm envelope, lỗi transport, fingerprint và đối soát ba chiều.
     │   ├── Contract.js            Mã phiên bản hợp đồng GAS–Extension hai bên công bố khớp mã tính từ hợp đồng.
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
-    │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
+    │   ├── RunMode.js             Kiểm quyền ghi theo mode của lượt, đếm lượt kéo ở mode đọc và kiểm, câu thông báo kết thúc lượt.
+    │   ├── ReadFinish.js          Kiểm chặng chính của lượt Lấy khi hết danh sách khách: gắn khách vắng một lần, không mở chiều đẩy.
+    │   ├── PullActivity.js        Kiểm kéo Activity qua cửa ghi: dấu #SC, xung đột định danh, người tạo, nối lại khách cha, thứ tự mã FBM.
+    │   ├── PullRequests.js        Kiểm dựng request FBM của chặng kéo và sửa: lệnh sửa Customer, grid theo phạm vi, grid giao dịch, bộ lọc ngày.
+    │   ├── PullScan.js            Kiểm mở việc quét và trang kéo: cursor và state gọn, mô tả trang FBM, tiến trình, xét khách vắng, mốc số khách.
+    │   ├── IdentityProbe.js       Kiểm liên kết Customer và probe danh tính: chỉ đọc grid cần thiết, thiếu dòng User báo lỗi rõ.
+    │   ├── PullIdentityMatch.js   Kiểm nối khách FBM vào dòng Sheet theo mã khách, MST, và khách bị chặn danh tính.
+    │   ├── PullNewCustomer.js     Kiểm khách mới kéo từ FBM: định danh, baseline, quyền đẩy, giá trị Xác thực, không Log từng bản ghi.
+    │   ├── PullCompare.js         Kiểm so ba bản khi kéo khách: hash không đổi, chỉ FBM đổi, chỉ ShinCRM đổi, xung đột.
+    │   ├── IdentityBinding.js     Kiểm liên kết Spreadsheet với tài khoản FBM: REBIND, không tự nâng cấp liên kết cũ.
+    │   ├── PullFingerprint.js     Kiểm chuẩn hóa ngày và dấu vân khi kéo.
+    │   ├── SeenStore.js           Kiểm sổ đã thấy theo mã nội bộ và phạm vi cố định đầu kỳ.
+    │   ├── PullEdges.js           Kiểm cạnh biên cửa ghi kéo về: bản ghi bị giữ, giao dịch mới, marker mồ côi, FBM không đổi sau đẩy.
+    │   ├── PushRetry.js           Kiểm ứng viên đẩy sau lỗi: cùng hash không lặp lại, hash đổi thì thử lại.
+    │   ├── PullGateRule.js        Kiểm cửa ghi Sheet không có luật nào từ chối nội dung trường kéo từ FBM về.
+    │   ├── LookupFlow.js          Kiểm chặng tra danh mục: lỗi đường truyền dừng đóng lỗi, lô không dòng vẫn đi tiếp.
+    │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách.
+    │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
+    │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
     │   ├── PushEligible.js         Kiểm phép xét đẩy một dòng, quyền đồng bộ, người phụ trách, và preflight đếm đúng tập chặng đẩy dựng.

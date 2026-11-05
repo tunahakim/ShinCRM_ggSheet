@@ -148,7 +148,6 @@ Cột cuối là các trách nhiệm đang lẫn trong tệp; bước B hoặc p
 | `tests/cases/fbmSync/Orchestration.js` | 73 | 527 | 2 | B4/B6 | nhiều module: heartbeat, scheduler, status, PropertyBuffer; check dài |
 | `tests/cases/fbmSync/ProductionMatrix.js` | 68 | 709 | 2 | B4/B8/B9 | ma trận FBM-0xx: cursor, lỗi kéo/đẩy, xung đột, hash |
 | `tests/cases/fbmSync/Push.js` | 65 | 523 | 2 | B9 | một tiến trình đẩy; check dài |
-| `tests/cases/fbmSync/Pull.js` | 64 | 524 | 2 | B8 | nhiều khía cạnh kéo; check dài |
 | `Ext/background/service_worker.js` | 59 | 838 | 2 | B4/B6/B11 | điều khiển tab, kho credential, gọi relay, vòng relay, đăng ký sự kiện |
 | `GAS/fbm_sync/state/State.js` | 52 | 569 | 2 | B4 | ô lượt, sổ đã thấy, kho đẩy, theo dõi request, vòng đời lượt |
 | `GAS/fbm_sync/transport/PushFlow.js` | 52 | 604 | 2 | B9 | xác minh sau ghi, lỗi đẩy, điều phối chặng đẩy |

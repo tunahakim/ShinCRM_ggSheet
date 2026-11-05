@@ -141,7 +141,7 @@ const PIPELINE_CATALOG = [
   var group = item[0].charAt(0);
   var testModules = {
     A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLogin.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
-    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Pull.js', 'tests/cases/fbmSync/Reconcile.js'],
+    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/PullScan.js', 'tests/cases/fbmSync/Reconcile.js'],
     C: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
     D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],
     E: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Reconcile.js'],

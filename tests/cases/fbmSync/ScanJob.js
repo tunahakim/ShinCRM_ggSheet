@@ -1,7 +1,7 @@
 /** Việc quét Customer: Extension gọi FBM một lần và cắt gói, GAS nhận từng gói theo cursor; kiểm cả nhánh gói trùng, gói lạ, mất response, mất tab, ghi lỗi và lượt thiếu dòng. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
-const { executorSession, executorRaw, sendBatchThroughExecutor, gateItemReply, gridResponse, row } = require('./Workflow');
+const { tabGia, rawExecutor, guiLo, traLoiGhi, luoiFbm, dongFbm } = require('../../lib/fbm/tab-fbm-gia');
 const { napServer } = require('../../lib/load-gas');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
@@ -49,7 +49,7 @@ function scanHarness(options) {
   Object.assign(F.BUDGET, opt.budget || {});
   const customerFields = F.GRID_FIELDS.customer.concat(['ghi_chu_noi_bo']), activityFields = F.GRID_FIELDS.activity;
   const so2 = (i) => String(i).padStart(2, '0');
-  const khach = (i) => row(customerFields, {
+  const khach = (i) => dongFbm(customerFields, {
     stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Công ty Thử Nghiệm Số ' + i + ' ' + 'x'.repeat(opt.nameLength || 0), ma_so_thue: '0100' + so2(i),
     ong_ba: 'Anh ' + i, dc_lh: 'Hà Nội', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ghi_chu_noi_bo: 'không được về GAS',
     ngay_gd: '/Date(' + Date.UTC(2026, 8, 20) + ')/', datetime0: '/Date(' + (Date.UTC(2026, 8, 20, 1) + i * 60000) + ')/', xorder: i
@@ -65,7 +65,7 @@ function scanHarness(options) {
     const keyIndex = pageValue ? rows.findIndex((item) => JSON.stringify(khoa.map((index, k) => (k < 2 ? gioMayChu(item[index]) : item[index]))) === JSON.stringify(pageValue)) : -1, keyRow = rows[keyIndex];
     const moTaDung = keyRow && body.lastPageItem === ngayFbm(keyRow[khoa[0]]) + ngayFbm(keyRow[khoa[1]]) + keyRow[khoa[2]] + keyRow[khoa[3]] && body.lastRowCount === total;
     const start = !pageValue ? 0 : moTaDung ? keyIndex + 1 : rows.length;
-    return gridResponse(customerFields, rows.slice(start, start + Number(body.count)), start ? 0 : total);
+    return luoiFbm(customerFields, rows.slice(start, start + Number(body.count)), start ? 0 : total);
   };
   /** Giao dịch FBM của một khách; mặc định một giao dịch mỗi khách. */
   // Id giao dịch FBM thật luôn là số; cửa ghi chỉ hỏi khách đang giữ một giao dịch khi id toàn chữ số.
@@ -83,9 +83,9 @@ function scanHarness(options) {
     trace.bulkFilters.push((body.filter || []).join('|'));
     const total = list.length;
     if (opt.fbmRowCap) { list = list.slice(0, opt.fbmRowCap); }
-    return gridResponse(activityFields, list.map((values) => row(activityFields, values)), total);
+    return luoiFbm(activityFields, list.map((values) => dongFbm(activityFields, values)), total);
   };
-  const tab = executorSession();
+  const tab = tabGia();
   // `tabCalls`: số request không phải `scan_chunk` đã qua tab; FBM bị gọi đúng bằng số này thì `scan_chunk` không gọi lại FBM.
   const trace = { kinds: [], jobs: [], errors: [], statuses: [], tabCalls: 0, activityCustomers: [], lookups: [], bulkFilters: [] };
   /** Đưa một request qua tab FBM giả như Extension: trả `{ fail: mã }` khi Extension báo lỗi vận chuyển, hoặc `{ raw }` để nộp GAS. Hook như `run`. */
@@ -98,8 +98,8 @@ function scanHarness(options) {
     if (fakeFail) { trace.errors.push(fakeFail); return { fail: fakeFail, message: 'Lỗi giả lập ' + fakeFail }; }
     let raw;
     if (kind === 'batch') {
-      raw = await sendBatchThroughExecutor(request, (item) => {
-        const gateReply = gateItemReply(item, { fields: customerFields, rows: rows.filter((dong) => !opt.goneCustomers || opt.goneCustomers.indexOf(dong[customerFields.indexOf('stt_rec_kh')]) < 0), owners: opt.owners, exists: opt.exists, fail: opt.lookupFail });
+      raw = await guiLo(request, (item) => {
+        const gateReply = traLoiGhi(item, { fields: customerFields, rows: rows.filter((dong) => !opt.goneCustomers || opt.goneCustomers.indexOf(dong[customerFields.indexOf('stt_rec_kh')]) < 0), owners: opt.owners, exists: opt.exists, fail: opt.lookupFail });
         if (gateReply) {
           // `lookups` chỉ đếm request tra mã khách đang giữ giao dịch hoặc khách còn tồn tại, không đếm phần khách của lô.
           const names = item.body.externalKey.map((k) => k.Name).join('|');
@@ -108,8 +108,8 @@ function scanHarness(options) {
         }
         const key = item.body.externalKey[0].Value;
         trace.activityCustomers.push(key);
-        const acts = actsOf(key).map((values) => row(activityFields, values));
-        const body = JSON.parse(gridResponse(activityFields, acts, acts.length));
+        const acts = actsOf(key).map((values) => dongFbm(activityFields, values));
+        const body = JSON.parse(luoiFbm(activityFields, acts, acts.length));
         if (item.body.type !== 0) { delete body.d.ViewPage; }
         return { body: JSON.stringify(body) };
       });
@@ -121,7 +121,7 @@ function scanHarness(options) {
       if (kind !== 'scan_chunk') { trace.tabCalls += 1; }
       const sent = await tab.send(h.rewrite ? h.rewrite(request, trace) : request, body);
       if (sent.reply && sent.reply.error) { trace.errors.push(sent.reply.code); return { fail: sent.reply.code, message: sent.reply.error }; }
-      raw = executorRaw(sent.reply, request.id);
+      raw = rawExecutor(sent.reply, request.id);
       if (raw.job) { trace.jobs.push(Object.assign({}, raw.job)); }
       if (h.edit) { raw = h.edit(raw, request, trace) || raw; }
     }
@@ -168,15 +168,6 @@ function scanHarness(options) {
   return { flow, F, logs, writes, local, tab, trace, run, poll, rows, customerFields, themKhach: (i) => rows.push(khach(i)) };
 }
 
-/** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */
-function scanRequest(id, job) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idField: 'stt_rec_kh', keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
-}
-function chunkRequest(id, jobId, chunkIndex) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: {}, meta: { kind: 'scan_chunk', fetchMs: 5000, job: { jobId, chunkIndex } } };
-}
-const bytes = (value) => Buffer.byteLength(JSON.stringify(value), 'utf8');
-
 async function chay(so) {
   section('FBM sync — việc quét Customer qua Extension');
 
@@ -192,37 +183,6 @@ async function chay(so) {
     FF.hash(projected, 'customer', { map: {} }) === FF.hash(fullRecord, 'customer', { map: {} }), FF.validateGridFields('customer', scanCols), missingTenCv
   ], [true, true, 'FBM_GRID_SHAPE_CHANGED: FBM thiếu metadata AliasName: ten_cv']);
 
-  // Executor: 3.000 dòng có dấu tiếng Việt (UTF-8 nhiều byte) phải thành nhiều gói, mỗi gói đã serialize không vượt trần; dòng không bị cắt đôi, đúng thứ tự, FBM chỉ bị gọi một lần.
-  const executorFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ghi_chu_noi_bo'];
-  const bigRows = Array.from({ length: 3000 }, (_, i) => ['R' + i, 'KH' + i, 'Công ty Trách Nhiệm Hữu Hạn Thương Mại Dịch Vụ Đầu Tư Số ' + i + ' ' + 'ă'.repeat(300), 'riêng']);
-  const tab = executorSession();
-  const first = (await tab.send(scanRequest('e1'), gridResponse(executorFields, bigRows, 3000))).reply.result;
-  const chunks = [first];
-  for (let index = 1; index < first.job.chunkCount; index += 1) { chunks.push((await tab.send(chunkRequest('e' + (index + 1), 'J-1', index), '')).reply.result); }
-  const chunkRows = chunks.map((chunk) => JSON.parse(chunk.body).d.Rows);
-  const allIds = chunkRows.flat().map((item) => item[0]);
-  const firstFields = JSON.parse(first.body).d.ViewPage.Fields.map((field) => field.AliasName);
-  check(so, 'Executor cắt 3.000 dòng thành nhiều gói, mỗi gói đã serialize không quá trần 768 KiB, đủ 3.000 dòng đúng thứ tự, dòng nguyên vẹn, chỉ gọi FBM một lần, chỉ giữ cột GAS xin', [
-    first.job.chunkCount > 1, chunks.every((chunk) => bytes(chunk) <= 768 * 1024), allIds.length, allIds.join(',') === bigRows.map((item) => item[0]).join(','),
-    chunkRows.flat().every((item) => item.length === 3 && item[2] === bigRows[Number(item[0].slice(1))][2]), tab.fetches(), firstFields, chunks.map((chunk) => chunk.job.chunkIndex).join(',') === chunks.map((_, i) => i).join(','), first.job.totalRowCount
-  ], [true, true, 3000, true, true, 1, ['stt_rec_kh', 'ma_kh', 'ten_kh'], true, 3000]);
-
-  const oversizeTab = executorSession();
-  const oversizeRows = [['R1', 'KH1', 'nhỏ'], ['R2', 'KH2', 'đ'.repeat(300 * 1024)], ['R3', 'KH3', 'nhỏ']];
-  const oversize = (await oversizeTab.send(scanRequest('o1', { chunkTargetBytes: 200 * 1024, chunkMaxBytes: 300 * 1024 }), gridResponse(['stt_rec_kh', 'ma_kh', 'ten_kh'], oversizeRows, 3))).reply.result;
-  check(so, 'Executor không gửi dòng mà riêng nó đã vượt trần một gói, báo id dòng đó trong oversize, các dòng khác vẫn đi', [oversize.job.oversize, JSON.parse(oversize.body).d.Rows.map((item) => item[0]), oversize.job.rowCount, oversize.job.chunkCount], [['R2'], ['R1', 'R3'], 3, 1]);
-
-  const keepTab = executorSession();
-  const kept = (await keepTab.send(scanRequest('k1', { keepIds: ['R2'] }), gridResponse(['stt_rec_kh', 'ma_kh', 'ten_kh'], [['R1', 'a', 'b'], ['R2', 'c', 'd']], 2))).reply.result;
-  check(so, 'Executor chỉ giữ dòng có id nằm trong keepIds GAS gửi', [JSON.parse(kept.body).d.Rows, kept.job.keptCount, kept.job.rowCount], [[['R2', 'c', 'd']], 1, 2]);
-
-  const goneTab = executorSession();
-  await goneTab.send(scanRequest('g1'), gridResponse(['stt_rec_kh', 'ma_kh', 'ten_kh'], [['R1', 'a', 'b']], 1));
-  const wrongJob = (await goneTab.send(chunkRequest('g2', 'J-khac', 0), '')).reply;
-  goneTab.reload();
-  const afterReload = (await goneTab.send(chunkRequest('g3', 'J-1', 0), '')).reply;
-  check(so, 'Tab không còn giữ việc quét (sai jobId hoặc tab tải lại) thì executor trả lỗi FBM_SCAN_JOB_GONE, không gọi FBM', [wrongJob.code, afterReload.code, goneTab.fetches()], ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_JOB_GONE', 1]);
-
   // GAS: số dòng mỗi request nhỏ và gói nhỏ buộc phải chuyển trang và xin nhiều gói; lượt phải nhận đủ khách, đọc giao dịch của đủ khách và gắn cờ khách cũ không còn trên FBM.
   const staleCustomer = { id: 'CUS-000900', fbmId: 'FBM-CU', fbmCustomerCode: 'ALT09999', companyName: 'Khách đã bỏ', recordStatus: 'active', syncStatus: 'đã đồng bộ' };
   const paged = scanHarness({ customers: 12, nameLength: 400, budget: { scanCustomerRows: 5, chunkTargetBytes: 6000 }, localCustomers: [Object.assign({}, staleCustomer)] });
@@ -234,7 +194,9 @@ async function chay(so) {
     pagedEnd.status.phase, scanJobs, scanChunks > 0, pagedFbmIds.length, new Set(pagedFbmIds).size, paged.local.activity.length, pagedState.metadata.customerScan, paged.local.customer.find((item) => item.fbmId === 'FBM-CU').syncStatus, paged.tab.fetches() === paged.trace.tabCalls
   ], ['done', 3, true, 12, 12, 12, { total: 12, seen: 12 }, paged.F.SYNC_STATUS.missing, true]);
   const pagedNames = paged.writes.filter((item) => item.entity === 'customer').flatMap((item) => item.records || []).map((item) => JSON.stringify(item));
-  check(so, 'Cột FBM ngoài danh sách GAS xin không về tới cửa ghi', pagedNames.some((text) => text.indexOf('không được về GAS') >= 0), false);
+  check(so, 'Cột FBM ngoài danh sách GAS xin không về tới cửa ghi',
+    pagedNames.some((text) => text.indexOf('không được về GAS') >= 0),
+    false);
 
   // Ghi Sheet lỗi ở bước ghi của lô đầu: cursor không tiến, lần sau dựng lại đúng lô đó và lượt vẫn đủ khách, không trùng.
   let failOnce = true;
