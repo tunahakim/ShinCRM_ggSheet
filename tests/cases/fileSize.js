@@ -79,7 +79,7 @@ const NGOAI_LE = [
   ['tests/cases/fbmSync/Orchestration.js', 289, 30260, 'B8', 'nâng trần khi bỏ recordHoldsPeekOwner (đọc sổ bận qua kho thử); đã tách liên kết, cổng Web App, bộ đệm kho; phần còn lại kiểm khung lượt qua chặng đọc/đẩy cũ (thử lại lát, trace, giữ bản ghi), tách khi viết lại chặng ở B8, B9; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight'],
   ['tests/cases/fbmSync/Preflight.js', 234, 22210, 'B9', 'một module; chỉ dài vì check dài, đã xuống dòng check theo nhãn, giá trị nhận, giá trị mong đợi'],
   ['tests/cases/fbmSync/ProductionMatrix.js', 707, 69606, 'B4/B8/B9', 'ma trận FBM-0xx: cursor, lỗi kéo/đẩy, xung đột, hash; nạp công cụ dựng cài đặt thử; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight'],
-  ['tests/cases/fbmSync/Pull.js', 527, 66736, 'B8', 'nhiều khía cạnh kéo; check dài; giả thêm cổng phiên cho cửa nhận response chung; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight'],
+  ['tests/cases/fbmSync/Pull.js', 531, 67642, 'B8', 'nhiều khía cạnh kéo; check dài; giả thêm cổng phiên cho cửa nhận response chung; mốc số khách ghi lúc đóng lượt; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight'],
   ['tests/cases/fbmSync/Push.js', 530, 67654, 'B9', 'một tiến trình đẩy; check dài; thêm dòng dựng phạm vi qua cổng cài đặt; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight'],
   ['tests/cases/fbmSync/ScanJob.js', 345, 30861, 'B8', 'một module; dài vì dựng hộp; giao máy nền trong hộp'],
   ['tests/cases/fbmSync/Sidebar.js', 993, 105355, 'B12', 'kiểm 7 màn đồng bộ'],

@@ -253,11 +253,15 @@ async function chay(so) {
   builders.FbmSync.customerAbsentMark = () => { marked.push('vắng'); };
   builders.FbmSync.customerBaselineWrite = () => { marked.push('mốc'); };
   builders.FbmSync.activityStagesContinue = () => { marked.push('cửa ghi'); return { ok: true }; };
-  const scanRun = (pages) => { const st = { runId: 'scan-run', mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice()]; };
+  const scanRun = (pages) => { const st = { runId: 'scan-run', mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} }; pages.forEach((grid, i) => builders.FbmSync.customerScanRecord(st, grid, i === 0)); marked.length = 0; builders.FbmSync.customerScanEnd(st); return [st.phase, st.lastFailureCode || '', marked.slice(), st.metadata.customerTotal === undefined ? null : st.metadata.customerTotal]; };
   const rowsOf = (n) => Array.from({ length: n }, () => ({}));
   check(so, 'chỉ xét khách vắng và sang cửa ghi khi đã nhận đủ số khách FBM báo ở trang đầu; dừng ở 50/1312 hoặc FBM không báo tổng thì phiên lỗi FBM_SCAN_INCOMPLETE, chưa ghi gì',
     [scanRun([{ total: 1312, rows: rowsOf(50) }, { total: 0, rows: [] }]), scanRun([{ total: 0, rows: rowsOf(50) }]), scanRun([{ total: 60, rows: rowsOf(50) }, { total: 0, rows: rowsOf(10) }]), scanRun([{ total: 0, rows: [] }])],
-    [['error', 'FBM_SCAN_INCOMPLETE', []], ['error', 'FBM_SCAN_INCOMPLETE', []], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']], ['pull_customer', '', ['mốc', 'vắng', 'cửa ghi']]]);
+    [['error', 'FBM_SCAN_INCOMPLETE', [], null], ['error', 'FBM_SCAN_INCOMPLETE', [], null], ['pull_customer', '', ['vắng', 'cửa ghi'], 60], ['pull_customer', '', ['vắng', 'cửa ghi'], 0]]);
+  // Mốc số khách chỉ ghi khi lượt đóng xong: lượt hỏng sau bước quét khách mà đã ghi mốc thì lần đếm sau thấy khớp, bỏ quét và khách chưa đọc bị bỏ qua.
+  const closeWith = (verdict) => { const st = { runId: 'close-run', mode: 'read', phase: 'pull_activity', metadata: { customerTotal: 1312 }, session: {}, cursor: {} }; marked.length = 0; builders.FbmSync.runClose(st, verdict, { message: 'x' }); return [marked.slice(), 'customerTotal' in st.metadata]; };
+  check(so, 'mốc số khách chỉ ghi khi lượt đóng xong; lượt lỗi, hủy hay dừng giữa chừng giữ mốc cũ; đóng xong thì số tạm bị xóa để lần đóng kế không ghi lại',
+    [closeWith('done'), closeWith('error'), closeWith('cancelled')], [[['mốc'], false], [[], false], [[], false]]);
   const savedScope = builders.FbmSync.scope;
   builders.FbmSync.scope = () => ({ codes: ['ALT0010', 'alt00099', 'ALT00010'], fbm: ['ALT0010', 'alt00099', 'ALT00010'], shin: ['CUS-1'], fbmNew: ['ALT0010', 'alt00099'], notFound: [] });
   const scopeScan = { mode: 'read', scan: 'full', phase: 'pull_customer', metadata: {}, session: {}, cursor: {} };
@@ -268,7 +272,7 @@ async function chay(so) {
   builders.FbmSync.scope = savedScope;
   check(so, 'Mã khách chỉ định chưa có trên Sheet mà danh sách khách FBM không trả về (gộp mọi trang, không phân biệt hoa thường) thành cảnh báo không chặn ở kết quả phiên, phiên vẫn sang cửa ghi',
     [(scopeScan.metadata.preflightIssues || []).map((item) => [item.code, item.blocking, /ALT0010\b/.test(item.message), /00099/.test(item.message)]), marked.slice()],
-    [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['mốc', 'vắng', 'cửa ghi']]);
+    [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['vắng', 'cửa ghi']]);
   builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline; builders.FbmSync.activityStagesContinue = savedScanEnd.stages;
 
   const identityCheckState = { session: { userId: '2037', accountName: 'ANHLT' }, metadata: {} };
