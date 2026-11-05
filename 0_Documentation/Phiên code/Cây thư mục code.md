@@ -210,7 +210,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── slots.html            Ba vùng nội dung mà UI_SCHEMA không khai trước được: danh sách giao dịch, hộp gợi ý tìm khách, khối thông tin chung. Trả về cây Block chứ không trả chuỗi HTML.
 │   │   ├── renderEngine.html     Cây Block thành HTML rồi gán vào bốn vùng. Thoát ký tự, dịch spatialConfig thành style, và renderTarget — cách DUY NHẤT đổi nội dung màn.
 │   │   ├── actions.html          Mười lăm hành động của cả hệ thống, tra theo tên. Không chạm DOM và không gọi máy chủ trực tiếp, nên mười lăm thân hàm kiểm được offline. Việc chặng sau thì ném lỗi có tên chứ không để thân rỗng.
-│   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và đưa lỗi vào alert — nhờ vậy actions.html không chạm DOM.
+│   │   ├── actionError.html      Cửa báo lỗi thao tác (cú bấm, lệnh xóa, thay đổi chưa lưu): dòng đáy có nút ✕ và ghi sheet Log đúng một lần theo nguồn lỗi; màn FBM đang giữ khung thì sang thẻ lỗi của màn đó. Không hộp thoại bật lên.
+│   │   ├── dispatch.html         Một tai nghe click duy nhất đặt ở khung. Chỗ DUY NHẤT đọc data-* thành payload, đặt con trỏ theo focusId, và chuyển lỗi cho actionError.html — nhờ vậy actions.html không chạm DOM.
 │   │   ├── fieldInvalid.html     Hiện kết quả kiểm ô của GAS: tô đỏ ô sai, bỏ dấu khi gõ lại, gộp câu báo. Dùng chung cho form bản ghi và các card cấu hình FBM; tự nó không kiểm gì.
 │   │   ├── recordDecision.html   Popup xung đột và popup bận khi lưu theo ảnh chụp người dùng đã xem bị cửa ghi từ chối. Form sửa và màn xung đột FBM cùng một luật nên cùng tệp này, chỉ khác bộ chữ.
 │   │   ├── notices.html          Nơi duy nhất giữ các việc người dùng cần biết, dòng báo ở đáy và lúc thân Sidebar chuyển sang màn thông báo.
@@ -452,6 +453,7 @@ tests\
     │   ├── lib\                   gas.js, sidebar.js, ext.js, quet.js: mỗi tệp kiểm một thư mục con cùng tên của tests/lib.
     │   ├── view.js                Điều phối ba tệp kiểm của server/view.
     │   └── view\                  viewSheetRenderer.js (vẽ theo giao dịch sống gần nhất, cột động, lọc, sắp), viewLedger.js (lượt vẽ hỏng không tự đánh thức, mỗi lỗi một dòng Log), viewTabTint.js (tab cam khi sheet cũ).
+    ├── actionError.js            Cửa báo lỗi thao tác: dòng đáy thay hộp thoại, ghi Log một lần theo nguồn lỗi, nút ✕ bỏ tại chỗ, màn FBM sang thẻ lỗi.
     └── domUi.js                  DOM giả tối thiểu kiểm ba đường UI: phát click, menu nổi và thu gọn nội dung.
 ```
 
