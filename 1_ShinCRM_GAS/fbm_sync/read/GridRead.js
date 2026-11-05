@@ -71,23 +71,24 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
    * Tra mã khách không lọc quyền (09/05 Phần 9, Nghiên cứu FBM ch16): `activity` hỏi khách đang giữ giao dịch có id này, `customer` hỏi khách này còn tồn tại không. Mỗi request một mã.
    * Không kèm điều kiện quyền và phạm vi nên kết quả chỉ được đọc qua `ownerLookupParse`, chỉ lấy `stt_rec_kh`. Mã sai định dạng thì không dựng request (trả `null`), vì mã đi thẳng vào câu SQL.
    */
-  FbmSync.ownerLookupRequest = function (kind, value) {
+  FbmSync.ownerLookupRequest = function (kind, value, withHeader) {
     var text = String(value === null || value === undefined ? '' : value).trim(), key;
     if (kind === 'activity' && FbmSync.ACTIVITY_ID_PATTERN.test(text)) { key = { Name: "stt_rec_kh in (select stt_rec from sysevents where id = '" + text + "') and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false }; }
     else if (kind === 'customer' && FbmSync.STT_REC_PATTERN.test(text)) { key = { Name: 'stt_rec_kh', Opr: '=', Value: text, Type: 'String', Ignore: false }; }
     else { return null; }
-    var cfg = FbmSync.scriptSettings(), payload = gridPayload('customer', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [key] }, cfg);
+    var cfg = FbmSync.scriptSettings(), payload = gridPayload('customer', { type: withHeader ? 0 : 1, count: 20, gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, externalKey: [key] }, cfg);
     payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
     return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'owner_lookup', entity: 'customer' } };
   };
 })();
 
 /** Đọc kết quả tra không lọc quyền: chỉ trả danh sách `stt_rec_kh`, không giữ cột nào khác của khách có thể không thuộc quyền mình. Lỗi FBM hoặc lưới lạ trả `ok: false` để bên gọi báo lỗi, không suy ra vắng. */
-FbmSync.ownerLookupParse = function (item) {
+FbmSync.ownerLookupParse = function (item, knownFields) {
   var check = FbmSync.protocol.assertSuccess(item);
   if (!check.ok) { return { ok: false, code: String(check.code || 'FBM_ERROR'), status: Number(check.status || 0), reason: String(check.bug && (check.bug.Message || check.bug.message) || 'FBM trả lỗi khi tra mã khách') }; }
   // Chỉ cần đúng cột `stt_rec_kh`; không đòi đủ cột của danh sách khách vì kết quả không được ghi.
-  var grid = FbmSync.gridRows(FbmSync.protocol.parse(item)), column = grid.fields.indexOf('stt_rec_kh');
+  var grid = FbmSync.gridRows(FbmSync.protocol.parse(item)), fields = grid.fields.length ? grid.fields : knownFields || [], column = fields.indexOf('stt_rec_kh');
+  if (!FbmSync.gridShapeMatches(grid, fields)) { return { ok: false, code: 'FBM_GRID_SHAPE_CHANGED', status: 0, reason: 'FBM trả kết quả tra mã khách có số cột khác ' + fields.length + ' cột đã lưu từ tiêu đề; cấu trúc FBM có thể đã đổi.' }; }
   if (column < 0) { return { ok: false, code: 'FBM_GRID_SHAPE_CHANGED', status: 0, reason: 'FBM trả kết quả tra mã khách không có cột stt_rec_kh.' }; }
   return { ok: true, sttRecs: grid.rows.map(function (row) { return String(Array.isArray(row) ? row[column] || '' : '').trim(); }).filter(Boolean) };
 };
@@ -270,13 +271,16 @@ FbmSync.identityUser = function (response) {
   if (!userId || !username || !fullName) { return { ok: false, code: 'IDENTITY_PROBE_INCOMPLETE', message: 'FBM trả dòng User nhưng thiếu mã số, mã đăng nhập hoặc tên đầy đủ.' }; }
   return { ok: true, userId: userId, username: username, accountName: fullName };
 };
+/** Trang không tiêu đề đọc cột theo vị trí đã lưu: chỉ đúng khi mọi dòng có đúng số cột đã lưu; lệch nghĩa là FBM đã đổi cấu trúc, không được đoán. */
+FbmSync.gridShapeMatches = function (grid, fields) {
+  return !!grid.fields.length || grid.rows.every(function (row) { return Array.isArray(row) && row.length === fields.length; });
+};
 /** Ghép từng ô theo AliasName và chuẩn hóa ngày trước khi reconcile. */
 FbmSync.rowsToRecords = function (entity, response, knownFields) {
   var grid = FbmSync.gridRows(response);
   var fields = grid.fields.length ? grid.fields : (knownFields || []);
   FbmSync.validateGridFields(entity, fields);
-  // Trang không tiêu đề đọc cột theo vị trí đã lưu; số cột lệch nghĩa là FBM đã đổi cấu trúc nên dừng, không đoán, tránh ghi nhầm trường.
-  if (!grid.fields.length && grid.rows.some(function (row) { return !Array.isArray(row) || row.length !== fields.length; })) {
+  if (!FbmSync.gridShapeMatches(grid, fields)) {
     var shapeError = new Error('FBM trả dòng ' + entity + ' có số cột khác ' + fields.length + ' cột đã lưu từ tiêu đề; cấu trúc FBM có thể đã đổi, đã dừng để không ghi nhầm trường.');
     shapeError.code = 'FBM_GRID_SHAPE_CHANGED';
     throw shapeError;

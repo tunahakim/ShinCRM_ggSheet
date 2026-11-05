@@ -41,6 +41,8 @@ FbmSync.customerScanStage = function (ctx) {
   if (grid.rows.length) { var lastRow = grid.rows[grid.rows.length - 1]; cursor.pageLast = FbmSync.customerPageItem(lastRow); cursor.pageLastValue = FbmSync.customerPageValue(lastRow); }
   var patch = { metadata: { customerScan: scan, scanOversize: state.metadata.scanOversize }, logs: logs };
   if (firstPage) { patch.progress = { done: 0, total: scan.total }; }
+  // Danh sách cột gốc của bảng khách (trước khi Extension giữ cột quét) để lô đọc chi tiết và tra mã khách của lượt không xin tiêu đề lần nữa; Extension cũ không gửi thì lô đầu tự xin như trước.
+  if (firstPage && chunk.fields) { patch.metadata.customerFields = chunk.fields; }
   if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state) }; }
   if (FbmSync.customerNext(state, { length: chunk.rowCount, firstItem: cursor.pageFirst || '', lastItem: cursor.pageLast || '', lastValue: cursor.pageLastValue || [] }, scan.total)) {
     var nextPage = state.cursor;

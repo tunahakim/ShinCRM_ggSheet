@@ -56,7 +56,7 @@ FbmSync.scanReplyCheck = function (rawResponse, cursor) {
   if (String(job.jobId || '') !== String(cursor.jobId || '') || !(index >= 0) || index > next) { mismatch('Gói quét "' + String(job.jobId || '') + '" số ' + String(job.chunkIndex) + ' không khớp việc quét đang chờ (gói số ' + next + '); đã dừng và không ghi gì.'); }
   if (index < next) { return { duplicate: String(index) }; }
   if (cursor.jobTotal !== null && cursor.jobTotal !== undefined && Number(job.totalRowCount) !== Number(cursor.jobTotal)) { mismatch('Tổng số dòng FBM đổi giữa các gói của cùng một việc quét (' + cursor.jobTotal + ' và ' + job.totalRowCount + '); đã dừng và không ghi gì.'); }
-  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [] } };
+  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [], fields: Array.isArray(job.fields) && job.fields.length ? job.fields.map(String) : null } };
 };
 
 /** Ghi nhận gói đã ghi xong; gọi sau khi Sheet và state của gói đã lưu. */

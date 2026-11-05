@@ -42,12 +42,13 @@ FbmSync.gateLookupChunk = function (cursor) {
  */
 FbmSync.activityBatchRequest = function (state) {
   var cursor = state.cursor || {}, metadata = state.metadata || {};
+  var customerHeader = !(Array.isArray(metadata.customerFields) && metadata.customerFields.length);
   if (cursor.lookup) {
-    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2)); });
+    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), customerHeader); });
     return lookups.length ? { items: lookups, meta: { kind: 'batch', entity: 'customer' } } : null;
   }
   var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), needHeader = !(Array.isArray(metadata.activityFields) && metadata.activityFields.length);
-  var customerItem = FbmSync.customerBatchRequest(customers, !(Array.isArray(metadata.customerFields) && metadata.customerFields.length));
+  var customerItem = FbmSync.customerBatchRequest(customers, customerHeader);
   if (!customerItem) { return null; }
   var pages = cursor.pages || {};
   return { items: [customerItem].concat(customers.map(function (sttRec) {
@@ -310,7 +311,7 @@ FbmSync.gateLookupContinue = function (state, checks, chunk, input, logs) {
   var local = input.local, waits = FbmSync.readWaitRead(), isDone = FbmSync.readListDoneReader(), pullAllowed = FbmSync.pullAllowedReader('customer'), scope = input.scope, sync = FbmSync.SYNC_STATUS;
   var flags = { customer: [], activity: [] }, adds = [], failed = [];
   chunk.forEach(function (entry, position) {
-    var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item);
+    var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item, state.metadata.customerFields);
     if (entry.charAt(0) === 'c') {
       var customer = local.byStt[value];
       if (!customer) { return; }
