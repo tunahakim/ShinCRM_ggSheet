@@ -27,10 +27,10 @@ FbmSync.dayKeyAdd = function (key, days) {
   return new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]) + Number(days))).toISOString().slice(0, 10);
 };
 
-/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới, cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
+/** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới, cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. "Hôm nay" là `cursor.today`, chốt lúc chuyển sang cửa sổ, nên mọi lát của lượt chia cùng một cách. */
 FbmSync.activityWindow = function (cursor) {
   var days = FbmSync.BUDGET.activityWindowDays, index = Number(cursor.windowIndex || 0), start = String(cursor.windowStart || '');
-  var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= FbmSync.dateNormalize(new Date());
+  var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= String(cursor.today || '');
   return { from: index ? FbmSync.dayKeyAdd(start, index * days) : '', to: last ? '' : to, last: last };
 };
 
@@ -50,10 +50,8 @@ FbmSync.activityScanRequest = function (cursor) {
 /** Mở lớp 1. Sheet chưa có giao dịch FBM nào thì không có gì để đối soát: trả `null`, không gọi FBM. */
 FbmSync.beginActivityBulkPull = function (state) {
   state.phase = 'pull_activity'; state.entity = 'activity';
-  if (typeof FbmSync.businessStepStart === 'function') {
-    FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
-    FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
-  }
+  FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
+  FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   var local = FbmSync.readLocal('activity');
   state.metadata = state.metadata || {};
   state.metadata.activityBulk = { windows: 0, missing: 0 };
@@ -65,102 +63,115 @@ FbmSync.beginActivityBulkPull = function (state) {
   return FbmSync.scanJobRequest(state);
 };
 
-/** Ngày sớm nhất của giao dịch đang theo dõi, làm mốc cửa sổ; không đọc được ngày nào thì lấy hôm nay (một cửa sổ mở hai đầu). */
-FbmSync.activityWindowStart = function () {
+/** Ngày sớm nhất của giao dịch đang theo dõi, làm mốc cửa sổ; không đọc được ngày nào thì lấy `today` (một cửa sổ mở hai đầu). */
+FbmSync.activityWindowStart = function (local, today) {
   var first = '', tracked = FbmSync.activityBulkTracker();
-  FbmSync.readLocal('activity').forEach(function (record) {
+  (local || []).forEach(function (record) {
     if (!tracked(record)) { return; }
     var key = FbmSync.dateNormalize(record.workDate);
     if (key && (!first || key < first)) { first = key; }
   });
-  return first || FbmSync.dateNormalize(new Date());
+  return first || today;
 };
 
 /**
- * Lấy cả khoảng thời gian là quá sức: chuyển sang cửa sổ ngày ngay trong lượt và trả request cửa sổ đầu. Đã ở chế độ cửa sổ thì không chia tiếp: dừng lỗi, không gắn cờ "không thấy".
- * Trả `null` khi cursor không phải việc quét giao dịch đang chờ request FBM, để lỗi đi tiếp đường chung.
+ * Lấy cả khoảng thời gian là quá sức: chuyển sang cửa sổ ngày ngay trong lượt và trả request cửa sổ đầu. Đã ở chế độ cửa sổ thì không chia tiếp: ném đúng mã lỗi kèm dòng Log, không gắn cờ "không thấy".
+ * Thuần trên bản sao ô lượt; `windowStart` (ngày sớm nhất của giao dịch đang theo dõi) và `now` do người gọi truyền.
  */
-FbmSync.activityScanToWindows = function (state, code, message) {
-  var cursor = state.cursor || {};
-  if (cursor.kind !== 'scan_job' || cursor.entity !== 'activity' || Number(cursor.chunkCount || 0) > 0) { return null; }
-  var reason = String(message || '').slice(0, 240), warn = typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn';
-  state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now();
+FbmSync.activityWindowPlan = function (state, code, message, windowStart, now) {
+  var cursor = state.cursor, reason = String(message || '').slice(0, 240), days = FbmSync.BUDGET.activityWindowDays;
   if (cursor.window) {
-    var window = FbmSync.activityWindow(cursor), text = 'Một khoảng ' + FbmSync.BUDGET.activityWindowDays + ' ngày giao dịch (' + (window.from || 'đầu') + ' đến ' + (window.to || 'nay') + ') vẫn quá lớn để lấy trong một lần: ' + reason + ' Đã dừng, không gắn cờ "không thấy bên FBM".';
-    FbmSync.stateWrite(state);
-    FbmSync.runFailCurrent(text, code);
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: text, detail: { code: code, windowIndex: Number(cursor.windowIndex || 0) } }); }
-    return { ok: false, code: code, request: null, error: text, status: FbmSync.statusView() };
+    var window = FbmSync.activityWindow(cursor), text = 'Một khoảng ' + days + ' ngày giao dịch (' + (window.from || 'đầu') + ' đến ' + (window.to || 'nay') + ') vẫn quá lớn để lấy trong một lần: ' + reason + ' Đã dừng, không gắn cờ "không thấy bên FBM".';
+    var failed = new Error(text);
+    failed.code = code;
+    failed.logs = [{ action: 'activity_bulk_failed', outcome: LOG_ERROR, reason: text, detail: { code: code, windowIndex: Number(cursor.windowIndex || 0) } }];
+    throw failed;
   }
-  FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: true, windowIndex: 0, windowStart: FbmSync.activityWindowStart() });
-  state.message = 'Lấy toàn bộ giao dịch một lần quá lớn; đang lấy theo từng khoảng ' + FbmSync.BUDGET.activityWindowDays + ' ngày.';
-  FbmSync.stateWrite(state);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_window', outcome: warn, cycleId: String(state.runId || ''), reason: 'Lấy toàn bộ giao dịch một lần không được (' + reason + '); chuyển sang từng khoảng ' + FbmSync.BUDGET.activityWindowDays + ' ngày trong lượt này.', detail: { code: code, windowStart: state.cursor.windowStart } }); }
-  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView() };
+  FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: true, windowIndex: 0, windowStart: windowStart, today: FbmSync.dateNormalize(new Date(now)) });
+  var log = { action: 'activity_bulk_window', outcome: LOG_WARN, reason: 'Lấy toàn bộ giao dịch một lần không được (' + reason + '); chuyển sang từng khoảng ' + days + ' ngày trong lượt này.', detail: { code: code, windowStart: windowStart } };
+  return { patch: { cursor: state.cursor, message: 'Lấy toàn bộ giao dịch một lần quá lớn; đang lấy theo từng khoảng ' + days + ' ngày.', logs: [log] }, next: FbmSync.scanJobRequest(state) };
 };
 
 /** Khách cha theo Sheet của các giao dịch đã biết, theo FBM ID giao dịch; `stt_rec_kh` của khách cha là mã vào danh sách đọc. */
-FbmSync.activityParentSttIndex = function (local) {
+FbmSync.activityParentSttIndex = function (local, customers) {
   var stt = {}, parents = {};
-  FbmSync.readLocal('customer').forEach(function (customer) { stt[String(customer.id || '').trim()] = String(customer.fbmId || '').trim(); });
+  (customers || []).forEach(function (customer) { stt[String(customer.id || '').trim()] = String(customer.fbmId || '').trim(); });
   (local || []).forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId) { parents[fbmId] = stt[String(record.customerId || '').trim()] || ''; } });
   return parents;
 };
 
-/** Một nhóm dòng FBM của giao dịch đã biết: đánh dấu đã thấy; giao dịch sửa (dấu vân khác) hoặc mang cờ cần xét lại thì khách cha vào danh sách đọc. Không ghi Sheet. Trả số khách được thêm. */
-FbmSync.activityBulkAccept = function (state, rows, seenIds) {
-  var local = FbmSync.readLocal('activity'), byFbmId = {}, parents = FbmSync.activityParentSttIndex(local), gate = FbmSync.stateCategoryGate(state), tracked = FbmSync.activityBulkTracker(), marked = [];
-  local.forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId && tracked(record)) { byFbmId[fbmId] = record; } });
+/** Đầu vào của chặng, đọc qua cổng chủ một lần mỗi lát. */
+FbmSync.activityScanInputs = function (state) {
+  return { local: FbmSync.readLocal('activity'), customers: FbmSync.readLocal('customer'), gate: FbmSync.stateCategoryGate(state) };
+};
+
+/**
+ * Một nhóm dòng FBM của giao dịch đã biết: đánh dấu đã thấy; giao dịch sửa hoặc mang cờ cần xét lại thì khách cha vào danh sách đọc. Không ghi Sheet. Trả số khách được thêm.
+ * Dấu vân so trên bản ghi dựng như cửa ghi kéo về dựng (`activityRecord`), vì dấu vân trên Sheet tính trên nội dung đã bỏ dấu #SC; so trên dòng thô thì giao dịch mang dấu luôn bị coi là sửa.
+ */
+FbmSync.activityBulkAccept = function (rows, seenIds, input) {
+  var byFbmId = {}, parents = FbmSync.activityParentSttIndex(input.local, input.customers), tracked = FbmSync.activityBulkTracker(), marked = [];
+  input.local.forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId && tracked(record)) { byFbmId[fbmId] = record; } });
   rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).forEach(function (row) {
     var fbmId = String(row.id || '').trim(), record = byFbmId[fbmId];
-    if (record && (FbmSync.readAgainStatus(record) || String(record.fbmHash || '') !== FbmSync.hash(row, 'activity', gate))) { marked.push(parents[fbmId]); }
+    if (record && (FbmSync.readAgainStatus(record) || String(record.fbmHash || '') !== FbmSync.activityRecord(row, input.gate, null).fbmHash)) { marked.push(parents[fbmId]); }
   });
-  FbmSync.seenStoreMark(FbmSync.ACTIVITY_BULK_STORE, local, rows.concat((seenIds || []).map(function (id) { return { id: id }; })));
+  FbmSync.seenStoreMark(FbmSync.ACTIVITY_BULK_STORE, input.local, rows.concat((seenIds || []).map(function (id) { return { id: id }; })));
   return FbmSync.readListAdd(marked);
 };
 
 /**
- * Nhận một gói của việc quét giao dịch: đánh dấu rồi mới tăng cursor. Hết gói thì sang cửa sổ kế, hết cửa sổ thì đánh dấu khách cha của giao dịch vắng.
- * FBM trả ít dòng hơn tổng nó báo nghĩa là một lần lấy không đủ: chuyển sang cửa sổ, không ghi gói thiếu.
+ * Chặng quét giao dịch (lớp 1): nhận một gói, đánh dấu rồi mới tiến cursor. Hết gói thì sang cửa sổ kế, hết cửa sổ thì đánh dấu khách cha của giao dịch vắng và trả `end`.
+ * FBM trả ít dòng hơn tổng nó báo ở gói đầu nghĩa là một lần lấy không đủ: chuyển sang cửa sổ, không đánh dấu gói thiếu.
  */
-FbmSync.activityScanChunk = function (state, cursor, rawResponse) {
-  var accepted = FbmSync.scanJobAccept(state, cursor, rawResponse), grid;
-  if (accepted.result) { return accepted.result; }
+FbmSync.activityScanStage = function (ctx) {
+  var check = FbmSync.replyCheck(ctx.reply);
+  if (check.suspected) { return { patch: {}, session: { suspected: check.suspected } }; }
+  var state = ctx.state, cursor = state.cursor, input = ctx.inputs, logs = [];
+  var accepted = FbmSync.scanReplyCheck(ctx.reply, cursor);
+  if (accepted.duplicate) {
+    logs.push({ action: 'scan_chunk_duplicate', outcome: LOG_WARN, reason: 'Extension trả lại gói quét đã nhận (gói ' + accepted.duplicate + '); xin lại gói ' + Number(cursor.next || 0) + '.' });
+    return { patch: { logs: logs }, next: FbmSync.scanJobRequest(state) };
+  }
   var chunk = accepted.chunk;
   if (chunk.index === 0 && chunk.rowCount < chunk.totalRowCount) {
-    return FbmSync.activityScanToWindows(state, 'FBM_SCAN_INCOMPLETE', 'FBM chỉ trả ' + chunk.rowCount + '/' + chunk.totalRowCount + ' giao dịch trong một lần lấy.');
+    var today = FbmSync.dateNormalize(new Date(ctx.now));
+    return FbmSync.activityWindowPlan(state, 'FBM_SCAN_INCOMPLETE', 'FBM chỉ trả ' + chunk.rowCount + '/' + chunk.totalRowCount + ' giao dịch trong một lần lấy.', FbmSync.activityWindowStart(input.local, today), ctx.now);
   }
-  try { grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(rawResponse)); } catch (shapeError) { return FbmSync.scanJobMismatch(state, String(shapeError && shapeError.message || shapeError)); }
-  var oversize = chunk.index === 0 ? chunk.oversize : [];
-  var imported = FbmSync.activityBulkAccept(state, grid.rows, oversize);
-  state = FbmSync.stateRead(); cursor = state.cursor;
+  var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(ctx.reply)), oversize = chunk.index === 0 ? chunk.oversize : [];
+  var imported = FbmSync.activityBulkAccept(grid.rows, oversize, input);
   // Dòng quá lớn không về được nhưng chắc chắn còn trên FBM: coi là đã thấy, không cập nhật.
-  FbmSync.scanJobOversize(state, 'activity', oversize);
-  if (!FbmSync.scanJobAdvance(cursor, chunk)) {
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: imported };
-  }
+  if (oversize.length) { state.metadata.scanOversize = Number(state.metadata.scanOversize || 0) + oversize.length; logs = logs.concat(FbmSync.scanOversizeLogs('activity', oversize)); }
+  var patch = { metadata: { scanOversize: state.metadata.scanOversize }, logs: logs };
+  if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state) }; }
   if (cursor.window && !FbmSync.activityWindow(cursor).last) {
     cursor.windowIndex = Number(cursor.windowIndex || 0) + 1; cursor.page = cursor.windowIndex; cursor.attempt = 0; cursor.restarts = 0;
     FbmSync.scanJobOpen(state, cursor);
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), imported: imported };
+    patch.cursor = state.cursor;
+    return { patch: patch, next: FbmSync.scanJobRequest(state) };
   }
-  state.metadata.activityBulk = { windows: cursor.window ? Number(cursor.windowIndex || 0) + 1 : 0, missing: 0 };
-  return FbmSync.activityBulkEnd(state, { imported: imported });
+  patch.cursor = cursor;
+  var absent = FbmSync.activityBulkAbsent(input, cursor.window ? Number(cursor.windowIndex || 0) + 1 : 0);
+  patch.metadata.activityBulk = absent.summary;
+  logs.push(absent.log);
+  return { patch: patch, end: { imported: imported } };
 };
 
-/** Lớp 1 đã nhận đủ: khách cha của giao dịch đã biết mà FBM không trả vào danh sách đọc, ghi Log một dòng tổng, rồi sang chặng kế. */
-FbmSync.activityBulkEnd = function (state, extra) {
-  var hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), tracked = FbmSync.activityBulkTracker(), local = FbmSync.readLocal('activity'), parents = FbmSync.activityParentSttIndex(local), absent = [], sample = [];
-  local.forEach(function (record) {
+/** Lớp 1 đã nhận đủ: khách cha của giao dịch đã biết mà FBM không trả vào danh sách đọc, xóa sổ đã thấy, trả sổ tổng và dòng Log cho chặng. */
+FbmSync.activityBulkAbsent = function (input, windows) {
+  var hasSeen = FbmSync.seenStoreReader(FbmSync.ACTIVITY_BULK_STORE), tracked = FbmSync.activityBulkTracker(), parents = FbmSync.activityParentSttIndex(input.local, input.customers), absent = [], sample = [];
+  input.local.forEach(function (record) {
     if (!tracked(record) || hasSeen(record)) { return; }
     absent.push(parents[String(record.fbmId).trim()]);
     if (sample.length < 20) { sample.push({ id: String(record.id || ''), fbmId: String(record.fbmId || '') }); }
   });
   FbmSync.seenStoreClear(FbmSync.ACTIVITY_BULK_STORE);
-  var added = FbmSync.readListAdd(absent);
-  state.metadata.activityBulk = Object.assign({ windows: 0 }, state.metadata.activityBulk || {}, { absent: absent.length, sample: sample });
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_bulk_done', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: 'Đã đối chiếu toàn bộ giao dịch ShinCRM đã biết với FBM' + (state.metadata.activityBulk.windows ? ' theo ' + state.metadata.activityBulk.windows + ' khoảng ngày' : ' trong một lần lấy') + '; ' + absent.length + ' giao dịch FBM không trả, ' + added + ' khách được đánh dấu để đọc chi tiết.', detail: state.metadata.activityBulk }); }
-  return FbmSync.activityStagesContinue(state, Object.assign({}, extra || {}));
+  var added = FbmSync.readListAdd(absent), summary = { windows: windows, missing: 0, absent: absent.length, sample: sample };
+  var reason = 'Đã đối chiếu toàn bộ giao dịch ShinCRM đã biết với FBM' + (windows ? ' theo ' + windows + ' khoảng ngày' : ' trong một lần lấy') + '; ' + absent.length + ' giao dịch FBM không trả, ' + added + ' khách được đánh dấu để đọc chi tiết.';
+  return { summary: summary, log: { action: 'activity_bulk_done', outcome: LOG_OK, reason: reason, detail: summary } };
+};
+
+/** Bước kết của chặng: mở chặng đọc kế của lượt. */
+FbmSync.activityScanEnd = function (state, end) {
+  return FbmSync.runTail(FbmSync.activityStagesContinue(state, { imported: end.imported }));
 };

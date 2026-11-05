@@ -6,7 +6,7 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.SCAN_ID_FIELDS = { customer: 'stt_rec_kh', activity: 'id' };
-// Kiểu cursor theo thực thể: quét khách là chặng theo hợp đồng chung (`customer_scan` trong `CURSOR_TABLE`), quét giao dịch còn đi đường cũ. Phong bì gửi Extension vẫn mang `scan_job`/`scan_chunk`.
+// Kiểu cursor theo thực thể, cả hai là chặng theo hợp đồng chung trong `CURSOR_TABLE` (`customer_scan`, `scan_job` của giao dịch). Phong bì gửi Extension vẫn mang `scan_job`/`scan_chunk`.
 FbmSync.SCAN_CURSOR_KINDS = { customer: 'customer_scan', activity: 'scan_job' };
 FbmSync.isScanCursor = function (cursor) { var kind = String(cursor && cursor.kind || ''); return kind === FbmSync.SCAN_CURSOR_KINDS.customer || kind === FbmSync.SCAN_CURSOR_KINDS.activity; };
 
@@ -46,15 +46,6 @@ FbmSync.scanJobRequest = function (state) {
   return request;
 };
 
-/** Gói lạ là lỗi hợp đồng: dừng phiên, không ghi gì, Sidebar và Log cùng thấy. */
-FbmSync.scanJobMismatch = function (state, message) {
-  var code = 'FBM_SCAN_JOB_MISMATCH', failed = FbmSync.runFailCurrent(message, code).failed;
-  state = FbmSync.stateRead();
-  if (!failed) { state.phase = 'error'; state.lastFailureCode = code; state.lastError = message; state.message = message; FbmSync.stateWrite(state); }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scan_job_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { code: code } }); }
-  return { ok: false, code: code, request: null, error: message, status: FbmSync.statusView() };
-};
-
 /**
  * Đối chiếu gói với cursor trước mọi xử lý, không đọc kho, không ghi: `{ chunk }` khi đúng gói đang chờ, `{ duplicate: số gói }` khi Extension trả lại gói đã nhận (cùng việc, số nhỏ hơn gói đang chờ), còn lại ném `FBM_SCAN_JOB_MISMATCH` (khác việc, vượt trước, tổng số dòng đổi giữa chừng, thiếu khối việc quét).
  */
@@ -68,18 +59,6 @@ FbmSync.scanReplyCheck = function (rawResponse, cursor) {
   return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [] } };
 };
 
-/** Đường cũ của việc quét giao dịch: đổi kết quả `scanReplyCheck` thành kết quả của `continue` (`{ result }` khi phải dừng hoặc xin lại gói). */
-FbmSync.scanJobAccept = function (state, cursor, rawResponse) {
-  var accepted;
-  try { accepted = FbmSync.scanReplyCheck(rawResponse, cursor); }
-  catch (error) { if (error.code !== 'FBM_SCAN_JOB_MISMATCH') { throw error; } return { result: FbmSync.scanJobMismatch(state, error.message) }; }
-  if (accepted.duplicate) {
-    FbmSync.traceEvent(state, 'scan_chunk_duplicate', { operation: 'scan_job', entity: cursor.entity, error: 'gói ' + accepted.duplicate + ' đã ghi, xin lại gói ' + Number(cursor.next || 0) });
-    return { result: { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView() } };
-  }
-  return accepted;
-};
-
 /** Ghi nhận gói đã ghi xong; gọi sau khi Sheet và state của gói đã lưu. */
 FbmSync.scanJobAdvance = function (cursor, chunk) {
   cursor.chunkCount = chunk.count;
@@ -88,38 +67,43 @@ FbmSync.scanJobAdvance = function (cursor, chunk) {
   return cursor.next >= cursor.chunkCount;
 };
 
-/** Dòng mà riêng nó đã vượt trần một gói không về GAS: ghi Log từng dòng; dòng đó không bị gắn cờ "không thấy". */
-FbmSync.scanJobOversize = function (state, entity, ids) {
-  if (!ids.length) { return; }
-  state.metadata.scanOversize = Number(state.metadata.scanOversize || 0) + ids.length;
-  FbmSync.scanOversizeLogs(entity, ids).forEach(function (line) { logEvent(Object.assign({ source: 'fbm_sync', cycleId: String(state.runId || '') }, line)); });
-};
 /** Dòng Log cho từng dòng quá cỡ, để người gọi ghi. */
 FbmSync.scanOversizeLogs = function (entity, ids) {
   return ids.map(function (id) { return { action: 'scan_row_oversize', outcome: LOG_ERROR, reason: 'Một dòng ' + entity + ' FBM lớn hơn trần một gói nên không chuyển được về ShinCRM; dòng này không bị gắn cờ "không thấy bên FBM".', detail: { entity: entity, fbmId: String(id || '') } }; });
 };
 
 /**
- * Tab không còn giữ việc quét: chạy lại cả việc với lần thử mới, tối đa `scanJobRestarts` lần rồi dừng lỗi.
- * Chỉ chạy khi `transportRecoverPlan` chọn `scan_restart` (cursor đang là việc quét, mã `FBM_SCAN_JOB_GONE`).
+ * Tab không còn giữ việc quét: chạy lại cả việc với lần thử mới, tối đa `scanJobRestarts` lần rồi ném `FBM_SCAN_JOB_GONE` kèm dòng Log.
+ * Thuần trên bản sao ô lượt; chỉ chạy khi `transportRecoverPlan` chọn `scan_restart` (cursor đang là việc quét, mã `FBM_SCAN_JOB_GONE`).
  */
-FbmSync.scanJobRestart = function (state, code, message) {
-  var cursor = state.cursor || {};
-  state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now();
-  if (Number(cursor.restarts || 0) >= FbmSync.BUDGET.scanJobRestarts) {
-    var text = 'Tab FBM mất việc quét ' + (Number(cursor.restarts || 0) + 1) + ' lần liên tiếp (tab tải lại hoặc Extension khởi động lại); đã dừng. Giữ tab FBM mở và chạy lại.';
-    FbmSync.stateWrite(state);
-    FbmSync.runFailCurrent(text, 'FBM_SCAN_JOB_GONE');
-    if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scan_job_gone', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: text, detail: { restarts: Number(cursor.restarts || 0) } }); }
-    return { ok: false, code: 'FBM_SCAN_JOB_GONE', request: null, error: text, status: FbmSync.statusView() };
+FbmSync.scanRestartPlan = function (state, message) {
+  var cursor = state.cursor, restarts = Number(cursor.restarts || 0), max = FbmSync.BUDGET.scanJobRestarts;
+  if (restarts >= max) {
+    var text = 'Tab FBM mất việc quét ' + (restarts + 1) + ' lần liên tiếp (tab tải lại hoặc Extension khởi động lại); đã dừng. Giữ tab FBM mở và chạy lại.', gone = new Error(text);
+    gone.code = 'FBM_SCAN_JOB_GONE';
+    gone.logs = [{ action: 'scan_job_gone', outcome: LOG_ERROR, reason: text, detail: { restarts: restarts } }];
+    throw gone;
   }
-  cursor.restarts = Number(cursor.restarts || 0) + 1;
+  cursor.restarts = restarts + 1;
   cursor.attempt = Number(cursor.attempt || 0) + 1;
-  state.metadata = state.metadata || {};
-  if (state.metadata.customerScan) { state.metadata.customerScan.seen = Number(cursor.seenBefore || 0); }
+  var patch = { logs: [{ action: 'scan_job_restart', outcome: LOG_WARN, reason: String(message || 'Tab FBM không còn giữ việc quét.').slice(0, 240), detail: { restarts: cursor.restarts } }] };
+  // Số khách đã nhận trả về mốc trước trang này để không đếm trùng các gói sẽ nhận lại; `scanJobOpen` đọc mốc này.
+  if (state.metadata && state.metadata.customerScan) { state.metadata.customerScan = Object.assign({}, state.metadata.customerScan, { seen: Number(cursor.seenBefore || 0) }); patch.metadata = { customerScan: state.metadata.customerScan }; }
   FbmSync.scanJobOpen(state, cursor);
-  state.message = 'Tab FBM mất việc quét; đang chạy lại lần ' + cursor.restarts + '/' + FbmSync.BUDGET.scanJobRestarts + '.';
-  FbmSync.stateWrite(state);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scan_job_restart', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: String(message || 'Tab FBM không còn giữ việc quét.').slice(0, 240), detail: { restarts: cursor.restarts } }); }
-  return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), restarted: true };
+  patch.cursor = state.cursor;
+  patch.message = 'Tab FBM mất việc quét; đang chạy lại lần ' + cursor.restarts + '/' + max + '.';
+  return { patch: patch, next: FbmSync.scanJobRequest(state) };
+};
+
+/**
+ * Người điều phối đường cứu việc quét khi Extension báo lỗi gửi request: bỏ request đang chờ, đọc đầu vào qua cổng chủ, chạy công cụ cứu mà `transportRecoverPlan` đã chọn trên bản sao ô lượt rồi phát request. Công cụ ném lỗi thì `runSlice` đóng lượt với đúng mã đó.
+ */
+FbmSync.scanRecoverRun = function (state, plan, code, message) {
+  var now = Date.now(), windows = plan === 'activity_windows';
+  state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = now;
+  var windowStart = windows ? FbmSync.activityWindowStart(FbmSync.readLocal('activity'), FbmSync.dateNormalize(new Date(now))) : '';
+  var out = FbmSync.stageCall(state, function (copy) { return windows ? FbmSync.activityWindowPlan(copy, code, message, windowStart, now) : FbmSync.scanRestartPlan(copy, message); });
+  var result = { ok: true, request: FbmSync.nextEnvelope(out.next), status: FbmSync.statusView() };
+  if (!windows) { result.restarted = true; }
+  return result;
 };

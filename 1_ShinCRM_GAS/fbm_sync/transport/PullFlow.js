@@ -502,7 +502,6 @@ FbmSync.continueStep = function (rawResponse) {
     return { ok: true, request: FbmSync.nextEnvelope(customerRequest), status: FbmSync.statusView() };
   }
   // Danh sách toàn bộ khách đi bằng việc quét; kiểm tra liên kết vẫn đọc grid thường theo `stt_rec_kh`.
-  if (cursor.kind === 'scan_job') { return FbmSync.activityScanChunk(state, cursor, rawResponse); }
   if (cursor.kind === 'customer_grid' && state.scan === 'identity_check') {
     var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
     state.metadata.customerFields = customerGrid.fields;

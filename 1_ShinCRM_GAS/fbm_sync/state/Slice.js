@@ -84,7 +84,12 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.customerScanStage(ctx); },
     end: function (state) { return FbmSync.customerScanEnd(state); }
   },
-  run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
+  run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  scan_job: {
+    inputs: function (state) { return FbmSync.activityScanInputs(state); },
+    stage: function (ctx) { return FbmSync.activityScanStage(ctx); },
+    end: function (state, end) { return FbmSync.activityScanEnd(state, end); }
+  }
 };
 FbmSync.cursorTable = function (kind) {
   return Object.prototype.hasOwnProperty.call(FbmSync.CURSOR_TABLE, kind) && kind !== 'run' ? FbmSync.CURSOR_TABLE[kind] : FbmSync.CURSOR_TABLE.run;
@@ -119,11 +124,7 @@ FbmSync.replyIntake = function (state, rawResponse) {
 FbmSync.stageRun = function (entry, state, rawResponse) {
   FbmSync.replyIntake(state, rawResponse);
   FbmSync.stateWrite(state);
-  var out;
-  // Chặng ném lỗi có thể kèm `logs` đã gom trong lát (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.
-  try { out = entry.stage({ state: JSON.parse(JSON.stringify(state)), reply: rawResponse, inputs: entry.inputs ? entry.inputs(state) : {}, now: Date.now() }) || {}; }
-  catch (stageError) { if (stageError && stageError.logs) { FbmSync.stagePatchApply(state, { logs: stageError.logs }); } throw stageError; }
-  FbmSync.stagePatchApply(state, out.patch);
+  var inputs = entry.inputs ? entry.inputs(state) : {}, out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, now: Date.now() }); });
   if (out.session && out.session.suspected) {
     var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);
     return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
@@ -131,6 +132,16 @@ FbmSync.stageRun = function (entry, state, rawResponse) {
   if (out.next) { return { ok: true, request: FbmSync.nextEnvelope(out.next), status: FbmSync.statusView() }; }
   if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
   return entry.end(state, out.end);
+};
+/**
+ * Chạy một công cụ theo hợp đồng chung trên bản sao ô lượt (công cụ không sửa được ô lượt thật) rồi gộp patch nó trả. Công cụ ném lỗi có thể kèm `logs` đã gom (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.
+ */
+FbmSync.stageCall = function (state, tool) {
+  var out;
+  try { out = tool(JSON.parse(JSON.stringify(state))) || {}; }
+  catch (stageError) { if (stageError && stageError.logs) { FbmSync.stagePatchApply(state, { logs: stageError.logs }); } throw stageError; }
+  FbmSync.stagePatchApply(state, out.patch);
+  return out;
 };
 /**
  * Gộp patch của chặng vào ô lượt của lát rồi đánh dấu ghi. `metadata` gộp nông vào metadata hiện có; `logs` là các dòng Log chặng muốn ghi, mang mã lượt khi dòng chưa có; trường khác thay nguyên giá trị.
@@ -190,8 +201,7 @@ FbmSync.transportFailureRun = function (payload) {
   // Lỗi khi đọc chính sách đăng nhập hay dựng lại request hỏng thuộc cổng phiên: đóng lượt an toàn, không thử tiếp.
   try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }
   catch (policyError) { return FbmSync.sessionGateFailClosed(state, policyError); }
-  if (plan === 'activity_windows') { recovered = FbmSync.activityScanToWindows(state, failureCode, failureMessage); }
-  if (plan === 'scan_restart') { recovered = FbmSync.scanJobRestart(state, failureCode, failureMessage); }
+  if (plan === 'activity_windows' || plan === 'scan_restart') { return FbmSync.scanRecoverRun(state, plan, failureCode, failureMessage); }
   if (plan === 'reload_page' || plan === 'open_tab') {
     try { recovered = FbmSync.transportReissue(state, requestId, failureCode, failureMessage, plan); }
     catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
