@@ -66,6 +66,12 @@ async function chay(so) {
   check(so, "Tra mã khách không lọc quyền: id `1' or '1`, id không toàn chữ số, mã khách sai định dạng hoặc rỗng không sinh request; kết quả chỉ có stt_rec_kh, không chứa ten_kh", [
     traLa, traDung.meta.kind, JSON.stringify(traDung.body.externalKey).indexOf('GetCustomerValidate') < 0, ketQua, JSON.stringify(ketQua).indexOf('Công ty người khác') < 0
   ], [[null, null, null, null], 'owner_lookup', true, { ok: true, sttRecs: ['FBM-C9'] }, true]);
+  // Lượt đã lưu tên cột khách: tra mã không xin tiêu đề, đọc cột theo vị trí; số cột lệch thì báo lỗi, không đọc nhầm cột.
+  const khongTieuDe = F.ownerLookupRequest('customer', 'FBM-C9', false), daLuu = ['ten_kh', 'stt_rec_kh'];
+  const dongKhongTieuDe = (rows) => ({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 0, Rows: rows } }) });
+  check(so, 'Tra mã khách khi lượt đã lưu tên cột: request type 1 không tiêu đề, đọc stt_rec_kh theo vị trí đã lưu, dòng lệch số cột trả FBM_GRID_SHAPE_CHANGED', [
+    [khongTieuDe.body.type, khongTieuDe.body.gridPageIndex], F.ownerLookupParse(dongKhongTieuDe([['Công ty', 'FBM-C9']]), daLuu), F.ownerLookupParse(dongKhongTieuDe([['FBM-C9']]), daLuu).code
+  ], [[1, F.GRID_FIRST_PAGE_NO_HEADER], { ok: true, sttRecs: ['FBM-C9'] }, 'FBM_GRID_SHAPE_CHANGED']);
 
   // Khách vắng ở cửa ghi.
   const chuyen = await sheet3();

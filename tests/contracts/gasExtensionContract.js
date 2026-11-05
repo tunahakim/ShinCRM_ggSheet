@@ -34,8 +34,8 @@ const CONTRACT = {
     transport: ['contract', 'trace', 'captures', 'loginStage', 'loginBlocked'],
     // Response lô chỉ gồm phần tử đã chạy, đúng thứ tự gửi.
     item: ['id', 'ok', 'status', 'headers', 'body'],
-    // Gói của việc quét giữ dạng response grid FBM; `job` cho GAS đối chiếu với cursor trước khi ghi.
-    job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize'],
+    // Gói của việc quét giữ dạng response grid FBM; `job` cho GAS đối chiếu với cursor trước khi ghi. `fields` (chỉ gói 0) là tên cột gốc của bảng trước khi giữ cột, để GAS đọc các trang không tiêu đề của cùng bảng trong lượt.
+    job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize', 'fields'],
     // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
     codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'],
     // Lỗi Extension không gửi được envelope tới tab, trả nguyên mã để GAS quyết: không có tab (GAS cho mở thì phát lại kèm `openFbmContext`), tab không sẵn sàng (Extension không tự tải lại; GAS phát lại một lần kèm `reloadFbmPage`), Chrome chặn quyền site (không thử lại, người dùng phải mở quyền), địa chỉ ngoài miền FBM.

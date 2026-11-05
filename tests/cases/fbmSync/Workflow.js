@@ -1001,6 +1001,8 @@ async function chay(so) {
         return { body: JSON.stringify(body) };
       }) : executorRaw((await fbmTab.send(request, body)).reply, request.id);
       if (activityBatch && options && options.editBatch) { raw = options.editBatch(raw, fullBatches.length); }
+      // Extension bản cũ không gửi tên cột gốc trong gói đầu việc quét.
+      if (options && options.oldExtension && raw && raw.job) { delete raw.job.fields; }
       if (activityBatch) {
         // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
@@ -1097,9 +1099,13 @@ async function chay(so) {
   check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; cả lượt chỉ một khách lấy kèm tiêu đề cột', [
     nhieuTrang.activityItemTypes.filter((type) => type === 0).length, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''
   ], [1, 120, [[-1, -1], [1, 0], [2, 1]], 120, 120, 'done', '']);
-  check(so, 'lô đọc chi tiết: phần đọc khách chỉ lô đầu của lượt lấy kèm tiêu đề cột, các lô sau đọc cột theo danh sách đã lưu và vẫn ghi đủ khách', [
-    nhieuTrang.customerItemTypes.filter((type) => type === 0).length, nhieuTrang.customerItemTypes.length > 1, nhieuTrang.customerItemTypes[0], nhieuTrang.fullLocal.customer.length
-  ], [1, true, 0, 120]);
+  check(so, 'lô đọc chi tiết: gói đầu việc quét mang tên cột gốc nên không lô nào của lượt xin lại tiêu đề cột khách, vẫn ghi đủ khách', [
+    nhieuTrang.customerItemTypes.filter((type) => type === 0).length, nhieuTrang.customerItemTypes.length > 1, nhieuTrang.fullLocal.customer.length
+  ], [0, true, 120]);
+  const banCu = await fullPipeline(false, 'read', { customers: 120, scanCustomerRows: 50, oldExtension: true });
+  check(so, 'Extension cũ không gửi tên cột gốc: chỉ lô đầu xin tiêu đề cột khách, các lô sau đọc theo danh sách đã lưu, vẫn ghi đủ khách', [
+    banCu.customerItemTypes.filter((type) => type === 0).length, banCu.customerItemTypes[0], banCu.fullLocal.customer.length, banCu.fullStep.status.phase
+  ], [1, 0, 120, 'done']);
   const lechCotKhach = await fullPipeline(false, 'read', { customers: 120, scanCustomerRows: 50, cutCustomerColumn: true });
   check(so, 'phần đọc khách không tiêu đề có số cột khác tiêu đề đã lưu: dừng phiên FBM_GRID_SHAPE_CHANGED, Log báo, không ghi thêm khách nào sau lô đầu', [
     lechCotKhach.fullStep.status.phase, lechCotKhach.fullStep.status.lastFailureCode, lechCotKhach.fullLogs.some((event) => event.action === 'activity_batch_mismatch' && event.detail.code === 'FBM_GRID_SHAPE_CHANGED'), lechCotKhach.fullLocal.customer.length < 120
