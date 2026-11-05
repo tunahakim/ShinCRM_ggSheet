@@ -30,6 +30,33 @@ async function chay(so) {
   check(so, 'Chưa có số khách mốc: lượt lấy toàn bộ giao dịch đếm xong thì chạy Quét nhanh để lấy mốc, đếm lại khớp rồi dừng', [
     sauBulk.status.phase, sauLop1[0], dem(chuaMoc, 'scan_job'), dem(chuaMoc, 'customer_count'), chuaMoc.F.customerBaselineRead()
   ], ['done', 'customer_count', 1, 2, 12]);
+
+  // Request đếm chỉ cần tổng: không xin tiêu đề cột (nặng hơn cả response), Extension chỉ giữ tổng.
+  const hinh = scanHarness({ customers: 12 });
+  let demGui = null;
+  await hinh.run({ pack: 'quick', beforeSend: (request) => { if (request.meta.kind === 'customer_count') { demGui = request; } } });
+  check(so, 'request đếm không xin tiêu đề cột (type 1, trang đầu không tiêu đề) và chỉ giữ tổng (meta.keep rỗng), lượt vẫn đếm khớp', [
+    demGui.body.type, demGui.body.gridPageIndex, JSON.stringify(demGui.meta.keep), hinh.F.stateRead().phase
+  ], [1, hinh.F.GRID_FIRST_PAGE_NO_HEADER, '{"fields":[]}', 'done']);
+
+  // FBM không trả tổng: lượt đóng lỗi đúng mã qua đường lỗi chung, không đoán số, mốc giữ số của lần quét đủ.
+  const thieu = scanHarness({ customers: 12 });
+  await thieu.run({ pack: 'quick', afterError: () => null, edit: (raw, request) => { if (request.meta.kind === 'customer_count') { raw.body = JSON.stringify({ d: { Rows: [] } }); } return raw; } });
+  check(so, 'FBM không trả số khách ở bước đếm: lượt lỗi FBM_CUSTOMER_COUNT_INVALID, mốc giữ số của lần quét đủ, không mở Quét nhanh bù', [
+    thieu.F.stateRead().phase, thieu.F.stateRead().lastFailureCode, thieu.F.customerBaselineRead(), dem(thieu, 'scan_job')
+  ], ['error', 'FBM_CUSTOMER_COUNT_INVALID', 12, 1]);
+
+  // Chặng nhận bản sao ô lượt: sửa thẳng bản sao không lọt vào ô lượt thật, chỉ patch được gộp.
+  const sao = scanHarness({ customers: 12 });
+  sao.F.statePatch({ runId: 'r-sao', phase: 'pull_customer', cursor: { kind: 'customer_count' }, message: 'cũ' });
+  const traVe = sao.F.stageRun({ stage: (ctx) => { ctx.state.phase = 'done'; ctx.state.cursor.kind = 'xong'; return { patch: { message: 'mới' }, end: {} }; }, end: (state) => ({ phase: state.phase, kind: state.cursor.kind, message: state.message }) }, sao.F.stateRead(), JSON.stringify({ d: {} }));
+  check(so, 'chặng sửa thẳng ô lượt nhận được thì ô lượt thật không đổi; chỉ patch được gộp', [traVe.phase, traVe.kind, traVe.message], ['pull_customer', 'customer_count', 'mới']);
+
+  // Phép kiểm response chung: lỗi HTTP ném có mã, phiên đáng ngờ nhường cổng phiên, response tốt qua.
+  const loiMa = (fn) => { try { fn(); return ''; } catch (error) { return error.code; } };
+  check(so, 'replyCheck: HTTP 500 ném TRANSPORT_ERROR, FBM báo Bugs ném FBM_BUSINESS_ERROR, response tốt trả ok', [
+    loiMa(() => sao.F.replyCheck({ ok: false, status: 500, body: 'x' })), loiMa(() => sao.F.replyCheck({ ok: true, status: 200, body: JSON.stringify({ d: { Bugs: { Message: 'lỗi' } } }) })), sao.F.replyCheck({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1 } }) }).ok
+  ], ['TRANSPORT_ERROR', 'FBM_BUSINESS_ERROR', true]);
 }
 
 module.exports = { chay };

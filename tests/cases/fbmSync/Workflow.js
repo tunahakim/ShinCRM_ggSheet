@@ -748,7 +748,7 @@ async function chay(so) {
     const recountModes = [];
     two.F.recountStart = (mode, origin) => { recountModes.push([mode, origin]); return { ok: true, request: null }; };
     const counted = two.F.stateRead(); counted.metadata.countTail = { pending: false, mode: 'write', message: 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.' }; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);
-    two.F.customerCountContinue(two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } }));
+    two.F.stageRun(two.F.CURSOR_TABLE.customer_count, two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } }));
     check(so, 'C2: số khách lệch sau lượt Giữ phiên có đẩy thì Quét nhanh bù chạy theo chiều lịch nền (Hai chiều), không theo mode push của lượt', recountModes, [['write', 'background']]);
   }
   {

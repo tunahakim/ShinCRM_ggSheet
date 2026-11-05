@@ -63,7 +63,7 @@ async function chay(so) {
       staleRunCheck: () => null,
       responseRequestId: () => 'read-request', requestAnswered: (state, id) => !!id && String(state.activeRequestId || '') === id,
       protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null },
-      traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false,
+      traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false, sessionGateResponseStarted: () => {},
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
       pullWrite: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0 }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
