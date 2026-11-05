@@ -236,9 +236,10 @@ FbmSync.gridRows = function (response) {
 FbmSync.validateGridFields = function (entity, fields) {
   var required = FbmSync.scanFields(entity);
   var seen = {};
-  (fields || []).forEach(function (field) { if (seen[field]) { throw new Error('FBM trả AliasName trùng: ' + field); } seen[field] = true; });
+  var shapeChanged = function (message) { var error = new Error(message + '; cấu trúc FBM có thể đã đổi, đã dừng để không ghi nhầm trường.'); error.code = 'FBM_GRID_SHAPE_CHANGED'; throw error; };
+  (fields || []).forEach(function (field) { if (seen[field]) { shapeChanged('FBM trả AliasName trùng: ' + field); } seen[field] = true; });
   var missing = required.filter(function (field) { return !seen[field]; });
-  if (missing.length) { throw new Error('FBM thiếu metadata AliasName: ' + missing.join(', ')); }
+  if (missing.length) { shapeChanged('FBM thiếu metadata AliasName: ' + missing.join(', ')); }
   return true;
 };
 /** Đọc định danh từ dòng User theo AliasName; thiếu metadata/dòng thì fail-closed. */

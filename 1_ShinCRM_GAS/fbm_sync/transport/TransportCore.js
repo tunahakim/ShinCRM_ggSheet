@@ -331,7 +331,7 @@ FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
   var value = String(code || ''), cursor = state && state.cursor || {}, gate = state && state.metadata && state.metadata.sessionGate || {};
   var reissued = String(gate.noTabRetryRequestId || '') === String(requestId || '');
   if (FbmSync.ACTIVITY_WINDOW_CODES.indexOf(value) >= 0 && cursor.kind === 'scan_job' && cursor.entity === 'activity' && !(Number(cursor.chunkCount || 0) > 0)) { return 'activity_windows'; }
-  if (value === 'FBM_SCAN_JOB_GONE' && cursor.kind === 'scan_job') { return 'scan_restart'; }
+  if (value === 'FBM_SCAN_JOB_GONE' && FbmSync.isScanCursor(cursor)) { return 'scan_restart'; }
   if (value === 'FBM_TAB_NOT_READY' && !reissued) { return 'reload_page'; }
   if (value === 'FBM_TAB_NOT_FOUND' && !reissued && policy && policy.autoOpenTab === true) { return 'open_tab'; }
   return 'stop';
@@ -553,7 +553,7 @@ FbmSync.requestForCursor = function (state) {
   if (cursor.kind === 'customer_grid') {
     return FbmSync.customerGridRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false });
   }
-  if (cursor.kind === 'scan_job') { return FbmSync.scanJobRequest(state); }
+  if (FbmSync.isScanCursor(cursor)) { return FbmSync.scanJobRequest(state); }
   if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(); }
   if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state); }
   if (cursor.kind === 'conflict_refresh') { return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }); }

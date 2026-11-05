@@ -6,10 +6,13 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.SCAN_ID_FIELDS = { customer: 'stt_rec_kh', activity: 'id' };
+// Kiểu cursor theo thực thể: quét khách là chặng theo hợp đồng chung (`customer_scan` trong `CURSOR_TABLE`), quét giao dịch còn đi đường cũ. Phong bì gửi Extension vẫn mang `scan_job`/`scan_chunk`.
+FbmSync.SCAN_CURSOR_KINDS = { customer: 'customer_scan', activity: 'scan_job' };
+FbmSync.isScanCursor = function (cursor) { var kind = String(cursor && cursor.kind || ''); return kind === FbmSync.SCAN_CURSOR_KINDS.customer || kind === FbmSync.SCAN_CURSOR_KINDS.activity; };
 
 /** Mở việc quét cho trang đang mô tả trong cursor; `attempt` đổi thì `jobId` đổi, gói của lần chạy trước bị coi là gói lạ. */
 FbmSync.scanJobOpen = function (state, cursor) {
-  cursor.kind = 'scan_job';
+  cursor.kind = FbmSync.SCAN_CURSOR_KINDS[cursor.entity];
   cursor.attempt = Number(cursor.attempt || 0);
   cursor.page = Number(cursor.page || 0);
   cursor.jobId = String(state.runId || '') + ':' + cursor.entity + ':' + cursor.page + ':' + cursor.attempt;
@@ -53,24 +56,28 @@ FbmSync.scanJobMismatch = function (state, message) {
 };
 
 /**
- * Đối chiếu gói với cursor trước mọi xử lý. Trả `{ chunk }` khi đúng gói đang chờ, `{ result }` khi phải dừng hoặc xin lại gói.
- * Gói trùng (số thứ tự nhỏ hơn gói đang chờ, cùng việc) bỏ qua và xin lại gói đang chờ; gói khác việc, vượt trước hoặc tổng số dòng đổi giữa chừng là gói lạ.
+ * Đối chiếu gói với cursor trước mọi xử lý, không đọc kho, không ghi: `{ chunk }` khi đúng gói đang chờ, `{ duplicate: số gói }` khi Extension trả lại gói đã nhận (cùng việc, số nhỏ hơn gói đang chờ), còn lại ném `FBM_SCAN_JOB_MISMATCH` (khác việc, vượt trước, tổng số dòng đổi giữa chừng, thiếu khối việc quét).
  */
-FbmSync.scanJobAccept = function (state, cursor, rawResponse) {
-  var job = rawResponse && rawResponse.job;
-  if (!job || typeof job !== 'object') { return { result: FbmSync.scanJobMismatch(state, 'Extension trả response không có khối việc quét dù GAS đã cấp việc quét; Extension hoặc Sidebar đang chạy bản lệch hợp đồng. Đã dừng và không ghi gì.') }; }
+FbmSync.scanReplyCheck = function (rawResponse, cursor) {
+  var job = rawResponse && rawResponse.job, mismatch = function (message) { var error = new Error(message); error.code = 'FBM_SCAN_JOB_MISMATCH'; throw error; };
+  if (!job || typeof job !== 'object') { mismatch('Extension trả response không có khối việc quét dù GAS đã cấp việc quét; Extension hoặc Sidebar đang chạy bản lệch hợp đồng. Đã dừng và không ghi gì.'); }
   var index = Number(job.chunkIndex), next = Number(cursor.next || 0);
-  if (String(job.jobId || '') !== String(cursor.jobId || '') || !(index >= 0) || index > next) {
-    return { result: FbmSync.scanJobMismatch(state, 'Gói quét "' + String(job.jobId || '') + '" số ' + String(job.chunkIndex) + ' không khớp việc quét đang chờ (gói số ' + next + '); đã dừng và không ghi gì.') };
-  }
-  if (index < next) {
-    if (FbmSync.traceEvent) { FbmSync.traceEvent(state, 'scan_chunk_duplicate', { operation: 'scan_job', entity: cursor.entity, error: 'gói ' + index + ' đã ghi, xin lại gói ' + next }); }
+  if (String(job.jobId || '') !== String(cursor.jobId || '') || !(index >= 0) || index > next) { mismatch('Gói quét "' + String(job.jobId || '') + '" số ' + String(job.chunkIndex) + ' không khớp việc quét đang chờ (gói số ' + next + '); đã dừng và không ghi gì.'); }
+  if (index < next) { return { duplicate: String(index) }; }
+  if (cursor.jobTotal !== null && cursor.jobTotal !== undefined && Number(job.totalRowCount) !== Number(cursor.jobTotal)) { mismatch('Tổng số dòng FBM đổi giữa các gói của cùng một việc quét (' + cursor.jobTotal + ' và ' + job.totalRowCount + '); đã dừng và không ghi gì.'); }
+  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [] } };
+};
+
+/** Đường cũ của việc quét giao dịch: đổi kết quả `scanReplyCheck` thành kết quả của `continue` (`{ result }` khi phải dừng hoặc xin lại gói). */
+FbmSync.scanJobAccept = function (state, cursor, rawResponse) {
+  var accepted;
+  try { accepted = FbmSync.scanReplyCheck(rawResponse, cursor); }
+  catch (error) { if (error.code !== 'FBM_SCAN_JOB_MISMATCH') { throw error; } return { result: FbmSync.scanJobMismatch(state, error.message) }; }
+  if (accepted.duplicate) {
+    FbmSync.traceEvent(state, 'scan_chunk_duplicate', { operation: 'scan_job', entity: cursor.entity, error: 'gói ' + accepted.duplicate + ' đã ghi, xin lại gói ' + Number(cursor.next || 0) });
     return { result: { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView() } };
   }
-  if (cursor.jobTotal !== null && cursor.jobTotal !== undefined && Number(job.totalRowCount) !== Number(cursor.jobTotal)) {
-    return { result: FbmSync.scanJobMismatch(state, 'Tổng số dòng FBM đổi giữa các gói của cùng một việc quét (' + cursor.jobTotal + ' và ' + job.totalRowCount + '); đã dừng và không ghi gì.') };
-  }
-  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [] } };
+  return accepted;
 };
 
 /** Ghi nhận gói đã ghi xong; gọi sau khi Sheet và state của gói đã lưu. */
@@ -85,8 +92,11 @@ FbmSync.scanJobAdvance = function (cursor, chunk) {
 FbmSync.scanJobOversize = function (state, entity, ids) {
   if (!ids.length) { return; }
   state.metadata.scanOversize = Number(state.metadata.scanOversize || 0) + ids.length;
-  if (typeof logEvent !== 'function') { return; }
-  ids.forEach(function (id) { logEvent({ source: 'fbm_sync', action: 'scan_row_oversize', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: 'Một dòng ' + entity + ' FBM lớn hơn trần một gói nên không chuyển được về ShinCRM; dòng này không bị gắn cờ "không thấy bên FBM".', detail: { entity: entity, fbmId: String(id || '') } }); });
+  FbmSync.scanOversizeLogs(entity, ids).forEach(function (line) { logEvent(Object.assign({ source: 'fbm_sync', cycleId: String(state.runId || '') }, line)); });
+};
+/** Dòng Log cho từng dòng quá cỡ, để người gọi ghi. */
+FbmSync.scanOversizeLogs = function (entity, ids) {
+  return ids.map(function (id) { return { action: 'scan_row_oversize', outcome: LOG_ERROR, reason: 'Một dòng ' + entity + ' FBM lớn hơn trần một gói nên không chuyển được về ShinCRM; dòng này không bị gắn cờ "không thấy bên FBM".', detail: { entity: entity, fbmId: String(id || '') } }; });
 };
 
 /**

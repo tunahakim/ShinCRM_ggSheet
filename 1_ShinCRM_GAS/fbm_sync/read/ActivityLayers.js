@@ -151,41 +151,6 @@ FbmSync.readAgainStatus = function (record) {
   return status === sync.missing || status === sync.transferred || status === sync.pushed || status === sync.conflict;
 };
 
-/**
- * Danh sách toàn bộ khách chỉ đánh dấu, không ghi Sheet: khách mới, khách sửa (dấu vân hoặc mã khách khác), khách mang cờ cần xét lại, khách lệch giao dịch cuối (lớp 2); gói Quét toàn bộ đánh dấu mọi khách. Đánh dấu "đã thấy" để cuối danh sách biết khách vắng.
- * Log một dòng tóm tắt, không một dòng mỗi khách vì lượt đầu mọi khách đều mới.
- */
-FbmSync.customerScanMark = function (state, rows) {
-  var gate = FbmSync.stateCategoryGate(state), customers = FbmSync.readLocal('customer'), byFbmId = {}, all = state.scanPack === 'all', last = all ? null : FbmSync.lastActivityIndex(gate), pullAllowed = FbmSync.pullAllowedReader('customer'), marked = [], order = [], reasons = {}, sample = [];
-  customers.forEach(function (record) { var id = String(record.fbmId || '').trim(); if (id) { byFbmId[id] = record; } });
-  rows.forEach(function (row) {
-    var sttRec = String(row.stt_rec_kh || '').trim(), local = byFbmId[sttRec], reason = '';
-    if (!sttRec) { return; }
-    if (!local) { reason = 'new'; }
-    else if (all) { reason = 'all'; }
-    else if (FbmSync.readAgainStatus(local)) { reason = 'status'; }
-    else if (String(local.fbmHash || '') !== FbmSync.hash(row, 'customer', gate)) { reason = 'changed'; }
-    else if (String(row.ma_kh || '').trim() !== String(local.fbmCustomerCode || '').trim()) { reason = 'code'; }
-    // Khách chặn chiều lấy về không vào lớp 2 lẫn thứ tự lớp 3.
-    if (local && !all && pullAllowed(local)) {
-      var index = FbmSync.seenStoreIndex(FbmSync.READ_LIST_STORE, local);
-      if (index >= 0) { order.push(index); }
-      if (!reason && FbmSync.lastActivityDiff(row, last[String(local.id)], gate).length) { reason = 'activity'; }
-    }
-    if (!reason) { return; }
-    marked.push(sttRec);
-    reasons[reason] = Number(reasons[reason] || 0) + 1;
-    if (sample.length < 20) { sample.push({ customer: String(local && local.id || sttRec), reason: reason }); }
-  });
-  FbmSync.seenStoreMark('customer', customers, rows.map(function (row) { return { fbmId: row.stt_rec_kh }; }));
-  var added = FbmSync.readListAdd(marked);
-  if (!all) { FbmSync.topOrderAppend(order); }
-  if (added && typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'read_list_mark', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: added + ' khách được đánh dấu để đọc chi tiết (khách mới, sửa, cờ cần xét lại hoặc lệch giao dịch cuối với FBM).', detail: { count: added, reasons: reasons, sample: sample } });
-  }
-  return added;
-};
-
 /** Cuối danh sách toàn bộ khách: khách trên Sheet không thấy trong danh sách vào danh sách đọc, cửa ghi tra mã khách rồi mới gắn cờ. Chỉ chế độ ghi Sheet mới xét vắng mặt. */
 FbmSync.customerAbsentMark = function (state) {
   if (!FbmSync.canWriteSheet(state.mode)) { FbmSync.seenStoreClear('customer'); return 0; }

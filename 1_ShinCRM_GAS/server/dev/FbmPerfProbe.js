@@ -19,7 +19,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'toFbmCodes',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
-  'customerScanRecord', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
+  'customerScanStage', 'readReasonOf', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
   'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure',

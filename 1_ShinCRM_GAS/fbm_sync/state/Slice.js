@@ -74,6 +74,11 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.customerCountStage(ctx); },
     end: function (state, end) { return FbmSync.customerCountEnd(state, end); }
   },
+  customer_scan: {
+    inputs: function (state) { return FbmSync.customerScanInputs(state); },
+    stage: function (ctx) { return FbmSync.customerScanStage(ctx); },
+    end: function (state) { return FbmSync.customerScanEnd(state); }
+  },
   run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
 };
 FbmSync.cursorTable = function (kind) {
@@ -109,7 +114,10 @@ FbmSync.replyIntake = function (state, rawResponse) {
 FbmSync.stageRun = function (entry, state, rawResponse) {
   FbmSync.replyIntake(state, rawResponse);
   FbmSync.stateWrite(state);
-  var out = entry.stage({ state: JSON.parse(JSON.stringify(state)), reply: rawResponse, inputs: entry.inputs ? entry.inputs(state) : {}, now: Date.now() }) || {};
+  var out;
+  // Chặng ném lỗi có thể kèm `logs` đã gom trong lát (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.
+  try { out = entry.stage({ state: JSON.parse(JSON.stringify(state)), reply: rawResponse, inputs: entry.inputs ? entry.inputs(state) : {}, now: Date.now() }) || {}; }
+  catch (stageError) { if (stageError && stageError.logs) { FbmSync.stagePatchApply(state, { logs: stageError.logs }); } throw stageError; }
   FbmSync.stagePatchApply(state, out.patch);
   if (out.session && out.session.suspected) {
     var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);

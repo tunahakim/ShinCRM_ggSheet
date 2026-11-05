@@ -236,24 +236,6 @@ FbmSync.customerNext = function (state, page, total) {
   return true;
 };
 
-/** Đếm khách đã nhận trong lượt quét; tổng lấy ở trang đầu vì FBM chỉ đếm `TotalRowCount` ở trang đầu, trang sau trả 0 (Nghiên cứu FBM ch03 mục 3.3). */
-FbmSync.customerScanRecord = function (state, grid, firstPage) {
-  state.metadata = state.metadata || {};
-  var scope = firstPage && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
-  var scan = firstPage ? { total: Number(grid && grid.total || 0), seen: 0 } : (state.metadata.customerScan || { total: 0, seen: 0 });
-  if (scope && (scope.fbmNew || []).length) { scan.scopeUnseen = scope.fbmNew.slice(); }
-  scan.seen = Number(scan.seen || 0) + (grid && grid.rows ? grid.rows.length : 0);
-  // Mã chỉ định chưa có trên Sheet: FBM lọc `ma_kh in (...)` nên mã gõ sai trả về không dòng nào mà không báo lỗi; gạch dần các mã FBM có trả để cuối danh sách biết mã nào không có.
-  if ((scan.scopeUnseen || []).length && grid && grid.rows) {
-    var returned = {};
-    grid.rows.forEach(function (row) { returned[String(row.ma_kh || '').trim().toUpperCase()] = true; });
-    scan.scopeUnseen = scan.scopeUnseen.filter(function (code) { return !returned[String(code).trim().toUpperCase()]; });
-  }
-  state.metadata.customerScan = scan;
-  // Mẫu số tiến trình là số khách của lượt: FBM đã lọc theo phạm vi thử nên `TotalRowCount` chính là số mã thử.
-  if (firstPage) { state.progress = { done: 0, total: scan.total }; }
-};
-
 /** Tử số tiến trình: số khách đã xử lý xong (đã quét hết giao dịch, hoặc không có giao dịch để quét). */
 FbmSync.progressCustomersDone = function (state, count) {
   state.progress = state.progress || { done: 0, total: 0 };
@@ -265,32 +247,6 @@ FbmSync.finishPullRun = function (state) {
   FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
   return true;
-};
-
-/**
- * Hết danh sách toàn bộ khách. Chỉ xét khách vắng khi lượt đã nhận đủ số khách FBM báo ở trang đầu: lượt dừng sớm vì phân trang hỏng mà vẫn xét thì mọi khách chưa quét tới bị coi là vắng (gặp thật 2026-10-07: 1.262/1.312 khách).
- * Thiếu tổng hoặc nhận chưa đủ thì phiên kết thúc lỗi `FBM_SCAN_INCOMPLETE` trước cửa ghi, để Sidebar và Log đều thấy; chưa có gì được ghi vì danh sách khách chỉ đánh dấu.
- */
-FbmSync.customerScanEnd = function (state) {
-  var scan = state.metadata && state.metadata.customerScan || {}, total = Number(scan.total || 0), seen = Number(scan.seen || 0);
-  if (seen < total || (!total && seen > 0)) {
-    FbmSync.runFail(state, 'FBM_SCAN_INCOMPLETE', 'Lượt quét chỉ nhận ' + seen + '/' + (total || '?') + ' khách FBM nên đã dừng trước khi đọc chi tiết và chưa ghi gì. Báo người phụ trách kỹ thuật kiểm tra phân trang Customer.');
-    FbmSync.stateWrite(state);
-    return { ok: false, code: 'FBM_SCAN_INCOMPLETE', request: null, status: FbmSync.statusView(), error: state.lastError };
-  }
-  // Lượt đã đọc đủ danh sách toàn bộ khách: tổng này thành số khách mốc khi lượt đóng xong; lượt hỏng giữa chừng giữ mốc cũ.
-  state.metadata.customerTotal = total;
-  FbmSync.scopeUnseenNote(state, scan.scopeUnseen);
-  FbmSync.customerAbsentMark(state);
-  return FbmSync.activityStagesContinue(state, {});
-};
-
-/** Mã khách chỉ định mà danh sách khách FBM không trả về: cảnh báo ở kết quả phiên và ghi Log, phiên vẫn chạy cho các khách còn lại. */
-FbmSync.scopeUnseenNote = function (state, codes) {
-  if (!(codes || []).length) { return; }
-  var message = 'FBM không trả về khách nào có mã: ' + codes.join(', ') + '. Kiểm tra lại mã trong danh sách khách chỉ định (đủ ký tự, đúng tiền tố) hoặc quyền xem của tài khoản FBM.';
-  state.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat([{ code: 'FBM_SCOPE_CODE_NOT_ON_FBM', severity: 'warn', scope: 'fbm_sync', message: message, blocking: false }]);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'scope_code_not_on_fbm', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: message, detail: { codes: codes.slice() } }); }
 };
 
 /** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */
@@ -336,34 +292,6 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   FbmSync.finishPullRun(state);
   result.status = FbmSync.statusView();
   return result;
-};
-
-/**
- * Nhận một gói Customer của việc quét: chỉ đánh dấu khách vào danh sách đọc, không ghi Sheet; đánh dấu xong mới tăng cursor. Hết gói của trang thì xin trang kế đến khi đủ tổng FBM báo; hết trang thì sang cửa ghi.
- * Gói đầu của trang lưu dòng đầu; mỗi gói lưu khóa của dòng cuối, vì trang kế cần cả hai mà gói cuối có thể không còn dòng nào.
- */
-FbmSync.customerScanChunk = function (state, cursor, rawResponse) {
-  var accepted = FbmSync.scanJobAccept(state, cursor, rawResponse), grid;
-  if (accepted.result) { return accepted.result; }
-  var chunk = accepted.chunk;
-  // Gói không ghép được cột (thiếu cột, trùng cột) thì dừng phiên như gói lạ: không đoán cột theo vị trí, không ghi gì.
-  try { grid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(rawResponse)); } catch (shapeError) { return FbmSync.scanJobMismatch(state, String(shapeError && shapeError.message || shapeError)); }
-  var marked = FbmSync.customerScanMark(state, grid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); }));
-  FbmSync.customerScanRecord(state, { total: chunk.totalRowCount, rows: grid.rows }, Number(cursor.page || 0) === 0 && chunk.index === 0);
-  if (chunk.index === 0) { cursor.pageFirst = FbmSync.customerPageItem(grid.rows[0]); FbmSync.scanJobOversize(state, 'customer', chunk.oversize); }
-  if (grid.rows.length) { var lastRow = grid.rows[grid.rows.length - 1]; cursor.pageLast = FbmSync.customerPageItem(lastRow); cursor.pageLastValue = FbmSync.customerPageValue(lastRow); }
-  if (!FbmSync.scanJobAdvance(cursor, chunk)) {
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), marked: marked };
-  }
-  var scanTotal = Number(state.metadata.customerScan && state.metadata.customerScan.total || 0);
-  if (FbmSync.customerNext(state, { length: chunk.rowCount, firstItem: cursor.pageFirst || '', lastItem: cursor.pageLast || '', lastValue: cursor.pageLastValue || [] }, scanTotal)) {
-    cursor.page = Number(cursor.page || 0) + 1; cursor.attempt = 0; cursor.restarts = 0;
-    FbmSync.scanJobOpen(state, cursor);
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.scanJobRequest(state)), status: FbmSync.statusView(), marked: marked };
-  }
-  return FbmSync.customerScanEnd(state);
 };
 
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */
@@ -575,11 +503,13 @@ FbmSync.continueStep = function (rawResponse) {
     return { ok: true, request: FbmSync.nextEnvelope(customerRequest), status: FbmSync.statusView() };
   }
   // Danh sách toàn bộ khách đi bằng việc quét; kiểm tra liên kết vẫn đọc grid thường theo `stt_rec_kh`.
-  if (cursor.kind === 'scan_job') { return cursor.entity === 'activity' ? FbmSync.activityScanChunk(state, cursor, rawResponse) : FbmSync.customerScanChunk(state, cursor, rawResponse); }
+  if (cursor.kind === 'scan_job') { return FbmSync.activityScanChunk(state, cursor, rawResponse); }
   if (cursor.kind === 'customer_grid' && state.scan === 'identity_check') {
     var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
     state.metadata.customerFields = customerGrid.fields;
-    FbmSync.customerScanRecord(state, customerGrid, Number(cursor.pageIndex) < 0);
+    var identityFirstPage = Number(cursor.pageIndex) < 0;
+    state.metadata.customerScan = FbmSync.customerScanRecord(identityFirstPage ? null : state.metadata.customerScan, customerGrid.rows, customerGrid.total, null);
+    if (identityFirstPage) { state.progress = { done: 0, total: state.metadata.customerScan.total }; }
     FbmSync.identityCheckPage(state, eligibleCustomerRows);
     FbmSync.progressCustomersDone(state, customerGrid.rows.length);
     if (FbmSync.customerNext(state, FbmSync.customerPageOf(customerGrid.rows, true), customerGrid.total)) {
