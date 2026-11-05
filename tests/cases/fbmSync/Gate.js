@@ -44,6 +44,13 @@ async function chay(so) {
   check(so, 'Danh sách đọc: lượt hỏng giữa chừng thì lượt sau không còn mã và ghi chú "giao dịch chờ nối" của lượt cũ; khách đã đọc thêm lại không đổi danh sách; khách tạo dòng giữa lượt không bị coi là đã đánh dấu', [
     conLai, themLai, docTrongLuot(ds.local.customer[3]), F.readListNext(10)
   ], [[[], {}], 0, false, []]);
+  // Hàng chờ đọc dở quá trần byte: ném READ_WAIT_FULL, không ghi cắt bớt, hàng chờ cũ còn nguyên.
+  F.readWaitWrite({ 'FBM-C2': ['800001'] });
+  const hangDay = {};
+  for (let i = 0; i < 1000; i += 1) { hangDay['FBM-K' + i] = ['9' + String(i).padStart(5, '0')]; }
+  let loiDay = '';
+  try { F.readWaitWrite(hangDay); } catch (error) { loiDay = error.code; }
+  check(so, 'Hàng chờ giao dịch đọc dở quá trần byte: lỗi READ_WAIT_FULL, không ghi gì, hàng chờ cũ còn nguyên', [loiDay, F.readWaitRead()], ['READ_WAIT_FULL', { 'FBM-C2': ['800001'] }]);
 
   // Khách mới trong danh sách FBM: tạo dòng cùng giao dịch ở bước ghi của lô; trước đó không ghi Sheet lần nào.
   let ghiTruocLo = -1;
