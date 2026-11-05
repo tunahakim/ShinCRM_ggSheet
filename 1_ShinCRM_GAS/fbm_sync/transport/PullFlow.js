@@ -278,8 +278,8 @@ FbmSync.customerScanEnd = function (state) {
     FbmSync.stateWrite(state);
     return { ok: false, code: 'FBM_SCAN_INCOMPLETE', request: null, status: FbmSync.statusView(), error: state.lastError };
   }
-  // Số khách mốc của bước đếm chỉ ghi ở đây: lượt đã đọc đủ danh sách toàn bộ khách.
-  FbmSync.customerBaselineWrite(total);
+  // Lượt đã đọc đủ danh sách toàn bộ khách: tổng này thành số khách mốc khi lượt đóng xong; lượt hỏng giữa chừng giữ mốc cũ.
+  state.metadata.customerTotal = total;
   FbmSync.scopeUnseenNote(state, scan.scopeUnseen);
   FbmSync.customerAbsentMark(state);
   return FbmSync.activityStagesContinue(state, {});

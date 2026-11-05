@@ -79,6 +79,10 @@ FbmSync.runClose = function (state, verdict, detail) {
   state.activeRequestId = ''; state.deadlineAt = 0; state.current = '';
   // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.
   if (!failed) { state.cursor = {}; state.entity = ''; }
+  // Số khách mốc chỉ ghi khi lượt xong: lượt hỏng sau bước quét khách mà vẫn ghi thì lần đếm sau thấy khớp và bỏ quét, khách chưa đọc bị bỏ qua. Ghi xong xóa để lần đóng lượt kế (đuôi đếm khách) không ghi lại.
+  var customerTotal = state.metadata && state.metadata.customerTotal;
+  if (spec.phase === 'done' && typeof customerTotal === 'number') { FbmSync.customerBaselineWrite(customerTotal); }
+  if (state.metadata) { delete state.metadata.customerTotal; }
   if (extra.cursor) { state.cursor = extra.cursor; }
   state.phase = spec.phase;
   state.message = message;
