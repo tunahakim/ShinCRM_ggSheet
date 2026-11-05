@@ -9,8 +9,11 @@ function loi(fn) {
 /** Hộp có khóa script giả bật/tắt được và Log gom theo thứ tự; lượt tay đọc đã mở sẵn (request đầu đang bay). */
 function hopCoLuot(origin) {
   const khoa = { ban: false, tryLock() { return !this.ban; }, releaseLock() {} };
-  const logs = [];
-  const { hop, documentProperties } = workflowGas({ LockService: { getScriptLock: () => khoa }, logEvent: (line) => logs.push(line), LOG_WARN: 'warn' });
+  const logs = [], ref = {};
+  // Nhãn lượt lấy đúng lúc gọi logEvent như LogGate thật, để bắt dòng ghi sau khi lượt đã đóng.
+  const logEvent = (line) => logs.push(Object.assign({ luot: ref.F ? ref.F.logContextText() : '' }, line));
+  const { hop, documentProperties } = workflowGas({ LockService: { getScriptLock: () => khoa }, logEvent, LOG_WARN: 'warn' });
+  ref.F = hop.FbmSync;
   const F = hop.FbmSync;
   F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
@@ -96,6 +99,12 @@ async function chay(so) {
   // Gặp khi nghiệm thu 2026-11-01: lượt tay mở ngay sau lượt nền Quét nhanh chỉ mang nhãn "Tay" vì ô lượt còn chuỗi nền cũ.
   tayNhan.F.statePatch({ chain: { current: 'customerFull' } });
   check(so, 'lượt tay mở khi ô lượt còn chuỗi nền Quét nhanh vẫn ghi tên kiểu quét', tayNhan.F.runOpen({ origin: 'manual', scan: 'full' }).runLabel, 'Tay · Quét nhanh');
+
+  // Gặp khi nghiệm thu B4: dòng transport_failure ghi sau khi lượt đã đóng nên mất nhãn lượt.
+  const hongDuong = hopCoLuot(), nhanHong = hongDuong.F.stateRead().runLabel;
+  hongDuong.F.transportFailureRun({ requestId: hongDuong.F.stateRead().activeRequestId, code: 'FBM_FETCH_TIMEOUT', message: 'Hết giờ.' });
+  const dongHong = hongDuong.logs.filter((line) => line.action === 'transport_failure')[0] || {};
+  check(so, 'hỏng đường truyền giữa lượt: dòng transport_failure mang nhãn lượt, lượt đóng lỗi', [dongHong.luot, hongDuong.F.stateRead().phase], [nhanHong, 'error']);
 
   // Lượt chết (Extension im giữa lượt): status chỉ báo kẹt, không ghi; lần bấm Đồng bộ kế đóng lượt cũ rồi mở lượt mới.
   const ket = hopCoLuot();

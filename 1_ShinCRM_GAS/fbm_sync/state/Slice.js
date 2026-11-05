@@ -132,12 +132,13 @@ FbmSync.transportFailureRun = function (payload) {
   }
   if (recovered) { return recovered; }
   state.lastProgressAt = Date.now();
+  // Ghi Log khi lượt còn mở để dòng mang nhãn lượt; đóng lượt trước thì nhãn rơi về kênh gọi.
+  FbmSync.sessionGateRecordFailure(state, failureCode, failureMessage, 'transport_failure');
   if (FbmSync.runInProgress(state)) {
     FbmSync.runFail(state, failureCode, failureMessage, { cursor: {} });
   } else {
     Object.assign(state, { activeRequestId: '', deadlineAt: 0, lastFailureCode: failureCode, retryable: false, lastError: failureMessage, message: failureMessage, cursor: {}, phase: 'error' });
   }
   FbmSync.stateWrite(state);
-  FbmSync.sessionGateRecordFailure(state, failureCode, failureMessage, 'transport_failure');
   return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
 };
