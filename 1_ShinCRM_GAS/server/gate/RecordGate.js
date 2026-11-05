@@ -18,14 +18,23 @@ function recordGateRun(req) {
   if (typeof (req && req.decide) !== 'function') { throw new Error('Cửa bản ghi cần `decide`: hàm quyết chạy trong khóa trên bản đọc mới.'); }
 
   return documentLockRun(function () {
-    var holds = recordHoldsRead();
+    var holds = recordHoldsRead(), seen = {};
     var gate = {
-      read: function (entity, schemas) { return entityBlockRecords(entityReadAllCombined(entity, schemas)); },
-      readById: function (entity, schemas, id) { return entityBlockRecords(entityReadRecordById(entity, schemas, id))[0] || null; },
+      read: function (entity, schemas) {
+        var records = entityBlockRecords(entityReadAllCombined(entity, schemas));
+        seen[entity] = true;
+        return records;
+      },
+      readById: function (entity, schemas, id) {
+        var record = entityBlockRecords(entityReadRecordById(entity, schemas, id))[0] || null;
+        if (seen[entity] !== true) { (seen[entity] = seen[entity] || {})[String(id === null || id === undefined ? '' : id).trim()] = true; }
+        return record;
+      },
       busy: function (entity, ids) { return recordHoldsBusy(holds, by, entity, ids); }
     };
     var plan = req.decide(gate) || {};
     var saves = recordGateList(plan.save, 'save'), removes = recordGateList(plan.remove, 'remove');
+    recordGateAssertReadInLock(seen, by, saves);
     var next = recordHoldsApply(holds, by, req.run, recordGateList(plan.hold, 'hold'), recordGateList(plan.release, 'release'), new Date().toISOString());
     recordGateAssertFree(holds, by, saves, removes);
 
@@ -47,12 +56,12 @@ function recordGateRun(req) {
 }
 
 /**
- * Nhả mọi bản ghi chủ `by` đang giữ, trừ `keep` (`["entity:mã"]`): đường thu hồi khi lượt mới bắt đầu, khi hủy lượt hoặc khi lượt cũ chết. Sổ không có mục nào của chủ đó thì không lấy khóa (xem `recordHoldsPeekOwner` về điều kiện đúng).
+ * Nhả mọi bản ghi chủ `by` đang giữ, trừ `keep` (`["entity:mã"]`): đường thu hồi khi lượt mới bắt đầu, khi hủy lượt hoặc khi lượt cũ chết. Đọc sổ, xét chủ và ghi trong cùng một lần cầm khóa; sổ không có mục nào của chủ đó thì không ghi gì và trả `false`.
  */
 function recordGateReleaseOwner(by, keep) {
-  if (!recordHoldsPeekOwner(by)) { return false; }
   return documentLockRun(function () {
     var holds = recordHoldsRead();
+    if (!recordHoldsHasOwner(holds, by)) { return false; }
     return recordHoldsWrite(holds, recordHoldsWithoutOwner(holds, by, keep));
   });
 }
@@ -64,6 +73,22 @@ function recordGateList(list, name) {
     if (!item || !item.entity) { throw new Error('Hàm quyết trả một mục `' + name + '` thiếu `entity`.'); }
   });
   return list;
+}
+
+/**
+ * Lần sửa bản ghi đã có của nguồn máy phải dựa trên bản đọc trong chính lần cầm khóa này (`gate.read` cả thực thể hoặc `gate.readById` đúng mã): cửa ghi chỉ kiểm xung đột của nguồn máy khi có ảnh chụp người dùng, nên ghi theo bản đọc mang từ ngoài khóa vào là đường ghi đè thay đổi người khác vừa lưu. Nguồn `user` đã bắt buộc giá trị lúc mở form ở cửa ghi.
+ */
+function recordGateAssertReadInLock(seen, by, saves) {
+  var unread = [];
+  saves.forEach(function (item) {
+    if (String(item.source || 'user') === 'user') { return; }
+    var read = seen[item.entity];
+    (Array.isArray(item.records) ? item.records : []).forEach(function (record) {
+      var id = String(record && record.id || '').trim();
+      if (id && read !== true && !(read && read[id])) { unread.push(item.entity + ':' + id); }
+    });
+  });
+  if (unread.length) { throw new Error('Hàm quyết của "' + by + '" sửa bản ghi chưa đọc trong lần cầm khóa này: ' + unread.join(', ') + '. Không ghi gì; đọc bản ghi qua `gate.read`/`gate.readById` rồi mới quyết.'); }
 }
 
 function recordGateAssertFree(holds, by, saves, removes) {

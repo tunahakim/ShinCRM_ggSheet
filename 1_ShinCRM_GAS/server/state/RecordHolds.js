@@ -23,11 +23,8 @@ function recordHoldsRead() {
   return recordHoldsLoad();
 }
 
-/**
- * Nhìn sổ khi chưa cầm khóa, chỉ để biết có cần lấy khóa hay không. Chỉ đúng cho chủ mà mỗi lúc chỉ có một lượt chạy (đồng bộ FBM, nhờ khóa điều phối): không ai khác ghi mục của chủ đó, nên "không có mục" đọc ngoài khóa vẫn đúng lúc cầm khóa.
- */
-function recordHoldsPeekOwner(by) {
-  var holds = recordHoldsLoad();
+/** Hàm thuần: sổ có mục nào của chủ `by` không. */
+function recordHoldsHasOwner(holds, by) {
   return Object.keys(holds).some(function (key) { return holds[key] && holds[key].by === by; });
 }
 

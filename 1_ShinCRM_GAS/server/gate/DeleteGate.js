@@ -1,7 +1,7 @@
 /**
  * Cửa xóa: một hành động Xóa của người dùng, hai kết cục do hệ thống quyết. Tài liệu 06 Phần 5.
  *
- * **Xóa hẳn** là xóa dòng khỏi sheet, không để lại dấu vết. **Xóa mềm** là đặt `recordStatus` thành `deleted` và giữ dòng lại. Chọn đường nào thì hỏi đúng một điểm cắm là `beforeHardDelete(entity, ids)` cho cả danh sách mã; vắng điểm cắm thì luôn xóa hẳn. Lõi không bao giờ biết tầng bên kia là cái gì, nó chỉ nhận lý do giữ lại rồi đưa cho người dùng đọc `[RÀNG BUỘC CỨNG]`.
+ * **Xóa hẳn** là xóa dòng khỏi sheet, không để lại dấu vết. **Xóa mềm** là đặt `recordStatus` thành `deleted` và giữ dòng lại. Chọn đường nào thì hỏi đúng một điểm cắm là `beforeHardDelete(entity, ids)` cho cả danh sách mã; điểm cắm vắng hoặc hỏng thì mọi mã chỉ bị xóa mềm. Lõi không bao giờ biết tầng bên kia là cái gì, nó chỉ nhận lý do giữ lại rồi đưa cho người dùng đọc `[RÀNG BUỘC CỨNG]`.
  *
  * Cửa này là người điều phối, không tự chạm Sheet: biết mã nào còn qua `entityPresentIds`, xóa mềm qua tiến trình ghi `writeGateApply` (xóa mềm là một lượt ghi), xóa hẳn qua `entityDeleteRecords`. Không công cụ nào nhận số dòng, nên thứ tự xóa mềm – xóa hẳn không làm sai dòng; xóa mềm đứng trước chỉ để lần tra mã của xóa hẳn còn dùng được cột mã đã đọc.
  *
@@ -12,16 +12,18 @@
 var DELETE_GATE_SOURCE = 'core';
 
 /**
- * Hỏi điểm cắm một lần cho cả danh sách mã: trả `{ mã: lý do }` của những mã phải giữ lại (xóa mềm). Vắng điểm cắm thì không giữ mã nào.
+ * Hỏi điểm cắm một lần cho cả danh sách mã: trả `{ mã: lý do }` của những mã phải giữ lại (xóa mềm). Mã không có trong câu trả lời là được xóa hẳn.
  *
- * Điểm cắm ném lỗi thì **giữ lại mọi mã** và ghi Log mức lỗi, không coi như được phép. Một module đồng bộ hỏng phải dẫn tới giữ dòng lại, chứ không dẫn tới xóa mất dòng: giữ lại thì sửa được, xóa rồi thì không.
+ * Quyền xóa hẳn chỉ đến từ câu trả lời của điểm cắm. Điểm cắm vắng (gọi thẳng nên vắng là lỗi tham chiếu), ném lỗi hay trả sai hình dạng thì **giữ lại mọi mã** và ghi Log mức lỗi: thiếu người gác không được hiểu là cổng mở. Giữ lại thì sửa được, xóa rồi thì không.
  */
 function deleteGateAskHook(entity, ids) {
-  if (!ids.length || typeof beforeHardDelete !== 'function') { return {}; }
+  if (!ids.length) { return {}; }
 
   var reasons = {};
   try {
-    var soft = (beforeHardDelete(entity, ids) || {}).soft || {};
+    var answer = beforeHardDelete(entity, ids);
+    var soft = answer && answer.soft;
+    if (!soft || typeof soft !== 'object' || Array.isArray(soft)) { throw new Error('điểm cắm trả sai hình dạng (cần `{ soft: { mã: lý do } }`)'); }
     ids.forEach(function (id) {
       if (Object.prototype.hasOwnProperty.call(soft, id)) { reasons[id] = String(soft[id] || 'Một tầng khác đang cần bản ghi này.'); }
     });

@@ -196,7 +196,10 @@ function fbmScopeDefaultCustomer() {
   return { ok: true, scope: fbmDevSetTestCodes(FBM_DEV_DEFAULT_TEST_CODES) };
 }
 
-/** Ghi dữ liệu thử qua Cửa bản ghi với chủ `fbm`: dữ liệu thử đặt thẳng giá trị đã biết, không cần đọc lại dòng. Chỉ DEV. */
+/** Ghi dữ liệu thử qua Cửa bản ghi; cửa buộc nguồn máy đọc trong khóa trước khi sửa. Chỉ DEV. */
 function fbmFixtureSave(entity, records, source) {
-  return FbmSync.recordChange(function () { return { save: [{ entity: entity, records: records, source: source }] }; }).saves[0];
+  return FbmSync.recordChange(function (gate) {
+    gate.read(entity, FbmSync.recordSchemas());
+    return { save: [{ entity: entity, records: records, source: source }] };
+  }).saves[0];
 }
