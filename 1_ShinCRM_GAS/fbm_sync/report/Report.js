@@ -227,8 +227,7 @@ FbmSync.previewRecords = function (entity, records) {
     }
   });
   if (target.length === before) { return preview; }
-  // Đếm byte UTF-8 (kho tính theo byte, chữ có dấu chiếm 2–3 byte).
-  var bytes = function () { return encodeURIComponent(JSON.stringify(preview)).replace(/%[0-9A-F]{2}/g, 'x').length; };
+  var bytes = function () { return FbmSync.documentPropertyBytes(JSON.stringify(preview)); };
   while (bytes() > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT && (preview.activities.length || preview.customers.length)) { preview.truncated = true; (preview.activities.length ? preview.activities : preview.customers).pop(); }
   FbmSync.documentPropertySet(FbmSync.PREVIEW_KEY, JSON.stringify(preview), 'preview');
   return preview;

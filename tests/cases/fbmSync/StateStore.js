@@ -24,6 +24,12 @@ function kiemKhoTrangThai(so) {
   check(so, 'DocumentProperties đầy giữ nguyên state cũ, không ghi dở JSON; cổng kho ném lỗi có mã kèm khóa hỏng, không tự ghi Log',
     [loiDay && loiDay.code, nen.props.FBM_SYNC_STATE_V1 === truoc, loiDay && loiDay.detail.property, docLog(nen, { flush: true }).length], ['FBM_DOCUMENT_PROPERTIES_QUOTA', true, 'FBM_SYNC_STATE_V1', 0]);
 
+  const mocLoi = (i) => Object.assign(F.traceContext({ runId: 'r-trace' }, { error: 'Lỗi giao thức Extension có dấu tiếng Việt '.repeat(20), stack: 'tại hàm xử lý đồng bộ '.repeat(80) }), { at: 1000 + i, stage: 'relay_error_' + i });
+  for (let i = 0; i < F.TRACE_LIMIT; i += 1) { F.traceStore([mocLoi(i)]); }
+  const hopDen = JSON.parse(nen.props.FBM_SYNC_TRACE_V1);
+  check(so, 'hộp đen toàn mốc lỗi có stack dài vẫn ghi được: bỏ mốc cũ nhất cho tới khi vừa một khóa, mốc mới nhất luôn còn',
+    [F.documentPropertyBytes(nen.props.FBM_SYNC_TRACE_V1) <= F.DOCUMENT_PROPERTY_VALUE_LIMIT, hopDen.length < F.TRACE_LIMIT, hopDen.length > 1, hopDen[hopDen.length - 1].stage], [true, true, true, 'relay_error_' + (F.TRACE_LIMIT - 1)]);
+
   F.stateWrite({ runId: 'r-push', phase: 'push', cursor: { kind: 'push_wait' } });
   let loiDong = null;
   try { F.stateWrite(Object.assign(F.stateRead(), { phase: 'error', lastError: 'Lỗi khi ghi FBM', message: 'Lỗi khi ghi FBM', metadata: { customerErrors: phinh } })); } catch (err) { loiDong = err; }

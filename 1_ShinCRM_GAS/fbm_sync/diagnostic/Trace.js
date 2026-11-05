@@ -40,7 +40,7 @@ FbmSync.traceAppend = function (events) {
   return added;
 };
 
-/** Gộp sự kiện vào khóa trace trong kho, bỏ trùng với dòng đã có. Ghi hỏng thì ném lỗi có mã; ghi Log là việc của `runEntryPoint` khi đóng lời gọi. */
+/** Gộp sự kiện vào khóa trace, bỏ trùng. Trần theo số mốc và byte thật (mốc lỗi mang stack): bỏ mốc cũ nhất tới khi vừa. Ghi hỏng thì ném; Log do `runEntryPoint` ghi. */
 FbmSync.traceStore = function (events) {
   if (!Array.isArray(events) || !events.length) { return 0; }
   var rows = documentMemoRead(FbmSync.props(), FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [], seen = {}, added = 0;
@@ -49,7 +49,9 @@ FbmSync.traceStore = function (events) {
     if (!event || !event.stage || seen[FbmSync.traceKey(event)]) { return; }
     seen[FbmSync.traceKey(event)] = true; rows.push(event); added += 1;
   });
-  if (added) { FbmSync.documentPropertySet(FbmSync.TRACE_KEY, JSON.stringify(rows.slice(-FbmSync.TRACE_LIMIT)), 'trace'); }
+  if (!added) { return 0; }
+  for (rows = rows.slice(-FbmSync.TRACE_LIMIT); rows.length > 1 && FbmSync.documentPropertyBytes(JSON.stringify(rows)) > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT;) { rows.shift(); }
+  FbmSync.documentPropertySet(FbmSync.TRACE_KEY, JSON.stringify(rows), 'trace');
   return added;
 };
 
@@ -62,8 +64,7 @@ FbmSync.traceEvent = function (state, stage, extra) {
 };
 
 FbmSync.traceRead = function (limit) {
-  var rows = [], take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT));
-  rows = documentMemoRead(FbmSync.props(), FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [];
+  var take = Math.max(1, Math.min(Number(limit || 20), FbmSync.TRACE_LIMIT)), rows = documentMemoRead(FbmSync.props(), FbmSync.TRACE_KEY, 'nhật ký trace đồng bộ', 'array') || [];
   // Sự kiện còn gom trong bộ nhớ của lần gọi này cũng phải hiện ở status, nếu không Sidebar thấy trace trễ một lần gọi.
   if (FbmSync.propertyBuffer && FbmSync.propertyBuffer.tracePending.length) { rows = rows.concat(FbmSync.propertyBuffer.tracePending); }
   return rows.slice(-take);

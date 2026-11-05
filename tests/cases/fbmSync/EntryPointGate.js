@@ -65,7 +65,7 @@ async function chay(so) {
   });
   check(so, 'request quá hạn bị bỏ: cửa ghi ô lượt chỉ ghi phát hiện, dòng Log request_unanswered do lúc đóng lời gọi ghi, đúng một lần', [closed.pending, closed.logged, logs.filter((entry) => entry.action === 'request_unanswered').length, close.hop.FbmSync.requestWatch.findings.length], [1, 0, 1, 0]);
   const traceTrace = [];
-  close.hop.FbmSync.documentPropertySet = (key, value, context) => { if (context !== 'trace') { return; } traceTrace.push(key); const err = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.'); err.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; err.detail = { property: key, context: context }; throw err; };
+  close.hop.FbmSync.documentPropertySet = (key, value, context) => { if (context !== 'trace') { return; } traceTrace.push(key); const err = new Error('Không thể lưu state đồng bộ: giá trị khóa quá cỡ.'); err.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; err.detail = { property: key, context: context }; throw err; };
   logs.length = 0;
   const traced = close.hop.runEntryPoint('thuTraceHong', 'fbm_sync', () => ({ ok: true }));
   const traceLine = logs.find((entry) => entry.action === 'thuTraceHong') || {};

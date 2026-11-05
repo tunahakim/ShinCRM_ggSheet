@@ -37,14 +37,14 @@ FbmSync.runDoneMessage = function (state) {
 };
 FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, transferredCustomer: 0, transferredActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
-// Apps Script giới hạn một giá trị DocumentProperties khoảng 9 KB: chặn trước khi gọi setProperty để không đẩy một JSON dở dang vào kho.
-// Ghi hỏng thì ném lỗi có mã kèm `detail`; không tự ghi Log và không trả kết quả để bên gọi bỏ qua: người điều phối bắt được lỗi thì ghi Log, không bắt thì `runEntryPoint` ghi.
+// Apps Script giới hạn MỘT giá trị DocumentProperties khoảng 9 KB (byte UTF-8): chặn trước setProperty để không ghi JSON dở. Ghi hỏng thì ném lỗi có mã kèm `detail`, không tự ghi Log, không trả kết quả cho bên gọi bỏ qua.
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
+FbmSync.documentPropertyBytes = function (text) { return Utilities.newBlob(String(text)).getBytes().length; };
 FbmSync.documentPropertySet = function (key, value, context) {
-  var text = String(value === null || value === undefined ? '' : value), bytes = Utilities.newBlob(text).getBytes().length, failure;
+  var text = String(value === null || value === undefined ? '' : value), bytes = FbmSync.documentPropertyBytes(text), failure;
   var detail = { property: String(key || ''), bytes: bytes, context: String(context || '') };
   if (bytes > FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT) {
-    failure = new Error('Không thể lưu state đồng bộ vì DocumentProperties đã chạm giới hạn dung lượng.');
+    failure = new Error('Không lưu được khóa "' + key + '": ' + bytes + ' byte, quá giới hạn một khóa DocumentProperties.');
     failure.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA';
   } else {
     try { FbmSync.props().setProperty(key, text); return; } catch (err) { detail.error = String(err && err.message || err); }
