@@ -8,34 +8,38 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '' }) }
   });
-  napServer(auditPull, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(auditPull, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
   const activityIssueLogs = [];
   auditPull.logEvent = (event) => activityIssueLogs.push(event);
   auditPull.FbmSync.stateRead = () => ({ runId: 'RUN-AUDIT' });
-  auditPull.FbmSync.linkActivityCustomers([{ fbmId: 'ACT-ORPHAN', customerFbmCode: 'ALT-MISSING' }], []);
+  auditPull.FbmSync.linkActivityCustomers([{ fbmId: 'ACT-ORPHAN', customerFbmCode: 'ALT-MISSING' }], [], { map: {} });
   const logsBeforeFlush = activityIssueLogs.length;
   auditPull.FbmSync.recordIssuesFlush();
   const orphanEntries = activityIssueLogs.filter((event) => event.action === 'pull_record_issue');
   check(so, 'Activity pull bỏ qua vì thiếu Customer cha: không ghi Log giữa lát, flush ra đúng một dòng có Activity ID và lý do', [logsBeforeFlush, orphanEntries.length, orphanEntries[0] && orphanEntries[0].recordId, orphanEntries[0] && orphanEntries[0].entity, orphanEntries[0] && orphanEntries[0].cycleId, /Customer cha/.test(orphanEntries[0] && orphanEntries[0].reason)], [0, 1, 'ACT-ORPHAN', 'activity', 'RUN-AUDIT', true]);
 
   const audit = taoHopCat({ FbmSync: {}, LOG_OK: 'ok', LOG_ERROR: 'error', FbmSyncLog: [] });
-  napServer(audit, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/report/Probe.js');
+  napServer(audit, 'fbm_sync/schema/FbmFields.js', 'server/dev/AltProbe.js');
   audit.FbmSync.stateRead = () => ({ mode: 'read', phase: 'done', runId: 'run-1' });
-  audit.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmId: 'A1', companyName: 'Test', fbmHash: 'h-cus' }] : [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1', workDate: '2026-09-09', fbmHash: 'h-act' }];
+  let auditActivities = [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1', customerFbmCode: 'ALT00010', workDate: '2026-09-09', fbmHash: 'h-act' }];
+  audit.FbmSync.localScan = () => ({ records: (entity) => entity === 'customer' ? [{ id: 'CUS-1', fbmCustomerCode: 'ALT00010', fbmId: 'A1', companyName: 'Test', fbmHash: 'h-cus' }] : auditActivities });
   audit.FbmSync.runPreflight = () => ({ ok: true, issues: [], blocking: [] });
   audit.logEvent = (event) => audit.FbmSyncLog.push(event);
   audit.flushLog = () => {};
   const auditResult = audit.fbmAuditAltState();
   check(so, 'nghiệm thu ALT00010 có case PASS', auditResult.ok, true);
   check(so, 'nghiệm thu ghi từng case vào Log', audit.FbmSyncLog.length >= 6, true);
+  // Giao dịch cũng mang `customerFbmCode`: đoán loại theo trường đó từng xét Giao dịch như Khách và bỏ lọt mã khách TMP- của nó.
+  auditActivities = [{ id: 'ACT-1', fbmId: '7', customerId: 'CUS-1', customerFbmCode: 'TMP-CUS-1', workDate: '2026-09-09', fbmHash: 'h-act' }];
+  const tmpCase = audit.fbmAuditAltState().cases.filter((item) => /TMP-/.test(item.name))[0];
+  check(so, 'nghiệm thu ALT00010 bắt Giao dịch mang mã khách TMP- (xét theo loại danh sách, không đoán theo trường)', tmpCase && tmpCase.status, 'FAIL');
   const probe = taoHopCat({ FbmSync: {} });
-  napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Probe.js');
+  napServer(probe, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'server/dev/AltProbe.js');
   probe.FbmSync.scope = () => ({ codes: ['CUS-ALT'], fbm: [], shin: ['CUS-ALT'], notFound: [] });
-  probe.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }]
-    : [];
-  probe.FbmSync.pushCandidates = (entity) => entity === 'customer' ? [{ entity: 'customer', kind: 'edit', id: 'CUS-OTHER', record: { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' } }] : [];
+  const probeScan = { records: (entity) => entity === 'customer' ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }] : [] };
+  probe.FbmSync.localScan = () => probeScan;
+  probe.FbmSync.pushCandidates = (entity, scan) => scan === probeScan && entity === 'customer' ? [{ entity: 'customer', kind: 'edit', id: 'CUS-OTHER', record: { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' } }] : [];
   const blocked = probe.fbmProbeAltState();
   check(so, 'probe ALT00010 fail-closed khi co ung vien ngoai pham vi', [blocked.ok, blocked.scopeViolations.length, blocked.writesToFbm, blocked.deletesToFbm], [false, 1, 0, 0]);
 }

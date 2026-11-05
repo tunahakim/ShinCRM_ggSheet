@@ -12,7 +12,7 @@ async function chay(so) {
   // Fixture chỉ chạy offline; không gửi request hoặc ghi dữ liệu FBM thật.
   section('FBM sync - protocol, fingerprint va ba chieu');
   const hop = taoHopCat({ FbmSync: {} });
-  napServer(hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
 
   const parsed = hop.FbmSync.protocol.parse('{"d":{"Bugs":{"FieldName":"x","Message":"bad"}}}');
   check(so, 'body Login.aspx voi HTTP 200 bi nhan la het phien', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<html><form action="Login.aspx"><input name="username"></form></html>' }), true);
@@ -35,7 +35,7 @@ async function chay(so) {
   const lookupPayload = hop.FbmSync.lookupPayload({ d: { TotalRowCount: 1, Rows: [['GD', 'Gọi điện chăm sóc']] } });
   check(so, 'lookup giu object Rows de doi chieu Category', [Array.isArray(lookupPayload.Rows), hop.FbmSync.lookupPairs({ d: lookupPayload }).GD], [true, 'Gọi điện chăm sóc']);
   const mappings = taoHopCat({ FbmSync: {} });
-  napServer(mappings, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js');
+  napServer(mappings, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js');
   const rows = [
     { source: '@CAT_TINH_THANH', value: 'Hà Nội', companion: 'HNI. Hà Nội # | HN. Hà Nội cũ' },
     { source: '@CAT_TINH_THANH', value: 'Hà Nội văn phòng', companion: 'HNI. Hà Nội #' }
@@ -45,14 +45,14 @@ async function chay(so) {
   check(so, 'nhieu gia tri ShinCRM cung anh xa mot ma FBM', map['@CAT_TINH_THANH\u001fHà Nội văn phòng'], 'HNI');
 
   const fbm = { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Test', ma_so_thue: '001', ong_ba: 'A', dien_thoai: '0123', email: '', dc_lh: 'HN', dc_lh_tinh: 'HNI', nguon_dm: 'X', ghi_chu: 'a\r\nb' };
-  const same = hop.FbmSync.customerRecord(fbm);
-  const local = Object.assign({}, same, { id: 'CUS-1' });
-  check(so, 'hash FBM va local dung cung khong gian', hop.FbmSync.hash(fbm, 'customer'), hop.FbmSync.hash(local, 'customer'));
-  check(so, 'doi dinh danh FBM khong bi coi la doi noi dung Customer', hop.FbmSync.hash(Object.assign({}, fbm, { stt_rec_kh: 'A2', ma_kh: 'ALT00011' }), 'customer'), hop.FbmSync.hash(fbm, 'customer'));
-  check(so, 'ba chieu khong doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, local, same, 'customer').unchanged, true);
-  check(so, 'ba chieu bat conflict hai phia', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, Object.assign({}, local, { companyName: 'shin' }), Object.assign({}, same, { companyName: 'fbm' }), 'customer').conflict, true);
-  check(so, 'chi Shin thay doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, Object.assign({}, local, { companyName: 'shin' }), same, 'customer').shinChanged, true);
-  check(so, 'chi FBM thay doi', hop.FbmSync.threeWay({ hBASE: same.fbmHash }, local, Object.assign({}, same, { companyName: 'fbm' }), 'customer').fbmChanged, true);
+  const gate0 = { map: {} }, same = hop.FbmSync.customerRecord(fbm, gate0);
+  const local = Object.assign({}, same, { id: 'CUS-1' }), hc = (r) => hop.FbmSync.hash(r, 'customer', gate0);
+  check(so, 'hash FBM va local dung cung khong gian', hop.FbmSync.hash(fbm, 'customer', gate0), hop.FbmSync.hash(local, 'customer', gate0));
+  check(so, 'doi dinh danh FBM khong bi coi la doi noi dung Customer', hop.FbmSync.hash(Object.assign({}, fbm, { stt_rec_kh: 'A2', ma_kh: 'ALT00011' }), 'customer', gate0), hop.FbmSync.hash(fbm, 'customer', gate0));
+  check(so, 'ba chieu khong doi', hop.FbmSync.threeWay(same.fbmHash, hc(local), hc(same)).unchanged, true);
+  check(so, 'ba chieu bat conflict hai phia', hop.FbmSync.threeWay(same.fbmHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(Object.assign({}, same, { companyName: 'fbm' }))).conflict, true);
+  check(so, 'chi Shin thay doi', hop.FbmSync.threeWay(same.fbmHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(same)).shinChanged, true);
+  check(so, 'chi FBM thay doi', hop.FbmSync.threeWay(same.fbmHash, hc(local), hc(Object.assign({}, same, { companyName: 'fbm' }))).fbmChanged, true);
   check(so, 'parse malformed tra loi co cau truc', !!hop.FbmSync.protocol.parse('{').parseError, true);
 }
 

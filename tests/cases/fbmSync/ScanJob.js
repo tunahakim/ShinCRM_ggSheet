@@ -186,7 +186,7 @@ async function chay(so) {
   let missingTenCv = '';
   try { FF.validateGridFields('customer', scanCols.filter((field) => field !== 'ten_cv')); } catch (error) { missingTenCv = error.message; }
   check(so, 'Cột việc quét Customer đủ cho hash: hash dòng đã chiếu cột bằng hash dòng đầy đủ; thiếu ten_cv thì validateGridFields dừng', [
-    FF.hash(projected, 'customer', {}) === FF.hash(fullRecord, 'customer', {}), FF.validateGridFields('customer', scanCols), missingTenCv
+    FF.hash(projected, 'customer', { map: {} }) === FF.hash(fullRecord, 'customer', { map: {} }), FF.validateGridFields('customer', scanCols), missingTenCv
   ], [true, true, 'FBM thiếu metadata AliasName: ten_cv']);
 
   // Executor: 3.000 dòng có dấu tiếng Việt (UTF-8 nhiều byte) phải thành nhiều gói, mỗi gói đã serialize không vượt trần; dòng không bị cắt đôi, đúng thứ tự, FBM chỉ bị gọi một lần.

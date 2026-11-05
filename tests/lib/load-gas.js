@@ -25,7 +25,8 @@ const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
 function taoHopCat(stubs) {
   // `Utilities` có sẵn vì chỉ là hàm thuần (độ dài byte, mã ngẫu nhiên); mã GAS gọi thẳng, không dò sự có mặt của nó.
   const utilities = { newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }), getUuid: () => 'test-uuid-' + (++utilities.seq), seq: 0 };
-  const hopCat = Object.assign({ console: console, Utilities: utilities }, stubs || {});
+  // `Session` chỉ có múi giờ script, cùng múi với dự án: biên giới ngày `dateToText` hỏi nó để chọn đường nhanh.
+  const hopCat = Object.assign({ console: console, Utilities: utilities, Session: { getScriptTimeZone: () => 'Asia/Ho_Chi_Minh' } }, stubs || {});
   // Khóa điều phối giả mặc định (luôn lấy được); ca cần thử nhánh bận tự truyền `LockService`.
   // Hạn chờ khóa của GAS thật; ca cần số khác tự truyền `SETTINGS`.
   if (!hopCat.SETTINGS) { hopCat.SETTINGS = { LOCK_WAIT_MS: 15000 }; }
@@ -153,6 +154,8 @@ function napServer(hopCat, ...danhSach) {
   if (typeof hopCat.sheetReadHeader !== 'function') {
     TEP_TANG_SHEET.filter((tep) => duongDans.indexOf(tep) < 0).forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep }));
   }
+  // Ngày của đồng bộ đổi sang chữ qua biên giới ngày duy nhất của lõi, như bản thật.
+  if (duongDans.some((duongDan) => duongDan.indexOf('fbm_sync/') === 0) && typeof hopCat.dateToText !== 'function' && duongDans.indexOf('server/util/DateText.js') < 0) { vm.runInContext(docTep('server/util/DateText.js'), hopCat, { filename: 'server/util/DateText.js' }); }
   // Công tắc, ngưỡng, phạm vi và nhịp của đồng bộ đọc qua cổng cài đặt, nên mọi hộp nạp tệp `fbm_sync` cần cổng và phần cài đặt của đồng bộ, như bản thật.
   if (duongDans.some((duongDan) => duongDan.indexOf('fbm_sync/') === 0) && typeof hopCat.settingsValues !== 'function') {
     // Hàm giả test đã gắn vào hộp trước đó thắng bản thật của tệp nạp kèm, như khi test gắn giả sau khi nạp.

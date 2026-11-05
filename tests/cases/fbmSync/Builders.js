@@ -8,7 +8,7 @@ async function chay(so) {
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
     PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '' }) }
   });
-  napServer(builders, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(builders, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
 
@@ -24,9 +24,9 @@ async function chay(so) {
   check(so, 'Activity tạo mới dùng type lưu form', activity.body.type, 1);
   check(so, 'Activity sửa mở form dùng type đọc form', builders.FbmSync.activityEditOpenRequest('174813').body.type, 0);
   check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
-  const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A9', customerFbmCode: 'ALT-OLD', fbmHash: 'old' }], [{ id: 'KH-2', fbmId: 'A8', fbmCustomerCode: 'ALT-OLD' }, { id: 'KH-1', fbmId: 'A9', fbmCustomerCode: 'ALT99999' }]);
+  const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A9', customerFbmCode: 'ALT-OLD', fbmHash: 'old' }], [{ id: 'KH-2', fbmId: 'A8', fbmCustomerCode: 'ALT-OLD' }, { id: 'KH-1', fbmId: 'A9', fbmCustomerCode: 'ALT99999' }], gate);
   check(so, 'Khách cha của giao dịch nối theo stt_rec_kh của khách được đọc, không theo ma_kh', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);
-  const stoppedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A-STOP', fbmHash: 'old' }], [{ id: 'KH-STOP', fbmId: 'A-STOP', fbmCustomerCode: 'ALT-STOP', fbmSyncPermission: 'Cấm đồng bộ' }]);
+  const stoppedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A-STOP', fbmHash: 'old' }], [{ id: 'KH-STOP', fbmId: 'A-STOP', fbmCustomerCode: 'ALT-STOP', fbmSyncPermission: 'Cấm đồng bộ' }], gate);
   check(so, 'Customer ngừng đồng bộ chặn Activity con ở chiều pull', [stoppedActivity.records.length, stoppedActivity.blocked], [0, 1]);
   const activityWithParent = builders.FbmSync.activityRecord({ id: 7, details: 'Gọi', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi điện' }, gate, { maKh: 'ALT99999' });
   check(so, 'Activity giữ mã Customer cha khi grid không trả ma_kh', activityWithParent.customerFbmCode, 'ALT99999');
@@ -51,7 +51,7 @@ async function chay(so) {
   check(so, 'TMP- bị loại khỏi ứng viên push', builders.FbmSync.isTemporaryRecord('customer', { fbmCustomerCode: 'TMP-001' }), true);
   check(so, 'thiếu field Customer bị chặn trước request', builders.FbmSync.pushEligibilityErrors({ companyName: 'X' }, 'customer').length > 0, true);
   const blockedGate = { map: { '@CAT_CONG_VIEC\u001fGọi': 'CALL' }, valid: { '@CAT_CONG_VIEC': { Gọi: true } }, blocked: { '@CAT_CONG_VIEC\u001fCALL': 'Tên danh mục trên FBM khác Category.' } };
-  check(so, 'Category lệch chỉ chặn record dùng đúng mã', builders.FbmSync.validatePushCategories({ taskType: 'Gọi' }, 'activity', blockedGate).length, 1);
+  check(so, 'Category lệch chỉ chặn record dùng đúng mã', builders.FbmSync.categoryGateCheck({ taskType: 'Gọi' }, 'activity', blockedGate).length, 1);
   let metadataFailed = false;
   try { builders.FbmSync.rowsToRecords('customer', { d: { Rows: [[]] } }); } catch (error) { metadataFailed = true; }
   check(so, 'metadata Customer thiếu thì fail-closed', metadataFailed, true);

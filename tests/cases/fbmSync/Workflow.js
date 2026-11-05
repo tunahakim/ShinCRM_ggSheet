@@ -422,12 +422,12 @@ async function chay(so) {
       const id = 'C-' + String(index + 1).padStart(2, '0');
       return { id, fbmId: 'F-' + id, fbmHash: 'h', fbmSyncPermission: 'Cho phép', leadCode: ['C-03', 'C-22', 'C-23'].indexOf(id) >= 0 ? 'HDDV' : 'WEB' };
     });
-    ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { F[name] = () => ''; });
+    ['pushConfigErrors', 'ownerCheck'].forEach((name) => { F[name] = () => ''; });
     F.pushEligibilityErrors = () => [];
     F.readLocal = (entity) => entity === 'customer' ? rows : [];
     // Mỗi lệnh đẩy giả lập đều lỗi để đi tiếp hàng đợi; nâng trần cầu dao để không cắt ngang 25 bản ghi.
     if (!(options && options.realBreaker)) { F.BUDGET = Object.assign({}, F.BUDGET, { pushFailuresMax: 100 }); }
-    F.validatePushCategories = (record, entity, gate) => {
+    F.categoryGateCheck = (record, entity, gate) => {
       const reason = gate.blocked['@CAT_NGUON_KH\u001f' + record.leadCode];
       return reason ? [{ result: { ok: false, reason } }] : [];
     };
@@ -566,8 +566,8 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.stateWrite(pushState);
   datUngVienDay(compactLookupFlow.hop, () => [{ kind: 'edit', entity: 'activity', id: 'ACT-QUOTA', position: 0, record: { id: 'ACT-QUOTA', fbmId: 'FBM-ACT-QUOTA', taskType: 'CODE-3', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', fbmSyncPermission: 'Cho phép', fbmHash: 'old' } }]);
   compactLookupFlow.hop.FbmSync.pushConfigErrors = () => '';
-  compactLookupFlow.hop.FbmSync.pushOwnerError = () => '';
-  compactLookupFlow.hop.FbmSync.validatePushCategories = () => [];
+  compactLookupFlow.hop.FbmSync.ownerCheck = () => '';
+  compactLookupFlow.hop.FbmSync.categoryGateCheck = () => [];
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
@@ -624,8 +624,8 @@ async function chay(so) {
   orderFlow.hop.FbmSync.stateWrite(orderState);
   datUngVienDay(orderFlow.hop, () => [{ kind: 'edit', entity: 'activity', id: 'ACT-ORDER', position: 0, record: { id: 'ACT-ORDER', fbmId: 'FBM-ACT-ORDER', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', fbmSyncPermission: 'Cho phép', fbmHash: 'old' } }]);
   orderFlow.hop.FbmSync.pushConfigErrors = () => '';
-  orderFlow.hop.FbmSync.pushOwnerError = () => '';
-  orderFlow.hop.FbmSync.validatePushCategories = () => [];
+  orderFlow.hop.FbmSync.ownerCheck = () => '';
+  orderFlow.hop.FbmSync.categoryGateCheck = () => [];
   orderFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   orderFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   let orderSheetWrites = 0;
@@ -643,8 +643,8 @@ async function chay(so) {
   aliasState.mode = 'push'; aliasState.phase = 'push'; aliasState.entity = 'customer'; aliasState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
   datUngVienDay(aliasFlow.hop, () => [{ kind: 'edit', id: 'CUS-ALIAS', position: 0, record: { id: 'CUS-ALIAS', fbmId: 'FBM-CUS-ALIAS', fbmHash: 'h0', fbmSyncPermission: 'Cho phép' } }]);
-  ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => ''; });
-  ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
+  ['pushConfigErrors', 'ownerCheck'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => ''; });
+  ['categoryGateCheck', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
   aliasFlow.hop.writeGateSave = () => ({ ok: true });
   aliasFlow.hop.FbmSync.customerEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_edit_open' } });
   const aliasRequest = aliasFlow.hop.FbmSync.nextPushRequest(aliasState);
@@ -659,8 +659,8 @@ async function chay(so) {
   pushingState.mode = 'write'; pushingState.phase = 'push'; pushingState.entity = 'activity';
   pushingState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   pushingFlow.hop.FbmSync.stateWrite(pushingState);
-  ['pushConfigErrors', 'pushOwnerError'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
-  ['validatePushCategories', 'pushEligibilityErrors'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => []; });
+  ['pushConfigErrors', 'ownerCheck'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => ''; });
+  ['categoryGateCheck', 'pushEligibilityErrors'].forEach((name) => { pushingFlow.hop.FbmSync[name] = () => []; });
   datUngVienDay(pushingFlow.hop, () => [{ kind: 'edit', entity: 'activity', id: 'ACT-PUSHING', position: 0, record: { id: 'ACT-PUSHING', fbmId: 'FBM-ACT-PUSHING', taskType: 'GD', content: 'Nội dung', workDate: '2026-09-20', customerId: 'CUS-1', customerFbmCode: 'ALT00001', fbmSyncPermission: 'Cho phép', fbmHash: 'old' } }]);
   pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
@@ -1034,7 +1034,7 @@ async function chay(so) {
   const readCategoryState = fullFlow.hop.FbmSync.stateRead();
   const unknownGate = { map: {}, valid: { '@CAT_CONG_VIEC': { 'Gọi điện': true, CV1: true } }, blocked: {} };
   check(so, 'nhóm 1.3: lượt Lấy từ FBM → ShinCRM không phát request danh mục, không sinh mã danh mục bị chặn, mã lạ không có trong Category vẫn bị chặn theo từng bản ghi',
-    [fullKinds.filter((kind) => kind.indexOf('completion:') === 0).length, (readCategoryState.metadata.categoryBlocks || []).length, fullFlow.hop.FbmSync.validateIncomingCategories({ taskType: 'CV9' }, 'activity', unknownGate).length],
+    [fullKinds.filter((kind) => kind.indexOf('completion:') === 0).length, (readCategoryState.metadata.categoryBlocks || []).length, fullFlow.hop.FbmSync.categoryGateCheck({ taskType: 'CV9' }, 'activity', unknownGate).length],
     [0, 0, 1]);
   const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
   const lastActivitySlice = tracedActivityPropCalls.length - 1;
@@ -1180,8 +1180,8 @@ async function chay(so) {
   approval.hop.FbmSync.preflightNeedsLocal = () => true;
   approval.hop.FbmSync.extractAuthorized = () => 'auth-token';
   const sessionFirst = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
-  approval.hop.FbmSync.authContinue('customer', {});
-  approval.hop.FbmSync.authContinue('activity', {});
+  approval.hop.FbmSync.authContinue('customer', { map: {} });
+  approval.hop.FbmSync.authContinue('activity', { map: {} });
   const awaitingApproval = { approvalRequired: approval.hop.FbmSync.stateRead().metadata.approvalRequired, status: approval.hop.FbmSync.statusView() };
   const approved = approval.hop.fbmSyncApprovePush();
   check(so, 'push lon: chỉ kiểm phiên FBM trước, xác thực xong mới đếm bản ghi và dừng chờ chấp thuận, không cấp request dữ liệu; sau chap thuan moi cap authorize', [
