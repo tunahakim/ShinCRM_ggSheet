@@ -7,6 +7,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 // Mỗi phần tử là `c:<stt_rec_kh>` (khách vắng, kiểm tra còn tồn tại) hoặc `a:<id giao dịch>` (giao dịch vắng, hỏi khách đang giữ).
 FbmSync.GATE_LOOKUP_PREFIX = 'FBM_SYNC_GATE_LOOKUP_';
+// Mã giao dịch đã thấy ở các trang trước của khách đang đọc dở nhiều trang, dạng `<stt_rec_kh>:<id>`: trang cuối đối chiếu vắng mặt trên cả các trang này, không chỉ trang cuối.
+FbmSync.ACTIVITY_PAGED_SEEN_PREFIX = 'FBM_SYNC_PAGED_SEEN_';
 
 /** Mở cửa ghi cho một chặng đọc; trả request lô đầu hoặc `null` khi chặng không có khách nào. */
 FbmSync.gateOpen = function (state, cursorFields, message) {
@@ -49,7 +51,11 @@ FbmSync.activityBatchRequest = function (state) {
   var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), needHeader = !(Array.isArray(metadata.activityFields) && metadata.activityFields.length);
   var customerItem = FbmSync.customerBatchRequest(customers, !(Array.isArray(metadata.customerFields) && metadata.customerFields.length));
   if (!customerItem) { return null; }
+  var pages = cursor.pages || {};
   return { items: [customerItem].concat(customers.map(function (sttRec) {
+    var page = pages[sttRec];
+    // Khách đang đọc dở nhiều trang luôn đã có danh sách cột (trang trước đã ghép dòng theo nó), nên không giữ phần tử lấy tiêu đề.
+    if (page) { return FbmSync.activityGridRequest(String(sttRec), { type: 1, count: count, gridPageIndex: page.pageIndex, gridPageValue: page.pageValue, pageItems: page.pageItems, gridRefresh: false }); }
     var options = needHeader ? { type: 0, count: count, gridPageIndex: -1, gridRefresh: false } : { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false };
     needHeader = false;
     return FbmSync.activityGridRequest(String(sttRec), options);
@@ -144,6 +150,7 @@ FbmSync.gateTransferCustomer = function (flags, local, customer, reason) {
 FbmSync.gateReadContinue = function (state, cursor, checks) {
   var customers = cursor.customers || [], gate = FbmSync.stateCategoryGate(state), write = FbmSync.canWriteSheet(state.mode), count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0];
   var returned = {}, readOk = {}, customerRecords = [], activityRecords = [], failed = [], outcomes = [], retry = [], isFresh = FbmSync.activityFreshIndex();
+  var pages = cursor.pages || {}, nextPages = {}, pagedSeen = Object.keys(pages).length ? FbmSync.shardListRead(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX) : [], pagedNew = [];
   state.metadata = state.metadata || {};
   if (!customerCheck.check.ok) {
     // Không biết khách nào còn nên không kết luận vắng mặt cho ai: báo lỗi từng khách của lô, không ghi, không tra.
@@ -175,12 +182,19 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
         var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item), state.metadata.activityFields);
         state.metadata.activityFields = grid.fields;
         var records = grid.rows.filter(function (item) { return !FbmSync.isTemporaryRecord('activity', item); }).map(function (item) { return FbmSync.activityRecord(item, gate, { sttRec: sttRec, maKh: row.ma_kh }); });
-        var complete = grid.rows.length < count;
+        var page = pages[sttRec], fresh = !!(page && page.fresh) || isFresh(records);
         activityRecords = activityRecords.concat(records);
-        readOk[sttRec] = { complete: complete };
-        // Khách chạm trần một lần đọc chưa được đọc đủ: không vào tập "đã đọc" để giao dịch của khách không bị kết luận vắng.
-        outcomes.push({ sttRec: sttRec, fresh: isFresh(records), complete: complete });
-        if (!complete) { failed.push({ customer: String(row.ma_kh || sttRec), code: 'FBM_ACTIVITY_PAGE_LIMIT', status: 0, reason: 'Khách có từ ' + grid.rows.length + ' giao dịch trở lên, vượt trần một lần đọc; đã ghi phần đã đọc, phần còn lại chưa đọc và giao dịch của khách không bị kết luận vắng.' }); }
+        if (grid.rows.length >= count) {
+          // Khách chạm trần một lần đọc: ghi phần đã đọc, lô sau xin trang kế của riêng khách; chưa vào tập "đã đọc" và chưa xét vắng tới khi hết trang.
+          var next = FbmSync.activityPageNext(page, grid.rows, grid.total);
+          if (!next) { failed.push({ customer: String(row.ma_kh || sttRec), code: 'FBM_ACTIVITY_PAGE_STUCK', status: 0, reason: 'FBM trả lại đúng trang giao dịch đã đọc khi xin trang kế; đã ghi phần đã đọc, phần còn lại chưa đọc và giao dịch của khách không bị kết luận vắng.' }); outcomes.push({ sttRec: sttRec, fresh: null }); return; }
+          next.fresh = fresh;
+          nextPages[sttRec] = next;
+          records.forEach(function (record) { pagedNew.push(sttRec + ':' + String(record.fbmId || '').trim()); });
+          return;
+        }
+        readOk[sttRec] = { complete: true };
+        outcomes.push({ sttRec: sttRec, fresh: fresh, complete: true });
       });
     } catch (shapeError) {
       // Khối này chỉ ghép dòng theo tiêu đề cột: lỗi ở đây là FBM trả lệch cấu trúc (thiếu, trùng, đổi số cột), dừng cả lô chứ không đoán.
@@ -190,6 +204,8 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
   // Đối chiếu trên Sheet trước khi ghi: ghi xong thì giao dịch đổi khách đã nằm dưới khách mới.
   var local = write ? FbmSync.gateLocalIndex() : null, inBatch = {}, lookups = [], moved = [], flags = { customer: [], activity: [] }, waits = write ? FbmSync.readWaitRead() : {};
   activityRecords.forEach(function (record) { inBatch[String(record.fbmId || '').trim()] = String(record.customerFbmId || ''); });
+  // Giao dịch thấy ở trang trước của khách đọc nhiều trang cũng là đã thấy trong lần đọc khách đó.
+  pagedSeen.forEach(function (entry) { var at = entry.indexOf(':'), id = entry.slice(at + 1); if (inBatch[id] === undefined) { inBatch[id] = entry.slice(0, at); } });
   if (write) {
     customers.forEach(function (sttRec) { if (customerCheck.check.ok && !returned[sttRec] && local.byStt[sttRec]) { lookups.push('c:' + sttRec); } });
     Object.keys(local.activitiesOf).forEach(function (cus) {
@@ -222,17 +238,25 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
   state.metadata = state.metadata || {};
   if ((activityFields || []).length) { state.metadata.activityFields = activityFields; }
   if ((customerFields || []).length) { state.metadata.customerFields = customerFields; }
-  state.cursor.customers = retry;
+  var carried = retry.concat(Object.keys(nextPages));
+  state.cursor.customers = carried;
+  state.cursor.pages = nextPages;
   FbmSync.activityCustomerErrors(state, failed);
+  if (pagedSeen.length || pagedNew.length) { FbmSync.shardListWrite(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX, pagedSeen.filter(function (entry) { return nextPages[entry.slice(0, entry.indexOf(':'))]; }).concat(pagedNew)); }
   if (write) {
     FbmSync.gateFlagWrite(state, 'activity', flags.activity);
     FbmSync.readWaitWrite(waits);
     FbmSync.readListAdd(moved);
   }
-  FbmSync.readListDone(customers.filter(function (sttRec) { return retry.indexOf(sttRec) < 0; }));
+  FbmSync.readListDone(customers.filter(function (sttRec) { return carried.indexOf(sttRec) < 0; }));
   FbmSync.activityReadMark(outcomes.filter(function (item) { return item.complete; }).map(function (item) { return item.sttRec; }), outcomes.filter(function (item) { return item.fresh; }).map(function (item) { return item.sttRec; }));
-  FbmSync.progressCustomersDone(state, customers.length - retry.length);
-  if (cursor.layer === 'top') { state.cursor.customers = customers; FbmSync.activityTopAccount(state.cursor, outcomes); state.cursor.customers = retry; }
+  FbmSync.progressCustomersDone(state, customers.length - carried.length);
+  if (cursor.layer === 'top') {
+    // Vị trí lớp top đi theo khách: khách còn ở lô sau giữ đúng vị trí của mình để bộ đếm im lặng tính đúng khi khách đó xong.
+    var positions = cursor.topPositions || [];
+    state.cursor.customers = customers; FbmSync.activityTopAccount(state.cursor, outcomes);
+    state.cursor.customers = carried; state.cursor.topPositions = carried.map(function (sttRec) { return positions[customers.indexOf(sttRec)]; });
+  }
   var imported = customerRecords.length + activityRecords.length;
   if (lookups.length) {
     FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, lookups);

@@ -171,6 +171,18 @@ FbmSync.customerPageValue = function (row) {
 };
 
 /**
+ * Vị trí trang kế của giao dịch một khách (keyset, Nghiên cứu FBM ch05 mục 5.8): dòng đầu, dòng cuối dạng `[end_date][datetime0][id][line_nbr]` và khóa trang bốn cột đó. `previous` rỗng là trang đầu; tổng lấy ở trang đầu vì trang sau FBM trả 0.
+ * Trả `null` khi trang vừa nhận có dòng cuối trùng trang trước: FBM đã bỏ qua khóa trang và trả lại cùng trang, xin tiếp sẽ lặp mãi.
+ */
+FbmSync.activityPageNext = function (previous, rows, total) {
+  var first = rows[0] || {}, last = rows[rows.length - 1] || {};
+  var item = function (row) { return FbmSync.fbmDayKey(row.end_date) + FbmSync.fbmDayKey(row.datetime0) + String(row.id || '') + String(row.line_nbr || ''); };
+  var lastItem = item(last), rowCount = Number(previous ? previous.pageItems.lastRowCount : total || 0);
+  if (previous && previous.pageItems.lastPageItem === lastItem) { return null; }
+  return { pageIndex: FbmSync.gridNextPageIndex(previous ? previous.pageIndex : -1), pageValue: FbmSync.gridPageValue([last.end_date || '', last.datetime0 || '', last.id || '', last.line_nbr || '']), pageItems: { firstPageItem: item(first), lastPageItem: lastItem, lastRowCount: rowCount } };
+};
+
+/**
  * Khóa trang gửi lại FBM phải ở dạng `/Date(ms)/` (gửi Date thành chuỗi ISO thì FBM trả trang kế rỗng) và cộng thêm lệch giờ máy chủ như giao diện FBM:
  * FBM đọc ngày gửi lên như giờ UTC, gửi nguyên ms FBM trả thì mốc lùi 7 giờ, khách cùng ngày với dòng cuối trang bị bỏ qua âm thầm và vùng khách chung một ngày (khách chưa có giao dịch) trả trang rỗng (gặp thật 2026-10-08: dừng ở 1.000/1.312).
  * So kiểu bằng `toString` vì Date tạo ở ngữ cảnh khác không qua được `instanceof`.
