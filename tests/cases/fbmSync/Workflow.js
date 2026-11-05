@@ -927,6 +927,21 @@ async function chay(so) {
     const so2 = (i) => String(i).padStart(2, '0');
     const customerRows = Array.from({ length: soKhach }, (_, k) => k + 1).map((i) => row(fullCustomerFields, { stt_rec_kh: 'FBM-C' + i, ma_kh: 'ALT' + String(i).padStart(5, '0'), ten_kh: 'Cong ty ' + i, ma_so_thue: '0100' + so2(i), ong_ba: String.fromCharCode(65 + (i - 1) % 26), dc_lh: 'Ha Noi', dien_thoai: '09' + so2(i), email: 'c' + i + '@example.test', ngay_gd: '/Date(' + Date.UTC(2026, 8, 20) + ')/', datetime0: '/Date(' + Date.parse(gio(i, 1) + 'Z') + ')/', xorder: i }));
     const activityRows = Object.fromEntries(customerRows.map((_, k) => k + 1).map((i) => ['FBM-C' + i, [row(fullActivityFields, { id: 'FBM-A' + i, details: 'Goi dien ' + i, end_date: '2026-09-20', owner: 'Owner ' + i, datetime0: gio(i, 3), line_nbr: 1 })]]));
+    // `manyActivities`: khách có nhiều giao dịch, mã số `900000 + n`, xếp như FBM (`end_date desc, datetime0 desc, id, line_nbr`), ngày ở dạng `/Date(ms)/`.
+    Object.keys(options && options.manyActivities || {}).forEach((key) => {
+      activityRows[key] = Array.from({ length: options.manyActivities[key] }, (_, n) => row(fullActivityFields, { id: String(900000 + n), details: 'Giao dich ' + n, end_date: '/Date(' + (Date.UTC(2026, 8, 20) - n * 3600000) + ')/', owner: 'Owner', datetime0: '/Date(' + (Date.UTC(2026, 8, 1) - n * 3600000) + ')/', line_nbr: 1 }));
+    });
+    const gdKhoa = ['end_date', 'datetime0', 'id', 'line_nbr'].map((field) => fullActivityFields.indexOf(field));
+    const msCua = (value) => Number(String(value).match(/-?\d+/)[0]);
+    const gdNgay = (value) => new Date(msCua(value) + 7 * 3600000).toISOString().slice(0, 10).replace(/-/g, '');
+    // Trang giao dịch kế theo keyset như trang khách: khóa và mô tả trang phải khớp dòng cuối trang trước và tổng số dòng, lệch thì trang rỗng; `ignoreActivityKey` giả FBM bỏ qua khóa và trả lại trang đầu.
+    const activityPage = (rows, body) => {
+      if (!body.gridPageValue || options && options.ignoreActivityKey) { return { rows: rows.slice(0, Number(body.count)), total: rows.length }; }
+      const at = rows.findIndex((dong) => JSON.stringify(gdKhoa.map((index, k) => (k < 2 ? '/Date(' + (msCua(dong[index]) + 7 * 3600000) + ')/' : dong[index]))) === JSON.stringify(body.gridPageValue)), keyRow = rows[at];
+      const dung = keyRow && body.lastPageItem === gdNgay(keyRow[gdKhoa[0]]) + gdNgay(keyRow[gdKhoa[1]]) + keyRow[gdKhoa[2]] + keyRow[gdKhoa[3]] && body.lastRowCount === rows.length;
+      const start = dung ? at + 1 : rows.length;
+      return { rows: rows.slice(start, start + Number(body.count)), total: 0 };
+    };
     const customerPageIndexes = [], activityItemTypes = [], customerItemTypes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
     let fullStep = null;
     const fbmTab = executorSession();
@@ -979,8 +994,9 @@ async function chay(so) {
         if (khachLoi[key]) { return { raw: khachLoi[key] }; }
         // FBM chỉ trả tiêu đề cột khi `type: 0`; trang không tiêu đề chỉ có `Rows`.
         activityItemTypes.push(item.body.type);
-        const dongs = (activityRows[key] || []).map((dong) => options && options.cutColumn === key ? dong.slice(1) : dong);
-        const body = JSON.parse(gridResponse(fullActivityFields, dongs, dongs.length));
+        const trang = activityPage(activityRows[key] || [], item.body);
+        const dongs = trang.rows.map((dong) => options && options.cutColumn === key ? dong.slice(1) : dong);
+        const body = JSON.parse(gridResponse(fullActivityFields, dongs, trang.total));
         if (item.body.type !== 0) { delete body.d.ViewPage; }
         return { body: JSON.stringify(body) };
       }) : executorRaw((await fbmTab.send(request, body)).reply, request.id);
@@ -1090,12 +1106,18 @@ async function chay(so) {
   check(so, 'khách giữ tiêu đề cột bị lỗi: các khách còn lại xếp sang lô sau, lô sau có đúng một khách lấy tiêu đề, đủ giao dịch của khách còn lại', [
     tieuDeLoi.fullBatches.map(khoaLo), tieuDeLoi.activityItemTypes, tieuDeLoi.fullLocal.activity.map((item) => item.fbmId).sort(), tieuDeLoi.fullStep.status.phase
   ], [[['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5'], ['FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5']], [1, 1, 1, 1, 0, 1, 1, 1], ['FBM-A2', 'FBM-A3', 'FBM-A4', 'FBM-A5'], 'done']);
-  const tranGiaoDich = await fullPipeline(false, 'read', { customers: 3, activityCustomerRows: 1, localActivity: [{ id: 'ACT-000077', fbmId: 'FBM-A-CU', recordStatus: 'active', syncStatus: 'đã đồng bộ' }] });
-  check(so, 'khách chạm trần giao dịch một lần đọc: ghi phần đã đọc, báo lỗi khách FBM_ACTIVITY_PAGE_LIMIT ở Sidebar và Log, không đánh dấu giao dịch cũ là không thấy bên FBM', [
-    tranGiaoDich.fullLocal.activity.map((item) => [item.fbmId, item.recordStatus]), tranGiaoDich.fullStep.status.phase, tranGiaoDich.fullStep.status.metadata.customerErrors.recent.map((item) => item.code),
-    tranGiaoDich.fullLogs.filter((event) => /activity_customer_failed|activity_missing/.test(event.action)).map((event) => [event.action, event.detail && event.detail.code || ''])
-  ], [[['FBM-A-CU', 'active'], ['FBM-A1', null], ['FBM-A2', null], ['FBM-A3', null]], 'done', ['FBM_ACTIVITY_PAGE_LIMIT', 'FBM_ACTIVITY_PAGE_LIMIT', 'FBM_ACTIVITY_PAGE_LIMIT'],
-    [['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT'], ['activity_customer_failed', 'FBM_ACTIVITY_PAGE_LIMIT']]]);
+  // Khách C2 có 1.200 giao dịch: lô đầu đọc 1.000 dòng, lô sau chỉ xin trang kế của riêng C2. Sheet có sẵn giao dịch 900005 (nằm ở trang đầu) và 777777 (FBM không còn) dưới khách C2 (CUS-000002).
+  const coSan = [{ id: 'ACT-000501', fbmId: '900005', customerId: 'CUS-000002', recordStatus: 'active', syncStatus: 'đã đồng bộ' }, { id: 'ACT-000502', fbmId: '777777', customerId: 'CUS-000002', recordStatus: 'active', syncStatus: 'đã đồng bộ' }];
+  const haiTrang = await fullPipeline(false, 'read', { customers: 3, manyActivities: { 'FBM-C2': 1200 }, localActivity: coSan.map((item) => Object.assign({}, item)) });
+  const trangGd = (run) => run.fullBatches.map((batch) => batch.items.slice(1).map((item) => [item.body.externalKey[0].Value, item.body.gridPageIndex]));
+  const vang = (run) => run.fullLocal.activity.filter((item) => item.syncStatus === 'không thấy bên FBM').map((item) => item.fbmId);
+  check(so, 'khách có 1.200 giao dịch: đọc 2 trang (lô sau chỉ xin trang kế của riêng khách đó), ghi đủ 1.200 giao dịch, không báo lỗi khách, giao dịch thấy ở trang đầu không bị coi là vắng khi đọc trang sau, giao dịch FBM không còn thì bị gắn cờ', [
+    trangGd(haiTrang), haiTrang.fullLocal.activity.filter((item) => /^9\d{5}$/.test(item.fbmId)).length, haiTrang.fullStep.status.phase, (haiTrang.fullStep.status.metadata.customerErrors || { total: 0 }).total, vang(haiTrang)
+  ], [[[['FBM-C1', -1], ['FBM-C2', -2], ['FBM-C3', -2]], [['FBM-C2', 1]]], 1200, 'done', 0, ['777777']]);
+  const lapTrang = await fullPipeline(false, 'read', { customers: 3, manyActivities: { 'FBM-C2': 1200 }, ignoreActivityKey: true, localActivity: coSan.map((item) => Object.assign({}, item)) });
+  check(so, 'FBM bỏ qua khóa trang và trả lại đúng trang đã đọc: báo lỗi khách FBM_ACTIVITY_PAGE_STUCK, không xin lặp, ghi phần đã đọc, không gắn cờ vắng cho giao dịch của khách đó', [
+    trangGd(lapTrang), lapTrang.fullLocal.activity.filter((item) => /^9\d{5}$/.test(item.fbmId)).length, lapTrang.fullStep.status.phase, lapTrang.fullStep.status.metadata.customerErrors.recent.map((item) => item.code), vang(lapTrang)
+  ], [[[['FBM-C1', -1], ['FBM-C2', -2], ['FBM-C3', -2]], [['FBM-C2', 1]]], 1000, 'done', ['FBM_ACTIVITY_PAGE_STUCK'], []]);
   const lechCot = await fullPipeline(false, 'read', { customers: 5, cutColumn: 'FBM-C3' });
   check(so, 'trang không tiêu đề có số cột khác tiêu đề đã lưu: dừng phiên FBM_GRID_SHAPE_CHANGED, không ghi giao dịch nào, Sidebar và Log đều báo', [
     lechCot.fullLocal.activity.length, lechCot.fullStep.status.phase, lechCot.fullStep.status.lastFailureCode, lechCot.fullStep.status.message.indexOf('số cột khác 11 cột') >= 0,
