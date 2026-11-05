@@ -187,7 +187,7 @@ function chay(so) {
   docKhach.n = 0;
   const sauGhiFbm = trongLanGoi(hf, () => hf.documentLockRun(() => {
     hf.FbmSync.readLocal('customer');
-    hf.FbmSync.recordChange(() => ({ save: [{ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'pull' }] }));
+    hf.FbmSync.recordChange((gate) => { gate.read('customer', hf.FbmSync.recordSchemas()); return { save: [{ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'pull' }] }; });
     const truoc = docKhach.n;
     const phone = hf.FbmSync.readLocal('customer')[0].phone;
     return [String(phone).replace(/^'/, ''), docKhach.n - truoc];

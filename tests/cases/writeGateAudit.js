@@ -131,7 +131,7 @@ function chay(so) {
     [callersOf('writeGateSave'), callersOf('deleteGateRemove')],
     [['server/gate/RecordGate.js'], ['server/gate/RecordGate.js']]);
   check(so, 'sổ bận chỉ được Cửa bản ghi đọc/ghi, và khóa kho của sổ chỉ nằm trong tệp sổ bận',
-    [['recordHoldsRead', 'recordHoldsWrite', 'recordHoldsApply', 'recordHoldsBusy', 'recordHoldsWithoutOwner', 'recordHoldsPeekOwner'].reduce((out, ten) => out.concat(callersOf(ten).filter((file) => file !== 'server/state/RecordHolds.js' && file !== 'server/gate/RecordGate.js')), []),
+    [['recordHoldsRead', 'recordHoldsWrite', 'recordHoldsApply', 'recordHoldsBusy', 'recordHoldsWithoutOwner', 'recordHoldsHasOwner'].reduce((out, ten) => out.concat(callersOf(ten).filter((file) => file !== 'server/state/RecordHolds.js' && file !== 'server/gate/RecordGate.js')), []),
       files.filter((file) => file !== 'server/state/RecordHolds.js' && /SHIN_RECORD_HOLDS_V1|\bRECORD_HOLDS_KEY\b/.test(stripNonCode(fs.readFileSync(path.join(GAS_DIR, file), 'utf8'))))],
     [[], []]);
 

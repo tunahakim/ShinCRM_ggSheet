@@ -18,10 +18,10 @@ const WORKER = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_wor
 /**
  * Trần số lần gọi kho DocumentProperties của một lát Activity sau đợt 1 bước A: nạp cả kho trước khóa, nạp lại trong khóa, ghi gộp, ghi trace (đo 2026-10-07 trước refactor: 83).
  * Cộng một lần đọc cờ dừng từ kho thật trước khi phát request: lệnh Dừng ghi cờ không cần khóa nên bản chụp trong khóa không thấy nó.
- * Lát kết thúc lượt được cộng thêm số lần xóa dấu "đã thấy", vì kho Google không có lệnh xóa nhiều khóa một lần.
+ * Lát kết thúc lượt được cộng thêm số lần xóa dấu "đã thấy" (kho Google không có lệnh xóa nhiều khóa một lần) và một lần đọc sổ bận trong khóa tài liệu để nhả bản ghi của lượt.
  */
 const FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX = 6;
-const FBM_SEEN_STORE_RESET_DELETES = 8;
+const FBM_RUN_CLOSE_EXTRA_CALLS = 9;
 
 function gridResponse(fields, rows, total) {
   return JSON.stringify({ d: {
@@ -1038,8 +1038,8 @@ async function chay(so) {
     [0, 0, 1]);
   const traced = await fullPipeline(true), tracedActivityPropCalls = traced.fullActivityPropCalls;
   const lastActivitySlice = tracedActivityPropCalls.length - 1;
-  check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_SEEN_STORE_RESET_DELETES + ' lần xóa dấu đã thấy (trước refactor: 83)',
-    [tracedActivityPropCalls.length >= 1, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_SEEN_STORE_RESET_DELETES : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);
+  check(so, 'đợt 1 bước A: mỗi lát Activity gọi kho DocumentProperties không quá ' + FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + ' lần, lát kết thúc lượt cộng thêm ' + FBM_RUN_CLOSE_EXTRA_CALLS + ' lần (xóa dấu đã thấy, đọc sổ bận trong khóa) (trước refactor: 83)',
+    [tracedActivityPropCalls.length >= 1, tracedActivityPropCalls.every((count, index) => count <= FBM_ACTIVITY_SLICE_PROPERTY_CALLS_MAX + (index === lastActivitySlice ? FBM_RUN_CLOSE_EXTRA_CALLS : 0)), tracedActivityPropCalls], [true, true, tracedActivityPropCalls]);
   // Lô giao dịch: chi phí cố định của một lần gọi GAS không tăng theo số khách trong lô.
   const lo5 = await fullPipeline(true, 'read', { customers: 5 }), lo50 = await fullPipeline(true, 'read', { customers: 50 });
   const chiPhiLo = (run) => [run.fullActivitySheetReads.length, run.fullActivitySheetReads[0].reads, run.fullActivitySheetReads[0].writes, run.fullActivityPropCalls[0]];

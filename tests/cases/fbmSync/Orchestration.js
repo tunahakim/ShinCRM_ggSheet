@@ -170,14 +170,14 @@ async function chay(so) {
   const staleClose = (state) => orchestration.FbmSync.staleRunClose(state, orchestration.FbmSync.staleRunCheck(state, Date.now() + orchestration.FbmSync.STALE_RUN_MS + 1));
   const recoveredWrite = staleClose(orchestration.FbmSync.stateRead());
   check(so, 'Lượt mất phản hồi lúc chờ lệnh ghi: không tự thử lại và vẫn giữ bản ghi trong sổ bận',
-    [recoveredWrite.phase, recoveredWrite.lastFailureCode, orchestration.recordHoldsPeekOwner('fbm')],
+    [recoveredWrite.phase, recoveredWrite.lastFailureCode, orchestration.recordHoldsHasOwner(JSON.parse(props.data.SHIN_RECORD_HOLDS_V1 || '{}'), 'fbm')],
     ['error', 'SYNC_STALE_WRITE', true]);
   const stuckRead = orchestration.FbmSync.runOpen({ entity: 'customer', phase: 'pull_customer', total: 1 });
   orchestration.FbmSync.stateWrite(stuckRead);
   giuBanGhiDongBo(orchestration, 'customer', 'C-1');
   staleClose(orchestration.FbmSync.stateRead());
   check(so, 'Lượt kẹt không chờ lệnh ghi thì nhả mọi bản ghi đồng bộ đang giữ',
-    orchestration.recordHoldsPeekOwner('fbm'),
+    orchestration.recordHoldsHasOwner(JSON.parse(props.data.SHIN_RECORD_HOLDS_V1 || '{}'), 'fbm'),
     false);
   const lookupProps = {};
   const lookupHop = taoHopCat({ FbmSync: {}, PropertiesService: taoPropertiesService({ doc: lookupProps }) });

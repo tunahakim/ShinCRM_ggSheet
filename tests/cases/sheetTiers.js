@@ -242,7 +242,15 @@ function chay(so) {
   check(so, 'điểm cắm lỗi thì giữ lại bản ghi (xóa mềm), báo lý do và ghi Log mức lỗi',
     [xoaLoi.hard, xoaLoi.soft.rows.length, /module hỏng/.test(xoaLoi.reasons.KH000002), JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('beforeHardDelete') >= 0],
     [[], 1, true, true]);
+  h.beforeHardDelete = () => ({ soft: ['KH000002'] });
+  const xoaSaiHinh = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
   delete h.beforeHardDelete;
+  h.flushLog();
+  const xoaVang = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
+  h.flushLog();
+  check(so, 'điểm cắm trả sai hình dạng hoặc vắng hẳn thì không xóa hẳn mã nào: giữ lại ở dạng xóa mềm và báo lý do',
+    [xoaSaiHinh.hard, xoaSaiHinh.soft.rows.length, /sai hình dạng/.test(xoaSaiHinh.reasons.KH000002), xoaVang.hard, xoaVang.soft.rows.length, /beforeHardDelete/.test(xoaVang.reasons.KH000002), xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1).getValue()],
+    [[], 1, true, [], 1, true, 'KH000002']);
   check(so, 'hàm thuần chia nhóm',
     h.deleteGateSplit(['A', 'B', 'C'], ['C'], { B: 'giữ' }),
     { hard: ['A'], soft: ['B'], gone: ['C'] });

@@ -106,6 +106,7 @@ function chay(so) {
     [true, true, 'schema', true, true, true, 0]);
 
   const deletedEnv = taoHop();
+  deletedEnv.hop.beforeHardDelete = () => ({ soft: {} });
   const deleted = trongLanGoi(deletedEnv.hop, () => deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất, không vẽ',
     [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, dongSoCuoi(deletedEnv.hop).customer, (deletedEnv.hop.reloadStateRead().viewsStaleRevision === deletedEnv.hop.reloadStateRead().revision), deletedEnv.hop.rendered],
