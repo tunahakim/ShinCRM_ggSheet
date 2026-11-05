@@ -111,11 +111,18 @@ FbmSync.readListDoneReader = function () {
 FbmSync.readWaitRead = function () {
   return FbmSync.documentPropertyJson(FbmSync.READ_WAIT_KEY, 'danh sách giao dịch chờ đọc lại') || {};
 };
+/**
+ * Ghi hàng chờ đọc dở; rỗng thì xóa khóa. Quá trần `BUDGET.readWaitMaxBytes` thì ném `READ_WAIT_FULL` và không ghi gì: ghi cắt bớt là bỏ giao dịch chờ âm thầm, khách cha đọc sau sẽ không còn biết giao dịch nào đã chuyển sang mình.
+ */
 FbmSync.readWaitWrite = function (waits) {
   var props = FbmSync.props();
-  if (Object.keys(waits || {}).length) { props.setProperty(FbmSync.READ_WAIT_KEY, JSON.stringify(waits)); return; }
-  if (!props.getProperty(FbmSync.READ_WAIT_KEY)) { return; }
-  if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.READ_WAIT_KEY); } else { props.setProperty(FbmSync.READ_WAIT_KEY, ''); }
+  if (Object.keys(waits || {}).length) {
+    var text = JSON.stringify(waits), bytes = FbmSync.documentPropertyBytes(text), cap = FbmSync.BUDGET.readWaitMaxBytes;
+    if (bytes > cap) { var full = new Error('Hàng chờ giao dịch đọc dở của lượt đã đầy (' + bytes + '/' + cap + ' byte): quá nhiều giao dịch đang chờ khách cha chưa đọc. Lượt dừng và chưa ghi hàng chờ; chạy lại lượt để đọc tiếp, lặp lại thì báo người phụ trách kỹ thuật.'); full.code = 'READ_WAIT_FULL'; throw full; }
+    FbmSync.documentPropertySet(FbmSync.READ_WAIT_KEY, text, 'hàng chờ giao dịch đọc dở');
+    return;
+  }
+  if (props.getProperty(FbmSync.READ_WAIT_KEY)) { props.deleteProperty(FbmSync.READ_WAIT_KEY); }
 };
 
 /** Mỗi khách ShinCRM: ngày làm việc lớn nhất trong các giao dịch đã có `@ACT_FBM_ID` và các giao dịch của ngày đó. Giao dịch nội bộ không được tính, nếu không một giao dịch ngày tương lai sẽ che phát sinh thật bên FBM. */

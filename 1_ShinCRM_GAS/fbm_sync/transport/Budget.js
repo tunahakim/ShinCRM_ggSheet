@@ -21,6 +21,8 @@ FbmSync.BUDGET = {
   activityCustomerRows: 1000,
   // Quét từ khách mới nhất xuống dừng sau chừng này khách liên tiếp không có giao dịch mới (chủ dự án chốt); Log `activity_top_scan` ghi vị trí sâu nhất để chỉnh theo số đo thật.
   activityTopScanQuietStreak: 20,
+  // Trần hàng chờ giao dịch đọc dở (khách cha chưa đọc → id giao dịch), dưới trần một khóa DocumentProperties để chạm trần là lỗi có tên chứ không phải lỗi kho.
+  readWaitMaxBytes: 8000,
   batchMaxBytes: 4 * 1024 * 1024,
   pushBatchRecords: 20,
   lookupMaxAgeMs: 300000,
