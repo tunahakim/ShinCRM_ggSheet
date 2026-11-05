@@ -251,23 +251,23 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
   return null;
 };
 
-/** Đổi record Customer FBM sang schema nội bộ của Sheet. */
+/** Đổi record Customer FBM sang schema nội bộ của Sheet. Dấu vân FBM tính một lần ở đây trên bản đã đổi, cùng cách tính với dòng trên Sheet; giờ đồng bộ do bên ghi đặt. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
-  record.fbmHash = FbmSync.hash(fbm, 'customer', categoryGate);
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  record.fbmHash = FbmSync.hash(record, 'customer', categoryGate);
   return record;
 };
-/** Đổi record Activity FBM sang schema nội bộ của Sheet. */
+/** Đổi record Activity FBM sang schema nội bộ của Sheet. Dấu vân tính trên bản đã bỏ dấu `#SC` như dòng trên Sheet; tính trên dòng thô thì giao dịch còn dấu luôn lệch dấu vân. */
 FbmSync.activityRecord = function (fbm, categoryGate, parent) {
   var parentCode = fbm.ma_kh || (parent && (parent.ma_kh || parent.maKh)) || '';
   // `customerFbmId` là `stt_rec_kh` của khách vừa đọc, khóa nối khách cha; mã khách `ma_kh` chỉ để hiển thị vì có thể đổi hoặc trùng.
-  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, customerFbmId: String(parent && parent.sttRec || '').trim(), workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncedAt: new Date(), syncStatus: FbmSync.SYNC_STATUS.synced };
-  record.fbmHash = FbmSync.hash(fbm, 'activity', categoryGate);
+  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, customerFbmId: String(parent && parent.sttRec || '').trim(), workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  record.fbmHash = FbmSync.hash(record, 'activity', categoryGate);
   return record;
 };
 
-/** Nối Activity FBM vào mã Customer nội bộ theo `stt_rec_kh` của khách đã đọc (09/05 Phần 9), không qua `ma_kh`, và giữ hash ổn định sau khi đổi khóa ngoại. */
-FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
+/** Nối Activity FBM vào mã Customer nội bộ theo `stt_rec_kh` của khách đã đọc (09/05 Phần 9), không qua `ma_kh`. Mã khách cha đứng ngoài dấu vân nên giữ nguyên `fbmHash` lúc dựng. */
+FbmSync.linkActivityCustomers = function (records, customers) {
   var byFbm = {}, orphaned = 0, blocked = 0;
   (customers || []).forEach(function (customer) {
     var fbmId = String(customer.fbmId || '').trim();
@@ -286,9 +286,7 @@ FbmSync.linkActivityCustomers = function (records, customers, categoryGate) {
       if (FbmSync.logPullRecord) { FbmSync.logPullRecord('activity', record, customer, FbmSync.SYNC_STATUS.skipped, 'Customer cha ' + String(customer.id || '') + ' không cho phép lấy từ FBM: ' + parentPermission.reason, { issue: parentPermission.invalid }); }
       return null;
     }
-    var linkedRecord = Object.assign({}, record, { customerId: String(customer.id || '').trim(), customerFbmCode: customerCode });
-    linkedRecord.fbmHash = FbmSync.hash(linkedRecord, 'activity', categoryGate);
-    return linkedRecord;
+    return Object.assign({}, record, { customerId: String(customer.id || '').trim(), customerFbmCode: customerCode });
   }).filter(Boolean);
   return { records: linked, orphaned: orphaned, blocked: blocked };
 };

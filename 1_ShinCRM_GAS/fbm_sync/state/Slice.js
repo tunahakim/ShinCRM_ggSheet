@@ -68,6 +68,11 @@ FbmSync.controlFailRun = function (error) {
  * Hàm xử lý tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
  */
 FbmSync.CURSOR_TABLE = {
+  activity_grid: {
+    inputs: function (state) { return FbmSync.activityGridInputs(state); },
+    stage: function (ctx) { return FbmSync.activityGridStage(ctx); },
+    end: function (state, end) { return FbmSync.activityGridEnd(state, end); }
+  },
   conflict_refresh: { legacy: true, run: function (rawResponse) { return FbmSync.conflictOpened(rawResponse); } },
   customer_count: {
     inputs: function (state) { return FbmSync.customerCountInputs(state); },

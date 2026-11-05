@@ -84,30 +84,29 @@ FbmSync.startRun = function (options) {
   FbmSync.stateWrite(state);
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
 };
-/** Xử lý một trang pull; read/write ghi Sheet, check/push chỉ xem trước. */
-FbmSync.pullRecords = function (entity, records, mode) {
-  var state = FbmSync.stateRead(), count = (records || []).length;
-  var pullStep = 'pull_' + String(entity || ''), reconcileStep = 'reconcile_' + String(entity || '');
+/**
+ * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi rồi xóa các mục chờ xác nhận đã khớp; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
+ * `ctx`: `{ categoryGate, now, accountName }` như `pullPageApply`.
+ */
+FbmSync.pullBatchApply = function (state, entity, records, ctx) {
+  var count = (records || []).length, pullStep = 'pull_' + String(entity || ''), reconcileStep = 'reconcile_' + String(entity || '');
   state.counts.completed += count;
   state.counts.total = Math.max(Number(state.counts.total || 0), Number(state.counts.completed || 0));
-  if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, pullStep, { received: count }); }
-  if (!FbmSync.canWriteSheet(mode)) {
+  FbmSync.businessStepAdd(state, pullStep, { received: count });
+  if (!FbmSync.canWriteSheet(state.mode)) {
     state.message = 'Đã đọc ' + count + ' bản ghi (chế độ không ghi Sheet).';
-    if (typeof FbmSync.businessStepAdd === 'function') { FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count }); }
-    FbmSync.stateWrite(state);
+    FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count });
     return { ok: true, preview: true, written: 0, skipped: count };
   }
-  var result = FbmSync.pullWrite(entity, records || []);
+  var result = FbmSync.pullPageApply(entity, records || [], ctx);
+  result.pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); });
   state.counts.succeeded += Number(result.written || 0);
   // Ô Xung đột của phiên đếm cả dòng cũ vẫn còn xung đột; số chờ quyết trên Sidebar chỉ cộng xung đột mới và trừ dòng đã tự gỡ, vì dòng cũ đã nằm trong số đếm lúc preflight.
   state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
   state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0) - Number(result.conflictsCleared || 0));
   state.counts.skipped += Number(result.skipped || 0);
   if (result.identityBlocks.length) { state.metadata.identityBlocks = (Array.isArray(state.metadata.identityBlocks) ? state.metadata.identityBlocks : []).concat(result.identityBlocks); }
-  if (typeof FbmSync.businessStepAdd === 'function') {
-    FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0) + Number(result.conflictsKept || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
-  }
-  FbmSync.stateWrite(state);
+  FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0) + Number(result.conflictsKept || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });
   return result;
 };
 
@@ -520,12 +519,6 @@ FbmSync.continueStep = function (rawResponse) {
     FbmSync.identityCheckFinish(state);
     FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' }); FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
-  }
-  // Cửa ghi: một lô đọc chi tiết hoặc một lô tra mã; hết khách của chặng thì sang chặng kế.
-  if (cursor.kind === 'activity_grid') {
-    var batchStep = FbmSync.activityBatchContinue(state, cursor, rawResponse);
-    if (!batchStep.done) { return batchStep.result; }
-    return FbmSync.activityStagesContinue(batchStep.state, { imported: batchStep.imported });
   }
   state.phase = 'error'; state.lastError = 'Không nhận diện được cursor đồng bộ.'; FbmSync.stateWrite(state);
   return { ok: false, status: FbmSync.statusView(), error: state.lastError };

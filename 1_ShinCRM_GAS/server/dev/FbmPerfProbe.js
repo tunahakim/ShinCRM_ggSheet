@@ -16,14 +16,14 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'statusView', 'staleRunClose', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
-  'pullRecords', 'pullWrite', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
+  'pullBatchApply', 'pullPageApply', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'toFbmCodes',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanStage', 'readReasonOf', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
   'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure',
-  'activityBatchContinue', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
+  'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
 ];
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
 /** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */

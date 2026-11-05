@@ -13,9 +13,7 @@ FbmSync.ACTIVITY_PAGED_SEEN_PREFIX = 'FBM_SYNC_PAGED_SEEN_';
 /** Mở cửa ghi cho một chặng đọc; trả request lô đầu hoặc `null` khi chặng không có khách nào. */
 FbmSync.gateOpen = function (state, cursorFields, message) {
   state.phase = 'pull_activity'; state.entity = 'activity';
-  if (typeof FbmSync.businessStepStart === 'function') {
-    ['pull_customer', 'reconcile_customer', 'pull_activity', 'reconcile_activity'].forEach(function (step) { FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: step.indexOf('customer') >= 0 ? 'customer' : 'activity' }); });
-  }
+  ['pull_customer', 'reconcile_customer', 'pull_activity', 'reconcile_activity'].forEach(function (step) { FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: step.indexOf('customer') >= 0 ? 'customer' : 'activity' }); });
   state.cursor = Object.assign({ kind: 'activity_grid', customers: [], count: FbmSync.BUDGET.activityCustomerRows }, cursorFields || {});
   state.message = message;
   FbmSync.activityBatchPlan(state.cursor, state.metadata);
@@ -62,25 +60,39 @@ FbmSync.activityBatchRequest = function (state) {
   })), meta: { kind: 'batch', entity: 'activity' } };
 };
 
-/** Lỗi của một khách không làm hỏng lô: Log từng khách, Sidebar thấy 20 khách gần nhất cùng tổng số. */
+/** Lỗi của một khách không làm hỏng lô: Sidebar thấy 20 khách gần nhất cùng tổng số; trả dòng Log từng khách để chặng đưa vào patch. */
 FbmSync.activityCustomerErrors = function (state, failed) {
-  if (!failed.length) { return; }
+  if (!failed.length) { return []; }
   var previous = state.metadata.customerErrors || { total: 0, recent: [] };
   state.metadata.customerErrors = { total: Number(previous.total || 0) + failed.length, recent: (previous.recent || []).concat(failed).slice(-20) };
   state.counts.error = Number(state.counts.error || 0) + failed.length;
-  if (typeof logEvent !== 'function') { return; }
-  failed.forEach(function (item) {
-    logEvent({ source: 'fbm_sync', action: 'activity_customer_failed', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: item.reason, detail: { customer: item.customer, code: item.code, status: item.status } });
-  });
+  return failed.map(function (item) { return { action: 'activity_customer_failed', outcome: LOG_ERROR, reason: item.reason, detail: { customer: item.customer, code: item.code, status: item.status } }; });
 };
 
-/** Lô lệch kế hoạch hoặc lệch cấu trúc cột là lỗi của cả lô: dừng phiên, không ghi gì. */
-FbmSync.activityBatchMismatch = function (state, message, failureCode) {
-  var code = failureCode || 'FBM_BATCH_ITEM_MISMATCH', failed = FbmSync.runFailCurrent(message, code).failed;
-  state = FbmSync.stateRead();
-  if (!failed) { state.phase = 'error'; state.lastFailureCode = code; state.lastError = message; state.message = message; FbmSync.stateWrite(state); }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_batch_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(state.runId || ''), reason: message, detail: { code: code } }); }
-  return { ok: false, code: code, request: null, error: message, status: FbmSync.statusView() };
+/** Lô lệch kế hoạch hoặc lệch cấu trúc cột là lỗi của cả lô: lỗi có mã kèm dòng Log để chặng ném, lượt đóng lỗi và không ghi gì. */
+FbmSync.activityBatchError = function (message, failureCode) {
+  var error = new Error(message);
+  error.code = failureCode || 'FBM_BATCH_ITEM_MISMATCH';
+  error.logs = [{ action: 'activity_batch_mismatch', outcome: LOG_ERROR, reason: message, detail: { code: error.code } }];
+  return error;
+};
+
+/**
+ * Kiểm response của một lô theo kế hoạch: thiếu, thừa hoặc trùng phần tử là lệch hợp đồng, ném `FBM_BATCH_ITEM_MISMATCH` (thiếu phần tử thì không biết khách nào vắng thật). Khớp thì xếp loại từng phần tử theo `classifyFailure`.
+ */
+FbmSync.activityBatchCheck = function (reply, expected) {
+  var items = reply && reply.items, received = {}, bad = '';
+  if (!Array.isArray(items) || !items.length) { throw FbmSync.activityBatchError('Response lô đọc chi tiết không phải lô hoặc lô rỗng dù GAS đã cấp lô; Extension hoặc Sidebar đang chạy bản lệch hợp đồng.'); }
+  items.forEach(function (item) {
+    var id = String(item && item.id);
+    if (!/^\d+$/.test(id) || Number(id) >= expected || received[id]) { bad = bad || id; }
+    received[id] = item;
+  });
+  if (bad) { throw FbmSync.activityBatchError('Lô đọc chi tiết trả phần tử "' + bad + '" không có trong kế hoạch hoặc bị trùng; đã dừng và không ghi gì.'); }
+  if (items.length < expected) { throw FbmSync.activityBatchError('Lô đọc chi tiết chỉ trả ' + items.length + '/' + expected + ' phần tử; đã dừng và không ghi gì.'); }
+  var checks = [];
+  for (var position = 0; position < expected; position += 1) { checks.push({ item: received[String(position)], check: FbmSync.protocol.assertSuccess(received[String(position)]) }); }
+  return checks;
 };
 
 /**
@@ -110,15 +122,14 @@ FbmSync.gateFlagDecide = function (gate, state, entity, flags) {
     if (flag.status) { FbmSync.logPullRecord(entity, { fbmId: record.fbmId }, record, flag.status, flag.reason); }
   });
   // Ghi theo gói `CHUNK_ROWS` dòng: khách chuyển quyền kéo theo mọi giao dịch của khách nên một lần có thể vượt một lần qua cửa ghi.
-  var size = typeof SETTINGS !== 'undefined' && SETTINGS.CHUNK_ROWS ? Number(SETTINGS.CHUNK_ROWS) : 2000, save = [];
+  var size = Number(SETTINGS.CHUNK_ROWS), save = [];
   for (var start = 0; start < writes.length; start += size) { save.push({ entity: entity, records: writes.slice(start, start + size), source: 'pull' }); }
   return { save: save, value: writes.length };
 };
 
-/** Hai lần đọc FBM nói khác nhau về khách đang giữ một giao dịch: không ghi gì, Log để người phụ trách kiểm tra. */
-FbmSync.gateOwnerMismatch = function (state, activity, owner, reason) {
-  if (typeof logEvent !== 'function') { return; }
-  logEvent({ source: 'fbm_sync', action: 'activity_owner_mismatch', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: 'activity', recordId: String(activity.id || ''), cycleId: String(state.runId || ''), reason: 'Giao dịch ' + String(activity.id || '') + ' (FBM ' + String(activity.fbmId || '') + '): ' + reason + ' Chưa ghi gì.', detail: { fbmId: String(activity.fbmId || ''), owner: String(owner || ''), customerId: String(activity.customerId || '') } });
+/** Hai lần đọc FBM nói khác nhau về khách đang giữ một giao dịch: không ghi gì; trả dòng Log để người phụ trách kiểm tra. */
+FbmSync.gateOwnerMismatch = function (activity, owner, reason) {
+  return { action: 'activity_owner_mismatch', outcome: LOG_WARN, entity: 'activity', recordId: String(activity.id || ''), reason: 'Giao dịch ' + String(activity.id || '') + ' (FBM ' + String(activity.fbmId || '') + '): ' + reason + ' Chưa ghi gì.', detail: { fbmId: String(activity.fbmId || ''), owner: String(owner || ''), customerId: String(activity.customerId || '') } };
 };
 
 /** Chỉ mục khách và giao dịch trên Sheet cho một bước đối chiếu; dựng một lần mỗi lời gọi. */
@@ -144,14 +155,46 @@ FbmSync.gateTransferCustomer = function (flags, local, customer, reason) {
 };
 
 /**
- * Vòng đọc của lô: kiểm phần tử, ghi khách rồi giao dịch, đối chiếu vắng mặt, ghi cờ không cần tra; còn vắng mặt thì mở vòng tra mã.
- * Phần tử nghi phiên thì cả lô không ghi và đi đường probe (cursor còn nguyên nên dựng lại đúng lô); lỗi của một khách thì chỉ bỏ khách đó.
+ * Đầu vào của chặng lô đọc chi tiết, đọc qua cổng chủ một lần mỗi lát: cổng danh mục và tên tài khoản cho `pullPageApply`; chỉ mục Sheet khi lô được ghi Sheet hoặc đang tra mã; phạm vi chỉ ở vòng tra mã.
  */
-FbmSync.gateReadContinue = function (state, cursor, checks) {
-  var customers = cursor.customers || [], gate = FbmSync.stateCategoryGate(state), write = FbmSync.canWriteSheet(state.mode), count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0];
+FbmSync.activityGridInputs = function (state) {
+  var lookup = !!(state.cursor && state.cursor.lookup), local = lookup || FbmSync.canWriteSheet(state.mode);
+  return { categoryGate: FbmSync.stateCategoryGate(state), accountName: FbmSync.scriptSettings().accountName, local: local ? FbmSync.gateLocalIndex() : null, scope: lookup ? FbmSync.scope() : null };
+};
+
+/**
+ * Chặng lô đọc chi tiết (lớp xả đọc và vòng tra mã): kiểm lô, ghi hoặc gắn cờ, rồi lấp lô kế của lớp; hết khách thì `end` để bước kết mở lớp kế.
+ * Phần tử nghi phiên thì cả lô không ghi và nhường cổng phiên (cursor còn nguyên nên dựng lại đúng lô); lỗi của một khách thì chỉ bỏ khách đó.
+ */
+FbmSync.activityGridStage = function (ctx) {
+  var state = ctx.state, cursor = state.cursor, input = ctx.inputs, logs = [];
+  var chunk = cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null;
+  var checks = FbmSync.activityBatchCheck(ctx.reply, chunk ? chunk.length : (cursor.customers || []).length + 1);
+  if (checks.some(function (entry) { return entry.check.code === 'SESSION_SUSPECTED'; })) { return { patch: {}, session: { suspected: 'Phản hồi FBM đáng ngờ trong lô đọc chi tiết; chưa ghi gì, đang probe lại phiên.' } }; }
+  state.metadata = state.metadata || {};
+  var imported = chunk ? FbmSync.gateLookupContinue(state, checks, chunk, input, logs) : FbmSync.gateReadContinue(state, checks, input, { categoryGate: input.categoryGate, accountName: input.accountName, now: ctx.now }, logs);
+  var patch = function () { return { cursor: state.cursor, counts: state.counts, metadata: state.metadata, progress: state.progress, message: state.message, logs: logs }; };
+  if (!state.cursor.lookup) {
+    FbmSync.activityBatchPlan(state.cursor, state.metadata);
+    FbmSync.activityLayerProgress(state);
+  }
+  var request = FbmSync.activityBatchRequest(state);
+  return request ? { patch: patch(), next: request } : { patch: patch(), end: { imported: imported } };
+};
+
+/** Bước kết của chặng: mở lớp đọc kế của lượt; hết lớp thì chốt lượt hoặc sang chiều đẩy, lượt xong thì nối bước đếm khách. */
+FbmSync.activityGridEnd = function (state, end) {
+  return FbmSync.runTail(FbmSync.activityStagesContinue(state, { imported: end.imported }));
+};
+
+/**
+ * Vòng đọc của lô: ghi khách rồi giao dịch, đối chiếu vắng mặt, ghi cờ không cần tra; còn vắng mặt thì mở vòng tra mã (`cursor.lookup`). Sửa trên `state` của chặng, trả số bản ghi đã nhận.
+ * Cursor chỉ tiến sau khi ghi xong: ghi lỗi giữa chừng thì lát lỗi, ô lượt còn cursor cũ và lần sau dựng lại đúng lô này (ghi lại là idempotent).
+ */
+FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
+  var cursor = state.cursor, customers = cursor.customers || [], gate = input.categoryGate, write = FbmSync.canWriteSheet(state.mode), count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0];
   var returned = {}, readOk = {}, customerRecords = [], activityRecords = [], failed = [], outcomes = [], retry = [], isFresh = FbmSync.activityFreshIndex();
   var pages = cursor.pages || {}, nextPages = {}, pagedSeen = Object.keys(pages).length ? FbmSync.shardListRead(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX) : [], pagedNew = [];
-  state.metadata = state.metadata || {};
   if (!customerCheck.check.ok) {
     // Không biết khách nào còn nên không kết luận vắng mặt cho ai: báo lỗi từng khách của lô, không ghi, không tra.
     var reason = 'FBM trả lỗi khi đọc thông tin khách của lô; khách này chưa được đọc và không bị gắn cờ trong lượt. ' + String(customerCheck.check.bug && (customerCheck.check.bug.Message || customerCheck.check.bug.message) || '');
@@ -198,11 +241,11 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
       });
     } catch (shapeError) {
       // Khối này chỉ ghép dòng theo tiêu đề cột: lỗi ở đây là FBM trả lệch cấu trúc (thiếu, trùng, đổi số cột), dừng cả lô chứ không đoán.
-      return { result: FbmSync.activityBatchMismatch(state, String(shapeError && shapeError.message || shapeError), shapeError && shapeError.code || 'FBM_BATCH_ITEM_MISMATCH') };
+      throw FbmSync.activityBatchError(String(shapeError && shapeError.message || shapeError), shapeError && shapeError.code || 'FBM_BATCH_ITEM_MISMATCH');
     }
   }
-  // Đối chiếu trên Sheet trước khi ghi: ghi xong thì giao dịch đổi khách đã nằm dưới khách mới.
-  var local = write ? FbmSync.gateLocalIndex() : null, inBatch = {}, lookups = [], moved = [], flags = { customer: [], activity: [] }, waits = write ? FbmSync.readWaitRead() : {};
+  // Đối chiếu trên bản chụp Sheet đọc trước khi ghi: ghi xong thì giao dịch đổi khách đã nằm dưới khách mới.
+  var local = input.local, inBatch = {}, lookups = [], moved = [], flags = { customer: [], activity: [] }, waits = write ? FbmSync.readWaitRead() : {};
   activityRecords.forEach(function (record) { inBatch[String(record.fbmId || '').trim()] = String(record.customerFbmId || ''); });
   // Giao dịch thấy ở trang trước của khách đọc nhiều trang cũng là đã thấy trong lần đọc khách đó.
   pagedSeen.forEach(function (entry) { var at = entry.indexOf(':'), id = entry.slice(at + 1); if (inBatch[id] === undefined) { inBatch[id] = entry.slice(0, at); } });
@@ -226,22 +269,16 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
         var activity = local.activityById[fbmId];
         if (!activity || inBatch[fbmId] !== undefined) { return; }
         if (customerCheck.check.ok && !returned[sttRec]) { flags.activity.push({ record: activity, status: FbmSync.SYNC_STATUS.transferred, reason: 'FBM báo giao dịch thuộc khách ' + sttRec + ' nhưng khách đó không còn trong quyền của tài khoản; giữ dưới khách cũ.' }); return; }
-        if (readOk[sttRec] && readOk[sttRec].complete) { FbmSync.gateOwnerMismatch(state, activity, sttRec, 'FBM báo khách ' + sttRec + ' đang giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.'); }
+        if (readOk[sttRec] && readOk[sttRec].complete) { logs.push(FbmSync.gateOwnerMismatch(activity, sttRec, 'FBM báo khách ' + sttRec + ' đang giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.')); }
       });
     });
   }
-  // Cursor chỉ tiến sau khi ghi xong: ghi lỗi giữa chừng thì state còn cursor cũ, lần sau dựng lại đúng lô này (ghi lại là idempotent).
-  var activityFields = state.metadata.activityFields, customerFields = state.metadata.customerFields, mode = state.mode;
-  if (customerRecords.length) { FbmSync.pullRecords('customer', customerRecords, mode); FbmSync.previewRecords('customer', customerRecords); }
-  if (activityRecords.length) { FbmSync.pullRecords('activity', activityRecords, mode); FbmSync.previewRecords('activity', activityRecords); }
-  state = FbmSync.stateRead();
-  state.metadata = state.metadata || {};
-  if ((activityFields || []).length) { state.metadata.activityFields = activityFields; }
-  if ((customerFields || []).length) { state.metadata.customerFields = customerFields; }
+  if (customerRecords.length) { FbmSync.pullBatchApply(state, 'customer', customerRecords, pull); FbmSync.previewRecords('customer', customerRecords); }
+  if (activityRecords.length) { FbmSync.pullBatchApply(state, 'activity', activityRecords, pull); FbmSync.previewRecords('activity', activityRecords); }
   var carried = retry.concat(Object.keys(nextPages));
   state.cursor.customers = carried;
   state.cursor.pages = nextPages;
-  FbmSync.activityCustomerErrors(state, failed);
+  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, failed));
   if (pagedSeen.length || pagedNew.length) { FbmSync.shardListWrite(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX, pagedSeen.filter(function (entry) { return nextPages[entry.slice(0, entry.indexOf(':'))]; }).concat(pagedNew)); }
   if (write) {
     FbmSync.gateFlagWrite(state, 'activity', flags.activity);
@@ -257,22 +294,20 @@ FbmSync.gateReadContinue = function (state, cursor, checks) {
     state.cursor.customers = customers; FbmSync.activityTopAccount(state.cursor, outcomes);
     state.cursor.customers = carried; state.cursor.topPositions = carried.map(function (sttRec) { return positions[customers.indexOf(sttRec)]; });
   }
-  var imported = customerRecords.length + activityRecords.length;
   if (lookups.length) {
     FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, lookups);
     state.cursor.lookup = true; state.cursor.lookupPos = 0;
     state.message = 'Đang tra ' + lookups.length + ' mã vắng mặt trước khi gắn cờ...';
-    FbmSync.stateWrite(state);
-    return { result: { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityBatchRequest(state)), status: FbmSync.statusView(), imported: imported } };
   }
-  return FbmSync.gateNextBatch(state, imported);
+  return customerRecords.length + activityRecords.length;
 };
 
 /**
  * Vòng tra mã: mỗi phần tử một mã, theo bảng 09/05 Phần 9 "Vắng mặt và chuyển quyền". Lỗi tra thì không gắn cờ, Sidebar và Log báo; hai lần đọc FBM nói khác nhau thì không ghi, Log `activity_owner_mismatch`.
+ * Hết mã thì tắt vòng tra để chặng lấp lô kế. Trả 0 vì vòng tra không nhận bản ghi nào.
  */
-FbmSync.gateLookupContinue = function (state, cursor, checks, chunk) {
-  var local = FbmSync.gateLocalIndex(), waits = FbmSync.readWaitRead(), isDone = FbmSync.readListDoneReader(), pullAllowed = FbmSync.pullAllowedReader('customer'), scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null, sync = FbmSync.SYNC_STATUS;
+FbmSync.gateLookupContinue = function (state, checks, chunk, input, logs) {
+  var local = input.local, waits = FbmSync.readWaitRead(), isDone = FbmSync.readListDoneReader(), pullAllowed = FbmSync.pullAllowedReader('customer'), scope = input.scope, sync = FbmSync.SYNC_STATUS;
   var flags = { customer: [], activity: [] }, adds = [], failed = [];
   chunk.forEach(function (entry, position) {
     var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item);
@@ -289,58 +324,27 @@ FbmSync.gateLookupContinue = function (state, cursor, checks, chunk) {
     if (!result.ok) { failed.push({ customer: 'giao dịch ' + value, code: result.code, status: result.status, reason: 'Không tra được khách đang giữ giao dịch vắng; giao dịch chưa bị gắn cờ. ' + result.reason }); return; }
     var owner = result.sttRecs[0] || '', next = local.byStt[owner];
     if (!owner) { flags.activity.push({ record: activity, status: sync.missing, reason: 'Không thấy giao dịch bên FBM; không suy ra xóa.' }); return; }
-    if (owner === current) { FbmSync.gateOwnerMismatch(state, activity, owner, 'FBM báo khách cũ vẫn giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.'); return; }
-    if (isDone(owner)) { FbmSync.gateOwnerMismatch(state, activity, owner, 'FBM báo khách ' + owner + ' đang giữ giao dịch nhưng lần đọc khách đó trong lượt không có giao dịch này.'); return; }
+    if (owner === current) { logs.push(FbmSync.gateOwnerMismatch(activity, owner, 'FBM báo khách cũ vẫn giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.')); return; }
+    if (isDone(owner)) { logs.push(FbmSync.gateOwnerMismatch(activity, owner, 'FBM báo khách ' + owner + ' đang giữ giao dịch nhưng lần đọc khách đó trong lượt không có giao dịch này.')); return; }
     if (next && (String(next.recordStatus || 'active') === 'deleted' || !pullAllowed(next))) {
       // Khách mới đã xóa mềm hoặc không cho lấy về: không đọc khách đó, chỉ đổi khách cha, giữ nội dung.
       flags.activity.push({ record: activity, patch: { customerId: String(next.id || '').trim() } });
-      if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'activity_parent_blocked', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', entity: 'activity', recordId: String(activity.id || ''), cycleId: String(state.runId || ''), reason: 'Giao dịch ' + String(activity.id || '') + ' đã chuyển sang khách ' + String(next.id || '') + ' nhưng khách đó đã xóa hoặc không cho lấy về; chỉ đổi khách cha, giữ nội dung.', detail: { fbmId: value, from: String(activity.customerId || ''), to: String(next.id || '') } }); }
+      logs.push({ action: 'activity_parent_blocked', outcome: LOG_WARN, entity: 'activity', recordId: String(activity.id || ''), reason: 'Giao dịch ' + String(activity.id || '') + ' đã chuyển sang khách ' + String(next.id || '') + ' nhưng khách đó đã xóa hoặc không cho lấy về; chỉ đổi khách cha, giữ nội dung.', detail: { fbmId: value, from: String(activity.customerId || ''), to: String(next.id || '') } });
       return;
     }
     if (scope && !(next && FbmSync.inScope(next, scope))) { flags.activity.push({ record: activity, status: sync.transferred, reason: 'Giao dịch đã chuyển sang khách ngoài phạm vi đồng bộ; giữ dưới khách cũ.' }); return; }
     adds.push(owner);
     (waits[owner] = waits[owner] || []).push(value);
   });
-  FbmSync.activityCustomerErrors(state, failed);
+  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, failed));
   FbmSync.gateFlagWrite(state, 'customer', flags.customer);
   FbmSync.gateFlagWrite(state, 'activity', flags.activity);
   FbmSync.readWaitWrite(waits);
   FbmSync.readListAdd(adds);
-  state.cursor.lookupPos = Number(cursor.lookupPos || 0) + chunk.length;
-  if (FbmSync.gateLookupChunk(state.cursor).length) {
-    FbmSync.stateWrite(state);
-    return { result: { ok: true, request: FbmSync.nextEnvelope(FbmSync.activityBatchRequest(state)), status: FbmSync.statusView() } };
+  state.cursor.lookupPos = Number(state.cursor.lookupPos || 0) + chunk.length;
+  if (!FbmSync.gateLookupChunk(state.cursor).length) {
+    FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, []);
+    state.cursor.lookup = false; state.cursor.lookupPos = 0;
   }
-  FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, []);
-  state.cursor.lookup = false; state.cursor.lookupPos = 0;
-  return FbmSync.gateNextBatch(state, 0);
-};
-
-/** Lô đã ghi xong: lấp lô kế của chặng; hết khách thì trả `{ done: true }` để PullFlow sang chặng sau. */
-FbmSync.gateNextBatch = function (state, imported) {
-  FbmSync.activityBatchPlan(state.cursor, state.metadata);
-  FbmSync.activityLayerProgress(state);
-  var request = FbmSync.activityBatchRequest(state);
-  FbmSync.stateWrite(state);
-  return request ? { result: { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView(), imported: imported } } : { done: true, state: state, imported: imported };
-};
-
-/** Nhận một lô của cửa ghi. Lô thiếu, thừa hoặc trùng phần tử là lệch hợp đồng: dừng phiên, không ghi gì. */
-FbmSync.activityBatchContinue = function (state, cursor, rawResponse) {
-  var chunk = cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null, expected = chunk ? chunk.length : (cursor.customers || []).length + 1, items = rawResponse && rawResponse.items, received = {}, bad = '';
-  if (!Array.isArray(items) || !items.length) { return { result: FbmSync.activityBatchMismatch(state, 'Response lô đọc chi tiết không phải lô hoặc lô rỗng dù GAS đã cấp lô; Extension hoặc Sidebar đang chạy bản lệch hợp đồng.') }; }
-  items.forEach(function (item) {
-    var id = String(item && item.id);
-    if (!/^\d+$/.test(id) || Number(id) >= expected || received[id]) { bad = bad || id; }
-    received[id] = item;
-  });
-  if (bad) { return { result: FbmSync.activityBatchMismatch(state, 'Lô đọc chi tiết trả phần tử "' + bad + '" không có trong kế hoạch hoặc bị trùng; đã dừng và không ghi gì.') }; }
-  if (items.length < expected) { return { result: FbmSync.activityBatchMismatch(state, 'Lô đọc chi tiết chỉ trả ' + items.length + '/' + expected + ' phần tử; đã dừng và không ghi gì.') }; }
-  var checks = [];
-  for (var position = 0; position < expected; position += 1) { checks.push({ item: received[String(position)], check: FbmSync.protocol.assertSuccess(received[String(position)]) }); }
-  if (checks.some(function (entry) { return entry.check.code === 'SESSION_SUSPECTED'; })) {
-    var probe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ trong lô đọc chi tiết; chưa ghi gì, đang probe lại phiên.');
-    return { result: probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError } };
-  }
-  return chunk ? FbmSync.gateLookupContinue(state, cursor, checks, chunk) : FbmSync.gateReadContinue(state, cursor, checks);
+  return 0;
 };
