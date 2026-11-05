@@ -1006,7 +1006,9 @@ async function chay(so) {
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
         const before = fullFlow.hop.FbmSync.statusView();
-        fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw }, 'relay');
+        // Chặng ném lỗi có mã thì lát đã đóng lượt lỗi rồi ném tiếp, như cửa relay thật nhận lỗi; ca kiểm đọc kết quả qua ô lượt.
+        try { fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw }, 'relay'); }
+        catch (stageError) { if (!stageError.code) { throw stageError; } fullStep = { ok: false, code: stageError.code, request: null, status: fullFlow.hop.FbmSync.statusView() }; }
         if (withTrace) { fullFlow.hop.FbmSync.traceEvent({}, 'engine_after', { operation: 'fbmContinueSync' }); }
         if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
@@ -1135,7 +1137,7 @@ async function chay(so) {
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
   readFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  readFlow.hop.FbmSync.pullWrite = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [] });
+  readFlow.hop.FbmSync.pullPageApply = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] });
   readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const readKinds = [];
@@ -1168,7 +1170,7 @@ async function chay(so) {
     let sheetWrites = 0;
     flow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
     flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-    flow.hop.FbmSync.pullWrite = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
+    flow.hop.FbmSync.pullPageApply = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }; };
     flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
     let step = flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }), last = step;

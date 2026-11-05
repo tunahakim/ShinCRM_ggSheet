@@ -4,6 +4,7 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan,
 const { datPhan } = require('../../lib/fbm/cai-dat-thu');
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 
 async function chay(so) {
   section("FBM sync — push");
@@ -66,10 +67,10 @@ async function chay(so) {
     approval.FbmSync.canWriteSheet('write'), approval.FbmSync.canWriteFbm('write')
   ], [true, false, false, true, false, false, true, true, true]);
   let pullWriteCalls = 0;
-  approval.FbmSync.pullWrite = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
+  approval.FbmSync.pullPageApply = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }; };
   approval.FbmSync.statePatch({ counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
-  const readPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-1' }], 'read');
-  const checkPull = approval.FbmSync.pullRecords('customer', [{ id: 'C-2' }], 'check');
+  const readPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-1' }], 'read');
+  const checkPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-2' }], 'check');
   check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
   orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = orchestration.FbmSync.start({ mode: 'read' });

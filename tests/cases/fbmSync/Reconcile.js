@@ -2,6 +2,7 @@
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require("../../lib/load-gas");
 const { taoBoTest } = require('./Sidebar');
+const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 
 async function chay(so) {
   section("FBM sync — reconcile và candidate");
@@ -36,7 +37,7 @@ async function chay(so) {
   edges.FbmSync.readLocal = () => [{ id: 'CUS-000010', fbmId: 'FBM-LOCK', fbmCustomerCode: 'ALT00010', companyName: 'Cũ', fbmHash: '' }];
   giuBanGhi(edges, 'khac', 'customer', 'CUS-000010');
   edges.writeGateSave = () => { lockedWrite = true; return { ok: true }; };
-  const lockedPull = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, { map: {} })]);
+  const lockedPull = keoVe(edges.FbmSync, 'customer', [edges.FbmSync.customerRecord({ stt_rec_kh: 'FBM-LOCK', ma_kh: 'ALT00010', ten_kh: 'Mới' }, { map: {} })]);
   check(so, 'pull bỏ qua bản ghi tiến trình khác đang giữ trong sổ bận, để lượt sau', [lockedPull.written, lockedPull.skipped, lockedWrite], [0, 1, false]);
 
   let activityPullWrite;
@@ -45,23 +46,23 @@ async function chay(so) {
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmId: 'S14', fbmCustomerCode: 'ALT00014' }] : [];
   edges.writeGateSave = (request) => { activityPullWrite = request; return { ok: true }; };
   const newActivity = edges.FbmSync.activityRecord({ id: 88, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Nội dung', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
-  const activityPull = edges.FbmSync.pullWrite('activity', [newActivity]);
+  const activityPull = keoVe(edges.FbmSync, 'activity', [newActivity]);
   check(so, 'Activity pull moi noi dung vao Customer noi bo', [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId], [1, 'CUS-ACT', 88]);
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmId: 'S14', fbmCustomerCode: 'ALT00014' }] : [];
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
-  const orphanActivityResult = edges.FbmSync.pullWrite('activity', [orphanActivity]);
+  const orphanActivityResult = keoVe(edges.FbmSync, 'activity', [orphanActivity]);
   check(so, 'Activity marker mo coi khong tao dong moi', orphanActivityResult.written, 0);
   const invalidState = { runId: 'invalid-activity', phase: 'pull_activity', entity: 'activity', cursor: { kind: 'activity_grid', index: 2 }, session: { customerAuthorized: '', activityAuthorized: '', expired: false }, metadata: { seen: { customer: {}, activity: {} }, conflicts: [] }, locks: {}, counts: { total: 1, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 }, message: '', lastError: '' };
   edges.FbmSync.stateRead = () => invalidState;
   edges.FbmSync.stateWrite = (next) => { Object.assign(invalidState, next); return invalidState; };
   const invalidActivity = edges.FbmSync.activityRecord({ id: 90, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Thiếu ngày', end_date: '' }, gate, { sttRec: 'S14' });
-  const invalidActivityResult = edges.FbmSync.pullWrite('activity', [invalidActivity]);
+  const invalidActivityResult = keoVe(edges.FbmSync, 'activity', [invalidActivity]);
   const invalidActivityUi = taoBoTest();
   invalidActivityUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
   check(so, 'Activity missing Sidebar có thông báo lỗi', invalidActivityUi.content.textContent.indexOf('lỗi') >= 0 || invalidActivityUi.content.textContent.indexOf('ngày') >= 0, true);
   check(so, 'Activity thiếu ngày bị chặn an toàn và không ghi Log từng record', [invalidActivityResult.written, reconcileLogs.some((event) => event.action === 'pull_record')], [0, false]);
   const validActivity = edges.FbmSync.activityRecord({ id: 91, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Đủ ngày', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
-  const mixedActivityResult = edges.FbmSync.pullWrite('activity', [validActivity, invalidActivity]);
+  const mixedActivityResult = keoVe(edges.FbmSync, 'activity', [validActivity, invalidActivity]);
   check(so, 'Activity hợp lệ vẫn được ghi khi cả thiếu ngày cùng lô', [mixedActivityResult.written, activityPullWrite.records.some((record) => String(record.fbmId) === '91'), reconcileLogs.some((event) => event.action === 'pull_record')], [1, true, false]);
 
   const conflictRawBase = { stt_rec_kh: 'FBM-CONFLICT', ma_kh: 'ALT00015', ten_kh: 'Ten goc', ma_so_thue: '010015', dien_thoai: '090015', dc_lh: 'Ha Noi' };
@@ -72,7 +73,7 @@ async function chay(so) {
   edges.FbmSync.readLocal = () => [conflictLocal];
   edges.writeGateSave = () => ({ ok: true });
   const conflictIncoming = edges.FbmSync.customerRecord(Object.assign({}, conflictRawBase, { ten_kh: 'Ten FBM moi' }), gate);
-  const conflictResult = edges.FbmSync.pullWrite('customer', [conflictIncoming]);
+  const conflictResult = keoVe(edges.FbmSync, 'customer', [conflictIncoming]);
   const conflictUi = taoBoTest();
   conflictUi.hop.fbmSyncPaint(edges.FbmSync.statusView());
   check(so, 'Conflict Sidebar hiển thị cho quyết định', conflictUi.content.textContent.toLowerCase().indexOf('xung đột') >= 0 || conflictUi.content.textContent.toLowerCase().indexOf('quyết định') >= 0, true);
@@ -97,7 +98,7 @@ async function chay(so) {
   edges.FbmSync.stateWrite = (next) => { Object.assign(notAppliedState, next); return notAppliedState; };
   edges.FbmSync.readLocal = () => [pushedRecord];
   edges.writeGateSave = (request) => { notAppliedWrite = request; return { ok: true }; };
-  const notApplied = edges.FbmSync.pullWrite('customer', [edges.FbmSync.customerRecord(oldFbm, { map: {} })]);
+  const notApplied = keoVe(edges.FbmSync, 'customer', [edges.FbmSync.customerRecord(oldFbm, { map: {} })]);
   check(so, 'FBM khong doi sau push thanh notApplied, chặn đẩy bằng trạng thái Sheet thay vì khóa trong state', [notApplied.skipped, notAppliedWrite.records[0].syncStatus, Object.keys(notAppliedState.locks)], [1, edges.FbmSync.SYNC_STATUS.notApplied, []]);
 
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });

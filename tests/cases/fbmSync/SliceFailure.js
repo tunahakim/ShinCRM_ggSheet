@@ -2,6 +2,7 @@
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { hopBuoc: dungState } = require('../../lib/fbm/hop-buoc');
+const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 
 function chay(so) {
   section('FBM sync - lát lỗi đóng lượt đúng bước');
@@ -97,9 +98,9 @@ function chay(so) {
   ghi.nen.FbmSync.canWriteSheet = () => true;
   ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};
   ghi.nen.writeGateSave = () => ({ ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] });
-  ghi.nen.FbmSync.pullWrite = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
+  ghi.nen.FbmSync.pullPageApply = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }; };
   const cursorGhi = JSON.stringify(ghi.nen.FbmSync.stateRead().cursor || {});
-  ghi.nen.FbmSync.continue = () => { ghi.nen.FbmSync.pullRecords('customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
+  ghi.nen.FbmSync.continue = () => { keoLo(ghi.nen.FbmSync, 'customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;
   let nemGhi = '';
   try { ghi.nen.FbmSync.controlDispatch('continue', { response: {} }); } catch (err) { nemGhi = err.code; }

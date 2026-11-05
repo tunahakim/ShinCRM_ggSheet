@@ -328,6 +328,7 @@ tests\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
 │   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
+│   │   ├── keo-ve.js             Gọi chặng kéo về như lớp xả đọc gọi (`keoVe` qua cửa ghi `pullPageApply`, `keoLo` qua `pullBatchApply` trên ô lượt): dựng ngữ cảnh lời gọi và xóa mục chờ xác nhận đã khớp như người điều phối.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.

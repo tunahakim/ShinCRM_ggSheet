@@ -255,7 +255,7 @@ async function chay(so) {
     { name: 'TransportCore.js', source: fs.readFileSync(TRANSPORT_CORE_FILE, 'utf8') },
     { name: 'AutoLogin.js', source: fs.readFileSync(path.join(gasSyncRoot, 'fbm_sync', 'auth', 'AutoLogin.js'), 'utf8') }
   ];
-  const customerReconcileNames = ['identityCheckBegin', 'identityCheckPage', 'identityCheckFinish', 'identityCheckCustomerRequest', 'customerTaxIdentityIssue', 'threeWay', 'pullWrite'];
+  const customerReconcileNames = ['identityCheckBegin', 'identityCheckPage', 'identityCheckFinish', 'identityCheckCustomerRequest', 'customerTaxIdentityIssue', 'threeWay', 'pullPageApply'];
   sessionLayerSources.forEach((item) => {
     customerReconcileNames.forEach((name) => {
       if (new RegExp('FbmSync\\.' + name + '\\s*\\(').test(item.source)) { sessionLayerCustomerCalls.push(item.name + ':' + name); }
