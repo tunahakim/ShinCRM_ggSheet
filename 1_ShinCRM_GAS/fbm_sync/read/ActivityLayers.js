@@ -225,20 +225,19 @@ FbmSync.activityLayerProgress = function (state) {
   state.progress = { done: done, total: done + left };
 };
 
-/** Lớp 3 xong thì ghi Log vị trí sâu nhất có giao dịch mới để chỉnh độ dài chuỗi im lặng theo số đo thật. */
-FbmSync.activityTopScanLog = function (state, cursor) {
+/** Dòng Log khi lớp 3 xong: vị trí sâu nhất có giao dịch mới, để chỉnh độ dài chuỗi im lặng theo số đo thật. Chặng trả dòng này trong patch, khung chạy chặng ghi. */
+FbmSync.activityTopScanLine = function (cursor) {
   var streak = FbmSync.BUDGET.activityTopScanQuietStreak;
-  logEvent({ source: 'fbm_sync', action: 'activity_top_scan', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } });
+  return { action: 'activity_top_scan', outcome: LOG_OK, reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } };
 };
 
 /** Các lớp đọc của chặng Giao dịch lấy từ dãy chặng của lượt (`RUN_PLANS`). */
 FbmSync.activityStagesOf = function (state) { return FbmSync.runPlanOfState(state).activity; };
 
-/** Mở chặng kế; chặng không có việc thì sang chặng sau. Trả request đầu của chặng, hoặc `null` khi lượt đã hết chặng đọc. */
+/** Mở chặng kế trên ô lượt được truyền vào; chặng không có việc thì sang chặng sau. Trả request đầu của chặng, hoặc `null` khi lượt đã hết chặng đọc. Không ghi ô lượt: người điều phối gọi nó ghi. */
 FbmSync.activityStageNext = function (state) {
   var stages = FbmSync.activityStagesOf(state);
   state.metadata = state.metadata || {};
-  if (state.cursor && state.cursor.kind === 'activity_grid' && state.cursor.layer === 'top') { FbmSync.activityTopScanLog(state, state.cursor); }
   for (var index = FbmSync.runPlanNext(stages, state.metadata.activityStage === undefined ? -1 : state.metadata.activityStage); index >= 0; index = FbmSync.runPlanNext(stages, index)) {
     state.metadata.activityStage = index;
     var stage = stages[index], request;
@@ -248,7 +247,6 @@ FbmSync.activityStageNext = function (state) {
     if (request) { return request; }
   }
   state.cursor = {};
-  FbmSync.stateWrite(state);
   return null;
 };
 

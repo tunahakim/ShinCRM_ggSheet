@@ -10,7 +10,7 @@ FbmSync.GATE_LOOKUP_PREFIX = 'FBM_SYNC_GATE_LOOKUP_';
 // Mã giao dịch đã thấy ở các trang trước của khách đang đọc dở nhiều trang, dạng `<stt_rec_kh>:<id>`: trang cuối đối chiếu vắng mặt trên cả các trang này, không chỉ trang cuối.
 FbmSync.ACTIVITY_PAGED_SEEN_PREFIX = 'FBM_SYNC_PAGED_SEEN_';
 
-/** Mở cửa ghi cho một chặng đọc; trả request lô đầu hoặc `null` khi chặng không có khách nào. */
+/** Mở cửa ghi cho một chặng đọc trên ô lượt được truyền vào; trả request lô đầu hoặc `null` khi chặng không có khách nào. Không ghi ô lượt. */
 FbmSync.gateOpen = function (state, cursorFields, message) {
   state.phase = 'pull_activity'; state.entity = 'activity';
   ['pull_customer', 'reconcile_customer', 'pull_activity', 'reconcile_activity'].forEach(function (step) { FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: step.indexOf('customer') >= 0 ? 'customer' : 'activity' }); });
@@ -18,7 +18,6 @@ FbmSync.gateOpen = function (state, cursorFields, message) {
   state.message = message;
   FbmSync.activityBatchPlan(state.cursor, state.metadata);
   FbmSync.activityLayerProgress(state);
-  FbmSync.stateWrite(state);
   return FbmSync.activityBatchRequest(state);
 };
 
@@ -180,6 +179,7 @@ FbmSync.activityGridStage = function (ctx) {
     FbmSync.activityLayerProgress(state);
   }
   var request = FbmSync.activityBatchRequest(state);
+  if (!request && state.cursor.layer === 'top') { logs.push(FbmSync.activityTopScanLine(state.cursor)); }
   return request ? { patch: patch(), next: request } : { patch: patch(), end: { imported: imported } };
 };
 

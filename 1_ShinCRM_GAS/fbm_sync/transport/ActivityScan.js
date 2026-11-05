@@ -47,7 +47,7 @@ FbmSync.activityScanRequest = function (cursor) {
   return FbmSync.activityBulkRequest({ type: 0, count: FbmSync.BUDGET.scanActivityRows, gridPageIndex: -1, gridRefresh: false, filter: cursor.window ? FbmSync.activityWindowFilters(cursor) : [] });
 };
 
-/** Mở lớp 1. Sheet chưa có giao dịch FBM nào thì không có gì để đối soát: trả `null`, không gọi FBM. */
+/** Mở lớp 1 trên ô lượt được truyền vào, không ghi ô lượt. Sheet chưa có giao dịch FBM nào thì không có gì để đối soát: trả `null`, không gọi FBM. */
 FbmSync.beginActivityBulkPull = function (state) {
   state.phase = 'pull_activity'; state.entity = 'activity';
   FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
@@ -59,7 +59,6 @@ FbmSync.beginActivityBulkPull = function (state) {
   FbmSync.seenStoreBegin(FbmSync.ACTIVITY_BULK_STORE, local);
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: false });
   state.message = 'Đang lấy toàn bộ giao dịch đã có trên ShinCRM từ FBM...';
-  FbmSync.stateWrite(state);
   return FbmSync.scanJobRequest(state);
 };
 

@@ -251,8 +251,9 @@ FbmSync.finishPullRun = function (state) {
 /** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */
 FbmSync.activityStagesContinue = function (state, extra) {
   var request = FbmSync.activityStageNext(state);
+  FbmSync.stateWrite(state);
   if (request) { return Object.assign({ ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() }, extra || {}); }
-  return FbmSync.pullFinishOrPush(FbmSync.stateRead(), extra);
+  return FbmSync.pullFinishOrPush(state, extra);
 };
 
 /** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
