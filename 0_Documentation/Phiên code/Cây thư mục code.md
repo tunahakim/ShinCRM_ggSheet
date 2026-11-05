@@ -135,12 +135,14 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── SettingsReadProbe.js  Đếm số lần đọc cài đặt, Category, Sheet và DocumentProperties trong một lời gọi đồng bộ FBM; chỉ đọc, bọc tạm rồi trả lại hàm gốc.
 │       ├── NoticeGateProbe.js    Nghiệm thu cổng thông báo trên DocumentProperties thật và đo phí một lần getProperties lạnh.
 │       ├── BookBindingProbe.js       Hàm dò cặp mã Sheet và mã script đã ghi, để nghiệm thu chuyển Sheet.
+│       ├── AltProbe.js           Dò ứng viên ghi và nghiệm thu khách thử ALT00010 bằng đúng phép xét của chặng đẩy; chỉ đọc, không gọi FBM.
 │       ├── DumpRecentLog.js      Đọc tối đa 20 dòng Log cuối trên DEV để chẩn đoán; chỉ đọc, không dùng khi vận hành thật.
 │       ├── FbmPerfProbe.js       Đo thời gian từng bước của mỗi lần gọi GAS đồng bộ FBM và các đoạn Extension; bật bằng fbmPerfOn, đọc bằng fbmPerfReport, số liệu ở CacheService. Danh sách bọc có tên đã mất thì báo lỗi, không bỏ qua.
 │       ├── FbmPerfScope.js       Dựng phạm vi và dữ liệu cho phiên đo: thu phạm vi về vài khách thử, xóa vài dòng Activity, chỉnh múi giờ tệp DEV.
 │       ├── FbmPayloadProbe.js    Đo GAS giải JSON và băm gói Activity nhiều cỡ để chọn cỡ gói một lần gọi.
 │       ├── FbmSyncFixture.js     Dựng dữ liệu thử đồng bộ trên Sheet DEV qua cửa bản ghi (ALT00010, CUS-020061, xung đột, mã bị xóa).
 │       ├── FbmSyncBackgroundProbe.js Nghiệm thu dừng đồng bộ nền bằng đúng các cửa Sidebar gọi, đóng request không Extension nào gửi.
+│       ├── HashCompatProbe.js    Đếm dòng có dấu vân hiện tại khớp mốc fbmHash đã lưu, dùng sau mỗi lần đổi công thức dấu vân.
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
@@ -270,17 +272,20 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── read\ActivityLayers.js    Chọn khách cần đọc giao dịch theo gói quét: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
-    ├── write\PushCandidates.js   Chọn record local và kiểm điều kiện trước khi đẩy.
+    ├── write\PushCandidates.js   Phép xét một dòng của chặng đẩy (pushEligible), dựng ứng viên và phép chờ sửa; preflight dùng chung.
+    ├── write\FormValues.js       Trích giá trị từ response mở form FBM để dựng lệnh ghi tiếp theo.
     ├── write\SheetSave.js        Cửa ghi Sheet duy nhất của module đồng bộ; ghi thất bại thì ném lỗi.
-    ├── reconcile\Fingerprint.js  Normalize, canonical và fingerprint ba chiều.
+    ├── reconcile\Fingerprint.js  Chuẩn hóa giá trị và ngày, dấu vân bản ghi, so ba dấu vân.
     ├── reconcile\Conflict.js     Lưu, hiển thị và giải quyết conflict.
     ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
-    ├── reconcile\CategoryGate.js Đọc và đối chiếu Category với lookup FBM; không trực tiếp ghi Sheet.
+    ├── reconcile\CategoryGate.js Cổng danh mục của lần gọi (map từ Category, mã bị chặn của phiên) và phép kiểm ô danh mục cho cả hai chiều.
+    ├── reconcile\CategoryLookup.js Đối chiếu bảng tra danh mục FBM của phiên với Category; không ghi Sheet.
+    ├── reconcile\SyncPermission.js Quyền đồng bộ một bản ghi: ô Cho phép đồng bộ FBM, Customer cha, người phụ trách giao dịch.
     ├── report\Report.js          Trạng thái công khai cho Sidebar.
     ├── diagnostic\Trace.js       Trace hop độc lập, chỉ giữ metadata giới hạn trong DocumentProperties.
-    ├── report\Preflight.js       Checker riêng của module FBM; gọi Core checker, kiểm owner/cấu hình/mapping/conflict trước khi push.
-    └── report\Probe.js           Dò ứng viên ghi của ALT00010 mà không gọi FBM.
+    ├── report\Preflight.js       Checker riêng của module FBM; gọi Core checker, kiểm cổng rẻ và cấu hình trước phiên.
+    └── report\PreflightPush.js   Phần preflight của chặng đẩy: đếm đúng tập ứng viên chặng đẩy dựng, dòng bị chặn quyền, dấu vân lệch mốc.
 ```
 
 ## tests — bộ kiểm chạy trên máy
@@ -412,6 +417,8 @@ tests\
     │   ├── Pull.js                Kiểm pull Customer/Activity, marker, missing và bảo toàn trường nội bộ.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
+    │   ├── PushEligible.js         Kiểm phép xét đẩy một dòng, quyền đồng bộ, người phụ trách, và preflight đếm đúng tập chặng đẩy dựng.
+    │   ├── Fingerprint.js          Kiểm dấu vân giữ giá trị cố định, băm hai đường ra cùng kết quả, chuẩn hóa ngày, threeWay, cổng danh mục.
     │   ├── Identity.js            Kiểm liên kết tài khoản FBM với Sheet: xem trạng thái không đọc Sheet, hủy liên kết bị chặn khi request đang bay.
     │   ├── WebAppRelay.js         Kiểm cổng Web App relay của GAS: khóa, Sheet, mã giao thức, danh sách lệnh relay, ghi địa chỉ Web App, Log qua runEntryPoint.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, luồng nhiều lát, chặn cấu hình đẩy, trigger hẹn giờ cũ còn sót.
