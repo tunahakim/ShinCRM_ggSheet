@@ -55,7 +55,7 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
       if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('phiên FBM chưa được xác minh tài khoản nên chưa có mã người dùng; không dựng request đọc khách.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
       payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
     }
-    var scope = entity === 'customer' && opt.includeScope !== false && typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
+    var scope = entity === 'customer' && opt.includeScope !== false ? FbmSync.scope() : null;
     if (scope) {
       // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua khuôn của trường `scopeCodes` nên không có dấu nháy.
       var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";

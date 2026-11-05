@@ -43,7 +43,7 @@ FbmSync.readListClear = function () {
 
 /** Khách trên Sheet được cửa ghi đọc: đã có mã FBM, chưa xóa, không phải dòng tạm, cho phép lấy về và thuộc phạm vi. Một chỗ cho cả cổng thêm lẫn bước chọn lô. */
 FbmSync.readListEligibleReader = function () {
-  var pullAllowed = FbmSync.pullAllowedReader('customer'), scope = typeof FbmSync.scope === 'function' ? FbmSync.scope() : null;
+  var pullAllowed = FbmSync.pullAllowedReader('customer'), scope = FbmSync.scope();
   return function (record) {
     return !!String(record && record.fbmId || '').trim() && FbmSync.seenStoreIndex(FbmSync.READ_LIST_STORE, record) >= 0 && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('customer', record) && pullAllowed(record) && FbmSync.inScope(record, scope);
   };
@@ -227,9 +227,8 @@ FbmSync.activityLayerProgress = function (state) {
 
 /** Lớp 3 xong thì ghi Log vị trí sâu nhất có giao dịch mới để chỉnh độ dài chuỗi im lặng theo số đo thật. */
 FbmSync.activityTopScanLog = function (state, cursor) {
-  if (typeof logEvent !== 'function') { return; }
   var streak = FbmSync.BUDGET.activityTopScanQuietStreak;
-  logEvent({ source: 'fbm_sync', action: 'activity_top_scan', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', cycleId: String(state.runId || ''), reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } });
+  logEvent({ source: 'fbm_sync', action: 'activity_top_scan', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: 'Quét từ khách mới nhất xuống dừng ở khách thứ ' + Number(cursor.topPos || 0) + (Number(cursor.topQuiet || 0) >= streak ? ' sau ' + streak + ' khách liên tiếp không có gì mới' : ' vì hết danh sách') + '; giao dịch mới sâu nhất ở khách thứ ' + Number(cursor.topDeepest || 0) + '.', detail: { depth: Number(cursor.topPos || 0), deepestFresh: Number(cursor.topDeepest || 0), quiet: Number(cursor.topQuiet || 0), streak: streak } });
 };
 
 /** Các lớp đọc của chặng Giao dịch lấy từ dãy chặng của lượt (`RUN_PLANS`). */
