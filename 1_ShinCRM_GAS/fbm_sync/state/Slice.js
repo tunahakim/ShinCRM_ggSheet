@@ -1,6 +1,6 @@
 /**
  * Khung một lát đồng bộ: mọi lệnh có lát (`start`, `continue`) chạy trong `runSlice` khi đã cầm khóa điều phối; lệnh `continue` đi đúng một đường `sliceContinue`.
- * Bộ xử lý của chặng cũ trong `CURSOR_TABLE` mang `legacy: true`: chúng tự đọc và ghi ô lượt, khung không ghi thay để không có hai lần ghi đè nhau.
+ * Bộ xử lý của chặng cũ trong `CURSOR_TABLE` mang `legacy: true`: chúng tự đọc và ghi ô lượt. Chặng theo hợp đồng chung chạy qua `stageRun`: nhận bản sao ô lượt, trả `{ patch, next | end }`, khung gộp patch và phát request.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
@@ -69,6 +69,11 @@ FbmSync.controlFailRun = function (error) {
  */
 FbmSync.CURSOR_TABLE = {
   conflict_refresh: { legacy: true, run: function (rawResponse) { return FbmSync.conflictOpened(rawResponse); } },
+  customer_count: {
+    inputs: function (state) { return FbmSync.customerCountInputs(state); },
+    stage: function (ctx) { return FbmSync.customerCountStage(ctx); },
+    end: function (state, end) { return FbmSync.customerCountEnd(state, end); }
+  },
   run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
 };
 FbmSync.cursorTable = function (kind) {
@@ -77,7 +82,55 @@ FbmSync.cursorTable = function (kind) {
 /** Response về qua một cửa: qua các phép kiểm chung (`replyAdmit`) rồi cursor chọn bộ xử lý qua `cursorTable`. Bộ xử lý của từng kiểu cursor không kiểm lại. */
 FbmSync.continue = function (rawResponse) {
   var state = FbmSync.stateRead(), stop = FbmSync.replyAdmit(state, FbmSync.responseRequestId(rawResponse), rawResponse);
-  return stop || FbmSync.cursorTable(String((state.cursor || {}).kind || '')).run(rawResponse);
+  if (stop) { return stop; }
+  var entry = FbmSync.cursorTable(String((state.cursor || {}).kind || ''));
+  // Lượt nền vừa đóng thì `backgroundTail` ghi sổ tiến trình và mở tiến trình đến hạn kế; chặng cũ tự gọi trong `continueRun`.
+  return entry.legacy ? entry.run(rawResponse) : FbmSync.backgroundTail(FbmSync.stageRun(entry, state, rawResponse));
+};
+
+/**
+ * Sổ sách chung khi response của request đang chờ về tới, trước khi chặng đọc nó: bỏ request đang chờ, ghi dấu vết vận chuyển, đánh dấu cổng phiên đã nhận response, giữ cookie Extension bắt được.
+ * Sửa trên ô lượt của lát; người gọi ghi.
+ */
+FbmSync.replyIntake = function (state, rawResponse) {
+  var cursor = state.cursor || {}, requestId = String(state.activeRequestId || ''), transportTrace = rawResponse && rawResponse.transport && rawResponse.transport.trace, meta = FbmSync.traceResponse(rawResponse);
+  state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now();
+  if (transportTrace) { FbmSync.traceImport(state, transportTrace, { runId: state.runId, requestId: requestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
+  FbmSync.traceEvent(state, 'fbm_response_received', { requestId: requestId, httpStatus: meta.httpStatus, responseLength: meta.responseLength });
+  FbmSync.sessionGateResponseStarted(state);
+  FbmSync.applyTransportSession(state, rawResponse);
+  return state;
+};
+
+/**
+ * Người điều phối một chặng theo hợp đồng chung: đọc đầu vào chặng cần qua cổng chủ của chúng (`inputs`), chạy chặng trên bản sao ô lượt (chặng không sửa được ô lượt thật), gộp patch rồi:
+ * `next` thì phát request qua `nextEnvelope`; `session.suspected` thì nhường cổng phiên probe lại; `end` thì giao kết quả cho bước kết của chặng (`end`). Chặng ném lỗi thì `runSlice` đóng lượt lỗi.
+ */
+FbmSync.stageRun = function (entry, state, rawResponse) {
+  FbmSync.replyIntake(state, rawResponse);
+  FbmSync.stateWrite(state);
+  var out = entry.stage({ state: JSON.parse(JSON.stringify(state)), reply: rawResponse, inputs: entry.inputs ? entry.inputs(state) : {}, now: Date.now() }) || {};
+  FbmSync.stagePatchApply(state, out.patch);
+  if (out.session && out.session.suspected) {
+    var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);
+    return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
+  }
+  if (out.next) { return { ok: true, request: FbmSync.nextEnvelope(out.next), status: FbmSync.statusView() }; }
+  if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
+  return entry.end(state, out.end);
+};
+/**
+ * Gộp patch của chặng vào ô lượt của lát rồi đánh dấu ghi. `metadata` gộp nông vào metadata hiện có; `logs` là các dòng Log chặng muốn ghi, mang mã lượt khi dòng chưa có; trường khác thay nguyên giá trị.
+ */
+FbmSync.stagePatchApply = function (state, patch) {
+  var value = patch || {};
+  Object.keys(value).forEach(function (key) {
+    if (key === 'logs') { return; }
+    if (key === 'metadata') { state.metadata = Object.assign(state.metadata || {}, value.metadata); return; }
+    state[key] = value[key];
+  });
+  (value.logs || []).forEach(function (line) { logEvent(Object.assign({ source: 'fbm_sync', cycleId: String(state.runId || '') }, line)); });
+  return FbmSync.stateWrite(state);
 };
 /**
  * Phép kiểm chung của mọi kết quả và lỗi Extension nộp về, theo thứ tự: lượt quá hạn thì thu hồi; không thuộc request đang chờ thì bỏ (`staleReplyDrop`); response lệch mã hợp đồng thì dừng. Trả `null` khi được xử lý tiếp.

@@ -381,7 +381,7 @@ FbmSync.pauseForRuntimeLimit = function (state) {
  * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay.
  */
 FbmSync.issueContext = null;
-/** Bọc request nội bộ thành envelope gửi qua Extension. */
+/** Cổng phát request: kênh Sidebar giữ chỗ nhận lượt; công tắc tổng tắt, hết ngân sách lời gọi hay phiên chưa xác minh thì không phát request này (cổng phiên có thể thay bằng probe hoặc đăng nhập); qua cổng thì `requestIssue`. */
 FbmSync.nextEnvelope = function (request) {
   if (!request) { return null; }
   if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
@@ -431,21 +431,28 @@ FbmSync.nextEnvelope = function (request) {
   } catch (gateError) {
     return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
+  return FbmSync.requestIssue(FbmSync.stateRead(), request, Date.now());
+};
+/**
+ * Bước phát request của lát, sau khi cổng phiên đã chọn request thật sẽ gửi: kiểm miền FBM của từng request, cấp `requestId`, đặt hạn chờ, ghi request đang chờ vào ô lượt và bọc phong bì cho Extension.
+ * Không quyết gửi hay không: công tắc tổng, ngân sách và cổng phiên do `nextEnvelope` xét trước.
+ */
+FbmSync.requestIssue = function (state, request, now) {
   (request.items || [request]).forEach(function (item) {
     var endpoint = FbmSync.protocol.validateEndpoint(item.url);
     if (!endpoint.ok) {
-      FbmSync.traceEvent(pendingState, 'request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code });
+      FbmSync.traceEvent(state, 'request_blocked', { operation: item.meta && item.meta.kind || '', endpoint: item.url, code: endpoint.code });
       throw new Error(endpoint.message + ' (' + endpoint.code + ')');
     }
   });
   // Một lượt relay có thể dựng nhiều envelope trong cùng một mili-giây. Bộ đếm
   // trong vùng tên GAS giữ các ID đó khác nhau trong cùng một lượt chạy.
-  var now = Date.now(), sequence = Number(FbmSync._requestIdAt || 0) === now ? Number(FbmSync._requestIdSequence || 0) + 1 : 0;
+  var sequence = Number(FbmSync._requestIdAt || 0) === now ? Number(FbmSync._requestIdSequence || 0) + 1 : 0;
   FbmSync._requestIdAt = now;
   FbmSync._requestIdSequence = sequence;
   // Giữ dạng ID cũ khi không có nguy cơ trùng để DTO/trace không phình theo số
   // bước; chỉ thêm hậu tố tuần tự cho các envelope cùng mili-giây.
-  var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), state = FbmSync.stateRead(), meta = Object.assign({}, request.meta || {});
+  var id = now.toString(36) + (sequence ? '-' + sequence.toString(36) : ''), meta = Object.assign({}, request.meta || {});
   meta.trace = Object.assign({}, meta.trace || {}, { runId: String(state.runId || ''), requestId: id });
   // Extension chỉ có bộ lọc generic; GAS quyết định rõ dữ liệu phụ trợ cần lấy từ tab.
   var defaultTransport = FbmSync.payloadCookieTransport();
@@ -462,7 +469,7 @@ FbmSync.nextEnvelope = function (request) {
       delete meta.openFbmContext;
     }
   } catch (gateError) {
-    return FbmSync.sessionGateFailClosed(pendingState, gateError);
+    return FbmSync.sessionGateFailClosed(state, gateError);
   }
   meta.timeoutMs = FbmSync.budgetTimeoutMs(request, requestGap);
   meta.fetchMs = FbmSync.budgetFetchMs(meta);
@@ -472,8 +479,8 @@ FbmSync.nextEnvelope = function (request) {
   state.activeRequestSig = FbmSync.requestSig(request);
   if (state.resubmit && state.resubmit.answered && state.resubmit.answered === FbmSync.requestWatch.lastAnswered) { state.resubmit.issued = id; }
   if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
-  state.lastProgressAt = Date.now();
-  state.deadlineAt = FbmSync.budgetDeadlineAt(state.lastProgressAt, meta.timeoutMs);
+  state.lastProgressAt = now;
+  state.deadlineAt = FbmSync.budgetDeadlineAt(now, meta.timeoutMs);
   FbmSync.stateWrite(state);
   FbmSync.traceEvent(state, 'response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }

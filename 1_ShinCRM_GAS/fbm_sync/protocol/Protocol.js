@@ -129,3 +129,16 @@ FbmSync.protocol = {
   }
 };
 
+
+/**
+ * Phép kiểm response chung mà mỗi chặng gọi cho request nó gửi: trả `{ ok: true }`, hoặc `{ suspected }` khi phản hồi có dấu hiệu phiên chết (chặng nhường cổng phiên probe lại).
+ * Lỗi khác (HTTP, FBM báo `Bugs`, thân không đọc được) thì ném có mã để lượt đóng lỗi với đúng lý do FBM báo; không có giá trị mặc định nào thay cho response hỏng.
+ */
+FbmSync.replyCheck = function (reply) {
+  var failure = FbmSync.protocol.classifyFailure(reply);
+  if (!failure) { return { ok: true }; }
+  if (failure.code === 'SESSION_SUSPECTED') { return { suspected: 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.' }; }
+  var error = new Error(String(failure.bug && (failure.bug.Message || failure.bug.message) || 'FBM trả về lỗi nghiệp vụ'));
+  error.code = String(failure.code || 'FBM_ERROR');
+  throw error;
+};
