@@ -30,7 +30,7 @@ FbmSync.dayKeyAdd = function (key, days) {
 /** Cửa sổ thứ `windowIndex`: cửa sổ đầu không chặn dưới, cửa sổ chứa hôm nay không chặn trên, để giao dịch ngày tương lai hay đổi về trước ngày sớm nhất vẫn nằm trong một cửa sổ. */
 FbmSync.activityWindow = function (cursor) {
   var days = FbmSync.BUDGET.activityWindowDays, index = Number(cursor.windowIndex || 0), start = String(cursor.windowStart || '');
-  var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= FbmSync.activityDateKey(new Date());
+  var to = FbmSync.dayKeyAdd(start, (index + 1) * days - 1), last = to >= FbmSync.dateNormalize(new Date());
   return { from: index ? FbmSync.dayKeyAdd(start, index * days) : '', to: last ? '' : to, last: last };
 };
 
@@ -70,10 +70,10 @@ FbmSync.activityWindowStart = function () {
   var first = '', tracked = FbmSync.activityBulkTracker();
   FbmSync.readLocal('activity').forEach(function (record) {
     if (!tracked(record)) { return; }
-    var key = FbmSync.activityDateKey(record.workDate);
+    var key = FbmSync.dateNormalize(record.workDate);
     if (key && (!first || key < first)) { first = key; }
   });
-  return first || FbmSync.activityDateKey(new Date());
+  return first || FbmSync.dateNormalize(new Date());
 };
 
 /**

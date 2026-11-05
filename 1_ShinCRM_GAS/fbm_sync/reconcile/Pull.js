@@ -132,7 +132,7 @@ FbmSync.pullWrite = function (entity, records) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.skipped, 'Không lấy từ FBM: ' + currentPermission.reason, { issue: currentPermission.invalid });
       return;
     }
-    var categoryErrors = typeof FbmSync.validateIncomingCategories === 'function' ? FbmSync.validateIncomingCategories(incoming, entity, categoryGate) : [];
+    var categoryErrors = FbmSync.categoryGateCheck(incoming, entity, categoryGate);
     if (entity === 'activity' && (!String(incoming.workDate || '').trim() || (FbmSync.isDate(incoming.workDate) && isNaN(incoming.workDate.getTime())))) {
       skipped += 1;
       if (current) { statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.error }); }
@@ -154,6 +154,7 @@ FbmSync.pullWrite = function (entity, records) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; giữ nguyên nội dung nội bộ.');
       return;
     }
+    var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate);
     // Trường FBM sở hữu đứng ngoài fingerprint nên hash không lộ khi chúng đổi; ghi đè riêng: ma_kh để Activity mới còn nối được Customer cha (FBM-054), người tạo để hiện đúng người tạo trên FBM.
     (FbmSync.PULL_OVERWRITE_FIELDS[entity] || []).forEach(function (field) {
       var value = String(incoming[field] || '').trim();
@@ -162,12 +163,12 @@ FbmSync.pullWrite = function (entity, records) {
       if (FbmSync.PULL_OVERWRITE_LOGGED[field]) { FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, FbmSync.PULL_OVERWRITE_LOGGED[field] + value + '.', { issue: true }); }
     });
     if (identityMatched) {
-      writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmId: key, fbmCustomerCode: incoming.fbmCustomerCode || current.fbmCustomerCode, fbmHash: FbmSync.hash(incoming, entity, categoryGate), syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
+      writes.push(Object.assign({}, mergedIncoming, { id: current.id, fbmId: key, fbmCustomerCode: incoming.fbmCustomerCode || current.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() }));
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Nối lại định danh FBM vào dòng ShinCRM hiện có.');
       return;
     }
     if (String(current.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) {
-      var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate), previousHash = String(current.fbmHash || '').trim(), pendingItem = typeof FbmSync.pendingPushGet === 'function' ? FbmSync.pendingPushGet(entity, current.id) : null, pendingHash = String(pendingItem && (pendingItem.hSHIN || pendingItem.hash) || '').trim();
+      var previousHash = String(current.fbmHash || '').trim(), pendingItem = FbmSync.pendingPushGet(entity, current.id), pendingHash = String(pendingItem && (pendingItem.hSHIN || pendingItem.hash) || '').trim();
       if (pendingHash && incomingHash === pendingHash) {
         pendingClears.push({ entity: entity, id: current.id });
         var confirmedStatus = localHash === pendingHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;
@@ -193,16 +194,15 @@ FbmSync.pullWrite = function (entity, records) {
       }
       return;
     }
-    var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = FbmSync.hash(incoming, entity, categoryGate);
     if (!String(current.fbmHash || '').trim() && localHash === incomingHash) {
       statusWrites.push({ id: current.id, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() });
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.synced, 'Bổ sung baseline còn thiếu, không ghi nội dung.');
       return;
     }
-    var decision = FbmSync.threeWay({ hBASE: current.fbmHash || '' }, current, incoming, entity, categoryGate);
+    var decision = FbmSync.threeWay(String(current.fbmHash || '').trim(), localHash, incomingHash);
     if (decision.unchanged) {
       // G12: dấu #SC đứng ngoài hash nên chỉ thấy qua markerId. Giao dịch của chính tài khoản đang đồng bộ còn dấu thì xếp một lệnh sửa (không mang dấu) để bỏ, kể cả giao dịch đẩy trước G12; đẩy không ăn thì trạng thái đó chặn xếp lại.
-      if (entity === 'activity' && String(incoming.markerId || '') === String(current.id || '') && String(current.syncStatus || '') === FbmSync.SYNC_STATUS.synced && String(incoming.owner || '') === String(FbmSync.scriptSettings().accountName || '')) {
+      if (entity === 'activity' && String(incoming.markerId || '') === String(current.id || '') && String(current.syncStatus || '') === FbmSync.SYNC_STATUS.synced && String(incoming.owner || '').trim() && !FbmSync.ownerCheck(incoming, FbmSync.scriptSettings().accountName)) {
         statusWrites.push({ id: current.id, syncStatus: FbmSync.SYNC_STATUS.pending });
         FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.pending, 'Nội dung trên FBM còn dấu nhận diện #SC; xếp lượt đẩy để bỏ dấu.');
         return;

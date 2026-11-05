@@ -8,113 +8,6 @@ FbmSync.preflightIssue = function (issues, code, severity, scope, message, block
 /** Số mã bản ghi tối đa nêu trong một cảnh báo preflight. */
 FbmSync.PREFLIGHT_ID_LIST_MAX = 8;
 
-/** Hash mỗi bản ghi có baseline trên bản đọc chung `localScan`; quyền đẩy và tóm tắt hash dùng chung kết quả. Đọc lỗi đã ném ở `localScan`: coi như Sheet trống thì phiên chạy tiếp trên dữ liệu sai (FBM-022). */
-FbmSync.preflightLocalScan = function (scan, gate) {
-  var result = {};
-  ['customer', 'activity'].forEach(function (entity) {
-    result[entity] = scan.records(entity).map(function (record) {
-      var baseline = String(record && record.fbmHash || '').trim();
-      return { record: record, baseline: baseline, hash: baseline ? scan.hash(record, entity, gate || {}) : '' };
-    });
-  });
-  return result;
-};
-
-FbmSync.preflightPushPermissions = function (issues, mode, scan) {
-  var customers = {}, counts = { customer: 0, activity: 0 }, frozen = { customer: [], activity: [] }, invalid = { customer: [], activity: [] }, pending = String(FbmSync.SYNC_STATUS && FbmSync.SYNC_STATUS.pending || 'chờ đối soát');
-  scan.customer.forEach(function (item) { customers[String(item.record.id || '')] = item.record; });
-  ['customer', 'activity'].forEach(function (entity) {
-    scan[entity].forEach(function (item) {
-      var record = item.record, parent = entity === 'activity' ? customers[String(record.customerId || '')] : null;
-      var own = FbmSync.syncPermission(record, entity);
-      if (own.invalid) { invalid[entity].push(String(record.id || '')); return; }
-      var changed = !item.baseline || item.hash !== item.baseline || String(record.syncStatus || '') === pending;
-      if (!changed) { return; }
-      if (!FbmSync.syncPermission(record, entity, parent).push) { counts[entity] += 1; return; }
-      if (FbmSync.isPushFrozen(record, parent)) { frozen[entity].push(String(record.id || '')); }
-    });
-  });
-  Object.keys(counts).forEach(function (entity) {
-    var label = entity === 'activity' ? 'Activity' : 'Customer';
-    if (counts[entity]) { FbmSync.preflightIssue(issues, 'FBM_RECORD_PUSH_PERMISSION_MISSING', 'warn', entity, 'Có ' + counts[entity] + ' bản ghi ' + label + ' đã thay đổi nhưng ô "Cho phép đồng bộ FBM" không cho đẩy lên FBM.', false); }
-    if (frozen[entity].length) {
-      var frozenShown = frozen[entity].slice(0, FbmSync.PREFLIGHT_ID_LIST_MAX).join(', ') + (frozen[entity].length > FbmSync.PREFLIGHT_ID_LIST_MAX ? '…' : '');
-      FbmSync.preflightIssue(issues, 'FBM_RECORD_PUSH_FROZEN', 'warn', entity, frozen[entity].length + ' bản ghi ' + label + ' đã sửa trên Sheet nhưng không đẩy lên FBM vì bản ghi hoặc khách của nó đang mang "' + FbmSync.SYNC_STATUS.missing + '" hoặc "' + FbmSync.SYNC_STATUS.transferred + '": ' + frozenShown + '. Nội dung sửa vẫn giữ trên Sheet.', false);
-    }
-    // Nêu mã bản ghi để người dùng tìm được dòng cần sửa; danh sách dài thì cắt bớt để thông báo không bị cổng Log cắt mất phần hướng dẫn.
-    if (invalid[entity].length) {
-      var shown = invalid[entity].slice(0, FbmSync.PREFLIGHT_ID_LIST_MAX).join(', ') + (invalid[entity].length > FbmSync.PREFLIGHT_ID_LIST_MAX ? '…' : '');
-      FbmSync.preflightIssue(issues, 'FBM_SYNC_PERMISSION_INVALID', 'warn', entity, invalid[entity].length + ' bản ghi ' + label + ' có ô "Cho phép đồng bộ FBM" trống hoặc sai giá trị nên không được đẩy lên FBM: ' + shown + '. Hãy chọn lại giá trị trong danh sách.', false);
-    }
-  });
-};
-
-/** Tổng hợp đúng một lần số liệu hash local cho log bước preflight, không ghi theo record. */
-FbmSync.preflightHashSummary = function (scan) {
-  var summary = { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0, customer: { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0 }, activity: { localRecords: 0, baselineComparable: 0, changed: 0, unchanged: 0, newRecords: 0, withoutBaseline: 0 } };
-  ['customer', 'activity'].forEach(function (entity) {
-    scan[entity].forEach(function (entry) {
-      var record = entry.record, item = summary[entity], linked = entity === 'customer'
-        ? !!String(record && (record.fbmId || record.fbmCustomerCode) || '').trim()
-        : !!String(record && record.fbmId || '').trim();
-      summary.localRecords += 1; item.localRecords += 1;
-      if (!entry.baseline) {
-        summary.withoutBaseline += 1; item.withoutBaseline += 1;
-        if (!linked) { summary.newRecords += 1; item.newRecords += 1; }
-        return;
-      }
-      summary.baselineComparable += 1; item.baselineComparable += 1;
-      if (entry.hash === entry.baseline) { summary.unchanged += 1; item.unchanged += 1; }
-      else { summary.changed += 1; item.changed += 1; }
-    });
-  });
-  return summary;
-};
-
-/**
- * `scan` là bản đọc `localScan` của lần kiểm tra; ứng viên đẩy và hàng xung đột đều xét trên đó, không đọc lại Sheet.
- * Chỉ lỗi chung (đọc dữ liệu hỏng, không dựng được ánh xạ danh mục, thiếu cấu hình chung) mới chặn phiên. Lỗi của riêng một bản ghi chỉ là cảnh báo: dòng xung đột và bản ghi từng đẩy lỗi bị phép xét một dòng (`pushReview`) loại, bản ghi lệch người phụ trách, thiếu ánh xạ danh mục hoặc thiếu trường bị chặng đẩy đánh dấu chờ sửa; preflight báo trước và không tính chúng vào số ứng viên.
- * `conflictPending` là số dòng xung đột chờ quyết để người điều phối ghi Log; hàm này không tự ghi.
- */
-FbmSync.preflightCandidates = function (issues, mode, scan) {
-  var gate = { valid: {} }, candidates = [], settings = {}, settingsOk = true, conflictPending = 0, blockWrite = mode === 'write';
-  try { settings = typeof FbmSync.scriptSettings === 'function' ? FbmSync.scriptSettings() : {}; } catch (settingsError) {
-    settingsOk = false;
-    FbmSync.preflightIssue(issues, 'FBM_SETTINGS_READ_FAILED', 'error', 'Cài đặt', 'Không đọc được cài đặt đồng bộ FBM trước phiên: ' + String(settingsError && settingsError.message || settingsError), blockWrite);
-  }
-  try {
-    conflictPending = FbmSync.conflictQueue(scan).length;
-  } catch (localConflictError) {
-    FbmSync.preflightIssue(issues, 'FBM_LOCAL_CONFLICT_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được conflict cục bộ: ' + String(localConflictError && localConflictError.message || localConflictError), blockWrite);
-  }
-  try {
-    var savedStore = FbmSync.pushFailuresRead(), savedFailures = savedStore.hashes, savedDetails = savedStore.details;
-    Object.keys(savedFailures).forEach(function (key) {
-      var detail = savedDetails[key] || {}, reason = detail.reason || 'Bản ghi đã từng lỗi đẩy; hệ đang chặn gửi lại khi dữ liệu local chưa đổi.';
-      FbmSync.preflightIssue(issues, 'FBM_PREVIOUS_PUSH_FAILURE', 'warn', String(key).split(':')[0] || 'fbm_sync', 'Bản ghi ' + key + ' có lỗi đẩy trước đó, lượt này bỏ qua bản ghi đó: ' + reason, false);
-    });
-  } catch (savedFailureError) {
-    FbmSync.preflightIssue(issues, 'FBM_FAILURE_STATE_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được trạng thái lỗi đẩy trước đó: ' + String(savedFailureError && savedFailureError.message || savedFailureError), blockWrite);
-  }
-  try { if (typeof FbmSync.readCategoryGate === 'function') { gate = FbmSync.readCategoryGate() || gate; } } catch (gateError) {
-    FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), blockWrite);
-  }
-  try {
-    // Cùng phép xét với chặng đẩy: dòng chờ người sửa chưa đánh dấu chỉ là cảnh báo; dòng đã đánh dấu thì phép xét coi là không có việc nên không báo lại mỗi lượt.
-    var holdCodes = { owner: 'FBM_ACTIVITY_OWNER_MISMATCH', category: 'FBM_CATEGORY_MAPPING_MISSING', eligibility: 'FBM_PUSH_INELIGIBLE' };
-    FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan, settingsOk ? settings : {})).forEach(function (candidate) {
-      var entity = candidate.entity;
-      if (candidate.hold) { FbmSync.preflightIssue(issues, holdCodes[candidate.hold.code], 'warn', entity, candidate.hold.reason, false); } else { candidates.push(candidate); }
-      if (settingsOk && candidate.kind === 'create' && entity === 'customer' && (!String(settings.customerPrefix || '').trim() || !String(settings.customerCodeLength || '').trim())) {
-        FbmSync.preflightIssue(issues, 'FBM_CUSTOMER_CODE_CONFIG_MISSING', 'error', 'Cài đặt', 'Ứng viên tạo Customer ' + String(candidate.id || '') + ' cần tiền tố và độ dài mã khách FBM.', blockWrite);
-      }
-    });
-  } catch (candidateError) {
-    FbmSync.preflightIssue(issues, 'FBM_LOCAL_CANDIDATE_CHECK_FAILED', 'error', 'fbm_sync', 'Không kiểm tra được ứng viên local trước phiên: ' + String(candidateError && candidateError.message || candidateError), blockWrite);
-  }
-  return { candidates: candidates, gate: gate, settings: settings, conflictPending: conflictPending };
-};
-
 /**
  * Kiểm tra trước phiên tách theo chi phí (tài liệu 09/02 Phần 3 "Thứ tự trong một kỳ"): phần rẻ (`preflightGates`) chạy trước mọi request FBM vì cấu hình sai thì không được chạm FBM; phần đắt (`preflightLocal`) đọc cả hai Sheet và tính hash, chỉ chạy khi chiều chạy cần và sau khi phiên FBM đã xác thực, để FBM lỗi thì không phí công tính.
  * Lệnh chẩn đoán gọi hàm này để chạy cả hai liền nhau.
@@ -168,9 +61,9 @@ FbmSync.preflightLocal = function (options, issues) {
     FbmSync.preflightIssue(list, 'FBM_LOCAL_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được Sheet Customer/Activity trước phiên: ' + String(localError && localError.message || localError), true);
     return FbmSync.preflightResult(mode, list, null);
   }
-  var report = FbmSync.preflightCandidates(list, checkMode, scan), local = FbmSync.preflightLocalScan(scan, report.gate || {});
-  FbmSync.preflightPushPermissions(list, checkMode, local);
-  return FbmSync.preflightResult(mode, list, { candidateCount: report.candidates.length, hashSummary: FbmSync.preflightHashSummary(local), conflictPending: report.conflictPending });
+  var report = FbmSync.preflightCandidates(list, checkMode, scan);
+  if (report.review) { FbmSync.preflightPushPermissions(list, report.review); }
+  return FbmSync.preflightResult(mode, list, { candidateCount: report.candidates.length, hashSummary: report.review ? FbmSync.preflightHashSummary(report.review.rows) : null, conflictPending: report.conflictPending });
 };
 
 FbmSync.logPreflight = function (result) {

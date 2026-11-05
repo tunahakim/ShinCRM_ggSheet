@@ -56,8 +56,7 @@ FbmSync.formDate = function (value, fallback) {
 
 /** Đổi ngày nghiệp vụ của Sheet về dạng .NET; chỉ dùng cho end_date khi ngày phát sinh đổi. */
 FbmSync.activityFormDate = function (value, fallback) {
-  var parsed = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
-  var key = typeof FbmSync.activityDateKey === 'function' ? FbmSync.activityDateKey(parsed) : '';
+  var key = FbmSync.dateNormalize(value);
   return key ? FbmSync.formDate(key, fallback) : FbmSync.formDate(value, fallback);
 };
 /**
@@ -71,7 +70,7 @@ FbmSync.activityEditDate = function (record, oldValues, name, aliases, fallback)
   if (hasOld && name === 'start_date') { return oldDate; }
   if (hasOld && name === 'end_date') {
     if (!record || !Object.prototype.hasOwnProperty.call(record, 'workDate')) { return oldDate; }
-    var localKey = FbmSync.activityDateKey(record.workDate), oldKey = FbmSync.activityDateKey(oldValues[name]);
+    var localKey = FbmSync.dateNormalize(record.workDate), oldKey = FbmSync.dateNormalize(oldValues[name]);
     return localKey && oldKey && localKey === oldKey ? oldDate : FbmSync.activityFormDate(record.workDate, oldDate);
   }
   if (record && Object.prototype.hasOwnProperty.call(record, 'workDate')) {

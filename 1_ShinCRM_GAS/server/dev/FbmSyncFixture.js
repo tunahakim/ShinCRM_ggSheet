@@ -139,7 +139,7 @@ function fbmProbeCreateCustomer() {
     ok: true, id: record.id, companyName: record.companyName || '', fbmId: record.fbmId || '', fbmCustomerCode: record.fbmCustomerCode || '',
     syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', fbmSyncPermission: record.fbmSyncPermission || '',
     permission: FbmSync.syncPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
-    categoryErrors: FbmSync.validatePushCategories(record, 'customer', gate), canonical: FbmSync.canonical('customer', record, gate),
+    categoryErrors: FbmSync.categoryGateCheck(record, 'customer', gate), fbmCodes: FbmSync.toFbmCodes(record, 'customer', gate),
     scope: settingsValue('fbm_run', 'scopeCodes'), candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
   };
 }

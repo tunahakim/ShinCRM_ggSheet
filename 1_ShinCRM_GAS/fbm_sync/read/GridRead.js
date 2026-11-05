@@ -161,22 +161,6 @@ FbmSync.conflictRefreshRequest = function (entity, item) {
   activityRequest.meta.kind = 'conflict_refresh_grid'; activityRequest.meta.entity = 'activity'; activityRequest.meta.conflictId = String(target.id || '');
   return activityRequest;
 };
-FbmSync.FALLBACK_TIME_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
-/** Chuẩn hóa ngày Activity về khóa yyyy-MM-dd theo múi giờ dự án (Asia/Ho_Chi_Minh). */
-FbmSync.activityDateKey = function (value) {
-  var date = typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value;
-  if (Object.prototype.toString.call(date) === '[object Date]' && !isNaN(date.getTime())) {
-    if (typeof Utilities !== 'undefined' && typeof Session !== 'undefined' && Utilities.formatDate) {
-      return Utilities.formatDate(date, Session.getScriptTimeZone() || 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
-    }
-    // Ngoài GAS (test offline) không có Session: tính theo giờ VN như múi giờ của dự án, không theo UTC.
-    return new Date(date.getTime() + FbmSync.FALLBACK_TIME_ZONE_OFFSET_MS).toISOString().slice(0, 10);
-  }
-  var text = String(date || '').trim();
-  var match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
-};
-
 /**
  * Con trỏ trang kế của grid Customer (keyset): bốn giá trị sort key của dòng cuối trang, theo tài liệu Nghiên cứu FBM ch04 mục 4.10.
  * Thiếu `stt_rec_kh` thì FBM trả trang kế rỗng và lượt quét tưởng đã hết khách (gặp thật 2026-10-07: dừng ở 50/1.312 khách).

@@ -124,7 +124,7 @@ FbmSync.lastActivityIndex = function (categoryGate) {
   FbmSync.readLocal('activity').forEach(function (record) {
     var customerId = String(record && record.customerId || '').trim();
     if (!String(record && record.fbmId || '').trim() || !customerId) { return; }
-    var day = FbmSync.canonical('activity', record, categoryGate).end_date, entry = index[customerId];
+    var day = FbmSync.toFbmCodes(record, 'activity', categoryGate).end_date, entry = index[customerId];
     if (!day) { return; }
     if (!entry || day > entry.day) { index[customerId] = { day: day, records: [record] }; } else if (day === entry.day) { entry.records.push(record); }
   });
@@ -140,7 +140,7 @@ FbmSync.lastActivityDiff = function (row, last, categoryGate) {
   if (!FbmSync.isDate(date) || isNaN(date.getTime())) { return ['end_date']; }
   // 01/01/1999 là "chưa có giao dịch" (kiểm trên FBM thật 2026-10-09: 326/326 khách mang ngày này có 0 giao dịch).
   if (FbmSync.isEmptyFbmDate(date)) { return last ? ['end_date'] : []; }
-  var day = FbmSync.canonical('activity', fbm, categoryGate).end_date;
+  var day = FbmSync.toFbmCodes(fbm, 'activity', categoryGate).end_date;
   if (!last || last.day !== day) { return ['end_date']; }
   return last.records.some(function (record) { return !FbmSync.diff('activity', fbm, record, categoryGate, FbmSync.LAST_ACTIVITY_FIELDS).length; }) ? [] : ['ma_cv'];
 };

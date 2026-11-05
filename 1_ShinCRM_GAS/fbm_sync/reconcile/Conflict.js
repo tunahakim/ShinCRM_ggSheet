@@ -139,7 +139,7 @@ FbmSync.conflictSnapshotOld = function (entity, local) {
     if (entity === 'activity' && field === 'id') { return; }
     var localField = FbmSync.conflictLocalField(entity, field);
     var raw = local[localField];
-    old[localField] = raw === null || raw === undefined || raw === '' ? '' : FbmSync.isDate(raw) ? String(FbmSync.normalizeFingerprintValue(entity, field, raw)) : String(raw);
+    old[localField] = raw === null || raw === undefined || raw === '' ? '' : FbmSync.isDate(raw) ? FbmSync.dateNormalize(raw) : String(raw);
   });
   return old;
 };

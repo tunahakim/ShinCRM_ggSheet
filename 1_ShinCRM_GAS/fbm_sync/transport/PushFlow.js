@@ -14,7 +14,6 @@ FbmSync.prepareCategoryGate = function (state) {
   // Chiều đẩy kiểm lại danh mục giữa các lô: chỉ Log khối chặn mới để Log không lặp cùng một mã mỗi lô.
   (state.metadata.categoryBlocks || []).forEach(function (block) { logged[FbmSync.categoryBlockKey(block)] = true; });
   state.metadata.categoryBlocks = blocks;
-  FbmSync.stateCategoryGate(state, gate);
   FbmSync.logCategoryBlocks(blocks.filter(function (block) { return !logged[FbmSync.categoryBlockKey(block)]; }));
   if (state.session) { state.session.lookups = {}; }
   return blocks;
@@ -138,7 +137,7 @@ FbmSync.diffFieldText = function (entity, left, right, gate) {
  * Trả `action`: `save` (FBM còn bằng mốc, hoặc còn dấu #SC cần bỏ), `settled` (hai bên đã bằng nhau), `conflict` (cả hai cùng đổi, hoặc chưa có mốc mà khác nhau), `fbmOnly` (chỉ FBM đổi, để chiều lấy về kéo).
  */
 FbmSync.pushOpenDecision = function (entity, record, formValues, gate) {
-  var decision = FbmSync.threeWay({ hBASE: String(record && record.fbmHash || '').trim() }, { hSHIN: FbmSync.hash(record, entity, gate) }, { hFBM: FbmSync.hash(formValues, entity, gate) });
+  var decision = FbmSync.threeWay(String(record && record.fbmHash || '').trim(), FbmSync.hash(record, entity, gate), FbmSync.hash(formValues, entity, gate));
   var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(formValues && formValues.details);
   var action = decision.hFBM === decision.hSHIN ? (markerLeft ? 'save' : 'settled') : !decision.fbmChanged ? 'save' : decision.shinChanged ? 'conflict' : 'fbmOnly';
   return { action: action, hFBM: decision.hFBM, hSHIN: decision.hSHIN, hBASE: decision.hBASE };
@@ -295,7 +294,7 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   var detail = FbmSync.pushFailureDetail(failure);
   state.counts.error += 1;
   state.message = 'Lỗi đẩy ' + String(candidate && candidate.entity || '') + ':' + String(candidate && candidate.id || '') + ': ' + detail.reason;
-  var gate = FbmSync.stateCategoryGate(state), localHash = typeof FbmSync.hash === 'function' ? FbmSync.hash(candidate.record || {}, candidate.entity, gate) : '';
+  var gate = FbmSync.stateCategoryGate(state), localHash = FbmSync.hash(candidate.record || {}, candidate.entity, gate);
   FbmSync.pushFailureAdd(candidate.entity + ':' + String(candidate.id || ''), localHash, Object.assign({}, detail, { requestKind: String(operation || candidate.kind || '') }));
   // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để không bị tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát nên an toàn để đẩy lại.
   var waitingForMarker = candidate.kind === 'recover' || candidate.kind === 'stuck' || (candidate.kind === 'create' && operation !== 'customer_create_open');
@@ -579,8 +578,8 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'activity_edit_open') {
     var activityOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'activity'), 'activity', candidate);
-    var configuredOwner = String(FbmSync.scriptSettings().accountName || ''), currentOwner = String(activityOldValues.owner || '');
-    if (!configuredOwner || (currentOwner && currentOwner !== configuredOwner)) { throw new Error('Hoạt động thuộc owner FBM khác tài khoản đã cấu hình.'); }
+    var openedOwnerError = FbmSync.ownerCheck(activityOldValues, FbmSync.scriptSettings().accountName);
+    if (openedOwnerError) { throw new Error(openedOwnerError); }
     FbmSync.requireFormFields(activityOldValues, 'activity');
     var activityDecision = FbmSync.pushOpenDecision('activity', candidate.record, activityOldValues, gate);
     if (activityDecision.action !== 'save') { return FbmSync.finishPushOpenWithoutSave(state, cursor, candidate, activityOldValues, activityDecision, gate); }

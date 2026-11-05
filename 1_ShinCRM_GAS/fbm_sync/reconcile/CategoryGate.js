@@ -63,20 +63,17 @@ FbmSync.readCategoryGate = function () {
 };
 
 /**
- * Gate danh mục của phiên: map dựng lại từ Sheet Category (nguồn sự thật), mã bị chặn suy từ `metadata.categoryBlocks` của phiên.
+ * Gate danh mục của phiên: map dựng lại từ Sheet Category (nguồn sự thật) qua bản chụp của lần gọi, mã bị chặn suy từ `metadata.categoryBlocks` của phiên.
  * Không chép map vào state: một giá trị DocumentProperties chỉ khoảng 9 KB, Category thật vượt ngưỡng đó làm phiên dừng ở bước đọc Customer (FBM-042).
- * Bản dựng gắn trên chính object state dạng không enumerable để một lượt GAS chỉ đọc Sheet một lần và JSON.stringify không ghi nó vào state.
+ * Không nhớ bản dựng trên object state: bản nhớ sống qua lần đổi `categoryBlocks` và qua bản đọc Category khác, nên hai nơi gọi có thể xét theo hai cổng khác nhau. Trong một lần gọi Sheet Category chỉ đọc một lần nhờ bản chụp; đọc lỗi thì ném, không thành cổng rỗng.
  */
-FbmSync.stateCategoryGate = function (state, freshGate) {
-  var holder = state && typeof state === 'object' ? state : null;
-  if (!freshGate && holder && holder.categoryGateOfRun) { return holder.categoryGateOfRun; }
+FbmSync.stateCategoryGate = function (state) {
   // Chép nông: gate đọc từ bản chụp dùng chung cho cả lần gọi, không được gắn `blocked` của phiên này lên nó.
-  var gate = Object.assign({}, freshGate || FbmSync.readCategoryGate());
+  var gate = Object.assign({}, FbmSync.readCategoryGate());
   gate.blocked = {};
-  (holder && holder.metadata && holder.metadata.categoryBlocks || []).forEach(function (block) {
+  (state && state.metadata && state.metadata.categoryBlocks || []).forEach(function (block) {
     if (block && block.source && block.code) { gate.blocked[block.source + '\u001f' + block.code] = block.reason; }
   });
-  if (holder) { Object.defineProperty(holder, 'categoryGateOfRun', { value: gate, enumerable: false, configurable: true, writable: true }); }
   return gate;
 };
 
@@ -98,136 +95,19 @@ FbmSync.categoryValueAllowed = function (categoryGate, source, value) {
   return blocked ? { ok: false, code: code, reason: blocked } : { ok: true, code: code };
 };
 
-/** Giữ payload Rows của completion để đối chiếu Category. */
-FbmSync.lookupPayload = function (response) {
-  var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;
-  if (typeof data === 'string') { data = FbmSync.protocol.parse(data) || []; }
-  if (Array.isArray(data) || (data && Array.isArray(data.Rows))) { return data; }
-  return [];
-};
-
-/** Chuẩn hóa response completion thành map mã -> tên. */
-FbmSync.lookupPairs = function (response) {
-  if (response && typeof response === 'object' && response.pairs && typeof response.pairs === 'object' && !Array.isArray(response.pairs)) {
-    return response.pairs;
-  }
-  var data = FbmSync.lookupPayload(response);
-  if (data && !Array.isArray(data) && Array.isArray(data.Rows)) { data = data.Rows; }
-  var out = {};
-  data.forEach(function (item) {
-    if (Array.isArray(item)) { out[String(item[0] || '').trim()] = String(item[1] || '').trim(); }
-    else if (item) { out[String(item.Value || item.value || item.Code || item.code || '').trim()] = String(item.Text || item.text || item.Name || item.name || '').trim(); }
-  });
-  return out;
-};
-
-/** Ba danh mục FBM đi chung một lô: một lần gọi GAS thay cho ba (Tài liệu 09/01 "Lô request đọc độc lập"). */
-FbmSync.lookupBatchRequest = function () {
-  return { items: FbmSync.SYNC_LOOKUPS.map(function (lookup) { return FbmSync.completionRequest(lookup.controller, lookup.key); }), meta: { kind: 'batch', entity: 'category' } };
-};
-
 /**
- * Nhận lô danh mục vào `state.session.lookups`; chỉ giữ mã Category đang dùng vì Rows đầy đủ có thể vượt trần một khóa state.
- * Phần tử thiếu, lạ hoặc lỗi để danh mục đó trống nên `validateLookupGate` chặn cả chiều đẩy. Trả `false` khi có phần tử nghi phiên: caller đi đường probe, cursor giữ nguyên để dựng lại đúng lô.
+ * Các ô danh mục của bản ghi không qua được cổng: thiếu mã FBM trong Category, hoặc mã bị chặn vì FBM đã đổi tên/xóa. Trả `[{ source, value, result }]`, rỗng là qua.
+ * Một phép kiểm cho cả hai chiều: bản ghi kéo về và bản ghi sắp đẩy xét trên cùng cổng của lần gọi, nên một mã không thể lọt chiều này mà bị chặn chiều kia. Tên trường FBM chỉ là đường dự phòng khi bản ghi chưa đổi sang tên ShinCRM.
  */
-FbmSync.lookupBatchApply = function (state, rawResponse) {
-  var byId = {}, expectedBySource = FbmSync.readCategoryGate().namesBySource || {}, suspected = false;
-  (rawResponse && Array.isArray(rawResponse.items) ? rawResponse.items : []).forEach(function (item) { byId[String(item && item.id)] = item; });
-  state.session.lookups = {};
-  FbmSync.SYNC_LOOKUPS.forEach(function (lookup, position) {
-    var item = byId[String(position)], check = item ? FbmSync.protocol.assertSuccess(item) : { ok: false, code: 'FBM_BATCH_ITEM_MISSING' };
-    if (!check.ok) { suspected = suspected || check.code === 'SESSION_SUSPECTED'; state.session.lookups[lookup.key] = { error: String(check.code || 'FBM_ERROR') }; return; }
-    var pairs = FbmSync.lookupPairs(item), expected = expectedBySource[lookup.key] || {}, compact = {};
-    Object.keys(expected).forEach(function (code) { if (Object.prototype.hasOwnProperty.call(pairs, code)) { compact[code] = pairs[code]; } });
-    if (!Object.keys(expected).length && Object.keys(pairs).length) { compact.__FBM_LOOKUP_PRESENT__ = ''; }
-    state.session.lookups[lookup.key] = { pairs: compact };
-  });
-  state.metadata = state.metadata || {};
-  state.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
-  return !suspected;
-};
-
-/**
- * Lượt có cần nạp danh mục FBM (`SYNC_LOOKUPS`) không. Chiều Lấy từ FBM → ShinCRM không nạp (2A điểm 12, chủ dự án chốt 2026-10-07): bản ghi kéo về vẫn kiểm theo từng bản ghi bằng Sheet Category; chỉ bỏ phép kiểm "FBM đã đổi tên danh mục", phép này còn ở chiều đẩy và "Kiểm tra an toàn".
- * Mỗi danh mục là một lần gọi GAS (khoảng 5 giây, đo 2026-10-07), nên bỏ nạp tiết kiệm khoảng 15 giây đầu mỗi lượt Lấy.
- */
-FbmSync.needsFbmLookups = function (state) { return String(state && state.mode || 'read') !== 'read'; };
-
-/** Tìm các mã Sheet không còn tồn tại hoặc đã đổi tên trên FBM. */
-FbmSync.validateLookupGate = function (state, categoryGate) {
-  var blocked = [], session = state && state.session && state.session.lookups || {};
-  (FbmSync.SYNC_LOOKUPS || []).forEach(function (lookup) {
-    var fbm = session[lookup.key], pairs = FbmSync.lookupPairs(fbm);
-    if (!Object.keys(pairs).length) { blocked.push({ source: lookup.key, reason: 'Không lấy được danh mục FBM' + (fbm && fbm.error ? ' (' + fbm.error + ')' : '') + '.' }); return; }
-    if (!categoryGate || !categoryGate.namesBySource) { return; }
-    var expected = categoryGate.namesBySource[lookup.key] || {};
-    Object.keys(expected).forEach(function (code) {
-      if (Object.prototype.hasOwnProperty.call(pairs, code) && pairs[code] !== expected[code]) {
-        blocked.push({ source: lookup.key, code: code, reason: 'Tên danh mục trên FBM khác Category: ' + pairs[code] });
-      } else if (!Object.prototype.hasOwnProperty.call(pairs, code)) {
-        blocked.push({ source: lookup.key, code: code, reason: 'Mã danh mục không tồn tại trên FBM.' });
-      }
-    });
-  });
-  return blocked;
-};
-
-/**
- * Bản ghi được đẩy lên và được kéo về hay không, theo ô "Cho phép đồng bộ FBM". So khớp đúng chữ với bảng `FBM_SYNC_PERMISSION_OPTIONS`; ô trống hoặc sai giá trị thì `invalid`: không đẩy nhưng vẫn kéo về (kéo về chỉ ghi vào sheet riêng, sai thì sửa được; đẩy lên ghi vào CRM chung không rút lại được), bên gọi phải cảnh báo kèm mã bản ghi.
- * Activity còn bị chặn theo Customer cha: cha không được đẩy thì con không được đẩy, cha không được kéo thì con không được kéo.
- */
-FbmSync.syncPermission = function (record, entity, customer) {
-  var value = String(FbmSync.value(record, 'fbmSyncPermission', '')), option = null;
-  FBM_SYNC_PERMISSION_OPTIONS.some(function (item) { if (item.value === value) { option = item; } return !!option; });
-  if (!option) {
-    return { push: false, pull: true, invalid: true, value: value, reason: value.trim() ? 'Ô "Cho phép đồng bộ FBM" có giá trị không hợp lệ "' + value + '".' : 'Ô "Cho phép đồng bộ FBM" đang trống.' };
-  }
-  var result = { push: option.push, pull: option.pull, invalid: false, value: value, reason: option.push ? '' : 'Bản ghi đang chọn "' + value + '".' };
-  if (entity === 'activity' && customer) {
-    var parent = FbmSync.syncPermission(customer, 'customer');
-    if (result.push && !parent.push) { result.push = false; result.reason = 'Khách hàng cha không cho phép đẩy lên FBM.'; }
-    if (result.pull && !parent.pull) { result.pull = false; result.reason = 'Khách hàng cha không cho phép lấy từ FBM.'; }
-  }
-  return result;
-};
-
-/**
- * Bộ lọc "được lấy từ FBM" dùng chung cho bước gắn cờ "không thấy" và bước chọn khách đọc giao dịch (09/02 Phần 3): bản ghi người dùng đã chặn chiều lấy về thì vắng bên FBM cũng không được gắn cờ, không tốn request đọc.
- * Giao dịch kế thừa quyền của khách cha nên tra bảng khách một lần cho cả lượt, không tra lại theo từng dòng.
- */
-FbmSync.pullAllowedReader = function (entity) {
-  if (entity !== 'activity') { return function (record) { return FbmSync.syncPermission(record, 'customer').pull; }; }
-  var byId = {};
-  FbmSync.readLocal('customer').forEach(function (customer) { byId[String(customer.id || '').trim()] = customer; });
-  return function (record) { return FbmSync.syncPermission(record, 'activity', byId[String(record.customerId || '').trim()]).pull; };
-};
-
-/** Activity chỉ được đẩy khi Customer cha đã liên kết đủ hai mã FBM. */
-FbmSync.activityParentReady = function (customer) {
-  return !!customer && !!String(customer.fbmId || '').trim() && !!String(customer.fbmCustomerCode || '').trim();
-};
-
-/** Kiểm các SELECT có ánh xạ FBM; chiều pull không gọi phép này. */
-FbmSync.validatePushCategories = function (record, entity, categoryGate) {
+FbmSync.categoryGateCheck = function (record, entity, categoryGate) {
   var fields = entity === 'customer' ? [
     ['@CAT_TINH_THANH', FbmSync.value(record, 'province', FbmSync.value(record, 'dc_lh_tinh', ''))],
     ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', FbmSync.value(record, 'nguon_dm', ''))]
   ] : [
     ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', FbmSync.value(record, 'ma_cv', ''))]
   ];
-  return fields.map(function (item) { return { source: item[0], result: FbmSync.categoryValueAllowed(categoryGate, item[0], item[1]) }; }).filter(function (item) { return !item.result.ok; });
-};
-
-/** Kiểm danh mục của record kéo về trước khi cho phép reconcile. */
-FbmSync.validateIncomingCategories = function (record, entity, categoryGate) {
-  var fields = entity === 'customer' ? [
-    ['@CAT_TINH_THANH', FbmSync.value(record, 'province', '')],
-    ['@CAT_NGUON_KH', FbmSync.value(record, 'leadSource', '')]
-  ] : [
-    ['@CAT_CONG_VIEC', FbmSync.value(record, 'taskType', '')]
-  ];
   return fields.map(function (item) {
     var value = String(item[1] === null || item[1] === undefined ? '' : item[1]).trim();
     return { source: item[0], value: value, result: FbmSync.categoryValueAllowed(categoryGate, item[0], value) };
-  }).filter(function (item) { return item.value && !item.result.ok; });
+  }).filter(function (item) { return !item.result.ok; });
 };

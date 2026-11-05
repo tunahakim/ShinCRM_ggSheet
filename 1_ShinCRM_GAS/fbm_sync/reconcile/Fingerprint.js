@@ -1,38 +1,30 @@
 /** Chuan hoa va tinh fingerprint cho doi soat FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Chuẩn hóa chuỗi, dòng mới và ngày .NET về cùng một dạng so sánh. */
+/** Chuẩn hóa chuỗi và dòng mới về cùng một dạng so sánh; giá trị ngày (Date hoặc `/Date(ms)/` của .NET) đi qua `dateNormalize`, không có cách tính ngày thứ hai. */
 FbmSync.isDate = function (value) { return Object.prototype.toString.call(value) === '[object Date]'; };
 FbmSync.normalize = function (value) {
   if (value === null || value === undefined) { return ''; }
-  if (FbmSync.isDate(value)) { return isNaN(value.getTime()) ? '' : value.toISOString(); }
-  var text = String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  var dateMatch = text.match(/^\/Date\((-?\d+)(?:[+-]\d+)?\)\/$/);
-  if (dateMatch) {
-    var ms = Number(dateMatch[1]), date = new Date(ms);
-    if (!isFinite(ms) || isNaN(date.getTime()) || FbmSync.isEmptyFbmDate(date)) { return ''; }
-    return date.toISOString();
-  }
-  return text;
+  if (FbmSync.isDate(FbmSync.fbDate(value))) { return FbmSync.dateNormalize(value); }
+  return String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 };
 
 /** FBM dùng hai mốc giả cho ô ngày chưa có giá trị. */
 FbmSync.isEmptyFbmDate = function (value) {
   if (!FbmSync.isDate(value) || isNaN(value.getTime())) { return false; }
-  // Mốc 1999 tính theo ngày Việt Nam, không theo nửa đêm UTC.
-  var localDate = new Date(value.getTime() + 7 * 60 * 60 * 1000), year = localDate.getUTCFullYear(), month = localDate.getUTCMonth(), day = localDate.getUTCDate();
-  return year <= 1900 || (year === 1999 && month === 0 && day === 1);
+  var key = dateToText(value, 'day');
+  return Number(key.slice(0, 4)) <= 1900 || key === '1999-01-01';
 };
 
-/** Chuẩn hóa ngày làm việc theo ngày Việt Nam, không để giờ FBM gây lệch hash. */
-FbmSync.normalizeFingerprintValue = function (entity, field, value) {
-  if (entity === 'activity' && field === 'end_date') {
-    var date = FbmSync.isDate(value) ? value : (typeof FbmSync.fbDate === 'function' ? FbmSync.fbDate(value) : value);
-    if (FbmSync.isDate(date) && !FbmSync.isEmptyFbmDate(date)) {
-      return typeof Utilities !== 'undefined' && Utilities.formatDate ? Utilities.formatDate(date, 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd') : new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    }
-  }
-  return FbmSync.normalize(value);
+/**
+ * Khóa ngày `yyyy-MM-dd` theo giờ Việt Nam cho mọi giá trị ngày của đồng bộ: Date của Sheet, `/Date(ms)/` của FBM, chữ năm-tháng-ngày. Ngày giả của FBM, Date hỏng và chữ không phải ngày thành rỗng.
+ * Đổi Date thành chữ đi qua `dateToText` của lõi, nên ngày của dấu vân, của cửa sổ quét và của lệnh ghi cùng một múi giờ với ngày trên Sheet.
+ */
+FbmSync.dateNormalize = function (value) {
+  var date = FbmSync.fbDate(value);
+  if (FbmSync.isDate(date)) { return isNaN(date.getTime()) || FbmSync.isEmptyFbmDate(date) ? '' : dateToText(date, 'day'); }
+  var match = String(date === null || date === undefined ? '' : date).trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return match ? match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2) : '';
 };
 
 /** Bỏ dấu nhận diện do ShinCRM gắn vào Activity trước khi so fingerprint. */
@@ -46,12 +38,21 @@ FbmSync.activityMarkerId = function (value) {
   return match ? String(match[1]).trim() : '';
 };
 
-/** Chọn đúng field FBM để fingerprint, bỏ qua các alias chỉ dùng hiển thị. */
-FbmSync.canonical = function (entity, record, categoryGate) {
-  // So sánh bằng tên field FBM để đổi tên cột Sheet không đổi baseline.
-  var aliases = FbmSync.FIELD_ALIASES[entity] || {};
-  var result = {};
-  (FbmSync.FINGERPRINT_FIELDS[entity] || []).forEach(function (alias) {
+/** Danh sách trường FBM tính dấu vân của một loại bản ghi; loại lạ là lỗi của bên gọi, không phải "không có trường nào". */
+FbmSync.fingerprintFields = function (entity) {
+  var fields = FbmSync.FINGERPRINT_FIELDS[entity];
+  if (!fields) { throw new Error('Loại bản ghi đồng bộ không hợp lệ: ' + String(entity)); }
+  return fields;
+};
+
+/**
+ * Bản ghi (tên trường ShinCRM hoặc tên FBM) thành các trường dấu vân theo tên FBM, giá trị danh mục đổi sang mã FBM, ngày thành khóa ngày. So bằng tên FBM để đổi tên cột Sheet không đổi mốc.
+ * Thiếu cổng danh mục là lỗi: băm tên hiển thị thay cho mã sẽ ra dấu vân khác mà không ai thấy.
+ */
+FbmSync.toFbmCodes = function (record, entity, categoryGate) {
+  if (!categoryGate || typeof categoryGate !== 'object' || !categoryGate.map) { throw new Error('Thiếu cổng danh mục khi tính dấu vân ' + String(entity) + '.'); }
+  var aliases = FbmSync.FIELD_ALIASES[entity] || {}, source = record || {}, result = {};
+  FbmSync.fingerprintFields(entity).forEach(function (alias) {
     var key = alias;
     var syncKey = (entity === 'customer' && alias === 'stt_rec_kh') ? 'fbmId' : (entity === 'customer' && alias === 'ma_kh') ? 'fbmCustomerCode' : (entity === 'activity' && alias === 'id') ? 'fbmId' : '';
     if (syncKey) { key = syncKey; }
@@ -61,26 +62,28 @@ FbmSync.canonical = function (entity, record, categoryGate) {
         return false;
       });
     }
-    var raw = FbmSync.value(record, key, FbmSync.value(record, alias, ''));
+    var raw = FbmSync.value(source, key, FbmSync.value(source, alias, ''));
     if (entity === 'activity' && alias === 'details') { raw = FbmSync.stripActivityMarker(raw); }
-    if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'dc_lh_tinh') { raw = FbmSync.value(record, 'ten_dclh_tinh', ''); }
-    if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'nguon_dm') { raw = FbmSync.value(record, 'ten_nguon_dm', ''); }
-    if ((raw === '' || raw === null || raw === undefined) && entity === 'activity' && alias === 'ma_cv') { raw = FbmSync.value(record, 'ten_cv', ''); }
+    if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'dc_lh_tinh') { raw = FbmSync.value(source, 'ten_dclh_tinh', ''); }
+    if ((raw === '' || raw === null || raw === undefined) && entity === 'customer' && alias === 'nguon_dm') { raw = FbmSync.value(source, 'ten_nguon_dm', ''); }
+    if ((raw === '' || raw === null || raw === undefined) && entity === 'activity' && alias === 'ma_cv') { raw = FbmSync.value(source, 'ten_cv', ''); }
     // FBM dùng id=0 cho Activity chưa lưu; đây không phải định danh ổn định.
     if (entity === 'activity' && alias === 'id' && (raw === 0 || String(raw).trim() === '0')) { raw = ''; }
-    // Fingerprint SELECT values in FBM-code space, never display-name space.
-    var toFbmCode = typeof FbmSync.categoryCode === 'function' ? FbmSync.categoryCode : function (gate, source, value) { return value; };
-    if (entity === 'customer' && alias === 'dc_lh_tinh') { raw = toFbmCode(categoryGate || {}, '@CAT_TINH_THANH', raw); }
-    if (entity === 'customer' && alias === 'nguon_dm') { raw = toFbmCode(categoryGate || {}, '@CAT_NGUON_KH', raw); }
-    if (entity === 'activity' && alias === 'ma_cv') { raw = toFbmCode(categoryGate || {}, '@CAT_CONG_VIEC', raw); }
-    result[alias] = FbmSync.normalizeFingerprintValue(entity, alias, raw);
+    if (entity === 'customer' && alias === 'dc_lh_tinh') { raw = FbmSync.categoryCode(categoryGate, '@CAT_TINH_THANH', raw); }
+    if (entity === 'customer' && alias === 'nguon_dm') { raw = FbmSync.categoryCode(categoryGate, '@CAT_NGUON_KH', raw); }
+    if (entity === 'activity' && alias === 'ma_cv') { raw = FbmSync.categoryCode(categoryGate, '@CAT_CONG_VIEC', raw); }
+    // Ngày làm việc so theo ngày Việt Nam để giờ FBM không làm lệch dấu vân; chữ không phải ngày giữ nguyên để sửa sai vẫn thấy đổi.
+    result[alias] = entity === 'activity' && alias === 'end_date' ? (FbmSync.dateNormalize(raw) || FbmSync.normalize(raw)) : FbmSync.normalize(raw);
   });
   return result;
 };
 
-/** Tạo fingerprint ổn định, độc lập với thứ tự thuộc tính. */
+/**
+ * Dấu vân của một bản ghi: công cụ duy nhất tính hBASE, hSHIN, hFBM. Người điều phối tính một lần cho mỗi bản ghi rồi truyền dấu vân bằng dữ liệu, không tính lại ở công cụ khác.
+ * Đổi công thức là đổi mọi mốc đã lưu trên Sheet và trong kho (sổ chờ xác nhận, sổ lỗi đẩy): test giữ giá trị cố định cho các bản ghi mẫu.
+ */
 FbmSync.hash = function (record, entity, categoryGate) {
-  var value = entity ? FbmSync.canonical(entity, record || {}, categoryGate) : record || {};
+  var value = FbmSync.toFbmCodes(record, entity, categoryGate);
   var keys = Object.keys(value).sort();
   var text = keys.map(function (key) { return key + '=' + FbmSync.normalize(value[key]); }).join('\u001f');
   var hash = 2166136261;
@@ -88,18 +91,15 @@ FbmSync.hash = function (record, entity, categoryGate) {
   return ('00000000' + hash.toString(16)).slice(-8);
 };
 
-/** Đối chiếu baseline, Sheet và FBM để phát hiện thay đổi hoặc conflict. */
-FbmSync.threeWay = function (base, shin, fbm, entity, categoryGate) {
-  // Baseline rỗng vẫn có nghĩa; hai giá trị đầu tiên khác nhau là conflict.
-  var hBase = base && Object.prototype.hasOwnProperty.call(base, 'hBASE') ? String(base.hBASE || '') : FbmSync.hash(base || {}, entity);
-  var hShin = shin && Object.prototype.hasOwnProperty.call(shin, 'hSHIN') ? String(shin.hSHIN || '') : FbmSync.hash(shin || {}, entity, categoryGate);
-  var hFbm = fbm && Object.prototype.hasOwnProperty.call(fbm, 'hFBM') ? String(fbm.hFBM || '') : FbmSync.hash(fbm || {}, entity, categoryGate);
+/** So ba dấu vân đã tính: mốc (rỗng vẫn có nghĩa, hai bên khác nhau là xung đột), ShinCRM, FBM. Chỉ nhận chữ, không tự tính dấu vân. */
+FbmSync.threeWay = function (hBase, hShin, hFbm) {
+  [hBase, hShin, hFbm].forEach(function (value) { if (typeof value !== 'string') { throw new Error('threeWay chỉ nhận dấu vân dạng chữ, nhận ' + Object.prototype.toString.call(value) + '.'); } });
   return { hBASE: hBase, hSHIN: hShin, hFBM: hFbm, unchanged: hShin === hBase && hFbm === hBase, shinChanged: hShin !== hBase, fbmChanged: hFbm !== hBase, conflict: hShin !== hBase && hFbm !== hBase && hShin !== hFbm };
 };
 
 /** Trả về các field khác nhau để màn hình conflict không phải đoán từ ba hash; `only` giới hạn trường cần so mà vẫn dùng chung bước chuẩn hóa với hash. */
 FbmSync.diff = function (entity, left, right, categoryGate, only) {
-  var a = FbmSync.canonical(entity, left || {}, categoryGate), b = FbmSync.canonical(entity, right || {}, categoryGate), fields = [];
+  var a = FbmSync.toFbmCodes(left, entity, categoryGate), b = FbmSync.toFbmCodes(right, entity, categoryGate), fields = [];
   Object.keys(a).sort().forEach(function (field) { if ((!only || only.indexOf(field) >= 0) && a[field] !== b[field]) { fields.push({ field: field, left: a[field], right: b[field] }); } });
   return fields;
 };
