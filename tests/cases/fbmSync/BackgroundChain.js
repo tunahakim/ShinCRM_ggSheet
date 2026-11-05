@@ -126,6 +126,14 @@ async function chay(so) {
   boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
   const sauBoDo = await boDo.hoi(1);
   check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);
+
+  // Dòng bắt đầu lượt: lượt người dùng bấm ghi Log thường để Sheet Log có điểm đầu của lượt; lượt nền chỉ có dòng vết, không ghi Log thường.
+  const dongBatDau = (logs) => logs.filter((event) => ['sync_session_started', 'session_started'].indexOf(event.action) >= 0).map((event) => event.action + '|' + event.outcome + '|' + !!event.cycleId);
+  const tay = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });
+  tay.F.controlDispatch('start', { kind: 'sync', mode: 'read', machineId: 'may-tay' });
+  const nen = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
+  const nenXong = (await nen.hoi(60)).xong;
+  check(so, 'Lượt tay ghi Log thường dòng bắt đầu phiên và bắt đầu kiểm phiên, kèm mã lượt; lượt nền chạy xong mà không có dòng nào trong hai dòng này', [dongBatDau(tay.logs), nenXong.indexOf('customerFull') >= 0, dongBatDau(nen.logs)], [['sync_session_started|ok|true', 'session_started|ok|true'], true, []]);
 }
 
 module.exports = { chay };

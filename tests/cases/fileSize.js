@@ -39,7 +39,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/client/ui/unsavedChanges.html', 355, 17450, 'UI', 'cảnh báo chưa lưu + hộp quyết định dùng chung'],
   ['1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js', 397, 33902, 'B11', 'cấu hình đăng nhập + chính sách + luồng cursor'],
   ['1_ShinCRM_GAS/fbm_sync/control/ControlPort.js', 239, 18191, 'B4', 'một việc: cổng lệnh'],
-  ['1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js', 271, 18614, 'B4', 'vết kỹ thuật + bước nghiệp vụ'],
+  ['1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js', 283, 19580, 'B4', 'vết kỹ thuật + bước nghiệp vụ; thêm cổng gửi dòng Log thường cho cửa lệnh ghi (`callLogAdd`)'],
   ['1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js', 322, 25353, 'B8', 'các lớp quét giao dịch'],
   ['1_ShinCRM_GAS/fbm_sync/read/GridRead.js', 305, 23900, 'B8', 'đọc lưới FBM'],
   ['1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js', 243, 22027, 'B9', 'một việc'],
