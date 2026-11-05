@@ -135,7 +135,9 @@ function scanHarness(options) {
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const sent = await deliver(step.request, h);
       if (sent.fail) {
-        step = F.controlDispatch('continue', { error: { requestId: step.request.id, code: sent.fail, message: sent.message } }, 'relay');
+        // Đường cứu hết lượt thì ném lỗi như mọi chặng; `runSlice` đã đóng lượt lỗi trước khi ném.
+        try { step = F.controlDispatch('continue', { error: { requestId: step.request.id, code: sent.fail, message: sent.message } }, 'relay'); }
+        catch (error) { if (!error.code) { throw error; } step = { ok: false, code: error.code, request: null, status: F.statusView(), error: error.message }; }
         trace.statuses.push(step.status);
         continue;
       }
@@ -143,6 +145,7 @@ function scanHarness(options) {
         step = F.controlDispatch('continue', { response: sent.raw }, 'relay');
       } catch (error) {
         trace.errors.push(String(error && error.message || error));
+        if (!h.afterError && error.code) { step = { ok: false, code: error.code, request: null, status: F.statusView(), error: error.message }; continue; }
         if (!h.afterError) { throw error; }
         step = h.afterError(F, error);
         continue;
