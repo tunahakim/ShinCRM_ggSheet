@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.protocol = {
   version: 1,
   // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Mọi lời gọi giữa GAS và Extension mang mã này: GAS gửi trong phong bì, Extension gửi trong response và thân lời gọi relay; lệch mã thì bên nhận dừng với `EXTENSION_PROTOCOL_MISMATCH`.
-  contract: '8b8d9bda0993',
+  contract: 'f939312ceea2',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -19,7 +19,7 @@ FbmSync.protocol = {
   },
   /**
    * Lô request đọc độc lập (09/01 "Lô request đọc độc lập"). Id phần tử là thứ tự trong lô: Extension chạy lần lượt và chỉ được dừng sớm, nên response hợp lệ luôn là `0..k-1`.
-   * `meta` phần tử chỉ mang thứ Extension cần để chạy và ghi vết; transport dùng chung nằm ở `meta` của lô.
+   * `meta` phần tử chỉ mang thứ Extension cần để chạy, cắt cột và ghi vết; transport dùng chung nằm ở `meta` của lô.
    */
   batch: function (id, items, meta) {
     var trace = meta && meta.trace || {};
@@ -27,6 +27,8 @@ FbmSync.protocol = {
       protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), meta: meta || {},
       items: (items || []).map(function (item, index) {
         var itemMeta = { kind: String(item.meta && item.meta.kind || ''), trace: { runId: trace.runId, requestId: trace.requestId, item: index } };
+        // Lệnh cắt cột đi theo từng phần tử: mỗi phần tử là một lưới riêng (khách, giao dịch từng khách, tra mã).
+        if (item.meta && item.meta.keep) { itemMeta.keep = item.meta.keep; }
         return { id: String(index), url: item.url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: item.body, bodyText: FbmSync.protocol.json(item.body), meta: itemMeta };
       })
     };

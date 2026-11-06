@@ -24,10 +24,10 @@ FbmSync.scanJobOpen = function (state, cursor) {
   return cursor;
 };
 
-/** Request lấy danh sách toàn bộ khách tại vị trí trang của cursor; bước "Đếm khách" dựng từ chính hàm này với `count: 1` nên hai bên luôn cùng phạm vi, cùng bộ lọc. */
-FbmSync.customerListRequest = function (cursor) {
+/** Request lấy danh sách toàn bộ khách tại vị trí trang của cursor; bước "Đếm khách" dựng từ chính hàm này với `count: 1` nên hai bên luôn cùng phạm vi, cùng bộ lọc. `keep` là `{ sourceFields }` hoặc `{ keepFields }` chuyển nguyên cho `gridRequest`. */
+FbmSync.customerListRequest = function (cursor, keep) {
   var value = cursor || {};
-  return FbmSync.customerGridRequest({ type: Number(value.type || 0), count: Number(value.count || FbmSync.BUDGET.scanCustomerRows), gridPageIndex: value.pageIndex === undefined ? -1 : value.pageIndex, gridPageValue: value.pageValue || null, pageItems: value.pageItems || null, gridRefresh: false });
+  return FbmSync.customerGridRequest(Object.assign({ type: Number(value.type || 0), count: Number(value.count || FbmSync.BUDGET.scanCustomerRows), gridPageIndex: value.pageIndex === undefined ? -1 : value.pageIndex, gridPageValue: value.pageValue || null, pageItems: value.pageItems || null, gridRefresh: false }, keep || {}));
 };
 
 /** Dựng request cho đúng vị trí cursor: chưa nhận gói nào thì gọi FBM, đã có thì xin gói kế từ RAM của tab. */
@@ -38,11 +38,11 @@ FbmSync.scanJobRequest = function (state) {
     return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
   }
   var activity = cursor.entity === 'activity';
-  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerListRequest(cursor);
+  // Trang khách sau trang đầu không có tiêu đề: cắt theo tên cột gốc trang đầu đã lưu. Cột giữ lại đi qua `meta.keep` do `gridRequest` dựng như mọi request đọc lưới.
+  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerListRequest(cursor, { sourceFields: (state.metadata || {}).customerFields });
   request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
-  // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha. Cột giữ lại đi qua `meta.keep` như mọi request đọc lưới.
-  request.meta.keep = { fields: FbmSync.scanFields(cursor.entity) };
-  request.meta.job = { jobId: cursor.jobId, idField: FbmSync.SCAN_ID_FIELDS[cursor.entity], keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
+  // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha. Extension tìm id theo vị trí trong dòng đã cắt.
+  request.meta.job = { jobId: cursor.jobId, idIndex: FbmSync.scanFields(cursor.entity).indexOf(FbmSync.SCAN_ID_FIELDS[cursor.entity]), keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
   return request;
 };
 
@@ -56,7 +56,7 @@ FbmSync.scanReplyCheck = function (rawResponse, cursor) {
   if (String(job.jobId || '') !== String(cursor.jobId || '') || !(index >= 0) || index > next) { mismatch('Gói quét "' + String(job.jobId || '') + '" số ' + String(job.chunkIndex) + ' không khớp việc quét đang chờ (gói số ' + next + '); đã dừng và không ghi gì.'); }
   if (index < next) { return { duplicate: String(index) }; }
   if (cursor.jobTotal !== null && cursor.jobTotal !== undefined && Number(job.totalRowCount) !== Number(cursor.jobTotal)) { mismatch('Tổng số dòng FBM đổi giữa các gói của cùng một việc quét (' + cursor.jobTotal + ' và ' + job.totalRowCount + '); đã dừng và không ghi gì.'); }
-  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [], fields: Array.isArray(job.fields) && job.fields.length ? job.fields.map(String) : null } };
+  return { chunk: { index: index, count: Number(job.chunkCount || 0), rowCount: Number(job.rowCount || 0), totalRowCount: Number(job.totalRowCount || 0), oversize: Array.isArray(job.oversize) ? job.oversize : [] } };
 };
 
 /** Ghi nhận gói đã ghi xong; gọi sau khi Sheet và state của gói đã lưu. */

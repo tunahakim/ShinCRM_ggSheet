@@ -504,8 +504,8 @@ FbmSync.continueStep = function (rawResponse) {
   }
   // Danh sách toàn bộ khách đi bằng việc quét; kiểm tra liên kết vẫn đọc grid thường theo `stt_rec_kh`.
   if (cursor.kind === 'customer_grid' && state.scan === 'identity_check') {
-    var customerGrid = FbmSync.rowsToRecords('customer', response, state.metadata && state.metadata.customerFields), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
-    state.metadata.customerFields = customerGrid.fields;
+    var customerGrid = FbmSync.rowsToRecords('customer', response), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
+    if (customerGrid.sourceFields) { state.metadata.customerFields = customerGrid.sourceFields; }
     var identityFirstPage = Number(cursor.pageIndex) < 0;
     state.metadata.customerScan = FbmSync.customerScanRecord(identityFirstPage ? null : state.metadata.customerScan, customerGrid.rows, customerGrid.total, null);
     if (identityFirstPage) { state.progress = { done: 0, total: state.metadata.customerScan.total }; }
@@ -514,7 +514,7 @@ FbmSync.continueStep = function (rawResponse) {
     if (FbmSync.customerNext(state, FbmSync.customerPageOf(customerGrid.rows, true), customerGrid.total)) {
       var identityCursor = state.cursor;
       FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityCursor.count, gridPageIndex: identityCursor.pageIndex, gridPageValue: identityCursor.pageValue, pageItems: identityCursor.pageItems, gridRefresh: false })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
+      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityCursor.count, gridPageIndex: identityCursor.pageIndex, gridPageValue: identityCursor.pageValue, pageItems: identityCursor.pageItems, gridRefresh: false, sourceFields: state.metadata.customerFields })), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
     }
     FbmSync.identityCheckFinish(state);
     FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' }); FbmSync.stateWrite(state);

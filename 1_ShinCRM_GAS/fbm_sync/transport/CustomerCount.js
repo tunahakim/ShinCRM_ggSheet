@@ -18,11 +18,11 @@ FbmSync.customerBaselineWrite = function (total) {
 
 /**
  * Request đếm: cùng điều kiện lọc với danh sách toàn bộ khách nên `TotalRowCount` hai bên khớp khi FBM không đổi; khác `count: 1` và không xin tiêu đề cột (chỉ cần tổng, tiêu đề nặng hơn cả response).
- * `meta.keep` rỗng: response nào lỡ mang lưới thì Extension chỉ giữ tổng.
+ * Không giữ cột nào (`keepFields` rỗng): Extension chỉ trả tổng.
  */
 FbmSync.customerCountRequest = function () {
-  var request = FbmSync.customerListRequest({ count: 1, type: 1, pageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER });
-  request.meta.kind = 'customer_count'; request.meta.entity = 'customer'; request.meta.keep = { fields: [] };
+  var request = FbmSync.customerListRequest({ count: 1, type: 1, pageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER }, { keepFields: [] });
+  request.meta.kind = 'customer_count'; request.meta.entity = 'customer';
   return request;
 };
 

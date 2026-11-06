@@ -85,7 +85,7 @@ FbmSync.conflictRefreshRead = function (state, rawResponse) {
     state.metadata.conflictRefresh = null; state.message = 'Bản ghi ' + target + ' không còn ở trạng thái xung đột chờ quyết trên Sheet.'; FbmSync.stateWrite(state);
     return { failure: FbmSync.conflictFail('CONFLICT_NOT_FOUND', state.message) };
   }
-  var latest = (FbmSync.rowsToRecords(entity, rawResponse, state.metadata[entity + 'Fields']).rows || [])[0];
+  var latest = (FbmSync.rowsToRecords(entity, rawResponse).rows || [])[0];
   if (!latest) { return { failure: FbmSync.conflictDropUnreadable(state, entity, target, 'không còn đọc được trên FBM (bị xóa hoặc chuyển quyền)') }; }
   var gate = FbmSync.stateCategoryGate(state), latestRecord = entity === 'customer' ? FbmSync.customerRecord(latest, gate) : FbmSync.activityRecord(latest, gate);
   return { entity: entity, id: target, local: local, latest: latestRecord, latestHash: String(latestRecord.fbmHash || FbmSync.hash(latestRecord, entity, gate)), gate: gate };

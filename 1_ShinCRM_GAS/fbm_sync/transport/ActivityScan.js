@@ -142,6 +142,8 @@ FbmSync.activityScanStage = function (ctx) {
   // Dòng quá lớn không về được nhưng chắc chắn còn trên FBM: coi là đã thấy, không cập nhật.
   if (oversize.length) { state.metadata.scanOversize = Number(state.metadata.scanOversize || 0) + oversize.length; logs = logs.concat(FbmSync.scanOversizeLogs('activity', oversize)); }
   var patch = { metadata: { scanOversize: state.metadata.scanOversize }, logs: logs };
+  // Cùng một lưới giao dịch với lô đọc chi tiết: lưu tên cột gốc để lô sau xin trang không tiêu đề.
+  if (grid.sourceFields) { state.metadata.activityFields = grid.sourceFields; patch.metadata.activityFields = grid.sourceFields; }
   if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state) }; }
   if (cursor.window && !FbmSync.activityWindow(cursor).last) {
     cursor.windowIndex = Number(cursor.windowIndex || 0) + 1; cursor.page = cursor.windowIndex; cursor.attempt = 0; cursor.restarts = 0;

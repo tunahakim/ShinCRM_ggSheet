@@ -37,26 +37,23 @@ FbmSync.gateLookupChunk = function (cursor) {
 
 /**
  * Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
- * Mỗi bảng (khách, giao dịch) chỉ lấy tiêu đề khi lượt chưa có danh sách cột của bảng đó: phần tử khách và phần tử giao dịch đầu lấy kèm tiêu đề, các phần tử khác đọc cột theo danh sách đã lưu.
+ * Mỗi bảng (khách, giao dịch) chỉ lấy tiêu đề khi lượt chưa có tên cột gốc của bảng đó; có rồi thì Extension cắt cột theo vị trí tính từ tên cột gốc. Chưa có tên cột gốc giao dịch thì mọi phần tử giao dịch đầu trang của lô lấy tiêu đề, vì vị trí cột phải biết lúc dựng request.
  */
 FbmSync.activityBatchRequest = function (state) {
   var cursor = state.cursor || {}, metadata = state.metadata || {};
-  var customerHeader = !(Array.isArray(metadata.customerFields) && metadata.customerFields.length);
   if (cursor.lookup) {
-    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), customerHeader); });
+    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), metadata.customerFields); });
     return lookups.length ? { items: lookups, meta: { kind: 'batch', entity: 'customer' } } : null;
   }
-  var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), needHeader = !(Array.isArray(metadata.activityFields) && metadata.activityFields.length);
-  var customerItem = FbmSync.customerBatchRequest(customers, customerHeader);
+  var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), activityFields = Array.isArray(metadata.activityFields) && metadata.activityFields.length ? metadata.activityFields : null;
+  var customerItem = FbmSync.customerBatchRequest(customers, metadata.customerFields);
   if (!customerItem) { return null; }
   var pages = cursor.pages || {};
   return { items: [customerItem].concat(customers.map(function (sttRec) {
     var page = pages[sttRec];
-    // Khách đang đọc dở nhiều trang luôn đã có danh sách cột (trang trước đã ghép dòng theo nó), nên không giữ phần tử lấy tiêu đề.
-    if (page) { return FbmSync.activityGridRequest(String(sttRec), { type: 1, count: count, gridPageIndex: page.pageIndex, gridPageValue: page.pageValue, pageItems: page.pageItems, gridRefresh: false }); }
-    var options = needHeader ? { type: 0, count: count, gridPageIndex: -1, gridRefresh: false } : { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false };
-    needHeader = false;
-    return FbmSync.activityGridRequest(String(sttRec), options);
+    // Khách đang đọc dở nhiều trang luôn đã có tên cột gốc (trang trước có hoặc đã dùng nó).
+    if (page) { return FbmSync.activityGridRequest(String(sttRec), { type: 1, count: count, gridPageIndex: page.pageIndex, gridPageValue: page.pageValue, pageItems: page.pageItems, gridRefresh: false, sourceFields: activityFields }); }
+    return FbmSync.activityGridRequest(String(sttRec), activityFields ? { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, sourceFields: activityFields } : { type: 0, count: count, gridPageIndex: -1, gridRefresh: false });
   })), meta: { kind: 'batch', entity: 'activity' } };
 };
 
@@ -194,7 +191,7 @@ FbmSync.activityGridEnd = function (state, end) {
  */
 FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
   var cursor = state.cursor, customers = cursor.customers || [], gate = input.categoryGate, write = FbmSync.canWriteSheet(state.mode), count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0];
-  var returned = {}, readOk = {}, customerRecords = [], activityRecords = [], failed = [], outcomes = [], retry = [], isFresh = FbmSync.activityFreshIndex();
+  var returned = {}, readOk = {}, customerRecords = [], activityRecords = [], failed = [], outcomes = [], isFresh = FbmSync.activityFreshIndex();
   var pages = cursor.pages || {}, nextPages = {}, pagedSeen = Object.keys(pages).length ? FbmSync.shardListRead(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX) : [], pagedNew = [];
   if (!customerCheck.check.ok) {
     // Không biết khách nào còn nên không kết luận vắng mặt cho ai: báo lỗi từng khách của lô, không ghi, không tra.
@@ -202,15 +199,11 @@ FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
     customers.forEach(function (sttRec) { failed.push({ customer: sttRec, code: String(customerCheck.check.code || 'FBM_ERROR'), status: Number(customerCheck.check.status || 0), reason: reason }); outcomes.push({ sttRec: sttRec, fresh: null }); });
   } else {
     try {
-      var customerGrid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item), state.metadata.customerFields);
-      state.metadata.customerFields = customerGrid.fields;
+      var customerGrid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item));
+      if (customerGrid.sourceFields) { state.metadata.customerFields = customerGrid.sourceFields; }
       customerGrid.rows.forEach(function (row) {
         var sttRec = String(row.stt_rec_kh || '').trim();
         if (customers.indexOf(sttRec) >= 0 && !FbmSync.isTemporaryRecord('customer', row)) { returned[sttRec] = row; }
-      });
-      checks.slice(1).forEach(function (entry) {
-        var fields = entry.check.ok && !(state.metadata.activityFields || []).length ? FbmSync.gridFields(entry.item) : [];
-        if (fields.length) { state.metadata.activityFields = fields; }
       });
       customers.forEach(function (sttRec, position) {
         var row = returned[sttRec], entry = checks[position + 1];
@@ -221,10 +214,8 @@ FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
           outcomes.push({ sttRec: sttRec, fresh: null });
           return;
         }
-        // Khách giữ tiêu đề bị lỗi thì lô chưa có danh sách cột: khách còn lại đọc lại ở lô sau, lô đó có một khách lấy tiêu đề.
-        if (!(state.metadata.activityFields || []).length) { retry.push(sttRec); return; }
-        var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item), state.metadata.activityFields);
-        state.metadata.activityFields = grid.fields;
+        var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item));
+        if (grid.sourceFields) { state.metadata.activityFields = grid.sourceFields; }
         var records = grid.rows.filter(function (item) { return !FbmSync.isTemporaryRecord('activity', item); }).map(function (item) { return FbmSync.activityRecord(item, gate, { sttRec: sttRec, maKh: row.ma_kh }); });
         var page = pages[sttRec], fresh = !!(page && page.fresh) || isFresh(records);
         activityRecords = activityRecords.concat(records);
@@ -276,7 +267,7 @@ FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
   }
   if (customerRecords.length) { FbmSync.pullBatchApply(state, 'customer', customerRecords, pull); FbmSync.previewRecords('customer', customerRecords); }
   if (activityRecords.length) { FbmSync.pullBatchApply(state, 'activity', activityRecords, pull); FbmSync.previewRecords('activity', activityRecords); }
-  var carried = retry.concat(Object.keys(nextPages));
+  var carried = Object.keys(nextPages);
   state.cursor.customers = carried;
   state.cursor.pages = nextPages;
   Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, failed));
@@ -311,7 +302,7 @@ FbmSync.gateLookupContinue = function (state, checks, chunk, input, logs) {
   var local = input.local, waits = FbmSync.readWaitRead(), isDone = FbmSync.readListDoneReader(), pullAllowed = FbmSync.pullAllowedReader('customer'), scope = input.scope, sync = FbmSync.SYNC_STATUS;
   var flags = { customer: [], activity: [] }, adds = [], failed = [];
   chunk.forEach(function (entry, position) {
-    var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item, state.metadata.customerFields);
+    var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item);
     if (entry.charAt(0) === 'c') {
       var customer = local.byStt[value];
       if (!customer) { return; }
