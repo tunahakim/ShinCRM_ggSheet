@@ -258,20 +258,31 @@
   function utf8Length(text) { return new TextEncoder().encode(text).length; }
   /** Byte của đoạn văn bản khi nằm trong chuỗi `body` của response JSON (đã thoát ký tự), vì trần đo trên gói đã serialize. */
   function quotedLength(text) { return utf8Length(JSON.stringify(String(text))) - 2; }
+  /** Lưới là response có mảng `Rows`; response khác (lỗi FBM, trang đăng nhập) trả null để đi nguyên về GAS. */
   function gridData(text) {
     var parsed = JSON.parse(String(text || '')), data = parsed && parsed.d !== undefined ? parsed.d : parsed;
     if (typeof data === 'string') { data = JSON.parse(data); }
-    return data && Array.isArray(data.Rows) && data.ViewPage && Array.isArray(data.ViewPage.Fields) ? data : null;
+    return data && Array.isArray(data.Rows) ? data : null;
   }
   function fieldName(field) { return String(field && (field.AliasName || field.aliasName || field.Name || field.name) || ''); }
   /**
-   * Giữ đúng cột GAS liệt kê trong `meta.keep.fields`, theo thứ tự GAS gửi; cột FBM không có thì bỏ qua để GAS tự báo thiếu cột khi đọc.
-   * Chạy trong tab vì response quét có thể vài MB, không ra khỏi tab được. Chỉ chạm response lưới; trang đăng nhập hay lỗi FBM đi nguyên về GAS.
+   * Cắt response lưới theo lệnh `keep` của GAS: dòng chỉ còn các cột GAS cần, đúng thứ tự GAS gửi; bỏ mô tả cột, bố cục và script của FBM. Tên cột cần không gửi về vì GAS đã biết.
+   * `keep.fields` (trang có tiêu đề): tìm vị trí theo tên trong tiêu đề, trả thêm `SourceFields` là tên cột gốc để GAS tính vị trí cho các trang không tiêu đề. `keep.positions` với `keep.width` (trang không tiêu đề): cắt theo vị trí GAS tính.
+   * Thiếu cột theo tên, hoặc có dòng mang số cột khác, thì không trả dòng mà báo `MissingFields`/`ShapeMismatch` để GAS dừng: cắt tiếp thì ô bị dồn và GAS đọc nhầm trường.
+   * Giữ `Authorized` và `Bugs` để cổng phiên và cổng lỗi của GAS vẫn phân loại được (FBM báo chưa đăng nhập bằng `Authorized:false` với lưới rỗng). Chạy trong tab vì response quét có thể vài MB, không ra khỏi tab được.
    */
   function replyPick(data, keep) {
-    var names = data.ViewPage.Fields.map(fieldName);
-    var wanted = (keep && Array.isArray(keep.fields) ? keep.fields : []).map(String).filter(function (name) { return names.indexOf(name) >= 0; }), positions = wanted.map(function (name) { return names.indexOf(name); });
-    return { Rows: data.Rows.map(function (row) { var values = Array.isArray(row) ? row : []; return positions.map(function (position) { return values[position] === undefined ? null : values[position]; }); }), ViewPage: { Fields: wanted.map(function (name) { return { AliasName: name }; }) }, TotalRowCount: Number(data.TotalRowCount || 0) };
+    var source = data.ViewPage && Array.isArray(data.ViewPage.Fields) ? data.ViewPage.Fields.map(fieldName) : null, byName = Array.isArray(keep.fields);
+    var positions = byName ? keep.fields.map(function (name) { return source ? source.indexOf(String(name)) : -1; }) : (Array.isArray(keep.positions) ? keep.positions : []).map(Number);
+    var width = source ? source.length : keep.width, out = { Rows: [], TotalRowCount: Number(data.TotalRowCount || 0) };
+    if (data.Authorized !== undefined) { out.Authorized = data.Authorized; }
+    if (data.Bugs !== undefined && data.Bugs !== null) { out.Bugs = data.Bugs; }
+    if (source) { out.SourceFields = source; }
+    var missing = byName ? keep.fields.filter(function (name, index) { return positions[index] < 0; }).map(String) : [];
+    if (missing.length) { out.MissingFields = missing; return out; }
+    if (width !== undefined && width !== null && data.Rows.some(function (row) { return !Array.isArray(row) || row.length !== Number(width); })) { out.ShapeMismatch = { width: Number(width) }; return out; }
+    out.Rows = data.Rows.map(function (row) { return positions.map(function (position) { return row[position] === undefined ? null : row[position]; }); });
+    return out;
   }
   /** Response lưới thì giữ cột theo `keep`; không phải lưới hoặc không có `keep` thì trả nguyên văn bản. */
   function replyPickText(text, keep) {
@@ -280,27 +291,26 @@
     try { data = gridData(text); } catch (notGrid) { return text; }
     return data ? JSON.stringify({ d: replyPick(data, keep) }) : text;
   }
-  /** Cắt gói từ lưới đã qua `replyPick`; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. */
-  function scanChunks(data, job, sourceFields) {
-    var wanted = data.ViewPage.Fields.map(fieldName);
-    var idPosition = wanted.indexOf(String(job.idField || '')), keep = Array.isArray(job.keepIds) ? {} : null, total = Number(data.TotalRowCount || 0);
+  /** Cắt gói từ lưới đã qua `replyPick`; một dòng không bao giờ bị cắt đôi, dòng riêng nó đã vượt trần thì không gửi mà báo id trong `oversize`. Vị trí cột mã (`job.idIndex`) do GAS tính; tên cột gốc chỉ đi trong gói 0. */
+  function scanChunks(data, job) {
+    var idIndex = Number(job.idIndex), keep = Array.isArray(job.keepIds) ? {} : null, total = Number(data.TotalRowCount || 0), head = {};
     if (keep) { job.keepIds.forEach(function (id) { keep[String(id)] = true; }); }
-    var fieldsText = JSON.stringify(wanted.map(function (name) { return { AliasName: name }; }));
-    var shell = function (rowsText) { return '{"d":{"Rows":[' + rowsText + '],"ViewPage":{"Fields":' + fieldsText + '},"TotalRowCount":' + total + '}}'; };
-    // Phần cố định của một gói: thân rỗng, khối `job` và dấu vết vận chuyển; dư 4 KiB cho trace, mã hợp đồng và wrapper relay.
-    var fixed = quotedLength(shell('')) + utf8Length(JSON.stringify({ ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: '', job: { jobId: job.jobId, chunkIndex: 0, chunkCount: 0, rowCount: 0, keptCount: 0, totalRowCount: total, oversize: [], fields: sourceFields } })) + 4096;
+    Object.keys(data).forEach(function (key) { if (key !== 'Rows' && key !== 'SourceFields') { head[key] = data[key]; } });
+    var headText = JSON.stringify(head).slice(1, -1), firstText = data.SourceFields ? JSON.stringify({ SourceFields: data.SourceFields }).slice(1, -1) : '';
+    var shell = function (rowsText, first) { return '{"d":{"Rows":[' + rowsText + ']' + (headText ? ',' + headText : '') + (first && firstText ? ',' + firstText : '') + '}}'; };
+    // Phần cố định của một gói: thân rỗng (gói 0 có thêm tên cột gốc), khối `job` và dấu vết vận chuyển; dư 4 KiB cho trace, mã hợp đồng và wrapper relay.
+    var fixed = quotedLength(shell('', true)) + utf8Length(JSON.stringify({ ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: '', job: { jobId: job.jobId, chunkIndex: 0, chunkCount: 0, rowCount: 0, keptCount: 0, totalRowCount: total, oversize: [] } })) + 4096;
     var target = Number(job.chunkTargetBytes || 0), max = Number(job.chunkMaxBytes || 0), chunks = [], current = [], size = fixed, oversize = [], kept = 0;
     data.Rows.forEach(function (row) {
-      var values = Array.isArray(row) ? row : [];
-      if (keep && !keep[String(values[idPosition])]) { return; }
-      var text = JSON.stringify(values), bytes = quotedLength(text) + 1;
+      if (keep && !keep[String(row[idIndex])]) { return; }
+      var text = JSON.stringify(row), bytes = quotedLength(text) + 1;
       kept += 1;
-      if (fixed + bytes > max) { oversize.push(idPosition >= 0 ? String(values[idPosition]) : ''); return; }
-      if (current.length && size + bytes > target) { chunks.push(shell(current.join(','))); current = []; size = fixed; }
+      if (fixed + bytes > max) { oversize.push(String(row[idIndex] === undefined ? '' : row[idIndex])); return; }
+      if (current.length && size + bytes > target) { chunks.push(shell(current.join(','), !chunks.length)); current = []; size = fixed; }
       current.push(text); size += bytes;
     });
-    if (current.length || !chunks.length) { chunks.push(shell(current.join(','))); }
-    return { chunks: chunks, rowCount: data.Rows.length, keptCount: kept, totalRowCount: total, oversize: oversize, fields: sourceFields };
+    if (current.length || !chunks.length) { chunks.push(shell(current.join(','), !chunks.length)); }
+    return { chunks: chunks, rowCount: data.Rows.length, keptCount: kept, totalRowCount: total, oversize: oversize };
   }
   function scanChunkResult(chunkIndex, trace, request) {
     var job = scanJob, index = Number(chunkIndex);
@@ -310,7 +320,7 @@
       throw gone;
     }
     traceEvent(trace, 'scan_chunk_sent', request, { responseLength: job.chunks[index].length });
-    return { ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: job.chunks[index], job: { jobId: job.jobId, chunkIndex: index, chunkCount: job.chunks.length, rowCount: job.rowCount, keptCount: job.keptCount, totalRowCount: job.totalRowCount, oversize: index === 0 ? job.oversize : [], fields: index === 0 ? job.fields || null : null }, transport: { trace: trace } };
+    return { ok: true, status: 200, headers: { contentType: 'application/json; charset=utf-8' }, body: job.chunks[index], job: { jobId: job.jobId, chunkIndex: index, chunkCount: job.chunks.length, rowCount: job.rowCount, keptCount: job.keptCount, totalRowCount: job.totalRowCount, oversize: index === 0 ? job.oversize : [] }, transport: { trace: trace } };
   }
   function execute(request) {
     if (!request || typeof request !== 'object') {
@@ -353,9 +363,8 @@
           throw unparseable;
         }
         if (data) {
-          // Tên cột gốc (trước khi giữ cột) đi kèm gói đầu để GAS đọc các trang không tiêu đề của cùng bảng trong lượt.
-          var cut = scanChunks(replyPick(data, req.meta.keep), req.meta.job || {}, data.ViewPage.Fields.map(fieldName));
-          scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize, fields: cut.fields };
+          var cut = scanChunks(replyPick(data, req.meta.keep), req.meta.job || {});
+          scanJob = { jobId: String(req.meta.job.jobId || ''), chunks: cut.chunks, rowCount: cut.rowCount, keptCount: cut.keptCount, totalRowCount: cut.totalRowCount, oversize: cut.oversize };
           traceEvent(trace, 'scan_job_cut', req, { responseLength: body.length, code: 'chunks:' + cut.chunks.length });
           var first = scanChunkResult(0, trace, req);
           first.transport = Object.assign({}, captured, first.transport);

@@ -153,7 +153,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 /** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
 var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '8b8d9bda0993';
+var FBM_CONTRACT_VERSION = 'f939312ceea2';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
