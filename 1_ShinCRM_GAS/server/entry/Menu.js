@@ -86,6 +86,22 @@ function shinShowSidebar() {
   return runEntryPoint('shinShowSidebar', 'core', sidebarOpen);
 }
 
+/**
+ * Module có dữ liệu cần đưa vào khung Sidebar tự đăng ký hàm trả dữ liệu đó ở tệp của mình, khóa là tên module; lõi không biết module nào tồn tại. Khai dạng `var ... typeof` vì GAS nạp tệp không theo thứ tự cố định.
+ */
+var SIDEBAR_SERVER_DATA_PROVIDERS = typeof SIDEBAR_SERVER_DATA_PROVIDERS !== 'undefined' ? SIDEBAR_SERVER_DATA_PROVIDERS : {};
+
+/**
+ * Kênh duy nhất đưa dữ liệu GAS vào khung Sidebar lúc dựng: `client/Sidebar.html` gọi hàm này trước mọi tệp client, trang nhận biến `SIDEBAR_SERVER_DATA` (khóa là tên module).
+ * Chỉ dành cho thứ GAS khai và không đổi trong lúc Sidebar mở, để Sidebar không gõ lại; không tốn lần gọi GAS nào vì khung vốn do GAS dựng. Hàm đăng ký không được đọc kho hay Sheet: trigger mở tệp cũng dựng khung này.
+ */
+function sidebarServerData() {
+  var data = {};
+  Object.keys(SIDEBAR_SERVER_DATA_PROVIDERS).forEach(function (owner) { data[owner] = SIDEBAR_SERVER_DATA_PROVIDERS[owner](); });
+  // Chặn `<` để chuỗi dữ liệu không cắt được thẻ script.
+  return '<script>var SIDEBAR_SERVER_DATA = ' + JSON.stringify(data).replace(/</g, '\\u003c') + ';</script>';
+}
+
 /** Dựng khung sidebar và hiện nó. Dùng chung cho lệnh menu và trigger mở tệp. */
 function sidebarShow() {
   var html = HtmlService.createTemplateFromFile('client/Sidebar')

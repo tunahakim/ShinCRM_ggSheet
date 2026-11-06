@@ -11,10 +11,22 @@ SETTINGS_SECTION_PROVIDERS.fbm_sync = function () { return fbmSettingsSections()
 
 /** Tên phần cài đặt của đồng bộ, để bên đọc không gõ chuỗi tay. */
 FbmSync.SETTING_SECTIONS = { master: 'fbm_master', run: 'fbm_run', account: 'fbm_account', extension: 'fbm_extension', background: 'fbm_background', loginPolicy: 'fbm_login_policy', pullDefaults: 'defaults_fbm_pull' };
-/** Tiến trình nền theo thứ tự hiện trên màn cài đặt; mỗi tiến trình có hai trường `<tên>Enabled`, `<tên>Minutes` trong phần lịch nền. */
-FbmSync.SCHEDULE_KINDS = ['heartbeat', 'customerFull', 'activityFull', 'detail'];
+/** Mặc định bật và chu kỳ (phút) của từng tiến trình nền; thứ tự khóa là thứ tự hiện trên màn cài đặt. Mỗi tiến trình có hai trường `<tên>Enabled`, `<tên>Minutes` trong phần lịch nền, dựng từ bảng này; tên lấy ở `RUN_PLANS` qua `scheduleLabel`. */
+FbmSync.SCHEDULE_DEFAULTS = { heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30 } };
+FbmSync.SCHEDULE_KINDS = Object.keys(FbmSync.SCHEDULE_DEFAULTS);
 /** Trần chu kỳ lịch nền: 7 ngày, tính bằng phút. */
 FbmSync.SCHEDULE_MAX_MINUTES = 7 * 24 * 60;
+
+/** Hai trường bật và chu kỳ của mỗi tiến trình nền, theo thứ tự `SCHEDULE_KINDS`. */
+function fbmScheduleFields() {
+  var fields = {};
+  FbmSync.SCHEDULE_KINDS.forEach(function (kind) {
+    var label = FbmSync.scheduleLabel(kind), base = FbmSync.SCHEDULE_DEFAULTS[kind];
+    fields[kind + 'Enabled'] = { kind: 'boolean', label: label, default: base.enabled };
+    fields[kind + 'Minutes'] = { kind: 'number', label: 'Chu kỳ ' + label + ' (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: base.minutes };
+  });
+  return fields;
+}
 
 function fbmSettingsSections() {
   return [
@@ -61,20 +73,13 @@ function fbmSettingsSections() {
     },
     {
       name: FbmSync.SETTING_SECTIONS.background, owner: 'fbm_sync', label: 'Lịch đồng bộ nền',
-      fields: {
+      fields: Object.assign({
         enabled: { kind: 'boolean', label: 'Đồng bộ nền', default: true, hint: 'Tắt thì không tiến trình nền nào chạy; lượt tay vẫn chạy.' },
-        direction: { kind: 'select', label: 'Chiều chạy nền', options: ['read', 'push', 'write'], empty: 'read', hint: 'read = chỉ lấy từ FBM; push = chỉ đẩy lên FBM; write = hai chiều.' },
-        heartbeatEnabled: { kind: 'boolean', label: 'Giữ phiên FBM', default: true },
-        heartbeatMinutes: { kind: 'number', label: 'Chu kỳ Giữ phiên FBM (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: 5 },
-        customerFullEnabled: { kind: 'boolean', label: 'Quét nhanh', default: true },
-        customerFullMinutes: { kind: 'number', label: 'Chu kỳ Quét nhanh (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: 60 },
-        activityFullEnabled: { kind: 'boolean', label: 'Lấy toàn bộ giao dịch', default: false },
-        activityFullMinutes: { kind: 'number', label: 'Chu kỳ Lấy toàn bộ giao dịch (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: 480 },
-        detailEnabled: { kind: 'boolean', label: 'Vòng xoay giao dịch', default: false },
-        detailMinutes: { kind: 'number', label: 'Chu kỳ Vòng xoay giao dịch (phút)', min: 0, max: FbmSync.SCHEDULE_MAX_MINUTES, default: 30 },
+        direction: { kind: 'select', label: 'Chiều chạy nền', options: ['read', 'push', 'write'], empty: 'read', hint: 'read = chỉ lấy từ FBM; push = chỉ đẩy lên FBM; write = hai chiều.' }
+      }, fbmScheduleFields(), {
         detailCustomersPerRun: { kind: 'number', label: 'Số khách mỗi lượt vòng xoay', min: 1, default: 30 },
         machineAutoTakeover: { kind: 'boolean', label: 'Tự nhận máy nền', default: false, hint: 'Bật thì máy vừa mở Chrome tự nhận chạy nền khi máy đang được giao im quá ngưỡng tính theo nhịp hỏi GAS và máy này có khóa giải mã mật khẩu FBM.' }
-      }
+      })
     },
     {
       name: FbmSync.SETTING_SECTIONS.loginPolicy, owner: 'fbm_sync', label: 'Tự đăng nhập FBM',

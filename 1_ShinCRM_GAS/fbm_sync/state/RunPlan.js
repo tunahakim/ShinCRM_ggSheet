@@ -2,7 +2,7 @@
  * Dãy chặng của từng kiểu lượt: dữ liệu khai một chỗ, `runPlanOf` chỉ tra bảng. Kiểu hay mức quét không có trong bảng thì ném `SYNC_UNKNOWN_SCAN`, không rơi về một dãy mặc định (lỗi gõ không được biến thành một lượt khác).
  * `activity` là các lớp của chặng Giao dịch theo thứ tự: `list` xả danh sách đọc, `top` quét từ khách mới nhất xuống, `bulk` quét lớp 1, `rotation` vòng xoay chi tiết. `list` cuối vét khách các lớp trước mới đánh dấu.
  * Chặng cũ còn tự nối nhau; bảng hiện quyết mức quét hợp lệ và các lớp của chặng Giao dịch.
- * `label` là tên kiểu lượt trong nhãn lượt của Log và tên tiến trình nền; tên ba mức quét phải trùng chữ với menu `Mức quét` của Sidebar (test giữ hai nơi khớp).
+ * `label` là tên kiểu lượt duy nhất: nhãn lượt trong Log, tên tiến trình nền, menu `Mức quét` và lịch nền của Sidebar (nhận qua `runNames`) đều đọc ở đây.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
@@ -43,6 +43,18 @@ FbmSync.runPlanOfStart = function (scan, scanPack) {
 };
 /** Dãy chặng của lượt đang mở, dựng lại từ mức quét và gói đã chụp trong ô lượt. */
 FbmSync.runPlanOfState = function (state) { return FbmSync.runPlanOfStart(state.scan, state.scanPack); };
+/**
+ * Tên lượt cho Sidebar, dữ liệu thuần: các mức quét của lượt `full` theo thứ tự bảng, gói mặc định, và các tiến trình nền theo thứ tự `SCHEDULE_KINDS`.
+ * Sidebar nhận nó lúc dựng khung (`sidebarServerData`) nên không gõ lại tên hay mã nào; thêm mức quét hay tiến trình ở GAS là Sidebar có ngay.
+ */
+FbmSync.runNames = function () {
+  var prefix = 'sync:full:';
+  var packs = Object.keys(FbmSync.RUN_PLANS).filter(function (key) { return key.indexOf(prefix) === 0; }).map(function (key) { return { value: key.slice(prefix.length), label: FbmSync.RUN_PLANS[key].label }; });
+  var processes = FbmSync.SCHEDULE_KINDS.map(function (kind) { return { key: kind, label: FbmSync.scheduleLabel(kind) }; });
+  return { packs: packs, packDefault: FbmSync.SCAN_PACK_DEFAULT, processes: processes };
+};
+var SIDEBAR_SERVER_DATA_PROVIDERS = typeof SIDEBAR_SERVER_DATA_PROVIDERS !== 'undefined' ? SIDEBAR_SERVER_DATA_PROVIDERS : {};
+SIDEBAR_SERVER_DATA_PROVIDERS.fbm_sync = function () { return FbmSync.runNames(); };
 /** Vị trí kế sau `index` trong một dãy chặng (`-1` là chưa bắt đầu); hết dãy thì `-1`. */
 FbmSync.runPlanNext = function (sequence, index) {
   var next = Number(index) + 1;
