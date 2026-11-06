@@ -8,6 +8,7 @@ Chỉ đọc tệp này khi phiên có chạm giao diện Sidebar, screen schema
 - Không đưa vào screen schema: `className`, `rootClass`, `classes`, `*Class`, selector DOM, chuỗi CSS, `style` tự do, token `primary/error/muted`.
 - `action` là hợp đồng hành vi; không thêm `purpose` hay trường diễn giải trùng khi `action` đã đủ nghĩa.
 - Thứ GAS khai (mã và tên kiểu lượt, mức quét, tiến trình nền...) thì schema không gõ lại mã hay nhãn: lấy từ `SIDEBAR_SERVER_DATA`, dữ liệu GAS chèn một lần lúc dựng khung qua `sidebarServerData()` (`server/entry/Menu.js`), module tự đăng ký vào `SIDEBAR_SERVER_DATA_PROVIDERS`. Schema chỉ giữ phần riêng của giao diện (lời giải thích theo mã, id ô) và ném lúc nạp khi hai bên lệch. Kênh này chỉ cho dữ liệu không đổi trong lúc Sidebar mở; state sống vẫn đi qua lời gọi GAS.
+- Chữ trên nút và hộp xác nhận (ví dụ "Đăng nhập thử", "Hủy phiên cũ và đăng nhập") là câu chữ riêng của giao diện, viết cho người đang bấm, nên schema tự khai dù có lúc trùng chữ với tên kiểu lượt trong Log; không lấy từ tên lượt của GAS. Chỉ chỗ Sidebar hiện tên để người dùng chọn hoặc nhận ra kiểu lượt (menu Mức quét, danh sách tiến trình nền) mới phải lấy từ dữ liệu GAS.
 
 ## Trình bày và component
 
