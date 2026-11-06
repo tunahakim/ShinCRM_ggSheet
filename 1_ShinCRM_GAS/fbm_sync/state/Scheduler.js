@@ -20,7 +20,8 @@ FbmSync.detailCursorWrite = function (cus) {
   FbmSync.propertyJsonWrite(FbmSync.DETAIL_CURSOR_KEY, { cus: Math.floor(Number(cus)), at: Date.now() });
 };
 /** Tên tiến trình trong câu báo lỗi và câu xác nhận, đúng nhãn ở `Cài đặt phiên` (09/02 Phần 3). */
-FbmSync.SCHEDULE_LABELS = { heartbeat: 'Giữ phiên FBM', customerFull: 'Quét nhanh', activityFull: 'Lấy toàn bộ giao dịch', detail: 'Vòng xoay giao dịch' };
+/** Tên tiến trình nền là tên kiểu lượt nó mở trong `RUN_PLANS`; không khai tên lần thứ hai. */
+FbmSync.scheduleLabel = function (kind) { return FbmSync.runPlanOfStart(FbmSync.SCHEDULE_SCANS[kind]).label; };
 /** Loại quét nền luôn quét đẩy dù dấu lần đẩy sạch còn khớp: lưới an toàn cho sửa Sheet mà trigger không chạy nên sổ nạp lại không tăng (chủ dự án chốt Quét nhanh 2026-10-19). Lượt tay luôn quét. */
 FbmSync.PUSH_GATE_BYPASS_SCANS = ['full'];
 FbmSync.PUSH_GATE_CLOSED_TRACE = 'Bỏ qua kiểm dữ liệu ShinCRM và chặng đẩy: từ lần đẩy sạch trước không có gì đổi.';
@@ -33,7 +34,7 @@ FbmSync.SCHEDULE_SCANS = { customerFull: 'full', activityFull: 'activity_bulk', 
 FbmSync.processBookRead = function () {
   var props = FbmSync.props(), book = {};
   Object.keys(FbmSync.SCHEDULE_DONE_KEYS).forEach(function (kind) {
-    var retry = FbmSync.documentPropertyJson(FbmSync.SCHEDULE_RETRY_KEYS[kind], 'lần thử lại của ' + FbmSync.SCHEDULE_LABELS[kind]) || {};
+    var retry = FbmSync.documentPropertyJson(FbmSync.SCHEDULE_RETRY_KEYS[kind], 'lần thử lại của ' + FbmSync.scheduleLabel(kind)) || {};
     book[kind] = { doneAt: Number(props.getProperty(FbmSync.SCHEDULE_DONE_KEYS[kind]) || 0), failures: Math.max(0, Math.floor(Number(retry.failures) || 0)), retryAt: Math.max(0, Number(retry.retryAt) || 0) };
   });
   return book;
@@ -83,7 +84,7 @@ FbmSync.scheduleNextText = function (now, schedule, book) {
     var at = FbmSync.processDueAt(kind, schedule, book);
     if (schedule[kind].enabled && (!best || at < bestAt)) { best = kind; bestAt = at; }
   });
-  return best ? 'sớm nhất là ' + FbmSync.SCHEDULE_LABELS[best] + ', còn ' + Math.max(0, Math.ceil((bestAt - now) / 60000)) + ' phút' : 'không có tiến trình nào đang bật';
+  return best ? 'sớm nhất là ' + FbmSync.scheduleLabel(best) + ', còn ' + Math.max(0, Math.ceil((bestAt - now) / 60000)) + ' phút' : 'không có tiến trình nào đang bật';
 };
 FbmSync.scheduleNextAt = function (schedule, book) {
   var times = Object.keys(FbmSync.SCHEDULE_DONE_KEYS).filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return FbmSync.processDueAt(kind, schedule, book); });

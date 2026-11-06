@@ -37,7 +37,7 @@ FbmSync.backgroundSettle = function (state, now) {
   if (outcome !== 'dropped') {
     var mark = FbmSync.processBookMark(kind, outcome, now, FbmSync.processBookRead());
     if (outcome === 'failed') {
-      logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: LOG_WARN, cycleId: String(state.runId || ''), reason: FbmSync.SCHEDULE_LABELS[kind] + ' chạy nền không xong' + (state.lastFailureCode ? ' (mã ' + state.lastFailureCode + ')' : '') + ', lỗi liền ' + mark.failures + ' lần; thử lại sau ' + mark.minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: mark.failures, retryMinutes: mark.minutes } });
+      logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: LOG_WARN, cycleId: String(state.runId || ''), reason: FbmSync.scheduleLabel(kind) + ' chạy nền không xong' + (state.lastFailureCode ? ' (mã ' + state.lastFailureCode + ')' : '') + ', lỗi liền ' + mark.failures + ' lần; thử lại sau ' + mark.minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: mark.failures, retryMinutes: mark.minutes } });
     }
   }
   state.process = '';

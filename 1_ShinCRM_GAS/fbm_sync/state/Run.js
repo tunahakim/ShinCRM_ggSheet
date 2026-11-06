@@ -13,21 +13,21 @@ FbmSync.workStoreClear = function () {
 
 /**
  * Nhãn của lượt, chốt một lần lúc mở: ai chạy (Tay/Nền) và tiến trình nào. Dòng Log của lượt lấy nhãn này, không suy lại từ ô lượt lúc ghi (ô lượt có thể đã sang lượt khác).
- * `kindLabel` đặt thẳng tên tiến trình; bỏ trống thì lấy tên tiến trình nền (`process`) và thêm tên kiểu quét khi khác tiến trình (Quét nhanh do bước đếm gọi trong Giữ phiên).
+ * `kindLabel` đặt thẳng tên tiến trình; bỏ trống thì lấy tên tiến trình nền (`process`) và thêm tên kiểu lượt theo bảng dãy chặng (mức quét lẫn gói quét) khi khác tên tiến trình (Quét nhanh do bước đếm gọi trong Giữ phiên).
  */
 FbmSync.runLabelOf = function (state, kindLabel) {
-  var labels = FbmSync.SCHEDULE_LABELS, scans = FbmSync.SCHEDULE_SCANS, process = String(state.process || ''), background = state.origin === 'background';
+  var process = String(state.process || ''), background = state.origin === 'background', processLabel = background && process ? FbmSync.scheduleLabel(process) : '';
   var parts = [background ? 'Nền' : 'Tay'];
   if (kindLabel) { parts.push(kindLabel); return parts.join(' · '); }
-  if (background && process) { parts.push(labels[process] || process); }
-  var runKind = Object.keys(scans).filter(function (kind) { return scans[kind] === state.scan; })[0] || '';
-  if (!background || runKind !== process) { parts.push(labels[runKind] || String(state.scan || '')); }
+  var runLabel = FbmSync.runPlanOfStart(state.scan, state.scanPack).label;
+  if (processLabel) { parts.push(processLabel); }
+  if (runLabel !== processLabel) { parts.push(runLabel); }
   return parts.join(' · ');
 };
 
 /**
  * Nơi duy nhất mở lượt: dọn kho làm việc của lượt trước, dựng ô lượt mới từ ô hiện tại, ghi và trả về ô đã ghi.
- * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `cursor`, `message`, `kindLabel` (xem `runLabelOf`), `process` và `pollAt` (tiến trình nền và giờ bắt đầu lần hỏi mở lượt, xem `Heartbeat.js`).
+ * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `cursor`, `message`, `scanPack` (gói của lượt quét `full`, chụp đầu lượt), `kindLabel` (xem `runLabelOf`), `process` và `pollAt` (tiến trình nền và giờ bắt đầu lần hỏi mở lượt, xem `Heartbeat.js`).
  * Ô cũ còn lượt chưa đóng (lượt treo bị thay) thì các bước của nó được đóng trước khi metadata bị bỏ. Mỗi lượt xác nhận phiên FBM lại từ đầu nên phiên cũ không được mang sang; số xung đột đang chờ quyết thì mang sang vì nó phản ánh Sheet.
  */
 FbmSync.runOpen = function (spec) {
@@ -38,7 +38,7 @@ FbmSync.runOpen = function (spec) {
     runId: Number(now).toString(36), entity: String(opt.entity || ''), phase: opt.phase || 'checking_session', cursor: opt.cursor || {}, message: String(opt.message || ''),
     counts: Object.assign(FbmSync.countsDefault(), { total: Number(opt.total) || 0 }),
     metadata: Object.assign(FbmSync.stateDefault().metadata, { conflictCount: Number(old.metadata && old.metadata.conflictCount || 0), conflictLogged: Number(old.metadata && old.metadata.conflictLogged || 0) }),
-    process: String(opt.process || ''), pollAt: Number(opt.pollAt || 0), origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'),
+    process: String(opt.process || ''), pollAt: Number(opt.pollAt || 0), origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'), scanPack: String(opt.scanPack || ''),
     startedAt: Number(now), updatedAt: Number(now)
   });
   state.runLabel = FbmSync.runLabelOf(state, opt.kindLabel);
