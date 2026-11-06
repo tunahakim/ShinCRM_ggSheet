@@ -1,6 +1,8 @@
 /**
  * Kiểm các rào của ô lượt dùng chung cho mọi lượt (nền hay tay): câu hộp đen Extension trong Log, nhãn lượt trong Log theo tiến trình nền, lát bỏ lượt mở mà không còn request (RUN_LEFT_OPEN), dừng lượt nền và response đến muộn sau khi dừng, danh sách pha "đang chạy" của màn trạng thái.
  */
+const fs = require('fs');
+const path = require('path');
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 
@@ -26,6 +28,18 @@ function chay(so) {
   check(so, 'Lượt trong Log: Giữ phiên là Nền; Quét nhanh do Giữ phiên mở ghi cả hai; tiến trình nền ghi tên nó; lượt bấm tay ghi Tay và kiểu quét, không ghi tiến trình nền sót',
     [nhan({ origin: 'background', process: 'heartbeat', scan: 'keepalive' }), nhan({ origin: 'background', process: 'heartbeat', scan: 'full' }), nhan({ origin: 'background', process: 'detail', scan: 'detail' }), nhan({ origin: 'manual', process: 'heartbeat', scan: 'full' })],
     ['Nền · Giữ phiên FBM', 'Nền · Giữ phiên FBM · Quét nhanh', 'Nền · Vòng xoay giao dịch', 'Tay · Quét nhanh']);
+  check(so, 'Lượt tay ghi đúng mức quét đã chọn (trước đây mọi lượt quét tay đều ghi Quét nhanh); lượt nền Quét nhanh không nêu gói vẫn là Quét nhanh; lượt nền Lấy toàn bộ giao dịch không lặp tên',
+    [nhan({ origin: 'manual', scan: 'full', scanPack: 'quick' }), nhan({ origin: 'manual', scan: 'full', scanPack: 'deep' }), nhan({ origin: 'manual', scan: 'full', scanPack: 'all' }), nhan({ origin: 'background', process: 'customerFull', scan: 'full' }), nhan({ origin: 'background', process: 'activityFull', scan: 'activity_bulk' }), nhan({ origin: 'manual', scan: 'identity_check' })],
+    ['Tay · Quét nhanh', 'Tay · Quét kỹ', 'Tay · Quét toàn bộ', 'Nền · Quét nhanh', 'Nền · Lấy toàn bộ giao dịch', 'Tay · Kiểm tra liên kết']);
+  // Gặp khi nghiệm thu B8: lượt Quét kỹ bấm tay ghi "Tay · Quét nhanh" vì gói quét được gán sau khi nhãn đã chốt.
+  F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  F.start({ mode: 'read', origin: 'manual', manual: true, scan: 'full', pack: 'deep' });
+  check(so, 'Mở lượt tay Quét kỹ qua lệnh start: gói quét vào ô lượt cùng lúc mở lượt nên nhãn chốt là "Tay · Quét kỹ"', [F.stateRead().scanPack, F.stateRead().runLabel], ['deep', 'Tay · Quét kỹ']);
+  const menu = fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'client', 'schema', 'sync', 'screens', 'run.html'), 'utf8');
+  const menuLabel = (value) => (menu.match(new RegExp("value: '" + value + "', label: '([^']+)'")) || [])[1];
+  check(so, 'Mọi dòng RUN_PLANS có tên; tên ba mức quét trùng chữ với menu Mức quét của Sidebar; tên tiến trình nền lấy từ bảng dãy chặng', [
+    Object.keys(F.RUN_PLANS).filter((key) => !F.RUN_PLANS[key].label), ['quick', 'deep', 'all'].map((pack) => menuLabel(pack) === F.RUN_PLANS['sync:full:' + pack].label), F.SCHEDULE_LABELS, ['heartbeat', 'customerFull', 'activityFull', 'detail'].map(F.scheduleLabel)
+  ], [[], [true, true, true], undefined, ['Giữ phiên FBM', 'Quét nhanh', 'Lấy toàn bộ giao dịch', 'Vòng xoay giao dịch']]);
   F.runOpen({ phase: 'checking_session', origin: 'background', mode: 'read', scan: 'detail', process: 'detail', pollAt: Date.now() });
   F.logContextNote(F.stateRead());
   check(so, 'Mở lượt ghi ngay nguồn, kiểu quét và tiến trình: đọc lại kho giữa chừng vẫn thấy lượt nền Vòng xoay',
