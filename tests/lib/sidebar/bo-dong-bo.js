@@ -1,7 +1,8 @@
 /**
  * Sidebar Đồng bộ FBM thật nạp trong hộp cát với DOM giả: renderer giả chỉ dựng cây DOM đủ để kiểm màn, đồng hồ giả không tự nổ, dòng thông báo chung nuốt im. Dùng chung cho các tệp ca kiểm Sidebar đồng bộ.
  */
-const { napClient, taoHopCat } = require('../load-gas');
+const { taoHopCat } = require('../load-gas');
+const { napTheoSidebar } = require('./nap-sidebar');
 const { domGia } = require('../dom-gia');
 
 function taoSidebarDongBo() {
@@ -52,7 +53,8 @@ function taoSidebarDongBo() {
     return parent.appendChild(box);
   };
   hop.fbmSyncPaintError = null;
-  napClient(hop,
+  // Theo thứ tự Sidebar thật và có dữ liệu GAS chèn lúc dựng khung (tên mức quét, tiến trình nền).
+  napTheoSidebar([
     'client/ui/icons.html', 'client/ui/fieldInvalid.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
     'client/schema/sync/screens/run.html', 'client/schema/sync/screens/account.html', 'client/schema/sync/screens/results.html', 'client/schema/sync/screens/settings.html', 'client/schema/sync/screens/index.html',
     'client/schema/sync/results/status.html', 'client/schema/sync/results/issues.html', 'client/schema/sync/results/audit.html', 'client/schema/sync/results/conflict.html',
@@ -60,7 +62,7 @@ function taoSidebarDongBo() {
     'client/sync/screens/account.html',
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
-    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSyncMachine.html', 'client/ui/popupList.html', 'client/ui/recordDecision.html', 'client/sync/fbmSync.html');
+    'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSyncMachine.html', 'client/ui/popupList.html', 'client/ui/recordDecision.html', 'client/sync/fbmSync.html'], hop);
   hop.FBM_SYNC_CLIENT.active = true;
   return { hop, dom, screen: dom.root, content };
 }

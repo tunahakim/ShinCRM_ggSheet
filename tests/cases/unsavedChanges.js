@@ -18,7 +18,7 @@ function taoBoTest() {
     window: { addEventListener: (name, fn) => { calls.push({ name, fn }); } },
     actionErrorReport: (error) => { calls.push({ name: 'error', error }); }
   });
-  napTheoSidebar(['client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/sync/fbmSyncConfigEditor.html'], hop);
+  napTheoSidebar(['client/ui/icons.html', 'client/ui/uiBuilder.html', 'client/ui/renderEngine.html', 'client/ui/unsavedChanges.html', 'client/ui/recordDecision.html', 'client/save/formCollect.html', 'client/save/saveFlow.html', 'client/schema/sync/screens/settings.html', 'client/sync/fbmSyncConfigEditor.html'], hop);
   const dialog = dom.document.createElement('div'); dialog.id = 'shin-unsaved-dialog'; dialog.hidden = true;
   dom.root.appendChild(dialog);
   const wrapper = dom.document.createElement('div'); wrapper.className = 'shin-form-field';

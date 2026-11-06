@@ -5,6 +5,33 @@ const fs = require('fs');
 const path = require('path');
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { taoHopCat } = require('../../lib/load-gas');
+const { liet } = require('../../lib/quet/liet-tep');
+const { duLieuServer, napTheoSidebar } = require('../../lib/sidebar/nap-sidebar');
+
+/**
+ * Tên lượt và tiến trình nền chỉ khai ở GAS; Sidebar nhận qua dữ liệu chèn lúc dựng khung. Kiểm ba đường lệch: dữ liệu chèn khác bảng GAS, schema menu Mức quét để lọt gói thiếu lời giải thích, và tệp client gõ tay lại mã hay tên.
+ */
+function kiemTenSidebar(so, F) {
+  const data = duLieuServer().fbm_sync;
+  const packs = Object.keys(F.RUN_PLANS).filter((key) => key.indexOf('sync:full:') === 0).map((key) => ({ value: key.slice('sync:full:'.length), label: F.RUN_PLANS[key].label }));
+  check(so, 'Dữ liệu chèn vào Sidebar (chạy sidebarServerData thật) trùng bảng GAS: mức quét và tên theo RUN_PLANS, gói mặc định, tiến trình nền theo SCHEDULE_KINDS và scheduleLabel', [data.packs, data.packDefault, data.processes],
+    [packs, F.SCAN_PACK_DEFAULT, F.SCHEDULE_KINDS.map((key) => ({ key, label: F.scheduleLabel(key) }))]);
+  // Hộp đã có dữ liệu GAS thì khung nạp không chèn đè, nên thử được danh sách gói khác bảng thật.
+  const napRun = (goi) => { try { return napTheoSidebar(['client/schema/sync/screens/run.html'], taoHopCat({ SIDEBAR_SERVER_DATA: { fbm_sync: { packs: goi, packDefault: 'quick', processes: [] } } })).FBM_SYNC_RUN_SCHEMA.pack.options.map((o) => o.label); } catch (e) { return 'ném: ' + e.message; } };
+  check(so, 'Menu Mức quét lấy tên từ GAS; GAS thêm gói mà schema chưa có lời giải thích, hoặc bỏ gói mà lời giải thích còn, thì ném lúc nạp', [
+    napRun(data.packs), napRun(data.packs.concat([{ value: 'moi', label: 'Gói mới' }])), napRun(data.packs.slice(0, 2))
+  ], [data.packs.map((p) => p.label), 'ném: Mức quét "moi" chưa có lời giải thích trong schema màn Chạy đồng bộ.', 'ném: Lời giải thích cho mức quét "all" không còn trong GAS.']);
+  // Văn giải thích có thể nhắc tên lượt ("Như Quét nhanh, ..."); chỉ cấm chuỗi đứng riêng làm nhãn và mã tiến trình làm khóa. Phạm vi là tên Sidebar hiện như tên lượt: mức quét và tiến trình nền.
+  const ten = data.packs.map((p) => p.label).concat(data.processes.map((p) => p.label));
+  const viPham = [];
+  liet('client', '.html').forEach((tep) => fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', tep), 'utf8').split(/\r?\n/).forEach((dong, i) => {
+    if (dong.indexOf('detailCustomersPerRun') >= 0) { return; }
+    const lo = ten.filter((t) => dong.indexOf("'" + t + "'") >= 0).concat(F.SCHEDULE_KINDS.filter((k) => dong.indexOf("'" + k + "'") >= 0 || new RegExp('\\b' + k + '(Enabled|Minutes)\\b').test(dong)));
+    if (lo.length) { viPham.push(tep + ':' + (i + 1) + ' ' + lo.join(', ')); }
+  }));
+  check(so, 'Không tệp client nào gõ tay tên lượt làm nhãn hay mã tiến trình nền (trừ dòng số khách mỗi lượt Vòng xoay, khóa riêng của tiến trình detail)', viPham, []);
+}
 
 function chay(so) {
   section('FBM sync - rào ô lượt: hộp đen, nhãn lượt, lượt bỏ mở, dừng nền');
@@ -35,11 +62,10 @@ function chay(so) {
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   F.start({ mode: 'read', origin: 'manual', manual: true, scan: 'full', pack: 'deep' });
   check(so, 'Mở lượt tay Quét kỹ qua lệnh start: gói quét vào ô lượt cùng lúc mở lượt nên nhãn chốt là "Tay · Quét kỹ"', [F.stateRead().scanPack, F.stateRead().runLabel], ['deep', 'Tay · Quét kỹ']);
-  const menu = fs.readFileSync(path.join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'client', 'schema', 'sync', 'screens', 'run.html'), 'utf8');
-  const menuLabel = (value) => (menu.match(new RegExp("value: '" + value + "', label: '([^']+)'")) || [])[1];
-  check(so, 'Mọi dòng RUN_PLANS có tên; tên ba mức quét trùng chữ với menu Mức quét của Sidebar; tên tiến trình nền lấy từ bảng dãy chặng', [
-    Object.keys(F.RUN_PLANS).filter((key) => !F.RUN_PLANS[key].label), ['quick', 'deep', 'all'].map((pack) => menuLabel(pack) === F.RUN_PLANS['sync:full:' + pack].label), F.SCHEDULE_LABELS, ['heartbeat', 'customerFull', 'activityFull', 'detail'].map(F.scheduleLabel)
-  ], [[], [true, true, true], undefined, ['Giữ phiên FBM', 'Quét nhanh', 'Lấy toàn bộ giao dịch', 'Vòng xoay giao dịch']]);
+  check(so, 'Mọi dòng RUN_PLANS có tên; tên tiến trình nền lấy từ bảng dãy chặng', [
+    Object.keys(F.RUN_PLANS).filter((key) => !F.RUN_PLANS[key].label), F.SCHEDULE_LABELS, ['heartbeat', 'customerFull', 'activityFull', 'detail'].map(F.scheduleLabel)
+  ], [[], undefined, ['Giữ phiên FBM', 'Quét nhanh', 'Lấy toàn bộ giao dịch', 'Vòng xoay giao dịch']]);
+  kiemTenSidebar(so, F);
   F.runOpen({ phase: 'checking_session', origin: 'background', mode: 'read', scan: 'detail', process: 'detail', pollAt: Date.now() });
   F.logContextNote(F.stateRead());
   check(so, 'Mở lượt ghi ngay nguồn, kiểu quét và tiến trình: đọc lại kho giữa chừng vẫn thấy lượt nền Vòng xoay',

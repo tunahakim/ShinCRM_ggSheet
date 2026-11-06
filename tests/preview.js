@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const { dungHop, ghiO } = require('./lib/dung-hop');
 const { formatDateGia } = require('./lib/gas-stubs');
+const { kichBanDuLieuServer, THE_DU_LIEU_SERVER } = require('./lib/sidebar/nap-sidebar');
 
 const GAS_DIR = path.join(__dirname, '..', '1_ShinCRM_GAS');
 const TEP_RA = path.join(__dirname, 'xem-sidebar.html');
@@ -151,11 +152,14 @@ function dungGoi(nen) {
   return { core: core, goiGd: goiGd };
 }
 
-/** Thay mỗi thẻ `<?!= include('X') ?>` bằng ruột tệp `X.html`. Đúng phép thay chuỗi mà `include()` ở `server/entry/Menu.js` làm trên Google, không dựng lại gì. */
+/** Thay mỗi thẻ `<?!= include('X') ?>` bằng ruột tệp `X.html` và thẻ chèn dữ liệu GAS bằng kết quả `sidebarServerData()` thật. Đúng phép thay chuỗi mà Google làm, không dựng lại gì. */
 function gopSidebar() {
   const goc = fs.readFileSync(path.join(GAS_DIR, 'client/Sidebar.html'), 'utf8');
+  if (goc.indexOf(THE_DU_LIEU_SERVER) < 0) {
+    throw new Error('Sidebar.html không còn thẻ ' + THE_DU_LIEU_SERVER + '; bản xem trước không biết chèn dữ liệu GAS ở đâu.');
+  }
 
-  const ra = goc.replace(/<\?!=\s*include\(\s*'([^']+)'\s*\)\s*\?>/g, (_, duongDan) => {
+  const ra = goc.replace(THE_DU_LIEU_SERVER, () => kichBanDuLieuServer()).replace(/<\?!=\s*include\(\s*'([^']+)'\s*\)\s*\?>/g, (_, duongDan) => {
     const tep = path.join(GAS_DIR, duongDan + '.html');
     if (!fs.existsSync(tep)) {
       throw new Error('Dòng include trỏ vào "' + duongDan + '" nhưng không có tệp đó — lỗi này làm chết sidebar thật trên Google.');

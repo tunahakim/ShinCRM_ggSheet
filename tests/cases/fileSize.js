@@ -28,7 +28,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/client/style/components.html', 649, 34604, 'UI', 'CSS 5 nhóm component'],
   ['1_ShinCRM_GAS/client/style/frame.html', 225, 9802, 'giữ', 'CSS khung'],
   ['1_ShinCRM_GAS/client/sync/fbmSync.html', 1692, 132602, 'B12', '~12 trách nhiệm: áp trạng thái, cầu nối relay, giữ nháp, vẽ, lắp sự kiện, RPC Extension, xung đột, danh tính, lưu cấu hình, kết nối, lệnh vận hành; thêm nhịp hỏi GAS khi máy không chở lượt (phần máy nền đã tách sang fbmSyncMachine.html)'],
-  ['1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html', 455, 25206, 'B12', 'trình soạn cấu hình + so username + báo chưa lưu + gom ô thành phần cài đặt gửi GAS'],
+  ['1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html', 455, 25700, 'B12', 'trình soạn cấu hình + so username + báo chưa lưu + gom ô thành phần cài đặt gửi GAS; bảng ô của tiến trình nền dựng từ danh sách GAS'],
   ['1_ShinCRM_GAS/client/sync/screens/settings.html', 251, 31073, 'B12', 'một màn; dài vì dòng dày (TB 136 ký tự/dòng); thêm lỗi khóa hỏng kèm nút đặt về mặc định, khối máy chạy nền'],
   ['1_ShinCRM_GAS/client/ui/actions.html', 237, 11500, 'giữ', 'bảng hành động'],
   ['1_ShinCRM_GAS/client/ui/combo.html', 201, 9219, 'giữ', 'ô gõ-để-lọc'],
@@ -105,7 +105,7 @@ const NGOAI_LE = [
   ['tests/cases/view/viewSheetRenderer.js', 236, 17275, 'giữ', 'một module ViewSheetRenderer'],
   ['tests/lib/dom-gia.js', 203, 9215, 'giữ', 'DOM giả'],
   ['tests/lib/fake-sheet.js', 464, 22724, 'giữ', 'một việc: Sheet giả'],
-  ['tests/preview.js', 254, 17278, 'giữ', 'công cụ xem Sidebar, một việc'],
+  ['tests/preview.js', 258, 17700, 'giữ', 'công cụ xem Sidebar, một việc; chèn dữ liệu GAS như trang thật'],
 ];
 
 /** Số dòng và byte của một nội dung, sau khi đổi CRLF thành LF. */

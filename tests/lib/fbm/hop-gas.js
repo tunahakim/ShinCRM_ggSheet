@@ -93,6 +93,6 @@ function capSauNap(hopCat, duongDans) {
 }
 
 /** Cổng cài đặt chung cùng phần cài đặt và phạm vi của đồng bộ: mọi hộp chạy lượt đồng bộ cần, vì công tắc, ngưỡng và khoảng nghỉ đọc qua cổng. */
-const TEP_CAI_DAT_FBM = ['server/sheet/CellBudget.js', 'server/data/SettingsSections.js', 'server/settings/SettingsKinds.js', 'server/settings/SettingsGate.js', 'server/settings/SettingsService.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/state/Scope.js'];
+const TEP_CAI_DAT_FBM = ['server/sheet/CellBudget.js', 'server/data/SettingsSections.js', 'server/settings/SettingsKinds.js', 'server/settings/SettingsGate.js', 'server/settings/SettingsService.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/state/Scope.js'];
 
 module.exports = { capTruocTep, capSauTep, capSauNap, TEP_KHUNG_LUOT, TEP_CAI_DAT_FBM, TRANG_FBM_THU };
