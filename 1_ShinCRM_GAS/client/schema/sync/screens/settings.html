@@ -27,12 +27,8 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   background: {
     switchLabel: 'Bật lịch đồng bộ nền', switchId: 'fbm-sync-background-switch', directionLabel: 'Chiều đồng bộ', directionId: 'fbm-sync-background-direction',
     directions: [{ value: 'read', label: 'FBM → ShinCRM' }, { value: 'push', label: 'ShinCRM → FBM' }, { value: 'write', label: 'Đồng bộ hai chiều' }],
-    processes: [
-      { key: 'heartbeat', label: 'Giữ phiên FBM' },
-      { key: 'customerFull', label: 'Quét nhanh' },
-      { key: 'activityFull', label: 'Lấy toàn bộ giao dịch' },
-      { key: 'detail', label: 'Vòng xoay giao dịch' }
-    ],
+    // Mã, tên và thứ tự tiến trình nền do GAS khai (`SCHEDULE_KINDS`, tên trong `RUN_PLANS`), chèn lúc dựng khung.
+    processes: SIDEBAR_SERVER_DATA.fbm_sync.processes,
     processesHelp: 'Tắt chỉ bỏ lịch định kỳ; Quét nhanh vẫn chạy khi số khách FBM đổi. Chu kỳ thực tế không ngắn hơn Chu kỳ hỏi GAS; 0 là chạy mỗi lần Extension hỏi.',
     detail: {
       countLabel: 'Số khách mỗi lượt vòng xoay', countId: 'fbm-sync-detail-count', countPlaceholder: 'mặc định', countHelp: 'Mỗi lượt Vòng xoay giao dịch đọc tiếp N khách kế tiếp trên Sheet (số nguyên từ 1, không giới hạn trên) theo từng lô rồi lấy toàn bộ giao dịch của họ; lượt sau đọc N khách tiếp theo, hết danh sách thì quay lại đầu. Ví dụ 30 khách mỗi 30 phút thì khoảng 1.300 khách được xoay hết một vòng trong gần một ngày.'
@@ -50,6 +46,6 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   relay: { edit: 'Sửa cấu hình kết nối', save: 'Lưu cấu hình kết nối', rotateId: 'fbm-sync-rotate-relay' },
   notice: { relayOk: 'Extension đã nhận cấu hình relay của file này.', relayMissing: 'Chưa xác nhận Extension đã nhận cấu hình relay.', warningKind: 'warning', infoKind: 'info', errorKind: 'error' },
   corrupt: { reset: 'Đặt về mặc định', resetIdPrefix: 'fbm-sync-reset-' },
-  defaults: { processKeys: ['heartbeat', 'customerFull', 'activityFull', 'detail'], detailSuffixes: ['count'], detailFieldPrefix: 'fbm-sync-detail-', startupId: 'fbm-sync-run-on-startup', masterId: 'fbm-sync-settings-master-switch', backgroundSwitchId: 'fbm-sync-background-switch', policyPrefix: 'fbm-sync-policy-', loginRetryId: 'fbm-sync-login-retry-minutes', thresholdPrefix: 'fbm-sync-setting-', processMinutesSuffix: '-minutes', extensionPrefix: 'fbm-extension-' }
+  defaults: { detailSuffixes: ['count'], detailFieldPrefix: 'fbm-sync-detail-', startupId: 'fbm-sync-run-on-startup', masterId: 'fbm-sync-settings-master-switch', backgroundSwitchId: 'fbm-sync-background-switch', policyPrefix: 'fbm-sync-policy-', loginRetryId: 'fbm-sync-login-retry-minutes', thresholdPrefix: 'fbm-sync-setting-', processMinutesSuffix: '-minutes', extensionPrefix: 'fbm-extension-' }
 };
 </script>

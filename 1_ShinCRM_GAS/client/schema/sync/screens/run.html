@@ -1,20 +1,32 @@
 <script>
 /* Schema tĩnh của màn Chạy đồng bộ. Trạng thái sống và pipeline do controller điền vào Block. */
+/**
+ * Menu Mức quét dựng từ danh sách gói GAS chèn lúc dựng khung (`SIDEBAR_SERVER_DATA.fbm_sync`). Gói GAS có mà thiếu lời giải thích, hay lời giải thích cho gói GAS không còn, thì ném ngay lúc nạp để không lọt menu thiếu chữ hoặc lời giải thích mồ côi.
+ */
+function fbmSyncPackSchema(hints) {
+  var names = SIDEBAR_SERVER_DATA.fbm_sync;
+  var options = names.packs.map(function (pack) {
+    if (!hints[pack.value]) { throw new Error('Mức quét "' + pack.value + '" chưa có lời giải thích trong schema màn Chạy đồng bộ.'); }
+    return { value: pack.value, label: pack.label, hint: hints[pack.value] };
+  });
+  Object.keys(hints).forEach(function (value) {
+    if (!options.some(function (option) { return option.value === value; })) { throw new Error('Lời giải thích cho mức quét "' + value + '" không còn trong GAS.'); }
+  });
+  return { id: 'fbm-sync-pack', label: 'Mức quét', kind: 'menu', defaultValue: names.packDefault, modes: ['read', 'write'], options: options };
+}
+
 var FBM_SYNC_RUN_SCHEMA = {
   id: 'run',
   label: 'Chạy đồng bộ',
   rootId: 'fbm-sync-run-root',
   regions: { pack: 'fbm-sync-run-pack-region', action: 'fbm-sync-run-action-region', details: 'fbm-sync-run-details-region', pipeline: 'fbm-sync-pipeline-region', liveStatus: 'fbm-sync-live-status-region' },
   mode: { id: 'fbm-sync-mode', label: 'Loại đồng bộ', kind: 'menu' },
-  // Gói phát hiện thay đổi bên FBM; chiều đẩy không đọc FBM để phát hiện thay đổi nên không có mức quét.
-  pack: {
-    id: 'fbm-sync-pack', label: 'Mức quét', kind: 'menu', defaultValue: 'quick', modes: ['read', 'write'],
-    options: [
-      { value: 'quick', label: 'Quét nhanh', hint: 'Bắt khách mới, sửa khách và giao dịch mới gần đây. Bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động, sửa hoặc xóa giao dịch cũ.' },
-      { value: 'deep', label: 'Quét kỹ', hint: 'Như Quét nhanh, thêm lấy toàn bộ giao dịch để bắt sửa và xóa giao dịch cũ. Vẫn bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động.' },
-      { value: 'all', label: 'Quét toàn bộ', hint: 'Đọc giao dịch của mọi khách trong phạm vi: không bỏ sót gì nhưng lâu nhất.' }
-    ]
-  },
+  // Gói phát hiện thay đổi bên FBM; chiều đẩy không đọc FBM để phát hiện thay đổi nên không có mức quét. Mã, tên và gói mặc định do GAS khai (`RUN_PLANS`), ở đây chỉ có lời giải thích theo mã.
+  pack: fbmSyncPackSchema({
+    quick: 'Bắt khách mới, sửa khách và giao dịch mới gần đây. Bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động, sửa hoặc xóa giao dịch cũ.',
+    deep: 'Như Quét nhanh, thêm lấy toàn bộ giao dịch để bắt sửa và xóa giao dịch cũ. Vẫn bỏ sót giao dịch thêm lùi ngày ở khách ít hoạt động.',
+    all: 'Đọc giao dịch của mọi khách trong phạm vi: không bỏ sót gì nhưng lâu nhất.'
+  }),
   cardTitle: 'Chọn loại đồng bộ',
   action: {
     ids: { start: 'fbm-sync-start', cancel: 'fbm-sync-cancel', approve: 'fbm-sync-approve' },

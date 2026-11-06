@@ -133,7 +133,7 @@ function fbmSyncSetLoginPolicyDependencyState(parentEnabled) {
   return parentEnabled !== true;
 }
 function fbmSyncSetBackgroundDependencyState(parentEnabled) {
-  var process = FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys;
+  var process = FBM_SYNC_SETTINGS_SCHEMA.background.processes.map(function (item) { return item.key; });
   fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, { disabled: fbmSyncConfigControlDisabled('background', 'direction') });
   process.forEach(function (kind) {
     fbmSyncSetTargetState(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, { disabled: fbmSyncConfigControlDisabled('background', kind + 'Enabled') });
@@ -216,7 +216,7 @@ function fbmSyncPatchSettings(panel, status) {
     if (activeId !== id) { fbmSyncSetToggleState(id, enabled, disabled); }
   }
   if (background.direction !== undefined) { patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.directionId, background.direction); }
-  FBM_SYNC_SETTINGS_SCHEMA.defaults.processKeys.forEach(function (kind) {
+  FBM_SYNC_SETTINGS_SCHEMA.background.processes.map(function (item) { return item.key; }).forEach(function (kind) {
     var enabled = background[kind + 'Enabled'] !== false;
     patchToggle(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind, enabled, fbmSyncConfigControlDisabled('background', kind + 'Enabled'));
     patchValue(FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + kind + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix, background[kind + 'Minutes']);

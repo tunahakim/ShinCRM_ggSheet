@@ -10,6 +10,13 @@ function fbmSyncConfigCanonicalKey(key) {
   return key === 'identity' || key === 'login' ? 'connection' : key;
 }
 
+/**
+ * Mỗi tiến trình nền có cặp trường `<mã>Enabled`, `<mã>Minutes` (khuôn của GAS `FbmSettings.js`); bảng nào cần một dòng cho mỗi tiến trình thì dựng qua đây theo danh sách GAS chèn lúc dựng khung, không gõ lại mã. `entry(key)` trả các dòng của tiến trình đó.
+ */
+function fbmSyncProcessEntries(entry) {
+  return FBM_SYNC_SETTINGS_SCHEMA.background.processes.reduce(function (out, item) { return Object.assign(out, entry(item.key)); }, {});
+}
+
 /*
  * Đây là schema hành vi của giao diện, không phải schema dữ liệu lưu trong GAS.
  * Nó chỉ mô tả khóa cha/con để renderer dùng cùng một luật khóa cho mọi card.
@@ -18,13 +25,8 @@ var FBM_SYNC_CONFIG_UI_SCHEMA = {
   module: { parentPath: 'enabled' },
   background: {
     parentPath: 'enabled',
-    dependencies: {
-      heartbeatMinutes: 'heartbeatEnabled',
-      customerFullMinutes: 'customerFullEnabled',
-      activityFullMinutes: 'activityFullEnabled',
-      detailMinutes: 'detailEnabled',
-      detailCustomersPerRun: 'detailEnabled'
-    }
+    // Chu kỳ khóa theo công tắc của chính tiến trình; số khách mỗi lượt khóa theo công tắc Vòng xoay giao dịch.
+    dependencies: Object.assign(fbmSyncProcessEntries(function (key) { var row = {}; row[key + 'Minutes'] = key + 'Enabled'; return row; }), { detailCustomersPerRun: 'detailEnabled' })
   },
   loginPolicy: {
     parentPath: 'enabled',
@@ -314,14 +316,12 @@ var FBM_SYNC_CONFIG_UNSAVED_FIELDS = {
   module: { enabled: 'fbm-sync-settings-master-switch', approvalThreshold: 'fbm-sync-setting-approval-threshold', scopeLimited: 'fbm-sync-setting-scope-limited', scopeCodes: 'fbm-sync-setting-scope-codes', requestGapMinSeconds: 'fbm-sync-setting-request-gap-min', requestGapMaxSeconds: 'fbm-sync-setting-request-gap-max' },
   relay: {},
   extension: { pollMinutes: 'fbm-extension-poll-minutes', runOnStartup: 'fbm-sync-run-on-startup' },
-  background: {
-    enabled: 'fbm-sync-background-switch', direction: 'fbm-sync-background-direction',
-    heartbeatMinutes: 'fbm-sync-process-heartbeat-minutes', heartbeatEnabled: 'fbm-sync-process-heartbeat',
-    customerFullMinutes: 'fbm-sync-process-customerFull-minutes', customerFullEnabled: 'fbm-sync-process-customerFull',
-    activityFullMinutes: 'fbm-sync-process-activityFull-minutes', activityFullEnabled: 'fbm-sync-process-activityFull',
-    detailMinutes: 'fbm-sync-process-detail-minutes', detailEnabled: 'fbm-sync-process-detail',
-    detailCustomersPerRun: 'fbm-sync-detail-count'
-  },
+  background: Object.assign({ enabled: 'fbm-sync-background-switch', direction: 'fbm-sync-background-direction' }, fbmSyncProcessEntries(function (key) {
+    var id = FBM_SYNC_SETTINGS_SCHEMA.background.processPrefix + key, row = {};
+    row[key + 'Minutes'] = id + FBM_SYNC_SETTINGS_SCHEMA.background.minutesSuffix;
+    row[key + 'Enabled'] = id;
+    return row;
+  }), { detailCustomersPerRun: 'fbm-sync-detail-count' }),
   loginPolicy: { enabled: 'fbm-sync-policy-auto-login', autoOpenTab: 'fbm-sync-policy-auto-open', retryEnabled: 'fbm-sync-policy-retry', retryMinutes: 'fbm-sync-login-retry-minutes' }
 };
 
