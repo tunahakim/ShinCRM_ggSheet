@@ -139,10 +139,10 @@ async function chay(so) {
   heartbeat.logEvent = (event) => gateLogs.push(event);
   heartbeat.flushLog = () => { gateFlushes += 1; };
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const validRead = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/read', body: { read: true }, meta: { kind: 'valid_read' } });
+  const validRead = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/read', body: { read: true }, meta: { kind: 'grid' } });
   heartbeat.FbmSync.statePatch({ activeRequestId: '', phase: 'push', mode: 'push', cursor: { kind: 'customer_edit_save' }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const validWrite = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/write', body: { write: true }, meta: { kind: 'valid_write' } });
-  check(so, 'session hop le khong doi hanh vi ca doc va ghi', [validRead.meta.kind, validWrite.meta.kind, validRead.meta.openFbmContext, validWrite.meta.openFbmContext, gateLogs.length], ['valid_read', 'valid_write', undefined, undefined, 0]);
+  const validWrite = heartbeat.FbmSync.nextEnvelope({ url: 'https://fbm.test/write', body: { write: true }, meta: { kind: 'customer_edit_save' } });
+  check(so, 'session hop le khong doi hanh vi ca doc va ghi', [validRead.meta.kind, validWrite.meta.kind, validRead.meta.openFbmContext, validWrite.meta.openFbmContext, gateLogs.length], ['grid', 'customer_edit_save', undefined, undefined, 0]);
 
   datPhan(heartbeat, 'loginPolicy', { enabled: false, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
   heartbeat.FbmSync.statePatch({ runId: 'closed-gate', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: true }, lastFailureCode: '', lastError: '' });

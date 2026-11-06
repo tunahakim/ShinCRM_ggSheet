@@ -945,7 +945,8 @@ async function chay(so) {
     const customerPageIndexes = [], activityItemTypes = [], customerItemTypes = [], fullKinds = [], fullStatuses = [], fullActivityPropCalls = [], fullActivitySheetReads = [], fullBatches = [], fullLookupFields = [];
     let fullStep = null;
     const fbmTab = executorSession();
-    // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm lượt đầu mất tab FBM ngay ở lô giao dịch đầu tiên.
+    // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm mọi lô giao dịch của lượt đầu đứt đường truyền, `loseTab: 1` chỉ lô đầu tiên.
+    let lanMat = 0;
     for (let round = 0; round < (options && options.rounds || 1); round += 1) {
     fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     fullStep = fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true });
@@ -957,7 +958,7 @@ async function chay(so) {
       const activityBatch = kind === 'batch' && request.meta.entity === 'activity';
       if (kind === 'batch' && request.meta.entity === 'category') { fullLookupFields.push(request.items.map((item) => item.body.controller)); }
       if (activityBatch) { fullBatches.push(request); }
-      if (activityBatch && round === 0 && options && options.loseTab) {
+      if (activityBatch && round === 0 && options && options.loseTab && (options.loseTab === true || lanMat++ < options.loseTab)) {
         fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { error: { requestId: request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Mất tab FBM' } }, 'relay');
         fullStatuses.push(fullStep.status);
         continue;
@@ -1128,11 +1129,16 @@ async function chay(so) {
   // Chạy lại: ghi lại cùng lô không tạo dòng trùng; mất tab giữa lượt thì lượt mới quét lại từ đầu, không đánh vắng mặt nhầm.
   const chayLai = await fullPipeline(false, 'read', { customers: 5, rounds: 2 });
   const matTab = await fullPipeline(false, 'read', { customers: 5, rounds: 2, loseTab: true });
+  const matMotLan = await fullPipeline(false, 'read', { customers: 5, loseTab: 1 });
   const daDanhVang = (run) => run.fullLocal.activity.concat(run.fullLocal.customer).filter((item) => item.syncStatus === 'không thấy bên FBM').length;
-  check(so, 'chạy lại cùng lô không tạo dòng trùng; mất tab ở lô đầu thì lượt đó dừng lỗi, lượt sau quét lại cả lượt, không trùng dòng và không đánh vắng mặt nhầm', [
+  check(so, 'chạy lại cùng lô không tạo dòng trùng; đường truyền đứt ở lô đọc đầu thì GAS gửi lại lô đúng một lần, lần gửi lại vẫn đứt thì lượt đó dừng lỗi (lượt đầu 2 lô, lượt sau 1 lô), lượt sau quét lại cả lượt, không trùng dòng và không đánh vắng mặt nhầm', [
     chayLai.fullLocal.customer.length, chayLai.fullLocal.activity.length, daDanhVang(chayLai), chayLai.fullStep.status.phase,
     matTab.fullStatuses.some((status) => status && status.phase === 'error'), matTab.fullLocal.customer.length, matTab.fullLocal.activity.length, daDanhVang(matTab), matTab.fullStep.status.phase, matTab.fullBatches.length
-  ], [5, 5, 0, 'done', true, 5, 5, 0, 'done', 2]);
+  ], [5, 5, 0, 'done', true, 5, 5, 0, 'done', 3]);
+  check(so, 'đường truyền đứt một lần ở lô đọc giao dịch: GAS gửi lại đúng lô đó (cùng các khách) một lần, lượt đi tiếp đến xong, đủ khách và giao dịch, Log ghi lần gửi lại, đếm 1 lần vào trần gửi lại của lượt', [
+    matMotLan.fullStep.status.phase, matMotLan.fullBatches.length, JSON.stringify(matMotLan.fullBatches[0].items.map((item) => item.body)) === JSON.stringify(matMotLan.fullBatches[1].items.map((item) => item.body)), matMotLan.fullBatches[0].id !== matMotLan.fullBatches[1].id,
+    matMotLan.fullLocal.customer.length, matMotLan.fullLocal.activity.length, matMotLan.fullLogs.filter((event) => event.action === 'transport_retry').length, matMotLan.fullFlow.hop.FbmSync.stateRead().metadata.transportReplays
+  ], ['done', 2, true, true, 5, 5, 1, 1]);
 
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
