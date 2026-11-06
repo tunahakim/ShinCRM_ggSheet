@@ -7,6 +7,7 @@ Chỉ đọc tệp này khi phiên có chạm giao diện Sidebar, screen schema
 - Screen schema chỉ mô tả ý định và hành vi người dùng: cấu trúc, vùng/ID, nhãn, `action`, dữ liệu và trạng thái tương tác; không mô tả cách trình bày.
 - Không đưa vào screen schema: `className`, `rootClass`, `classes`, `*Class`, selector DOM, chuỗi CSS, `style` tự do, token `primary/error/muted`.
 - `action` là hợp đồng hành vi; không thêm `purpose` hay trường diễn giải trùng khi `action` đã đủ nghĩa.
+- Thứ GAS khai (mã và tên kiểu lượt, mức quét, tiến trình nền...) thì schema không gõ lại mã hay nhãn: lấy từ `SIDEBAR_SERVER_DATA`, dữ liệu GAS chèn một lần lúc dựng khung qua `sidebarServerData()` (`server/entry/Menu.js`), module tự đăng ký vào `SIDEBAR_SERVER_DATA_PROVIDERS`. Schema chỉ giữ phần riêng của giao diện (lời giải thích theo mã, id ô) và ném lúc nạp khi hai bên lệch. Kênh này chỉ cho dữ liệu không đổi trong lúc Sidebar mở; state sống vẫn đi qua lời gọi GAS.
 
 ## Trình bày và component
 
