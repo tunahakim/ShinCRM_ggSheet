@@ -46,6 +46,8 @@ FbmSync.BUDGET = {
   chunkMaxBytes: 5 * 1024 * 1024,
   // Mất tab hoặc Extension mất việc quét thì chạy lại cả việc; quá số lần này là lỗi hệ thống, dừng và báo.
   scanJobRestarts: 2,
+  // Trần số lần GAS phát lại request trong một lượt khi đường truyền tới tab FBM hỏng (tải lại trang, mở tab, gửi lại request đọc); quá trần là đường truyền chập chờn, dừng lượt thay vì gửi dồn.
+  transportReplaysPerRun: 3,
   // Trần ô "khoảng cách giữa hai request tới FBM"; Extension cũng không chờ quá con số này cho một request.
   requestGapMaxSeconds: 60
 };

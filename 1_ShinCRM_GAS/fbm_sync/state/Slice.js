@@ -202,7 +202,8 @@ FbmSync.transportFailureRun = function (payload) {
   try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }
   catch (policyError) { return FbmSync.sessionGateFailClosed(state, policyError); }
   if (plan === 'activity_windows' || plan === 'scan_restart') { return FbmSync.scanRecoverRun(state, plan, failureCode, failureMessage); }
-  if (plan === 'reload_page' || plan === 'open_tab') {
+  if (plan === 'replay_budget') { failureMessage = ('Đường truyền tới tab FBM chập chờn: lượt đã phát lại request ' + FbmSync.BUDGET.transportReplaysPerRun + ' lần, dừng để không gửi dồn. ' + failureMessage).slice(0, 240); }
+  if (plan === 'reload_page' || plan === 'open_tab' || plan === 'replay') {
     try { recovered = FbmSync.transportReissue(state, requestId, failureCode, failureMessage, plan); }
     catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
   }

@@ -325,6 +325,7 @@ FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
 };
 /**
  * Bảng lỗi đường truyền: nơi duy nhất quyết GAS làm gì khi Extension không gửi được request (không đọc kho, không ghi; chính sách tự mở tab được truyền vào).
+ * Mỗi request được phát lại tối đa một lần (`noTabRetryRequestId`), cả lượt tối đa `BUDGET.transportReplaysPerRun` lần; chạm trần thì `replay_budget` (dừng, báo đường truyền chập chờn). `replay`: request đọc thuần mất giữa đường thì gửi lại.
  * `activity_windows`: quét giao dịch quá sức thì chia cửa sổ ngày. `scan_restart`: tab mất việc quét thì chạy lại việc. `reload_page`: tab không sẵn sàng thì phát lại kèm lệnh đổi trang (Extension không tự tải lại). `open_tab`: không có tab và chính sách cho mở. `stop`: còn lại, kể cả lần phát lại của chính request vừa cứu tab.
  */
 FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
@@ -332,17 +333,22 @@ FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
   var reissued = String(gate.noTabRetryRequestId || '') === String(requestId || '');
   if (FbmSync.ACTIVITY_WINDOW_CODES.indexOf(value) >= 0 && cursor.kind === 'scan_job' && cursor.entity === 'activity' && !(Number(cursor.chunkCount || 0) > 0)) { return 'activity_windows'; }
   if (value === 'FBM_SCAN_JOB_GONE' && FbmSync.isScanCursor(cursor)) { return 'scan_restart'; }
-  if (value === 'FBM_TAB_NOT_READY' && !reissued) { return 'reload_page'; }
-  if (value === 'FBM_TAB_NOT_FOUND' && !reissued && policy && policy.autoOpenTab === true) { return 'open_tab'; }
-  return 'stop';
+  var plan = 'stop';
+  if (value === 'FBM_TAB_NOT_READY' && !reissued) { plan = 'reload_page'; }
+  if (value === 'FBM_TAB_NOT_FOUND' && !reissued && policy && policy.autoOpenTab === true) { plan = 'open_tab'; }
+  // Lỗi sau khi request có thể đã tới FBM (tab tải lại giữa chừng, mạng đứt): chỉ gửi lại request đọc thuần đã khai trong REQUEST_REPLAY.
+  if (value === 'FBM_TRANSPORT_UNAVAILABLE' && !reissued && state.activeRequestReplay === true) { plan = 'replay'; }
+  if (plan !== 'stop' && Number(state.metadata && state.metadata.transportReplays || 0) >= FbmSync.BUDGET.transportReplaysPerRun) { plan = 'replay_budget'; }
+  return plan;
 };
-/** Phát lại đúng request vừa hỏng một lần theo kế hoạch `reload_page` hoặc `open_tab` của `transportRecoverPlan`; ghi dấu request phát lại để lần hỏng kế là `stop`. */
+/** Phát lại đúng request vừa hỏng một lần theo kế hoạch `reload_page`, `open_tab` hoặc `replay` của `transportRecoverPlan`; ghi dấu request phát lại để lần hỏng kế là `stop` và đếm vào trần gửi lại của lượt. */
 FbmSync.transportReissue = function (state, requestId, code, message, plan) {
-  var reload = plan === 'reload_page', gate = FbmSync.sessionGateMeta(state), request, envelope;
+  var reload = plan === 'reload_page', replay = plan === 'replay', gate = FbmSync.sessionGateMeta(state), request, envelope;
   state.activeRequestId = '';
   state.deadlineAt = 0;
   gate.noTabRetryRequestId = String(requestId || '');
-  state.message = reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
+  state.metadata.transportReplays = Number(state.metadata.transportReplays || 0) + 1;
+  state.message = replay ? 'Đường truyền tới tab FBM đứt giữa chừng; GAS gửi lại request đọc một lần.' : reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
   request = FbmSync.requestForCursor(state);
@@ -354,8 +360,8 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state = FbmSync.stateRead();
   gate = FbmSync.sessionGateMeta(state);
   gate.noTabRetryRequestId = String(envelope.id || '');
-  state.message = reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
-  FbmSync.sessionGateRecordFailure(state, String(code || ''), message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.'), 'transport_retry');
+  state.message = replay ? 'Đang gửi lại request đọc sau khi đường truyền tới tab FBM đứt.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
+  FbmSync.sessionGateRecordFailure(state, String(code || ''), (replay ? 'Gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
   return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
 FbmSync.sessionGateResponseStarted = function (state) {
@@ -445,6 +451,7 @@ FbmSync.requestIssue = function (state, request, now) {
       throw new Error(endpoint.message + ' (' + endpoint.code + ')');
     }
   });
+  var replay = FbmSync.requestReplayable(request);
   // Một lượt relay có thể dựng nhiều envelope trong cùng một mili-giây. Bộ đếm
   // trong vùng tên GAS giữ các ID đó khác nhau trong cùng một lượt chạy.
   var sequence = Number(FbmSync._requestIdAt || 0) === now ? Number(FbmSync._requestIdSequence || 0) + 1 : 0;
@@ -477,6 +484,7 @@ FbmSync.requestIssue = function (state, request, now) {
   if (request.items) { meta.batch = { maxBytes: FbmSync.BUDGET.batchMaxBytes }; }
   state.activeRequestId = id;
   state.activeRequestSig = FbmSync.requestSig(request);
+  state.activeRequestReplay = replay;
   if (state.resubmit && state.resubmit.answered && state.resubmit.answered === FbmSync.requestWatch.lastAnswered) { state.resubmit.issued = id; }
   if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
   state.lastProgressAt = now;
@@ -503,6 +511,27 @@ FbmSync.envelopeHold = function (request) {
   state.driverMachineId = machineId;
   FbmSync.stateWrite(state);
   return { pickup: true, runId: String(state.runId) };
+};
+/**
+ * Bảng khai mỗi loại request (`meta.kind`) có được gửi lại khi đường truyền đứt giữa chừng hay không. Không có giá trị mặc định: loại chưa khai thì `requestIssue` chặn trước khi gửi, nên thêm loại request mới mà quên khai là lỗi lộ ngay chứ không âm thầm gửi lại.
+ * `true` chỉ cho request đọc thuần: FBM có nhận rồi cũng không đổi gì. Request mở form, lưu, đăng nhập và cấp quyền form là `false` vì lần gửi đầu có thể đã tới FBM (mở form tạo khách sinh mã khách mới).
+ */
+FbmSync.REQUEST_REPLAY = {
+  login: false, authorize: false,
+  session_probe: true, grid: true, owner_lookup: true, customer_batch: true, identity_user_grid: true, conflict_refresh_grid: true, completion: true, customer_count: true, scan_job: true, scan_chunk: true,
+  // Lô chỉ là vỏ; lô gửi lại được khi mọi phần tử gửi lại được.
+  batch: true,
+  activity_create: false, activity_edit_open: false, activity_edit_save: false,
+  customer_create_open: false, customer_create_save: false, customer_edit_open: false, customer_edit_save: false
+};
+/** Tra bảng gửi lại cho request và từng phần tử lô; loại chưa khai hoặc giá trị không phải true/false thì ném `FBM_REQUEST_KIND_UNDECLARED`. */
+FbmSync.requestReplayable = function (request) {
+  var declared = function (meta) {
+    var kind = String(meta && meta.kind || ''), value = Object.prototype.hasOwnProperty.call(FbmSync.REQUEST_REPLAY, kind) ? FbmSync.REQUEST_REPLAY[kind] : undefined;
+    if (value !== true && value !== false) { var error = new Error('Loại request "' + kind + '" chưa khai có được gửi lại hay không trong FbmSync.REQUEST_REPLAY; đã dừng trước khi gửi (FBM_REQUEST_KIND_UNDECLARED).'); error.code = 'FBM_REQUEST_KIND_UNDECLARED'; throw error; }
+    return value;
+  };
+  return (request.items || []).reduce(function (all, item) { return declared(item.meta) && all; }, declared(request.meta));
 };
 /** Dấu của request đang chờ (bước và URL) để lần phát lại từ cursor so được với thứ đã phát; không chứa thân request. */
 FbmSync.requestSig = function (request) { return String(request && request.meta && request.meta.kind || '') + ' ' + String(request && request.url || ''); };
