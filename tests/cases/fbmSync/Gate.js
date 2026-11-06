@@ -1,6 +1,7 @@
 /** Cửa ghi chiều lấy về: danh sách đọc của lượt, request tra mã không lọc quyền, bảng vắng mặt và chuyển quyền (09/05 Phần 9), xét lại hai trạng thái đóng băng. */
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
+const { catLuoi, luoiFbm } = require('../../lib/fbm/tab-fbm-gia');
 
 const gdFbm = (id) => ({ id, details: 'Gọi ' + id, end_date: '2026-09-20', owner: 'Owner', datetime0: '2026-09-20T03:00:00', line_nbr: 1 });
 
@@ -62,16 +63,16 @@ async function chay(so) {
   // Request tra mã khách không lọc quyền: hàm dựng riêng, chỉ trả stt_rec_kh, chặn giá trị lạ.
   const traLa = [F.ownerLookupRequest('activity', "1' or '1"), F.ownerLookupRequest('activity', 'A-1'), F.ownerLookupRequest('customer', "A1' or '1"), F.ownerLookupRequest('customer', '')];
   const traDung = F.ownerLookupRequest('activity', '800001');
-  const ketQua = F.ownerLookupParse({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 1, ViewPage: { Fields: [{ AliasName: 'stt_rec_kh' }, { AliasName: 'ten_kh' }] }, Rows: [['FBM-C9', 'Công ty người khác']] } }) });
-  check(so, "Tra mã khách không lọc quyền: id `1' or '1`, id không toàn chữ số, mã khách sai định dạng hoặc rỗng không sinh request; kết quả chỉ có stt_rec_kh, không chứa ten_kh", [
-    traLa, traDung.meta.kind, JSON.stringify(traDung.body.externalKey).indexOf('GetCustomerValidate') < 0, ketQua, JSON.stringify(ketQua).indexOf('Công ty người khác') < 0
-  ], [[null, null, null, null], 'owner_lookup', true, { ok: true, sttRecs: ['FBM-C9'] }, true]);
-  // Lượt đã lưu tên cột khách: tra mã không xin tiêu đề, đọc cột theo vị trí; số cột lệch thì báo lỗi, không đọc nhầm cột.
-  const khongTieuDe = F.ownerLookupRequest('customer', 'FBM-C9', false), daLuu = ['ten_kh', 'stt_rec_kh'];
-  const dongKhongTieuDe = (rows) => ({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 0, Rows: rows } }) });
-  check(so, 'Tra mã khách khi lượt đã lưu tên cột: request type 1 không tiêu đề, đọc stt_rec_kh theo vị trí đã lưu, dòng lệch số cột trả FBM_GRID_SHAPE_CHANGED', [
-    [khongTieuDe.body.type, khongTieuDe.body.gridPageIndex], F.ownerLookupParse(dongKhongTieuDe([['Công ty', 'FBM-C9']]), daLuu), F.ownerLookupParse(dongKhongTieuDe([['FBM-C9']]), daLuu).code
-  ], [[1, F.GRID_FIRST_PAGE_NO_HEADER], { ok: true, sttRecs: ['FBM-C9'] }, 'FBM_GRID_SHAPE_CHANGED']);
+  const ketQua = F.ownerLookupParse(await catLuoi(traDung.meta.keep, luoiFbm(['stt_rec_kh', 'ten_kh'], [['FBM-C9', 'Công ty người khác']], 1)));
+  check(so, "Tra mã khách không lọc quyền: id `1' or '1`, id không toàn chữ số, mã khách sai định dạng hoặc rỗng không sinh request; lệnh cắt chỉ giữ stt_rec_kh nên kết quả không chứa ten_kh", [
+    traLa, traDung.meta.kind, JSON.stringify(traDung.body.externalKey).indexOf('GetCustomerValidate') < 0, traDung.meta.keep, ketQua, JSON.stringify(ketQua).indexOf('Công ty người khác') < 0
+  ], [[null, null, null, null], 'owner_lookup', true, { fields: ['stt_rec_kh'] }, { ok: true, sttRecs: ['FBM-C9'], sourceFields: ['stt_rec_kh', 'ten_kh'] }, true]);
+  // Lượt đã lưu tên cột gốc của khách: tra mã không xin tiêu đề, Extension cắt cột theo vị trí GAS tính; số cột lệch thì báo lỗi, không đọc nhầm cột.
+  const daLuu = ['ten_kh', 'stt_rec_kh'], khongTieuDe = F.ownerLookupRequest('customer', 'FBM-C9', daLuu);
+  const dongKhongTieuDe = (rows) => catLuoi(khongTieuDe.meta.keep, JSON.stringify({ d: { TotalRowCount: 0, Rows: rows } }));
+  check(so, 'Tra mã khách khi lượt đã lưu tên cột: request type 1 không tiêu đề, cắt stt_rec_kh theo vị trí trong tên cột gốc, dòng lệch số cột trả FBM_GRID_SHAPE_CHANGED', [
+    [khongTieuDe.body.type, khongTieuDe.body.gridPageIndex], khongTieuDe.meta.keep, F.ownerLookupParse(await dongKhongTieuDe([['Công ty', 'FBM-C9']])), F.ownerLookupParse(await dongKhongTieuDe([['FBM-C9']])).code
+  ], [[1, F.GRID_FIRST_PAGE_NO_HEADER], { positions: [1], width: 2 }, { ok: true, sttRecs: ['FBM-C9'], sourceFields: null }, 'FBM_GRID_SHAPE_CHANGED']);
 
   // Khách vắng ở cửa ghi.
   const chuyen = await sheet3();

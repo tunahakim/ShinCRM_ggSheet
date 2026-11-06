@@ -112,7 +112,22 @@ function traLoiGhi(item, ctx) {
   // `fail`: FBM trả lỗi nghiệp vụ cho request tra mã này.
   if (ctx.fail && ctx.fail(item)) { return { body: JSON.stringify({ d: { Bugs: { FieldName: 'stt_rec_kh', Message: 'Lỗi tra giả lập' } } }) }; }
   const found = ownerKey ? (ctx.owners || {})[ownerKey.Name.match(/id = '(\d+)'/)[1]] : (ctx.exists || []).indexOf(existKey.Value) >= 0 ? existKey.Value : '';
-  return { body: JSON.stringify({ d: { TotalRowCount: found ? 1 : 0, ViewPage: { Fields: [{ AliasName: 'stt_rec_kh' }] }, Rows: found ? [[found]] : [] } }) };
+  // FBM trả đủ cột của lưới khách như mọi request đọc khách; Extension mới cắt còn cột GAS cần.
+  const tra = JSON.parse(luoiFbm(ctx.fields, found ? [dongFbm(ctx.fields, { stt_rec_kh: found })] : [], found ? 1 : 0));
+  if (item.body.type !== 0) { delete tra.d.ViewPage; }
+  return { body: JSON.stringify(tra) };
 }
 
-module.exports = { tabGia, rawExecutor, guiLo, traLoiGhi, luoiFbm, dongFbm };
+/** Thân response FBM `body` đi qua executor thật với lệnh cắt `keep` GAS dựng; trả response đã cắt đúng như GAS nhận, cho test gọi thẳng hàm đọc lưới của GAS. */
+async function catLuoi(keep, body) {
+  const request = { id: 'cat', url: 'https://fbm.test/AppService/Grid', body: {}, meta: { kind: 'grid', fetchMs: 5000, keep } };
+  const result = (await tabGia().send(request, body)).reply.result;
+  return { ok: result.ok, status: result.status, body: result.body };
+}
+
+/** Lưới FBM có tiêu đề (`fields` theo thứ tự FBM, `rows` dạng mảng) cắt theo lệnh trang có tiêu đề GAS dựng cho `entity`; `F` là `FbmSync` của hộp GAS đang thử. */
+function luoiDaCat(F, entity, fields, rows, total) {
+  return catLuoi(F.gridKeep(F.scanFields(entity), true), luoiFbm(fields, rows, total));
+}
+
+module.exports = { tabGia, rawExecutor, guiLo, traLoiGhi, luoiFbm, dongFbm, catLuoi, luoiDaCat };

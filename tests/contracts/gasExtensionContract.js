@@ -13,8 +13,8 @@ const CONTRACT = {
   request: {
     fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
     meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'reloadFbmPage', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job', 'keep'],
-    // Cột giữ lại của response lưới (theo `AliasName`, đúng thứ tự). Extension lọc ngay trong tab; response không phải lưới đi nguyên.
-    keep: ['fields'],
+    // Lệnh cắt response lưới do GAS tính: `fields` (tên cột theo `AliasName`, đúng thứ tự; trang có tiêu đề) hoặc `positions` với `width` (vị trí cột và số cột gốc; trang không tiêu đề). Extension cắt ngay trong tab; response không phải lưới đi nguyên.
+    keep: ['fields', 'positions', 'width'],
     // Mọi URL trong envelope phải thuộc miền này; Extension từ chối envelope có địa chỉ khác trước khi tìm tab.
     site: 'https://fbo.com.vn:8888/',
     transport: ['captures', 'replacements'],
@@ -24,9 +24,9 @@ const CONTRACT = {
     batch: ['maxBytes'],
     // Việc quét: `scan_job` gọi FBM một lần, giữ cột theo `keep`, cắt gói và giữ trong RAM tab; `scan_chunk` trả gói theo số thứ tự, không gọi FBM.
     scanKinds: ['scan_job', 'scan_chunk'],
-    job: ['jobId', 'idField', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'maxResponseBytes', 'chunkIndex'],
+    job: ['jobId', 'idIndex', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'maxResponseBytes', 'chunkIndex'],
     item: ['id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
-    itemMeta: ['kind', 'trace']
+    itemMeta: ['kind', 'trace', 'keep']
   },
   // Extension → GAS: response FBM thô. `transport.contract` là mã phiên bản Extension đang chạy.
   response: {
@@ -34,8 +34,10 @@ const CONTRACT = {
     transport: ['contract', 'trace', 'captures', 'loginStage', 'loginBlocked'],
     // Response lô chỉ gồm phần tử đã chạy, đúng thứ tự gửi.
     item: ['id', 'ok', 'status', 'headers', 'body'],
-    // Gói của việc quét giữ dạng response grid FBM; `job` cho GAS đối chiếu với cursor trước khi ghi. `fields` (chỉ gói 0) là tên cột gốc của bảng trước khi giữ cột, để GAS đọc các trang không tiêu đề của cùng bảng trong lượt.
-    job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize', 'fields'],
+    // Lưới đã cắt theo `keep` (cả gói của việc quét): dòng chỉ còn cột GAS cần, đúng thứ tự GAS gửi; `SourceFields` là tên cột gốc khi trang có tiêu đề (gói quét: chỉ gói 0); thiếu cột theo tên thì `MissingFields`, dòng lệch số cột gốc thì `ShapeMismatch`, cả hai không kèm dòng. `Authorized` và `Bugs` của FBM giữ nguyên.
+    grid: ['Rows', 'TotalRowCount', 'Authorized', 'Bugs', 'SourceFields', 'MissingFields', 'ShapeMismatch'],
+    // `job` cho GAS đối chiếu gói quét với cursor trước khi ghi.
+    job: ['jobId', 'chunkIndex', 'chunkCount', 'rowCount', 'keptCount', 'totalRowCount', 'oversize'],
     // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
     codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'],
     // Lỗi Extension không gửi được envelope tới tab, trả nguyên mã để GAS quyết: không có tab (GAS cho mở thì phát lại kèm `openFbmContext`), tab không sẵn sàng (Extension không tự tải lại; GAS phát lại một lần kèm `reloadFbmPage`), Chrome chặn quyền site (không thử lại, người dùng phải mở quyền), địa chỉ ngoài miền FBM.

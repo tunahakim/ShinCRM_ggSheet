@@ -189,7 +189,7 @@ async function chay(so) {
   check(so, 'status noi ro chieu FBM ve ShinCRM', pullView.direction, 'FBM → ShinCRM');
   check(so, 'status noi ro dang dong bo khach hang', pullView.entityLabel, 'Khách hàng');
   const resumeState = orchestration.FbmSync.stateRead();
-  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 };
+  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.metadata = Object.assign({}, resumeState.metadata, { customerFields: orchestration.FbmSync.GRID_FIELDS.customer });
   orchestration.FbmSync.stateWrite(resumeState);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });

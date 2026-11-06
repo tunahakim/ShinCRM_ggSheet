@@ -2,6 +2,7 @@
 const { section, check } = require("../../lib/assert");
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhiDongBo, soBan } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
+const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
 
 const TEP = ['fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/write/SheetSave.js'];
 
@@ -46,7 +47,7 @@ async function chay(so) {
   const datKhach = (name, value) => { khachRow[khachFields.indexOf(name)] = value; };
   ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website'].forEach((name) => datKhach(name, khachFbm[name]));
   datKhach('dc_lh', 'Địa chỉ\ndòng hai'); datKhach('ten_dclh_tinh', 'Hà Nội'); datKhach('ten_nguon_dm', 'Khách tự tìm');
-  const khachLuoi = F.rowsToRecords('customer', { d: { Fields: khachFields.map((Name) => ({ AliasName: Name })), Rows: [khachRow], TotalRowCount: 1 } }).rows[0];
+  const khachLuoi = F.rowsToRecords('customer', await luoiDaCat(F, 'customer', khachFields, [khachRow], 1)).rows[0];
   const khachSheet = Object.assign({ id: 'CUS-000010' }, F.customerRecord(khachLuoi, GATE));
   check(so, 'Khách: hash từ form mở sửa = hash từ lưới khách = hash dòng Sheet kéo về từ lưới', [F.hash(khachForm, 'customer', GATE), F.hash(khachSheet, 'customer', GATE)], [F.hash(khachLuoi, 'customer', GATE), F.hash(khachLuoi, 'customer', GATE)]);
 
@@ -55,7 +56,7 @@ async function chay(so) {
   const gdFields = F.GRID_FIELDS.activity.slice(), gdRow = gdFields.map(() => '');
   const datGd = (name, value) => { gdRow[gdFields.indexOf(name)] = value; };
   datGd('id', 174813); datGd('ten_cv', 'Gọi điện'); datGd('details', 'Gọi khách\nhẹn tuần sau'); datGd('end_date', '/Date(' + new Date('2026-09-09T08:00:00+07:00').getTime() + ')/'); datGd('owner', 'Owner');
-  const gdLuoi = F.rowsToRecords('activity', { d: { Fields: gdFields.map((Name) => ({ AliasName: Name })), Rows: [gdRow], TotalRowCount: 1 } }).rows[0];
+  const gdLuoi = F.rowsToRecords('activity', await luoiDaCat(F, 'activity', gdFields, [gdRow], 1)).rows[0];
   const gdSheet = Object.assign({ id: 'ACT-008600' }, F.activityRecord(gdLuoi, GATE, { ma_kh: 'ALT00010', sttRec: 'A000050753' }));
   check(so, 'Giao dịch: hash từ form mở sửa = hash từ lưới = hash dòng Sheet (khác giờ trong ngày, xuống dòng, dấu #SC, công việc theo mã/tên)', [F.hash(gdForm, 'activity', GATE), F.hash(gdSheet, 'activity', GATE)], [F.hash(gdLuoi, 'activity', GATE), F.hash(gdLuoi, 'activity', GATE)]);
 

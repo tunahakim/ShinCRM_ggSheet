@@ -5,6 +5,7 @@ const { datPhan } = require('../../lib/fbm/cai-dat-thu');
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
+const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
 
 async function chay(so) {
   section("FBM sync — push");
@@ -104,7 +105,7 @@ async function chay(so) {
   check(so, 'status noi ro chieu FBM ve ShinCRM', pullView.direction, 'FBM → ShinCRM');
   check(so, 'status noi ro dang dong bo khach hang', pullView.entityLabel, 'Khách hàng');
   const resumeState = orchestration.FbmSync.stateRead();
-  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.activeRequestId = ''; resumeState.deadlineAt = 0;
+  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.metadata = Object.assign({}, resumeState.metadata, { customerFields: orchestration.FbmSync.GRID_FIELDS.customer }); resumeState.activeRequestId = ''; resumeState.deadlineAt = 0;
   orchestration.FbmSync.stateWrite(resumeState);
   const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'Sidebar mo lai probe lai phien truoc khi tiep tuc cursor Customer', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind], [true, true, 'session_probe']);
@@ -513,9 +514,11 @@ async function chay(so) {
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();
   const customerRow = []; customerRow[0] = 'FBM-CREATE'; customerRow[1] = 'ALT00020'; customerRow[2] = 'Khach tao lai'; customerRow[3] = '0100123456'; customerRow[4] = 'Nguoi lien he'; customerRow[5] = 'Ha Noi'; customerRow[6] = '0900000000'; customerRow[7] = 'a@example.com'; customerRow[9] = ''; customerRow[12] = 'HNI'; customerRow[18] = 'Source'; customerRow[21] = '';
   push.writeGateSave = (request) => { push._recoveryPatch = request.records[0]; return { ok: true }; };
-  const recoveryParsed = push.FbmSync.rowsToRecords('customer', { d: { Fields: customerFields.map((Name) => ({ AliasName: Name })), Rows: [customerRow], TotalRowCount: 1 } });
+  // FBM trả đủ cột của lưới khách; ô không đặt là chuỗi rỗng.
+  const recoveryGrid = await luoiDaCat(push.FbmSync, 'customer', customerFields, [customerFields.map((_, index) => customerRow[index] === undefined ? '' : customerRow[index])], 1);
+  const recoveryParsed = push.FbmSync.rowsToRecords('customer', recoveryGrid);
   check(so, 'fixture recovery doc dung stt_rec_kh va ma_kh', [recoveryParsed.rows[0].stt_rec_kh, recoveryParsed.rows[0].ma_kh], ['FBM-CREATE', 'ALT00020']);
-  push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Fields: customerFields.map((Name) => ({ AliasName: Name })), Rows: [customerRow], TotalRowCount: 1 } });
+  push.FbmSync.continuePush(push.FbmSync.stateRead(), recoveryGrid);
   check(so, 'Customer create recovery doi chieu exact va vach ID baseline', [push._recoveryPatch.fbmId, push._recoveryPatch.fbmCustomerCode, push._recoveryPatch.syncStatus, push.FbmSync.stateRead().counts.pushed], ['FBM-CREATE', 'ALT00020', push.FbmSync.SYNC_STATUS.synced, 1]);
   const lostState = push.FbmSync.runOpen({ phase: 'push' });
   lostState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_create', candidate: activityCandidate };

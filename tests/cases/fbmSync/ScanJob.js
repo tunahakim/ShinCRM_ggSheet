@@ -227,7 +227,7 @@ async function chay(so) {
   ], ['scan_chunk', 1, true, true, 'done', 12]);
 
   // Gói trùng (response cũ tới muộn): bỏ qua, xin lại gói đang chờ, không ghi trùng.
-  const dup = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });
+  const dup = scanHarness({ customers: 12, budget: { chunkTargetBytes: 5000 } });
   let dupSent = false;
   const dupEnd = await dup.run({ rewrite: (request) => {
     if (dupSent || request.meta.kind !== 'scan_chunk' || request.meta.job.chunkIndex !== 2) { return request; }

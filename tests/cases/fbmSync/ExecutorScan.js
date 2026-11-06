@@ -4,7 +4,7 @@ const { tabGia, luoiFbm } = require('../../lib/fbm/tab-fbm-gia');
 
 /** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */
 function scanRequest(id, job) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idField: 'stt_rec_kh', keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
+  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idIndex: 0, keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
 }
 function chunkRequest(id, jobId, chunkIndex) {
   return { id, url: 'https://fbm.test/AppService/Grid', body: {}, meta: { kind: 'scan_chunk', fetchMs: 5000, job: { jobId, chunkIndex } } };
@@ -22,11 +22,11 @@ async function chay(so) {
   for (let index = 1; index < first.job.chunkCount; index += 1) { chunks.push((await tab.send(chunkRequest('e' + (index + 1), 'J-1', index), '')).reply.result); }
   const chunkRows = chunks.map((chunk) => JSON.parse(chunk.body).d.Rows);
   const allIds = chunkRows.flat().map((item) => item[0]);
-  const firstFields = JSON.parse(first.body).d.ViewPage.Fields.map((field) => field.AliasName);
-  check(so, 'Executor cắt 3.000 dòng thành nhiều gói, mỗi gói đã serialize không quá trần 768 KiB, đủ 3.000 dòng đúng thứ tự, dòng nguyên vẹn, chỉ gọi FBM một lần, chỉ giữ cột GAS xin', [
+  const firstFields = JSON.parse(first.body).d.SourceFields, laterFields = chunks.slice(1).map((chunk) => JSON.parse(chunk.body).d.SourceFields);
+  check(so, 'Executor cắt 3.000 dòng thành nhiều gói, mỗi gói đã serialize không quá trần 768 KiB, đủ 3.000 dòng đúng thứ tự, dòng nguyên vẹn, chỉ gọi FBM một lần, chỉ giữ cột GAS xin; tên cột gốc chỉ đi trong gói 0', [
     first.job.chunkCount > 1, chunks.every((chunk) => bytes(chunk) <= 768 * 1024), allIds.length, allIds.join(',') === bigRows.map((item) => item[0]).join(','),
-    chunkRows.flat().every((item) => item.length === 3 && item[2] === bigRows[Number(item[0].slice(1))][2]), tab.fetches(), firstFields, chunks.map((chunk) => chunk.job.chunkIndex).join(',') === chunks.map((_, i) => i).join(','), first.job.totalRowCount
-  ], [true, true, 3000, true, true, 1, ['stt_rec_kh', 'ma_kh', 'ten_kh'], true, 3000]);
+    chunkRows.flat().every((item) => item.length === 3 && item[2] === bigRows[Number(item[0].slice(1))][2]), tab.fetches(), firstFields, laterFields.every((item) => item === undefined), chunks.map((chunk) => chunk.job.chunkIndex).join(',') === chunks.map((_, i) => i).join(','), first.job.totalRowCount
+  ], [true, true, 3000, true, true, 1, executorFields, true, true, 3000]);
 
   const oversizeTab = tabGia();
   const oversizeRows = [['R1', 'KH1', 'nhỏ'], ['R2', 'KH2', 'đ'.repeat(300 * 1024)], ['R3', 'KH3', 'nhỏ']];
