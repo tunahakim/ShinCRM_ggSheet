@@ -439,6 +439,7 @@ tests\
     │   ├── LookupFlow.js          Kiểm chặng tra danh mục: lỗi đường truyền dừng đóng lỗi, lô không dòng vẫn đi tiếp.
     │   ├── RequestSettings.js     Kiểm hàm dựng request nhận cfg và phạm vi qua tham số: thiếu hoặc nhầm thì ném; quét thân hàm dựng không tự đọc cài đặt hay phạm vi.
     │   ├── BatchDecide.js         Hàm quyết của lô đọc chi tiết chạy trên dữ liệu dựng tay với mọi cổng kho đều ném; người điều phối thiếu đầu vào lớp thì ném `FBM_BATCH_SOURCE_MISSING`.
+    │   ├── PullApplyInput.js      Cửa ghi kéo về nhận sổ chờ đẩy qua `ctx.pending` (thiếu thì ném), bản ghi thiếu dấu vân bị chặn trước khi ghi, phân tích response không sửa đầu vào.
     │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách.
     │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
