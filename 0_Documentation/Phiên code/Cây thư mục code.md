@@ -445,7 +445,7 @@ tests\
     │   ├── RequestSettings.js     Kiểm hàm dựng request nhận cfg và phạm vi qua tham số: thiếu hoặc nhầm thì ném; quét thân hàm dựng không tự đọc cài đặt hay phạm vi.
     │   ├── BatchDecide.js         Hàm quyết của lô đọc chi tiết chạy trên dữ liệu dựng tay với mọi cổng kho đều ném; người điều phối thiếu đầu vào lớp thì ném `FBM_BATCH_SOURCE_MISSING`.
     │   ├── PullApplyInput.js      Cửa ghi kéo về nhận sổ chờ đẩy qua `ctx.pending` (thiếu thì ném), bản ghi thiếu dấu vân bị chặn trước khi ghi, phân tích response không sửa đầu vào.
-    │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách.
+    │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách; mã khách tự sinh sai khuôn; người phụ trách giao dịch khác tài khoản.
     │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
@@ -481,7 +481,9 @@ tests\
     │   ├── SidebarMachine.js       Kiểm khối máy chạy nền ở Cài đặt phiên, lệnh giao/gỡ máy, đánh thức Extension lý do config, lời báo máy nền và nhịp hỏi GAS khi máy không chở lượt.
     │   ├── EntryPointGate.js       Kiểm cửa ra của mọi hàm fbm* về Sidebar không mang cookie/token phiên, và lệnh start giữ nguyên identity nháp của Kiểm liên kết.
     │   ├── StaticRules.js          Quét mã FBM theo quy tắc kiến trúc cứng (state, lỗi im lặng, typeof hàm, phase, DocumentProperties, popup, kind, số cứng, logEvent, baseline) với danh sách ngoại lệ chỉ được co lại.
-    │   ├── Push.js                Kiểm cổng ghi, khóa, owner, builder ghi và xử lý lỗi push.
+    │   ├── Push.js                Kiểm chặng đẩy: phát request ghi, sổ bận, áp kết quả hai pha, lỗi từng bản ghi, form sửa/tạo Activity, dọn dấu #SC, cứu lệnh tạo mất phản hồi.
+    │   ├── RunStartProbe.js       Kiểm mở lượt: request đầu là probe phiên FBM, chế độ chạy tách quyền ghi, lượt hỏng hay lượt cũ chạy lại từ probe, trạng thái hiện đúng chiều.
+    │   ├── PushCandidateList.js   Kiểm danh sách ứng viên đẩy: quyền đồng bộ, dòng vừa thành xung đột, lỗi đọc state, khách cha, phạm vi giới hạn, bản ghi đóng băng.
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
