@@ -181,9 +181,9 @@ async function chay(so) {
   check(so, 'nguoi dung chon bon loai dong bo thi Sidebar gui dung mode da chon', selectedModes, ['check', 'read', 'push', 'write']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  const awaiting = Object.assign(idle(), { phase: 'awaiting_approval', mode: 'push', runId: 'approval-1' });
-  let approved = 0;
-  hop.fbmSyncApprovePush = () => { approved += 1; return Promise.resolve({ ok: true }); };
+  const awaiting = Object.assign(idle(), { pendingApproval: { count: 12, fingerprint: 'abcd1234-12', approved: false } });
+  const approved = [];
+  hop.fbmSyncApprovePush = (fingerprint) => { approved.push(fingerprint); return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(awaiting);
   click(dom, dom.document.getElementById('fbm-sync-approve'));
   const active = Object.assign(idle(), { running: true, phase: 'pull_customer', mode: 'read', runId: 'run-1', cursor: { kind: 'customer_grid' } });
@@ -191,7 +191,7 @@ async function chay(so) {
   hop.fbmSyncCancel = () => { cancelled += 1; return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(active);
   click(dom, dom.document.getElementById('fbm-sync-cancel'));
-  check(so, 'run co nut chap thuan va dung dung theo phase GAS', [approved, cancelled], [1, 1]);
+  check(so, 'Màn Chạy có nút Chấp thuận khi GAS báo tập chờ duyệt (gửi đúng dấu tập) và nút Dừng khi lượt tay đang chạy', [approved, cancelled], [['abcd1234-12'], 1]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
   hop.FBM_SYNC_CLIENT.lastStatus = idle();

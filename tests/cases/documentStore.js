@@ -144,7 +144,7 @@ function chay(so) {
 
   // Quét chống tái phạm: JSON trong kho chỉ đọc qua công cụ chung, nên không còn đường "hỏng thì coi là rỗng" tự viết.
   // Ngoại lệ: chính công cụ; EntryPoints.js (địa chỉ Web App, JSON thân request) và Book.js (cặp mã Sheet) đọc ScriptProperties, không phải DocumentProperties.
-  const NGOAI_LE_JSON = ['server/state/DocumentStore.js', 'fbm_sync/transport/EntryPoints.js', 'server/sheet/Book.js'];
+  const NGOAI_LE_JSON = ['server/state/DocumentStore.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'server/sheet/Book.js'];
   const tuParse = cacTepJs(GAS, GAS).filter((tep) => !tep.startsWith('server/dev/') && NGOAI_LE_JSON.indexOf(tep) < 0).filter((tep) => {
     const nguon = fs.readFileSync(path.join(GAS, tep), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     return /\.getProperty\s*\(/.test(nguon) && /JSON\.parse\s*\(/.test(nguon);

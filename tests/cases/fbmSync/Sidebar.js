@@ -661,8 +661,8 @@ async function chay(so) {
   const gasSnapshot = { runId: 'run-017', running: true, phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
   hop.FBM_SYNC_CLIENT.lastStatus = gasSnapshot;
   hop.fbmSyncDrive = () => Promise.reject(new Error('Mất kết nối tới GAS'));
-  hop.callServer = () => Promise.resolve({});
-  await hop.fbmSyncApprovePush();
+  hop.callServer = (name) => (name === 'fbmApprovePush' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
+  await hop.fbmSyncApprovePush('abcd1234-2');
   const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
   check(so, 'FBM-017: lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
     [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],

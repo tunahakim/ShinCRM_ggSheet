@@ -415,6 +415,8 @@ async function chay(so) {
   // Chiều đẩy kiểm lại danh mục FBM giữa các lô: FBM đổi tên một mã giữa lượt thì chỉ bản ghi dùng mã đó bị chặn.
   const categoryPushRun = (options) => {
     const flow = workflowGas(), F = flow.hop.FbmSync, logs = [], sheetSaves = [], fbmNames = { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, lookupAt = [], issued = [];
+    // Ca này thử danh mục giữa các lô, không thử cổng chấp thuận: nâng ngưỡng qua cổng cài đặt để 25 bản ghi đi thẳng.
+    datPhan(flow.hop, 'run', { approvalThreshold: 1000 });
     flow.hop.logEvent = (event) => logs.push(event);
     F.readCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [], namesBySource: { '@CAT_TINH_THANH': {}, '@CAT_NGUON_KH': { WEB: 'Web', HDDV: 'Hóa đơn dịch vụ' }, '@CAT_CONG_VIEC': {} } });
     // 25 khách vừa sửa trên Sheet (hash khác mốc); chặng đẩy tự quét và xét bằng phép xét thật.
@@ -733,7 +735,7 @@ async function chay(so) {
     datLichNen(flow.hop, { direction, heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false, minutes: 480 }, detail: { enabled: false, minutes: 30, customersPerRun: 30 } });
     flow.documentProperties.setProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', String(now));
     flow.documentProperties.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
-    if (opt.cleanMark) { flow.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(F.pushCleanNow())); }
+    if (opt.cleanMark) { F.pushGateWrite({ status: 'clean', mark: F.pushGateMark(), at: now }); }
     F.backgroundMachineWrite(F.machineAssigned('may-A', 'Máy A', now));
     const result = opt.viaChain ? F.backgroundNext({ now, pollAt: now }) : F.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' });
     return { flow, F, traces, result, state: F.stateRead() };
@@ -742,7 +744,7 @@ async function chay(so) {
     const two = keepaliveFlow('write'), view = two.F.statusView();
     check(so, 'C2: Giữ phiên Hai chiều chưa có dấu lần đẩy sạch: mở lượt Chỉ đẩy nền keepalive (request đầu là kiểm phiên), mang cổng đã quyết, đánh dấu đếm cuối lượt theo chiều Hai chiều; màn trạng thái hiện chiều lịch nền và nhãn Giữ phiên',
       [two.result.ok, two.result.request && two.result.request.meta.kind, two.state.origin, two.state.mode, two.state.scan, two.state.scheduleMode, two.state.pushGate, two.state.metadata.countTail, two.state.process, view.direction, view.scanLabel],
-      [true, 'session_probe', 'background', 'push', 'keepalive', 'write', { open: true, reason: 'no_mark' }, { pending: true, mode: 'write' }, 'heartbeat', 'Hai chiều', 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)']);
+      [true, 'session_probe', 'background', 'push', 'keepalive', 'write', { open: true, reason: 'no_gate' }, { pending: true, mode: 'write' }, 'heartbeat', 'Hai chiều', 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)']);
     const viaChain = keepaliveFlow('write', { viaChain: true });
     check(so, 'C2: đường đuôi chuỗi (tiến trình kế trong cùng lần hỏi) và đường hỏi nền đi qua cùng một chỗ quyết, ra cùng lượt keepalive', [viaChain.state.scan, viaChain.state.mode, viaChain.result.request && viaChain.result.request.meta.kind], ['keepalive', 'push', two.result.request && two.result.request.meta.kind]);
     const recountModes = [];
@@ -1203,21 +1205,6 @@ async function chay(so) {
   check(so, 'Danh sách toàn bộ khách chỉ đánh dấu: lượt chỉ qua trang danh sách khách thì không ghi Sheet lần nào, request kế là lô cửa ghi đọc chi tiết khách vừa đánh dấu', [
     sameContract.sheetWrites, sameContract.last.request && sameContract.last.request.meta.kind, sameContract.last.request && sameContract.last.request.items.length
   ], [0, 'batch', 2]);
-
-  const approval = workflowGas();
-  approval.hop.FbmSync.preflightGates = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
-  approval.hop.FbmSync.preflightLocal = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 11 });
-  approval.hop.FbmSync.preflightNeedsLocal = () => true;
-  approval.hop.FbmSync.extractAuthorized = () => 'auth-token';
-  const sessionFirst = approval.hop.FbmSync.start({ mode: 'push', origin: 'manual', manual: true });
-  approval.hop.FbmSync.authContinue('customer', { map: {} });
-  approval.hop.FbmSync.authContinue('activity', { map: {} });
-  const awaitingApproval = { approvalRequired: approval.hop.FbmSync.stateRead().metadata.approvalRequired, status: approval.hop.FbmSync.statusView() };
-  const approved = approval.hop.fbmSyncApprovePush();
-  check(so, 'push lon: chỉ kiểm phiên FBM trước, xác thực xong mới đếm bản ghi và dừng chờ chấp thuận, không cấp request dữ liệu; sau chap thuan moi cap authorize', [
-    sessionFirst.request.meta.kind, awaitingApproval.approvalRequired, awaitingApproval.request || null, awaitingApproval.status.phase,
-    approved.ok, approved.request.meta.kind, approved.status.phase
-  ], ['session_probe', true, null, 'awaiting_approval', true, 'session_probe', 'checking_session']);
 
   const stopAfterResponse = workflowGas();
   stopAfterResponse.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });

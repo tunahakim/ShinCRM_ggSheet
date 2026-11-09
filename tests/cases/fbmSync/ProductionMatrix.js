@@ -2,22 +2,13 @@
 const { section, check } = require('../../lib/assert');
 const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require('../../lib/load-gas');
+const { clone, makeSync, pushQueue, editCustomer, pushOk, pushDrive } = require('../../lib/fbm/hang-day');
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
 /** Cổng danh mục rỗng: dấu vân bắt buộc có cổng, bản ghi mẫu không có giá trị danh mục cần đổi mã. */
 const NO_CATEGORY = { map: {} };
 
-function propertyStore() {
-  const data = {};
-  return {
-    getProperty(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
-    setProperty(key, value) { data[key] = String(value); },
-    deleteProperty(key) { delete data[key]; },
-    data
-  };
-}
 
-function clone(value) { return JSON.parse(JSON.stringify(value)); }
 
 /** Lưới FBM đủ cột (dòng là đối tượng theo tên cột) đi qua executor thật để cắt đúng cột GAS cần; `requestId` gắn vết như cửa relay. */
 async function luoiTheoTen(F, entity, fields, rows, requestId) {
@@ -25,68 +16,6 @@ async function luoiTheoTen(F, entity, fields, rows, requestId) {
   return requestId === undefined ? picked : Object.assign(picked, { trace: [{ requestId, stage: 'fetch' }] });
 }
 
-function makeSync() {
-  const documentProperties = propertyStore();
-  const local = { customer: [], activity: [] };
-  const writes = [];
-  const logs = [];
-  const hop = taoHopCat({
-    FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, SETTINGS: { CHUNK_ROWS: 2000 }, Date,
-    PropertiesService: { getDocumentProperties: () => documentProperties, getScriptProperties: () => documentProperties },
-    logEvent(event) { logs.push(event); }, logTrace() {}, LOG_OK: 'ok', LOG_ERROR: 'error', LOG_CONFLICT: 'conflict', flushLog() {},
-    Utilities: { getUuid: () => 'production-matrix-uuid', newBlob: (value) => ({ getBytes: () => Buffer.from(String(value), 'utf8') }) },
-    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
-    shinOpenBook: () => ({ getId: () => 'production-matrix-sheet' })
-  });
-  napServer(hop,
-    'fbm_sync/schema/FbmFields.js',
-    'fbm_sync/protocol/Protocol.js',
-    ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
-    'fbm_sync/read/GridRead.js',
-    'fbm_sync/reconcile/Fingerprint.js',
-    'fbm_sync/reconcile/Conflict.js',
-    'fbm_sync/reconcile/Identity.js',
-    'fbm_sync/reconcile/Pull.js',
-    'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js',
-    'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js',
-    'fbm_sync/write/RequestBuilders.js',
-    'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
-    'fbm_sync/transport/PushFlow.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
-    'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/control/ControlPort.js');
-  hop.FbmSync.readLocal = (entity) => local[entity].map(clone);
-  hop.writeGateSave = (request) => {
-    writes.push(request);
-    const entity = request.entity;
-    const conflicts = [];
-    (request.records || []).forEach((patch, i) => {
-      const old = request.old && request.old[i];
-      const row = local[entity].find((item) => String(item.id || '') === String(patch.id || ''));
-      if (!old || !row) { return; }
-      Object.keys(old).forEach((field) => {
-        if (!Object.prototype.hasOwnProperty.call(patch, field)) { return; }
-        const current = String(row[field] === undefined || row[field] === null ? '' : row[field]);
-        const mine = String(patch[field] === undefined || patch[field] === null ? '' : patch[field]);
-        if (current !== String(old[field]) && mine !== current) { conflicts.push({ index: i, id: patch.id, field, label: field, old: old[field], current, mine }); }
-      });
-    });
-    if (conflicts.length) { return { ok: false, conflicts }; }
-    (request.records || []).forEach((patch) => {
-      const id = String(patch.id || '');
-      let index = local[entity].findIndex((item) => String(item.id || '') === id);
-      if (index < 0) {
-        index = local[entity].length;
-        local[entity].push(Object.assign({}, patch, { id: id || (entity === 'customer' ? 'CUS-' : 'ACT-') + String(index + 1).padStart(6, '0') }));
-      } else {
-        local[entity][index] = Object.assign({}, local[entity][index], patch);
-      }
-    });
-    return { ok: true };
-  };
-  hop.FbmSync.configValue = () => '';
-  hop.FbmSync.readCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
-  return { hop, local, writes, logs, documentProperties };
-}
 
 function customer(id, code, name) {
   return { fbmId: id, fbmCustomerCode: code, companyName: name, taxNumber: '010000' + code.slice(-2), phone: '0900000000', email: code.toLowerCase() + '@example.test', address: 'Hà Nội', province: 'Hà Nội', contactPerson: 'Người liên hệ', leadSource: '', product: '', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ' };
@@ -203,21 +132,6 @@ async function chay(so) {
   check(so, 'phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và chỉ một tổng kết', [emptyCustomer.written, emptyActivity.written, empty.writes.length, [emptyCounts.total, emptyCounts.completed, emptyCounts.succeeded, emptyCounts.skipped, emptyCounts.conflict, emptyCounts.error], empty.logs.length, empty.logs[0] && empty.logs[0].action], [0, 0, 0, [0, 0, 0, 0, 0, 0], 1, 'empty_run']);
 
   // Hàng đợi push: Sheet giả trong bộ nhớ, danh sách ứng viên dựng lại từ Sheet sau mỗi bản ghi như GAS thật.
-  function pushQueue(customers, activities) {
-    const run = makeSync(), F = run.hop.FbmSync;
-    run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
-    F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
-    F.categoryGateCheck = () => [];
-    F.nextEnvelope = (request) => request;
-    const st = F.runOpen({ phase: 'push' });
-    st.mode = 'write'; st.phase = 'push'; 
-    st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
-    // Lượt đẩy luôn bắt đầu sau lô danh mục vừa đọc.
-    st.metadata.categoryCheck = { at: Date.now(), pushed: 0 };
-    F.stateWrite(st);
-    return { run, F };
-  }
-  const editCustomer = (x) => ({ id: 'CUS-' + x, fbmId: 'F-' + x, fbmCustomerCode: 'ALT0000' + x, companyName: 'Cty ' + x, taxNumber: '010' + x, contactPerson: 'Người liên hệ', phone: '0900000000', leadSource: 'Web', address: 'Hà Nội', province: 'Hà Nội', fbmSyncPermission: 'Cho phép', syncStatus: 'đã đồng bộ', fbmHash: 'cũ' });
 
   const skipOnError = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnError = [];
@@ -286,22 +200,6 @@ async function chay(so) {
 
   // Chặng đẩy theo danh sách mã: bước đẩy giả lập thành công đi qua đúng cửa bản ghi (nhả sổ bận, ghi baseline) rồi sang mã kế như finishPushVerification.
   const pushListKey = (q) => String(q.run.documentProperties.data.FBM_SYNC_PUSH_LIST_0 || '');
-  const pushOk = (q) => {
-    const st = q.F.stateRead(), id = st.cursor.candidate.id;
-    q.F.pushRowChange('customer', id, { release: true, build: (local) => ({ patch: { id, syncStatus: 'đã đồng bộ', fbmHash: q.F.hash(local, 'customer', q.F.stateCategoryGate(st)) } }) });
-    const after = q.F.stateRead(); after.cursor = q.F.pushCursorNext(after.cursor, true); after.current = ''; q.F.stateWrite(after);
-    return q.F.nextPushRequest(q.F.stateRead());
-  };
-  const pushDrive = (q, onStep) => {
-    const tried = [];
-    let request = q.F.nextPushRequest(q.F.stateRead());
-    for (let guard = 0; guard < 20 && request; guard += 1) {
-      const id = q.F.stateRead().cursor.candidate.id; tried.push(id);
-      if (onStep) { onStep(id, tried.length); }
-      request = pushOk(q);
-    }
-    return { tried, request };
-  };
   {
     const scanBox = pushQueue(['A', 'B'].map(editCustomer).concat([Object.assign(editCustomer('C'), { fbmHash: '' }), Object.assign(editCustomer('D'), { phone: '' })]), [Object.assign({ id: 'ACT-1', customerId: 'CUS-A', fbmId: '9001', workDate: '2026-10-01', taskType: 'Gọi điện', content: 'Gọi', owner: 'Người khác', fbmSyncPermission: 'Cho phép', fbmHash: 'cũ' })]);
     const SF = scanBox.F, scan = SF.localScan(), context = SF.pushReviewContext(SF.stateRead(), scan);
@@ -321,7 +219,7 @@ async function chay(so) {
   }
   {
     const q = pushQueue(['A', 'B', 'C', 'D', 'E'].map(editCustomer));
-    q.F.SHARD_LIST_BYTES = 16;
+    q.F.SHARD_LIST_BYTES = 40;
     const first = q.F.nextPushRequest(q.F.stateRead()), firstCursor = q.F.stateRead().cursor;
     const { tried } = (() => { const out = [q.F.stateRead().cursor.candidate.id]; let r = first; for (let g = 0; g < 20 && r; g += 1) { r = pushOk(q); if (r) { out.push(q.F.stateRead().cursor.candidate.id); } } return { tried: out }; })();
     check(so, 'C0: danh sách không vừa một khóa thì chỉ ghi phần đầu; lần quét lại nhặt phần còn lại, không sót bản ghi',
@@ -377,65 +275,6 @@ async function chay(so) {
     const capWrote = SF.shardListWrite('T_', ['aaaaaa', 'bbbbbb', 'cccccc'], 1);
     check(so, 'C0: shardListWrite trả số phần tử đã ghi, cắt theo số khóa cho phép; danh sách ngắn lại thì khóa thừa ghi rỗng (gộp được vào một lần gọi kho) và đọc lại đúng',
       [wrote, wide, narrow, capWrote, SF.shardListRead('T_')], [3, ['T_0', 'T_1', 'T_2', 'T_SHARDS'], ['dddddd', '', '', '1', ['dddddd']], 1, ['aaaaaa']]);
-  }
-
-  // Cổng của chặng đẩy (C1): dấu lần đẩy sạch chỉ ghi khi lần quét không còn ứng viên, xóa ở đầu chặng mở; lượt nền khớp dấu thì không đọc Sheet, không đẩy.
-  const cleanKey = (q) => q.run.documentProperties.data.FBM_SYNC_PUSH_CLEAN_V1;
-  const syncedCustomer = (q, x) => { const row = editCustomer(x); row.fbmHash = q.F.hash(row, 'customer', q.F.stateCategoryGate(q.F.stateRead())); return row; };
-  {
-    const F = pushQueue([]).F, now = { rev: 7, failures: '', scope: '', account: 'Le Tuan Anh' };
-    const bg = { origin: 'background', scan: 'detail' };
-    check(so, 'C1: phép quyết cổng: lượt tay và Quét nhanh luôn mở; chưa có dấu mở; lệch phần nào thì mở kèm tên phần; bốn phần khớp mới đóng',
-      [F.pushGateDecide({ origin: 'manual', scan: 'detail' }, now, now), F.pushGateDecide({ origin: 'background', scan: 'full' }, now, now), F.pushGateDecide(bg, null, now),
-        F.pushGateDecide(bg, Object.assign({}, now, { rev: 6 }), now).reason, F.pushGateDecide(bg, Object.assign({}, now, { failures: 'customer:CUS-A=h' }), now).reason,
-        F.pushGateDecide(bg, Object.assign({}, now, { scope: 'limited:ALT00010', account: '' }), now).reason, F.pushGateDecide(bg, Object.assign({}, now), now)],
-      [{ open: true, reason: 'manual' }, { open: true, reason: 'bypass_scan' }, { open: true, reason: 'no_mark' }, 'changed:rev', 'changed:failures', 'changed:scope,account', { open: false, reason: 'clean' }]);
-  }
-  {
-    const q = pushQueue([]);
-    q.run.local.customer.push(syncedCustomer(q, 'A'));
-    q.run.hop.reloadJournalRead = () => ({ rev: 41 });
-    const end = q.F.pushStageBegin(q.F.stateRead()), mark = JSON.parse(cleanKey(q) || 'null');
-    const capped = pushQueue(['A', 'B'].map(editCustomer));
-    capped.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify({ rev: 1 }));
-    capped.F.SHARD_LIST_BYTES = 8; capped.F.BUDGET.pushPassesMax = 1;
-    const cappedFirst = capped.F.pushStageBegin(capped.F.stateRead()), clearedAtBegin = cleanKey(capped);
-    pushOk(capped);
-    check(so, 'C1: chặng đẩy quét không còn ứng viên thì ghi dấu đúng bản đọc trước lần quét; chặng mở xóa dấu cũ ngay từ đầu; dừng không sạch thì không ghi dấu',
-      [end, mark, !!cappedFirst, clearedAtBegin, capped.F.stateRead().phase, cleanKey(capped)],
-      [null, { rev: 41, failures: '', scope: '', account: '' }, true, undefined, 'done', undefined]);
-  }
-  {
-    const q = pushQueue(['A'].map(editCustomer));
-    const reads = { count: 0 }, readBefore = q.F.readLocal;
-    q.F.readLocal = (entity) => { reads.count += 1; return readBefore(entity); };
-    q.F.preflightNeedsLocal = () => true;
-    const preflightCalls = [];
-    q.F.preflightLocal = (options) => { preflightCalls.push(options.scan); return { ok: true, issues: [], blocking: [], warnings: [], candidateCount: 1 }; };
-    q.F.preflightApply = () => null;
-    q.run.hop.logTrace = (entry) => q.run.logs.push(entry);
-    const mark = q.F.pushCleanNow();
-    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(mark));
-    const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
-    const stepped = q.F.preflightLocalStep(q.F.stateRead()), gated = q.F.stateRead(), stage = q.F.pushStageBegin(gated);
-    const closedTrace = q.run.logs.filter((event) => event.action === 'push_gate_closed');
-    const full = q.F.stateRead(); full.scan = 'full'; full.pushGate = undefined; q.F.stateWrite(full);
-    const fullState = q.F.stateRead(); q.F.preflightLocalStep(fullState);
-    check(so, 'C1: lượt nền khớp dấu thì cổng đóng: không chạy kiểm dữ liệu ShinCRM, không đọc Sheet, không phát request đẩy, giữ dấu, ghi một dòng vết; Quét nhanh nền vẫn kiểm',
-      [stepped, gated.pushGate, stage, reads.count, q.F.stateRead().phase, JSON.parse(cleanKey(q)), closedTrace.length, preflightCalls, fullState.pushGate],
-      [null, { open: false, reason: 'clean' }, null, 0, 'done', mark, 1, ['full'], { open: true, reason: 'bypass_scan' }]);
-  }
-  {
-    const q = pushQueue(['A'].map(editCustomer));
-    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', 'hỏng');
-    const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
-    const gate = q.F.pushGateCheck(q.F.stateRead(), { origin: 'background', scan: 'detail', mode: 'write' });
-    const warn = q.run.logs.filter((event) => event.action === 'push_clean_read');
-    q.run.hop.reloadJournalRead = () => ({ rev: 3 });
-    q.run.documentProperties.setProperty('FBM_SYNC_PUSH_CLEAN_V1', JSON.stringify(Object.assign(q.F.pushCleanNow(), { rev: 2 })));
-    check(so, 'C1: dấu hỏng thì Log cảnh báo rồi mở cổng, không coi là chưa có dấu một cách im lặng; sửa Sheet sau lần đẩy sạch (sổ nạp lại tăng) thì mở',
-      [gate, warn.length, warn[0] && warn[0].outcome, q.F.pushGateCheck(q.F.stateRead(), { origin: 'background', scan: 'detail', mode: 'write' })],
-      [{ open: true, reason: 'mark_corrupt' }, 1, 'warn', { open: true, reason: 'changed:rev' }]);
   }
 
   // Chế độ xung đột (FBM-024): hàng đợi là các dòng Sheet "xung đột chờ quyết", state chỉ giữ số đếm và một bản ghi đang mở.

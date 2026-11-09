@@ -14,8 +14,8 @@ const path = require('path');
 const vm = require('vm');
 const hopFbm = require('./fbm/hop-gas');
 const { taoKhoThuocTinh } = require('./gas/kho-thuoc-tinh');
-
 const GAS_DIR = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
+const NOTICE_STUBS = { noticeRaise: (list) => (notice) => { list.push(['raise', notice.topic, notice]); return true; }, noticeResolve: (list) => (topic, scope) => { list.push(['resolve', topic, scope]); return null; }, noticeList: () => () => [] };
 
 /**
  * Dựng một hộp cát rỗng. Truyền `stubs` để đặt sẵn những thứ chỉ có trên Google — ví dụ một `SpreadsheetApp` giả.
@@ -30,7 +30,8 @@ function taoHopCat(stubs) {
   // Khóa điều phối giả mặc định (luôn lấy được); ca cần thử nhánh bận tự truyền `LockService`.
   // Hạn chờ khóa của GAS thật; ca cần số khác tự truyền `SETTINGS`.
   if (!hopCat.SETTINGS) { hopCat.SETTINGS = { LOCK_WAIT_MS: 15000 }; }
-  // Cửa ghi Log (LogGate) mặc định nuốt dòng; ca cần đọc Log tự truyền `logEvent`. Mã GAS gọi thẳng, không dò sự có mặt.
+  // Cửa ghi Log (LogGate) mặc định nuốt dòng, cổng thông báo (NoticeGate) mặc định ghi vào `_notices`; ca cần đọc Log tự truyền `logEvent`, ca cần cổng thật tự nạp NoticeGate. Mã GAS gọi thẳng, không dò sự có mặt.
+  const notices = hopCat._notices = hopCat._notices || []; Object.keys(NOTICE_STUBS).forEach((key) => { if (!hopCat[key]) { hopCat[key] = NOTICE_STUBS[key](notices); } });
   ['logEvent', 'logTrace', 'flushLogIfTraced', 'logRegisterContext'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = () => {}; } });
   ['LOG_OK', 'LOG_WARN', 'LOG_ERROR'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = key.slice(4).toLowerCase(); } });
   if (!hopCat.LockService) { hopCat.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }; }

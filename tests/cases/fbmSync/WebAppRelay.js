@@ -24,7 +24,7 @@ async function chay(so) {
   relay.flushLog = () => { relayLog.flushes += 1; return 0; };
   relay.noticeRaise = (notice) => { relayLog.reports.push([notice.title, notice.topic]); return true; };
   relay.noticeResolve = () => null;
-  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
+  napServer(relay, 'server/state/DirtyState.js', 'server/entry/EntryPoint.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/report/Report.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/write/SheetSave.js');
   // Cửa lệnh giả: phần này chỉ kiểm cổng HTTP (khóa, Sheet, mã giao thức, danh sách lệnh relay, Log); cửa lệnh thật kiểm ở Control.
   const relayDispatched = [];
   relay.FbmSync.controlDispatch = (command, input, channel) => { relayDispatched.push([command, channel]); return { ok: true, code: 'RELAY_TEST_DONE', request: null, status: {} }; };
