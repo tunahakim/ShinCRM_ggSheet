@@ -15,3 +15,7 @@ Phép kiểm mới `tests/cases/blockKeys.js` bắt được bốn cặp vai–k
 ### Máy chạy nền (B6): các lựa chọn tạm
 
 Tự quyết khi làm B6, chủ dự án xem lại: (1) tắt công tắc tổng hoặc lịch nền thì mọi máy tắt chuông, bật lại thì Sidebar đánh thức máy đang mở; (2) chưa giao máy nào thì không máy nào tự nhận, kể cả khi bật "Tự nhận máy nền"; (3) người dùng dừng lượt nền thì kết quả tiến trình ghi là bỏ (`dropped`), không tính lỗi để dời giờ thử lại; (4) Giữ phiên tốn hai request mỗi lần (dò phiên rồi đếm khách); (6) Sidebar mở gửi cấu hình relay không đổi thì Extension chỉ đặt lại chuông, không hỏi GAS (cấu hình mới mới hỏi); (7) Sidebar ở máy không chở lượt hỏi GAS mỗi 60 giây (dùng lại `FBM_SYNC_RUN_SILENCE_MS`); (8) máy chưa cài Extension chỉ báo trong card máy nền, không ghi Log vì không phải lỗi.
+
+### Cổng chấp thuận đẩy (B9): các lựa chọn tạm
+
+Tự quyết khi làm B9, chủ dự án xem lại: (1) dòng chỉ ghi trạng thái chờ sửa (`hold`, ví dụ lệch người phụ trách) không tính vào ngưỡng và dấu tập, vì không phát lệnh ghi FBM; (2) nút "Kiểm lại ngay" mở màn đồng bộ và chạy một lượt tay chiều Đẩy; (3) giữa lượt đã chạy, phần còn lại dưới ngưỡng thì nhận cả dòng mới hoặc vừa sửa như một lượt mới (tập dưới ngưỡng vốn không cần duyệt), chạm ngưỡng thì chỉ đẩy phần đã qua cổng, phần mới để lượt sau hỏi; (4) khóa cũ `FBM_SYNC_PUSH_CLEAN_V1` bị bỏ qua, hàm chuyển một lần ở B10 xóa.
