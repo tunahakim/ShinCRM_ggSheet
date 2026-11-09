@@ -140,7 +140,7 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 14,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 12,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 9,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
@@ -164,7 +164,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 12,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 4,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 7,
