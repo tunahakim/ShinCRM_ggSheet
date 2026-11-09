@@ -73,7 +73,11 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.activityGridStage(ctx); },
     end: function (state, end) { return FbmSync.activityGridEnd(state, end); }
   },
-  conflict_refresh: { legacy: true, run: function (rawResponse) { return FbmSync.conflictOpened(rawResponse); } },
+  conflict_refresh: {
+    inputs: function (state) { return FbmSync.conflictRefreshInputs(state); },
+    stage: function (ctx) { return FbmSync.conflictRefreshStage(ctx); },
+    end: function (state, end) { return FbmSync.conflictRefreshEnd(state, end); }
+  },
   customer_count: {
     inputs: function (state) { return FbmSync.customerCountInputs(state); },
     stage: function (ctx) { return FbmSync.customerCountStage(ctx); },

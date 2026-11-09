@@ -157,7 +157,7 @@ function fbmRequeueCreateCustomerPush() {
 function fbmRequeueCreateCustomerConflict() {
   fbmFixtureSave('customer', [{ id: FBM_TEST_CREATE_CUSTOMER_ID, syncStatus: FbmSync.SYNC_STATUS.conflict }], 'pull');
   var state = FbmSync.stateRead();
-  state.phase = 'conflict'; state.metadata.conflictCount = FbmSync.conflictQueue().length; state.message = 'Có xung đột chờ quyết.';
+  state.phase = 'conflict'; state.metadata.conflictCount = FbmSync.conflictQueue(FbmSync.localScan()).length; state.message = 'Có xung đột chờ quyết.';
   FbmSync.stateWrite(state);
   return fbmProbeCreateCustomer();
 }
@@ -181,7 +181,7 @@ function fbmProbeStuckState() {
 /** Dò hash chờ xác nhận và khóa ghi (không chứa cookie hay mật khẩu) để điều tra lệch dữ liệu sau lệnh ghi FBM. */
 function fbmProbePendingPushes() {
   var state = FbmSync.stateRead();
-  return { pending: FbmSync.pendingPushesRead(), cursor: state.cursor, conflictRefresh: state.metadata.conflictRefresh };
+  return { pending: FbmSync.pendingPushesRead(), cursor: state.cursor };
 }
 
 /** Tạm thu phạm vi live (đọc và đẩy) về khách CUS-020061 đã tạo thật, để lượt hai chiều đọc được Activity của khách này (G12.5). Trả về ALT00010 bằng `fbmScopeDefaultCustomer`. */
