@@ -247,7 +247,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── protocol\Protocol.js     Envelope và parse response.
     ├── transport\Budget.js       Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
     ├── transport\TransportCore.js Hợp đồng request, retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại).
-    ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
+    ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, tra lại MST, đọc xác nhận, dọn dấu), hai pha áp kết quả và quyết lỗi đẩy.
+    ├── transport\PushStage.js   Người điều phối chặng đẩy theo hợp đồng chung: nhận response, quét lại và cổng chấp thuận, xét từng mã, chốt lượt.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
     ├── transport\RequestSettings.js Cài đặt dựng request: hằng địa chỉ FBM, `scriptSettings(state)` của một lát, phép kiểm `requestCfg` đầu mọi hàm dựng (thiếu cfg thì ném `FBM_REQUEST_SETTINGS_MISSING`).
     ├── transport\ScanJob.js     Việc quét: cấp scan_job/scan_chunk, đối chiếu gói với cursor, chạy lại khi tab mất việc.
@@ -339,6 +340,7 @@ tests\
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
+│   │   ├── buoc-day.js           Lối gọi chặng đẩy cho ca kiểm đúng như khung lát gọi (bản sao ô lượt, patch, chốt lượt).
 │   │   └── hang-day.js           Hộp thử chiều đẩy: hộp GAS với Sheet giả trong RAM và hàng đợi đẩy dựng sẵn đầu chặng; ma trận production và ca cổng chặng đẩy cùng dựng từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
