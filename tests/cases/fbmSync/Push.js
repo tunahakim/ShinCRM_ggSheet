@@ -1,131 +1,13 @@
-/** Kiểm tra chiều push, khóa, owner và log. */
+/** Chặng đẩy: phát request ghi, giữ sổ bận, áp kết quả hai pha, lỗi từng bản ghi, dựng form sửa/tạo Activity, dọn dấu #SC và cứu lệnh tạo mất phản hồi. */
 const { section, check } = require("../../lib/assert");
-const { buocDay, buocDayLoi, ungVienDay } = require('../../lib/fbm/buoc-day');
-const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
-const { datPhan } = require('../../lib/fbm/cai-dat-thu');
+const { buocDay, buocDayLoi } = require('../../lib/fbm/buoc-day');
+const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan } = require('../../lib/load-gas');
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
-const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
 
 async function chay(so) {
   section("FBM sync — push");
-  const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(pushed, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
-  // Ngoài ca phạm vi thử bên dưới, hộp này đẩy mọi dòng có việc: lưu qua cổng cài đặt rằng không giới hạn phạm vi khách.
-  datPhan(pushed, 'run', { scopeLimited: false });
-  // pushCandidates không còn nuốt lỗi đọc state, nên hộp thử phải có state và sổ lỗi đẩy dù rỗng.
-  pushed.FbmSync.stateRead = () => ({ metadata: {} });
-  pushed.FbmSync.pushFailuresRead = () => ({ hashes: {}, details: {} });
-  // Phép xét một dòng so người phụ trách Giao dịch với tài khoản đã liên kết; hộp này không nạp tệp cấu hình.
-  pushed.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: '' });
-  pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
-  const props = { data: {} };
-  const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
-  const orchestration = taoHopCat({
-    FbmSync: {},
-    PropertiesService: { getDocumentProperties: () => propertyApi, getScriptProperties: () => propertyApi }
-  });
-  napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
-  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const approvalProps = { data: {} };
-  const approvalPropertyApi = { getProperty: (key) => approvalProps.data[key] || null, setProperty: (key, value) => { approvalProps.data[key] = String(value); } };
-  const approval = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => approvalPropertyApi, getScriptProperties: () => approvalPropertyApi } });
-  napServer(approval, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/PreflightPush.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
-  approval.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  // Phần kiểm tra rẻ chạy đầu lượt; phần đọc và hash cả hai Sheet chỉ chạy sau khi phiên FBM xác thực xong, nên FBM hỏng ở bước xác thực thì ShinCRM chưa tốn công tính.
-  const localCalls = [];
-  approval.FbmSync.preflightGates = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
-  approval.FbmSync.preflightNeedsLocal = (options) => options.mode !== 'read';
-  approval.FbmSync.preflightLocal = (options) => { localCalls.push(options.mode); return { ok: true, issues: [], blocking: [], warnings: [], candidateCount: 11 }; };
-  approval.FbmSync.extractAuthorized = () => 'auth-token';
-  const firstAsk = approval.FbmSync.start({ mode: 'write' });
-  check(so, 'Mở lượt ghi: request đầu là kiểm phiên FBM, chưa đọc hay hash Sheet Customer/Activity', [firstAsk.ok, firstAsk.request.meta.kind, localCalls.length], [true, 'session_probe', 0]);
-  approval.FbmSync.authContinue('customer', { map: {} });
-  const afterAuth = approval.FbmSync.authContinue('activity', { map: {} });
-  check(so, 'Xác thực xong mới quét dữ liệu; số bản ghi lúc kiểm trước phiên không dừng lượt chờ chấp thuận (cổng chấp thuận nằm ở đầu chặng đẩy), đi tiếp sang request dữ liệu', [!!afterAuth, localCalls], [true, ['write']]);
-  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
-  approval.FbmSync.readLocal = () => [];
-  approval.FbmSync.start({ mode: 'read' });
-  approval.FbmSync.authContinue('customer', { map: {} });
-  approval.FbmSync.authContinue('activity', { map: {} });
-  check(so, 'Chiều Lấy không quét hash Sheet ShinCRM ở bất kỳ bước nào', localCalls.length, 1);
-  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
-  approval.FbmSync.preflightLocal = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
-  const pushOnly = approval.FbmSync.start({ mode: 'push' });
-  check(so, 'mode day rieng chi probe truoc khi gui du lieu ShinCRM len FBM', [pushOnly.ok, pushOnly.request.meta.kind, approval.FbmSync.stateRead().mode], [true, 'session_probe', 'push']);
-  approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
-  const checkOnly = approval.FbmSync.start({ mode: 'check' });
-  check(so, 'bon mode tach dung quyen ghi Sheet va FBM', [
-    checkOnly.ok,
-    approval.FbmSync.canWriteSheet('check'), approval.FbmSync.canWriteFbm('check'),
-    approval.FbmSync.canWriteSheet('read'), approval.FbmSync.canWriteFbm('read'),
-    approval.FbmSync.canWriteSheet('push'), approval.FbmSync.canWriteFbm('push'),
-    approval.FbmSync.canWriteSheet('write'), approval.FbmSync.canWriteFbm('write')
-  ], [true, false, false, true, false, false, true, true, true]);
-  let pullWriteCalls = 0;
-  approval.FbmSync.pullPageApply = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }; };
-  approval.FbmSync.statePatch({ counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
-  const readPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-1' }], 'read');
-  const checkPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-2' }], 'check');
-  check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
-  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const started = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start bat dau bang probe User', started.request.meta.kind, 'session_probe');
-  check(so, 'probe khong gui authorized cu', started.request.body.authorized, undefined);
-  orchestration.FbmSync.currentSpreadsheetId = () => 'sheet-push-test';
-  orchestration.FbmSync.identityStatus = () => ({ status: 'BOUND' });
-  orchestration.FbmSync.statePatch({ runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
-  const businessProbe = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
-  check(so, 'request nghiep vu chi duoc cap sau probe User dat', businessProbe.meta.kind, 'session_probe');
-  const businessRequest = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: businessProbe.id }] } });
-  check(so, 'probe dat thi moi phat request nghiep vu de kiem fail-closed', [businessRequest.ok, businessRequest.request && businessRequest.request.meta.kind], [true, 'grid']);
-  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: businessRequest.request.id }] } });
-  check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, null, 'error', 'TRANSPORT_ERROR']);
-  const blockedDuplicate = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'sau loi request chi cho phep nguoi dung chay lai tu dau bang probe', [blockedDuplicate.ok, blockedDuplicate.request && blockedDuplicate.request.meta.kind, orchestration.FbmSync.stateRead().phase], [true, 'session_probe', 'checking_session']);
-  orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
-  const resumed = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'start tiep tuc sau khi reservation cu da thu hoi bang probe moi', [resumed.ok, resumed.resumed, resumed.request.meta.kind], [true, true, 'session_probe']);
-  const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);
-  staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - orchestration.FbmSync.STALE_RUN_MS - 1; staleState.lastProgressAt = staleState.updatedAt; staleState.deadlineAt = staleState.updatedAt;
-  props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
-  const restarted = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'run stale duoc thay bang phien moi va probe lai', [restarted.ok, restarted.resumed, restarted.request.meta.kind, orchestration.FbmSync.stateRead().runId === 'old-run'], [true, undefined, 'session_probe', false]);
-  check(so, 'FBM-051: sản phẩm không đồng bộ nên phiên chỉ tải ba danh mục FBM, không tải crdmsp', orchestration.FbmSync.SYNC_LOOKUPS.map((item) => item.key + ':' + item.controller), ['@CAT_TINH_THANH:crProvinceCity', '@CAT_NGUON_KH:crLeadSource', '@CAT_CONG_VIEC:crJob']);
-  orchestration.FbmSync.previewRecords('customer', [{ fbmCustomerCode: 'ALT00010', companyName: 'Test', fbmId: 'A1' }]);
-  check(so, 'preview luu ma va ten Customer doc tu FBM', orchestration.FbmSync.previewRead().customers[0].code, 'ALT00010');
-  const pullStatus = orchestration.FbmSync.stateRead();
-  pullStatus.phase = 'pull_customer'; pullStatus.entity = 'customer'; pullStatus.mode = 'read'; orchestration.FbmSync.stateWrite(pullStatus);
-  const pullView = orchestration.FbmSync.statusView();
-  check(so, 'status noi ro chieu FBM ve ShinCRM', pullView.direction, 'FBM → ShinCRM');
-  check(so, 'status noi ro dang dong bo khach hang', pullView.entityLabel, 'Khách hàng');
-  const resumeState = orchestration.FbmSync.stateRead();
-  resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.metadata = Object.assign({}, resumeState.metadata, { customerFields: orchestration.FbmSync.GRID_FIELDS.customer }); resumeState.activeRequestId = ''; resumeState.deadlineAt = 0;
-  orchestration.FbmSync.stateWrite(resumeState);
-  const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
-  check(so, 'Sidebar mo lai probe lai phien truoc khi tiep tuc cursor Customer', [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind], [true, true, 'session_probe']);
-  const pushStatus = orchestration.FbmSync.stateRead();
-  pushStatus.phase = 'push'; pushStatus.entity = 'activity'; pushStatus.mode = 'write'; orchestration.FbmSync.stateWrite(pushStatus);
-  const pushView = orchestration.FbmSync.statusView();
-  check(so, 'status noi ro chieu ShinCRM sang FBM', pushView.direction, 'ShinCRM → FBM');
-  check(so, 'status noi ro dang dong bo giao dich', pushView.entityLabel, 'Giao dịch');
-  const queueState = orchestration.FbmSync.stateRead();
-  queueState.metadata.conflictCount = 2;
-  orchestration.FbmSync.stateWrite(queueState);
-  const queueMetadata = orchestration.FbmSync.statusView().metadata;
-  check(so, 'FBM-024: DTO Sidebar chỉ nhận số xung đột, bản ghi cụ thể chỉ có khi mở chế độ xung đột', [queueMetadata.conflictCount, 'conflicts' in queueMetadata], [2, false]);
-
-  const guards = taoHopCat({ FbmSync: {}, PropertiesService: { getScriptProperties: () => ({ getProperty: () => '' }), getDocumentProperties: () => ({ getProperty: () => null, setProperty: () => {} }) } });
-  napServer(guards, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
-  check(so, 'push config chan khi phien chua co ten day du cua tai khoan da xac minh', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'edit' }, { accountName: '' }), 'Phiên FBM chưa có tên đầy đủ của tài khoản đã xác minh; chiều đẩy đã bị dừng.');
-  check(so, 'push config chan tao Customer khi thieu prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh' }), 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.');
-  check(so, 'push config cho phep tao Customer khi du prefix va do dai ma khach', guards.FbmSync.pushConfigErrors({ entity: 'customer', kind: 'create' }, { accountName: 'Lê Tuấn Anh', customerPrefix: 'ALT', customerCodeLength: '8' }), '');
-  check(so, 'ma khach FBM tu sinh phai khop prefix va do dai', [guards.FbmSync.validateAutoCustomerCode('ALT00010', { customerPrefix: 'ALT', customerCodeLength: '8' }).ok, guards.FbmSync.validateAutoCustomerCode('CUS-000001', { customerPrefix: 'ALT', customerCodeLength: '8' }).ok], [true, false]);
-  check(so, 'push config cho activity sua khi account co', guards.FbmSync.pushConfigErrors({ entity: 'activity', kind: 'edit' }, { accountName: 'Lê Tuấn Anh' }), '');
-  check(so, 'owner Activity lech tai khoan dang dang nhap bi chan truoc request push', guards.FbmSync.ownerCheck({ owner: 'Tài khoản khác' }, 'Lê Tuấn Anh').indexOf('khác tài khoản FBM đang đăng nhập') >= 0, true);
-  check(so, 'ownerCheck: thiếu tên tài khoản là lỗi kể cả khi giao dịch chưa có owner; cùng tài khoản hoặc chưa có owner thì qua', [!!guards.FbmSync.ownerCheck({ owner: '' }, ''), !!guards.FbmSync.ownerCheck({ owner: 'Lê Tuấn Anh' }, '  '), guards.FbmSync.ownerCheck({ owner: 'Lê Tuấn Anh' }, 'Lê Tuấn Anh'), guards.FbmSync.ownerCheck({}, 'Lê Tuấn Anh')], [true, true, '', '']);
-
   const pushProps = { data: {} };
   const pushPropertyApi = { getProperty: (key) => pushProps.data[key] || null, setProperty: (key, value) => { pushProps.data[key] = String(value); } };
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
@@ -261,60 +143,6 @@ async function chay(so) {
   push.FbmSync.stateWrite(bugState);
   const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } });
   check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.ok, push.FbmSync.stateRead().counts.error, push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'] !== undefined], [true, 1, true]);
-  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
-    : [];
-  check(so, 'Customer moi chua cho phep chi pull khong push', ungVienDay(pushed.FbmSync, 'customer').length, 0);
-  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-XUNGDOT', fbmId: 'F1', fbmCustomerCode: 'ALT2', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.conflict, companyName: 'Sửa', fbmHash: 'cu' }, { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: 'Cho phép', companyName: 'Mới' }]
-    : [];
-  check(so, 'dòng vừa thành xung đột bị pushCandidates loại vì đọc lại trạng thái trên dòng; bản ghi khác vẫn vào danh sách đẩy', ungVienDay(pushed.FbmSync, 'customer').map((item) => item.id), ['CUS-KHAC']);
-  pushed.FbmSync.stateRead = () => { throw new Error('Không đọc được state'); };
-  let stateReadFailure = '';
-  try { ungVienDay(pushed.FbmSync, 'customer'); } catch (error) { stateReadFailure = String(error && error.message || error); }
-  check(so, 'pushCandidates không nuốt lỗi đọc state: ném lỗi rõ thay vì coi sổ lỗi đẩy là rỗng', stateReadFailure, 'Không đọc được state');
-  pushed.FbmSync.stateRead = () => ({ metadata: {} });
-  pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission() }]
-    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission(), taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
-  check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', ungVienDay(pushed.FbmSync, 'activity').length, 1);
-  {
-    const allow = pushed.FbmSync.pullDefaultPermission(), savedScope = pushed.FbmSync.scope;
-    pushed.FbmSync.scope = () => ({ codes: ['ALT00010', 'CUS-NEW'], fbm: ['ALT00010'], shin: ['CUS-ALT', 'CUS-NEW'], notFound: [] });
-    pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-      ? [
-        { id: 'CUS-ALT', fbmId: 'FBM-ALT', fbmCustomerCode: 'ALT00010', fbmSyncPermission: allow, syncStatus: pushed.FbmSync.SYNC_STATUS.pending },
-        { id: 'CUS-NEW', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: allow, companyName: 'Khách mới' },
-        { id: 'CUS-KHAC', fbmId: '', fbmCustomerCode: '', fbmSyncPermission: allow, companyName: 'Khách ngoài phạm vi' },
-        { id: 'CUS-THAT', fbmId: 'FBM-THAT', fbmCustomerCode: 'ALT00999', fbmSyncPermission: allow }
-      ]
-      : [
-        { id: 'ACT-ALT', customerId: 'CUS-ALT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'A', workDate: '2026-10-07' },
-        { id: 'ACT-THAT', customerId: 'CUS-THAT', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'B', workDate: '2026-10-07' }
-      ];
-    check(so, 'Phạm vi giới hạn: chiều đẩy chỉ xét khách GAS đã đổi ra từ danh sách (khách ghép cặp và khách mới chưa có mã FBM), khách ngoài danh sách và Activity của nó bị chặn',
-      [ungVienDay(pushed.FbmSync, 'customer').map((c) => c.kind + ':' + c.id), ungVienDay(pushed.FbmSync, 'activity').map((c) => c.id)],
-      [['edit:CUS-ALT', 'create:CUS-NEW'], ['ACT-ALT']]);
-    pushed.FbmSync.scope = savedScope;
-  }
-  {
-    // 09/05 Phần 9: bản ghi vắng hoặc đã chuyển cho người khác, và giao dịch của khách mang hai trạng thái đó, sửa trên Sheet cũng không được đẩy.
-    const allow = pushed.FbmSync.pullDefaultPermission(), sync = pushed.FbmSync.SYNC_STATUS;
-    pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-      ? [
-        { id: 'CUS-MAT', fbmId: 'FBM-MAT', fbmCustomerCode: 'ALT00011', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, companyName: 'Sửa khi vắng' },
-        { id: 'CUS-CHUYEN', fbmId: 'FBM-CHUYEN', fbmCustomerCode: 'ALT00012', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.transferred, companyName: 'Sửa khi đã chuyển' },
-        { id: 'CUS-OK', fbmId: 'FBM-OK', fbmCustomerCode: 'ALT00013', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.synced, companyName: 'Sửa bình thường' }
-      ]
-      : [
-        { id: 'ACT-CUA-CHUYEN', customerId: 'CUS-CHUYEN', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'Mới dưới khách đã chuyển', workDate: '2026-10-16' },
-        { id: 'ACT-MAT', customerId: 'CUS-OK', fbmId: '200001', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, taskType: 'Goi', content: 'Sửa khi vắng', workDate: '2026-10-16' },
-        { id: 'ACT-OK', customerId: 'CUS-OK', fbmId: '', fbmSyncPermission: allow, taskType: 'Goi', content: 'Mới', workDate: '2026-10-16' }
-      ];
-    check(so, 'Đóng băng: bản ghi mang "không thấy bên FBM" hoặc "đã chuyển cho người khác" và giao dịch của khách đã chuyển không vào danh sách đẩy dù đã sửa',
-      [ungVienDay(pushed.FbmSync, 'customer').map((c) => c.id), ungVienDay(pushed.FbmSync, 'activity').map((c) => c.id)],
-      [['CUS-OK'], ['ACT-OK']]);
-  }
   const transportState = push.FbmSync.runOpen({ phase: 'read' });
   push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };

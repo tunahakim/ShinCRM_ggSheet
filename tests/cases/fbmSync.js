@@ -47,6 +47,8 @@ const NHOM = [
   require("./fbmSync/PropertyBuffer"),
   require("./fbmSync/Preflight"),
   require("./fbmSync/PushEligible"),
+  require("./fbmSync/RunStartProbe"),
+  require("./fbmSync/PushCandidateList"),
   require("./fbmSync/Push"),
   require("./fbmSync/PushCompare"),
   require("./fbmSync/Audit"),
