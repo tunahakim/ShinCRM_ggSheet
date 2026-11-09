@@ -137,7 +137,7 @@ async function chay(so) {
   // Trang sau không tiêu đề cần tên cột gốc lượt đã lưu từ trang đầu.
   pageNextState.metadata.customerFields = sync.hop.FbmSync.scanFields('customer');
   sync.hop.FbmSync.scanJobOpen(pageNextState, pageNextState.cursor);
-  const nextPage = sync.hop.FbmSync.scanJobRequest(pageNextState);
+  const nextPage = sync.hop.FbmSync.scanJobRequest(pageNextState, sync.hop.FbmSync.scriptSettings(pageNextState), null);
   check(so, 'cursor Customer nhieu trang dung composite key bốn giá trị kèm stt_rec_kh (Nghiên cứu FBM ch04 mục 4.10) va trang ke tiep là chỉ số 1, đang đứng ở chỉ số 0', [hasNextPage, nextPage.meta.kind, nextPage.body.type, nextPage.body.gridPageIndex, nextPage.body.lastPageIndex, nextPage.body.gridPageValue], [true, 'scan_job', 1, 1, 0, ['2026-09-18', '2026-09-18T01:00:00', 2, 'FBM-C2']]);
 
   // Cửa ghi gắn cờ hàng loạt (khách chuyển quyền kéo theo mọi giao dịch): cắt theo gói CHUNK_ROWS dòng, đếm đủ.
@@ -206,7 +206,7 @@ async function chay(so) {
   function pushQueue(customers, activities) {
     const run = makeSync(), F = run.hop.FbmSync;
     run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
-    F.scriptSettings = () => ({ accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
+    F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
     F.categoryGateCheck = () => [];
     F.nextEnvelope = (request) => request;
     const st = F.runOpen({ phase: 'push' });
@@ -458,7 +458,7 @@ async function chay(so) {
   const cfRepull = keoVe(CF, 'customer', cfIds.map((n) => CF.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên FBM khác ' + n), NO_CATEGORY)));
   check(so, 'FBM-024: pull lần sau so lại dòng đang xung đột chờ quyết; còn xung đột thì giữ nguyên, không ghi đè, không cộng vào số chờ quyết nhưng vẫn báo là xung đột, không tính Bỏ qua',
     [cfRepull.conflicts, cfRepull.conflictsKept, cfRepull.skipped, cf.local.customer.map((row) => row.companyName), cf.local.customer[0].syncStatus], [0, 3, 0, ['Tên Shin 1', 'Tên Shin 2', 'Tên Shin 3'], 'xung đột chờ quyết']);
-  CF.scriptSettings = () => ({ accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8, baseUrl: 'https://fbm.test' });
+  CF.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
   check(so, 'FBM-024: dòng đang xung đột chờ quyết không vào danh sách đẩy', CF.pushCandidates('customer').length, 0);
 
   // Xung đột không khóa đồng bộ: mỗi kỳ pull so ba chiều lại với baseline cũ. Bốn khách: FBM đổi cho khớp ShinCRM, FBM quay về gốc, ShinCRM quay về gốc, vẫn khác nhau.
@@ -680,7 +680,7 @@ async function chay(so) {
   const activityGrid = (requestId, rows) => luoiTheoTen(sync.hop.FbmSync, 'activity', activityGridFields, rows, requestId);
   const fbmActivity = (details, endDate) => ({ id: 'FBM-A1', ma_kh: 'ALT00001', ten_cv: 'Gọi điện', details, end_date: endDate });
   const ac = makeSync(), AC = ac.hop.FbmSync;
-  AC.scriptSettings = () => ({ baseUrl: 'https://fbm.test', userId: '2037', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
+  AC.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', userId: '2037', accountName: 'Le Tuan Anh', customerPrefix: 'ALT', customerCodeLength: 8 });
   const acState = AC.runOpen({ phase: 'pull_activity' }); acState.mode = 'read';
   AC.readCategoryGate = () => ({ map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true }, '@CAT_CONG_VIEC': { 'Gọi điện': true } }, warnings: [] });
   AC.stateWrite(acState);

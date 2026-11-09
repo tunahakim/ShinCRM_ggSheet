@@ -16,7 +16,7 @@ function taoHop() {
   const hop = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => api, getScriptProperties: () => api }, writeGateSave: () => ({ ok: true }), logEvent: (event) => { logs.push(event); } });
   napServer(hop, ...TEP);
   hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', customerAuthorized: '1.test', activityAuthorized: '1.test' });
+  hop.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Owner', customerAuthorized: '1.test', activityAuthorized: '1.test' });
   hop.FbmSync.pushLookupDue = () => false;
   hop.FbmSync.categoryGateCheck = () => [];
   hop.FbmSync.pushEligibilityErrors = () => [];

@@ -70,8 +70,8 @@ FbmSync.preflightHashSummary = function (rows) {
  * Trả `review` là kết quả `preflightPushReview` (thiếu khi không dựng được phép xét) và `conflictPending` là số dòng xung đột chờ quyết để người điều phối ghi Log; hàm này không tự ghi.
  */
 FbmSync.preflightCandidates = function (issues, mode, scan) {
-  var candidates = [], review = null, settings = {}, settingsOk = true, conflictPending = 0, blockWrite = mode === 'write';
-  try { settings = FbmSync.scriptSettings(); } catch (settingsError) {
+  var candidates = [], review = null, settings = {}, settingsOk = true, conflictPending = 0, blockWrite = mode === 'write', current = null;
+  try { current = FbmSync.stateRead(); settings = FbmSync.scriptSettings(current); } catch (settingsError) {
     settingsOk = false;
     FbmSync.preflightIssue(issues, 'FBM_SETTINGS_READ_FAILED', 'error', 'Cài đặt', 'Không đọc được cài đặt đồng bộ FBM trước phiên: ' + String(settingsError && settingsError.message || settingsError), blockWrite);
   }
@@ -90,7 +90,7 @@ FbmSync.preflightCandidates = function (issues, mode, scan) {
     FbmSync.preflightIssue(issues, 'FBM_FAILURE_STATE_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được trạng thái lỗi đẩy trước đó: ' + String(savedFailureError && savedFailureError.message || savedFailureError), blockWrite);
   }
   var context = null;
-  try { context = FbmSync.pushReviewContext(FbmSync.stateRead(), scan, settingsOk ? settings : {}); } catch (gateError) {
+  try { context = FbmSync.pushReviewContext(current, scan, settingsOk ? settings : {}); } catch (gateError) {
     FbmSync.preflightIssue(issues, 'FBM_CATEGORY_GATE_FAILED', 'error', 'Category', 'Không dựng được ánh xạ Category FBM: ' + String(gateError && gateError.message || gateError), blockWrite);
     return { candidates: candidates, review: null, settings: settings, conflictPending: conflictPending };
   }

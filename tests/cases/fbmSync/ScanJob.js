@@ -300,7 +300,7 @@ async function chay(so) {
   // Dòng Log lỗi của phiên do sổ bước ghi lúc đóng bước; GAS thật luôn nạp sổ bước.
   napServer(noUser.flow.hop, 'fbm_sync/diagnostic/Trace.js');
   const settingsWithUser = noUser.F.scriptSettings;
-  noUser.F.scriptSettings = () => Object.assign(settingsWithUser(), { userId: '' });
+  noUser.F.scriptSettings = (state) => Object.assign(settingsWithUser(state), { userId: '' });
   const noUserEnd = await noUser.run({ afterError: () => null });
   const noUserStatus = noUser.F.statusView();
   check(so, 'Thiếu mã người dùng FBM: không gửi request đọc khách nào, phiên dừng ở lỗi FBM_USER_ID_MISSING, Sidebar và Log báo "chưa có mã người dùng"', [

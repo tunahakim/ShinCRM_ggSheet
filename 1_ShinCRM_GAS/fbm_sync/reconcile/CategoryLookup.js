@@ -25,8 +25,8 @@ FbmSync.lookupPairs = function (response) {
 };
 
 /** Ba danh mục FBM đi chung một lô: một lần gọi GAS thay cho ba (Tài liệu 09/01 "Lô request đọc độc lập"). */
-FbmSync.lookupBatchRequest = function () {
-  return { items: FbmSync.SYNC_LOOKUPS.map(function (lookup) { return FbmSync.completionRequest(lookup.controller, lookup.key); }), meta: { kind: 'batch', entity: 'category' } };
+FbmSync.lookupBatchRequest = function (cfg) {
+  return { items: FbmSync.SYNC_LOOKUPS.map(function (lookup) { return FbmSync.completionRequest(lookup.controller, lookup.key, cfg); }), meta: { kind: 'batch', entity: 'category' } };
 };
 
 /**

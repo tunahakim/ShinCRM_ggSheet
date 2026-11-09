@@ -236,14 +236,14 @@ FbmSync.activityStagesOf = function (state) { return FbmSync.runPlanOfState(stat
 
 /** Mở chặng kế trên ô lượt được truyền vào; chặng không có việc thì sang chặng sau. Trả request đầu của chặng, hoặc `null` khi lượt đã hết chặng đọc. Không ghi ô lượt: người điều phối gọi nó ghi. */
 FbmSync.activityStageNext = function (state) {
-  var stages = FbmSync.activityStagesOf(state);
+  var stages = FbmSync.activityStagesOf(state), cfg = FbmSync.scriptSettings(state), scope = FbmSync.scope();
   state.metadata = state.metadata || {};
   for (var index = FbmSync.runPlanNext(stages, state.metadata.activityStage === undefined ? -1 : state.metadata.activityStage); index >= 0; index = FbmSync.runPlanNext(stages, index)) {
     state.metadata.activityStage = index;
     var stage = stages[index], request;
-    if (stage === 'bulk') { request = FbmSync.beginActivityBulkPull(state); }
-    else if (stage === 'rotation') { request = FbmSync.activityRotationBegin(state); }
-    else { request = FbmSync.gateOpen(state, stage === 'top' ? { layer: 'top', topPos: 0, topQuiet: 0, topDeepest: 0, topPositions: [] } : { layer: 'list' }, stage === 'top' ? 'Đang quét giao dịch từ khách mới nhất xuống...' : 'Đang đọc chi tiết các khách cần đọc...'); }
+    if (stage === 'bulk') { request = FbmSync.beginActivityBulkPull(state, cfg); }
+    else if (stage === 'rotation') { request = FbmSync.activityRotationBegin(state, cfg, scope); }
+    else { request = FbmSync.gateOpen(state, stage === 'top' ? { layer: 'top', topPos: 0, topQuiet: 0, topDeepest: 0, topPositions: [] } : { layer: 'list' }, stage === 'top' ? 'Đang quét giao dịch từ khách mới nhất xuống...' : 'Đang đọc chi tiết các khách cần đọc...', cfg, scope); }
     if (request) { return request; }
   }
   state.cursor = {};
@@ -264,10 +264,10 @@ FbmSync.activityRotationRing = function (start) {
 };
 
 /** Mở chặng Vòng xoay: N khách theo lô `activityBatchCustomers` qua cửa ghi. Không có khách nào đủ điều kiện thì trả `null`, không đọc FBM. */
-FbmSync.activityRotationBegin = function (state) {
+FbmSync.activityRotationBegin = function (state, cfg, scope) {
   var start = FbmSync.detailCursorRead(), limit = Math.max(1, Number(state.detailCustomerLimit || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))), total = Math.min(limit, FbmSync.activityRotationRing(start).length);
   state.progress = { done: 0, total: total };
-  return FbmSync.gateOpen(state, { layer: 'rotation', rotation: { start: start, limit: limit, taken: 0, last: -1 } }, 'Đang đọc giao dịch của ' + total + ' khách theo vòng xoay...');
+  return FbmSync.gateOpen(state, { layer: 'rotation', rotation: { start: start, limit: limit, taken: 0, last: -1 } }, 'Đang đọc giao dịch của ' + total + ' khách theo vòng xoay...', cfg, scope);
 };
 
 /**

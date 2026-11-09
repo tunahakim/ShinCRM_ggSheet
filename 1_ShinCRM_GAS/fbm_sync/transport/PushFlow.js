@@ -79,11 +79,11 @@ FbmSync.markPushResult = function (candidate, response, operation) {
 /** Khi New Customer mất response, chỉ đọc lại theo mã tự sinh để xác định có ghi thành công hay chưa. */
 FbmSync.customerCreateRecoveryRequest = function (state, cursor) {
   var candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}) : cursor && cursor.candidate || {}, record = candidate.record || {}, taxNumber = String(record.taxNumber || '').trim();
-  if (!taxNumber || typeof FbmSync.customerGridRequest !== 'function') { return null; }
+  if (!taxNumber) { return null; }
   state.cursor = FbmSync.pushCursor(cursor, { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', candidate: FbmSync.pushCandidateForState(candidate) });
   state.message = 'Đang kiểm tra Customer vừa tạo sau khi mất phản hồi; không gửi lại lệnh ghi.';
   FbmSync.stateWrite(state);
-  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, includeScope: false, filter: ['ma_so_thue:**' + taxNumber] });
+  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, scope: null, filter: ['ma_so_thue:**' + taxNumber] }, FbmSync.scriptSettings(state));
 };
 /**
  * Đối chiếu đúng một dòng Customer sau create mất response rồi vá ID/baseline.
@@ -211,7 +211,7 @@ FbmSync.finishPushVerification = function (state, response) {
     // G12: dấu #SC chỉ cần tới lúc có ID FBM nên bỏ ngay bằng một lệnh sửa dựng từ form vừa đọc, không mở form thêm. ShinCRM đã sửa tiếp thì để lệnh đẩy kế tiếp (không mang dấu) bỏ hộ.
     if (outcome.cleaning) {
       cursor.operation = 'activity_marker_clean'; state.cursor = cursor; state.message = 'Đang bỏ dấu nhận diện của giao dịch ' + id + ' trên FBM...'; FbmSync.stateWrite(state);
-      return FbmSync.activityEditRequest(Object.assign({}, local, { fbmId: values.id }), values, gate);
+      return FbmSync.activityEditRequest(Object.assign({}, local, { fbmId: values.id }), values, gate, FbmSync.scriptSettings(state));
     }
     state.cursor = FbmSync.pushCursorNext(cursor, true); state.current = ''; state.message = 'Đã xác nhận ' + entity + ' ' + id + '.'; FbmSync.stateWrite(state);
     return FbmSync.nextPushRequest(state);
@@ -352,17 +352,18 @@ FbmSync.continueAfterPushError = function (state, cursor, failure) {
   return { ok: true, request: next ? FbmSync.nextEnvelope(next) : null, status: FbmSync.statusView() };
 };
 
-/** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. */
-FbmSync.pushConfigErrors = function (candidate, settings) {
-  var cfg = settings || FbmSync.scriptSettings();
+/** Kiểm tra các núm an toàn trước khi phát request ghi đầu tiên. `cfg` là `scriptSettings(state)` bên gọi đã đọc. */
+FbmSync.pushConfigErrors = function (candidate, cfg) {
+  if (!cfg || typeof cfg !== 'object') { throw new Error('pushConfigErrors thiếu cài đặt (cfg); người điều phối phải đọc cài đặt của lát và truyền vào.'); }
   if (!String(cfg.accountName || '').trim()) { return 'Phiên FBM chưa có tên đầy đủ của tài khoản đã xác minh; chiều đẩy đã bị dừng.'; }
   if (candidate.kind === 'create' && candidate.entity === 'customer' && (!String(cfg.customerPrefix || '').trim() || !String(cfg.customerCodeLength || '').trim())) { return 'Thiếu tiền tố hoặc độ dài mã khách FBM; không tạo Customer mới.'; }
   return '';
 };
 
-/** Kiểm tra mã ma_kh FBM tự sinh trước khi gửi lệnh lưu Customer mới. */
-FbmSync.validateAutoCustomerCode = function (code, settings) {
-  var cfg = settings || FbmSync.scriptSettings(), value = String(code || '').trim(), prefix = String(cfg.customerPrefix || '').trim(), length = Number(cfg.customerCodeLength || 0);
+/** Kiểm tra mã ma_kh FBM tự sinh trước khi gửi lệnh lưu Customer mới. `cfg` là `scriptSettings(state)` bên gọi đã đọc. */
+FbmSync.validateAutoCustomerCode = function (code, cfg) {
+  if (!cfg || typeof cfg !== 'object') { throw new Error('validateAutoCustomerCode thiếu cài đặt (cfg); người điều phối phải đọc cài đặt của lát và truyền vào.'); }
+  var value = String(code || '').trim(), prefix = String(cfg.customerPrefix || '').trim(), length = Number(cfg.customerCodeLength || 0);
   if (!prefix || !length) { return { ok: false, reason: 'Thiếu tiền tố hoặc độ dài mã khách FBM.' }; }
   if (value.indexOf(prefix) !== 0 || value.length !== length) { return { ok: false, reason: 'Mã khách FBM tự sinh không khớp tiền tố/độ dài đã cấu hình: ' + value }; }
   return { ok: true };
@@ -517,7 +518,7 @@ FbmSync.nextPushRequest = function (state) {
       flush();
       state.cursor = FbmSync.pushCursor(cursor, { kind: 'push_lookup' });
       state.message = 'Đang kiểm lại danh mục FBM trước khi đẩy tiếp...'; FbmSync.stateWrite(state);
-      return FbmSync.lookupBatchRequest();
+      return FbmSync.lookupBatchRequest(context.settings());
     }
     if (candidate.hold) {
       waiting.push(candidate); state.cursor = FbmSync.pushCursorNext(cursor, false); continue;
@@ -525,9 +526,9 @@ FbmSync.nextPushRequest = function (state) {
     flush();
     var request;
     if (entity === 'customer') {
-      request = candidate.kind === 'create' ? FbmSync.customerCreateOpenRequest() : FbmSync.customerEditOpenRequest(candidate.record.fbmId);
+      request = candidate.kind === 'create' ? FbmSync.customerCreateOpenRequest(context.settings()) : FbmSync.customerEditOpenRequest(candidate.record.fbmId, context.settings());
     } else {
-      request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, context.categoryGate) : FbmSync.activityEditOpenRequest(candidate.record.fbmId);
+      request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, context.categoryGate, context.settings()) : FbmSync.activityEditOpenRequest(candidate.record.fbmId, context.settings());
     }
     if (state.metadata.categoryCheck) { state.metadata.categoryCheck.pushed = Number(state.metadata.categoryCheck.pushed || 0) + 1; }
     state.phase = 'push'; state.current = candidate.id; state.cursor = FbmSync.pushCursor(cursor, { kind: 'push_wait', operation: request.meta.kind, entity: entity, candidate: FbmSync.pushCandidateForState(candidate) });
@@ -548,7 +549,7 @@ FbmSync.nextPushRequest = function (state) {
 
 /** Xử lý bước mở form và bước lưu của một candidate push. */
 FbmSync.continuePush = function (state, response) {
-  var cursor = state.cursor, candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate) : cursor.candidate, gate = FbmSync.stateCategoryGate(state);
+  var cursor = state.cursor, candidate = typeof FbmSync.hydratePushCandidate === 'function' ? FbmSync.hydratePushCandidate(cursor.candidate) : cursor.candidate, gate = FbmSync.stateCategoryGate(state), cfg = FbmSync.scriptSettings(state);
   if (cursor.operation === 'customer_create_recover') {
     return FbmSync.finishCustomerCreateRecovery(state, response);
   }
@@ -560,17 +561,17 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'customer_create_open') {
     var autoCode = FbmSync.extractAutoCustomerCode(response);
-    var codeCheck = FbmSync.validateAutoCustomerCode(autoCode);
+    var codeCheck = FbmSync.validateAutoCustomerCode(autoCode, cfg);
     if (!codeCheck.ok) { throw new Error(codeCheck.reason); }
     if (!autoCode) { throw new Error('Không lấy được _ma_kh_auto từ form tạo Customer.'); }
     candidate.autoCode = autoCode; cursor.candidate = typeof FbmSync.pushCandidateForState === 'function' ? FbmSync.pushCandidateForState(candidate) : candidate; cursor.operation = 'customer_create_save'; state.cursor = cursor; FbmSync.stateWrite(state);
-    return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate);
+    return FbmSync.customerCreateRequest(candidate.record, autoCode, '', gate, cfg);
   }
   if (cursor.operation === 'customer_edit_open') {
     var customerOldValues = FbmSync.requireFormFields(FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'customer'), 'customer', candidate), 'customer');
     var customerDecision = FbmSync.pushOpenDecision('customer', candidate.record, customerOldValues, gate);
     if (customerDecision.action !== 'save') { return FbmSync.finishPushOpenWithoutSave(state, cursor, candidate, customerOldValues, customerDecision, gate); }
-    var customerSaveRequest = FbmSync.customerEditRequest(candidate.record, customerOldValues, gate);
+    var customerSaveRequest = FbmSync.customerEditRequest(candidate.record, customerOldValues, gate, cfg);
     cursor.operation = 'customer_edit_save';
     delete cursor.oldValues;
     state.cursor = cursor; FbmSync.stateWrite(state);
@@ -578,12 +579,12 @@ FbmSync.continuePush = function (state, response) {
   }
   if (cursor.operation === 'activity_edit_open') {
     var activityOldValues = FbmSync.requireOpenedRecord(FbmSync.extractFormValues(response, 'activity'), 'activity', candidate);
-    var openedOwnerError = FbmSync.ownerCheck(activityOldValues, FbmSync.scriptSettings().accountName);
+    var openedOwnerError = FbmSync.ownerCheck(activityOldValues, cfg.accountName);
     if (openedOwnerError) { throw new Error(openedOwnerError); }
     FbmSync.requireFormFields(activityOldValues, 'activity');
     var activityDecision = FbmSync.pushOpenDecision('activity', candidate.record, activityOldValues, gate);
     if (activityDecision.action !== 'save') { return FbmSync.finishPushOpenWithoutSave(state, cursor, candidate, activityOldValues, activityDecision, gate); }
-    var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate);
+    var activitySaveRequest = FbmSync.activityEditRequest(candidate.record, activityOldValues, gate, cfg);
     cursor.operation = 'activity_edit_save';
     delete cursor.oldValues;
     state.cursor = cursor; FbmSync.stateWrite(state);
@@ -598,5 +599,5 @@ FbmSync.continuePush = function (state, response) {
   FbmSync.pushFailuresRemove([cursor.entity + ':' + String(candidate.id || '')]);
   cursor.operation = cursor.entity === 'customer' ? 'customer_verify' : 'activity_verify';
   state.cursor = cursor; state.message = 'Đã ghi ' + cursor.entity + ' ' + candidate.id + '; đang đọc xác nhận FBM...'; FbmSync.stateWrite(state);
-  return cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(pushed.fbmId) : FbmSync.activityEditOpenRequest(pushed.fbmId);
+  return cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(pushed.fbmId, cfg) : FbmSync.activityEditOpenRequest(pushed.fbmId, cfg);
 };

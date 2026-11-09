@@ -21,10 +21,10 @@ async function chay(so) {
   check(so, 'conflict map Activity end_date ve workDate noi bo', edges.FbmSync.conflictLocalField('activity', 'end_date'), 'workDate');
   check(so, 'conflict map Customer ten_kh ve companyName noi bo', edges.FbmSync.conflictLocalField('customer', 'ten_kh'), 'companyName');
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: () => '' }) };
-  const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' });
+  const refresh = edges.FbmSync.conflictRefreshRequest('activity', { id: 'ACT-1', fbmId: '174813' }, edges.FbmSync.scriptSettings(edges.FbmSync.stateRead()));
   check(so, 'conflict dựng request đọc lại đúng Activity FBM, không bị giới hạn bởi mốc', [refresh.meta.kind, refresh.meta.entity, refresh.body.externalKey[0].Name, refresh.body.externalKey[0].Value, refresh.body.filter], ['conflict_refresh_grid', 'activity', 'id', '174813', []]);
   edges.FbmSync.scope = () => ({ fbm: ['ALT00010'], shin: [] });
-  const customerRefresh = edges.FbmSync.conflictRefreshRequest('customer', { id: 'CUS-NEW', fbmId: 'A000080352' });
+  const customerRefresh = edges.FbmSync.conflictRefreshRequest('customer', { id: 'CUS-NEW', fbmId: 'A000080352' }, edges.FbmSync.scriptSettings(edges.FbmSync.stateRead()));
   check(so, 'FBM-052: conflict đọc lại Customer đích danh theo ID FBM, không gắn lọc mã khách thử nên khách mới tạo mã khác vẫn đọc được', customerRefresh.body.externalKey.map((key) => key.Name + '=' + key.Value), ['stt_rec_kh=A000080352', "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1=1"]);
   const khoReconcile = {};
   edges.PropertiesService = { getDocumentProperties: () => ({ getProperty: (k) => khoReconcile[k] || '', setProperty: (k, v) => { khoReconcile[k] = String(v); }, deleteProperty: (k) => { delete khoReconcile[k]; } }) };

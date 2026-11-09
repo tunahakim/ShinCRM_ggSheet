@@ -6,13 +6,13 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * Đọc hỏng thì ném lên cổng báo lỗi chung: coi sổ lỗi đẩy là rỗng sẽ đẩy lại âm thầm bản ghi từng lỗi.
  */
 FbmSync.pushReviewContext = function (state, scan, settings) {
-  var categoryGate = FbmSync.stateCategoryGate(state || FbmSync.stateRead()), cached = settings;
+  var current = state || FbmSync.stateRead(), categoryGate = FbmSync.stateCategoryGate(current), cached = settings;
   return {
     categoryGate: categoryGate,
     pushFailures: FbmSync.pushFailuresRead().hashes,
     scope: typeof FbmSync.scope === 'function' ? FbmSync.scope() : null,
     hash: function (record, entity) { return scan ? scan.hash(record, entity, categoryGate) : FbmSync.hash(record, entity, categoryGate); },
-    settings: function () { if (!cached) { cached = FbmSync.scriptSettings(); } return cached; }
+    settings: function () { if (!cached) { cached = FbmSync.scriptSettings(current); } return cached; }
   };
 };
 

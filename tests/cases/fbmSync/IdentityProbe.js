@@ -12,7 +12,7 @@ function chay(so) {
   builders.FbmSync.identityCheckBegin(identityCheckState);
   builders.FbmSync.identityCheckPage(identityCheckState, [{ stt_rec_kh: 'FBM-1' }, { stt_rec_kh: 'FBM-OTHER' }]);
   const identityCheckResult = builders.FbmSync.identityCheckFinish(identityCheckState);
-  const identityCheckRequest = builders.FbmSync.identityCheckCustomerRequest({ type: 0 });
+  const identityCheckRequest = builders.FbmSync.identityCheckCustomerRequest({ type: 0 }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
   check(so, 'Kiem tra lien ket Customer chi doc ID da lien ket va tra n/N',
     [identityCheckResult.total, identityCheckResult.matched, identityCheckResult.missing, identityCheckResult.missingSample[0].fbmId, identityCheckRequest.body.externalKey.some((item) => item.Name === 'ma_kh'), identityCheckRequest.body.sortExpression],
     [2, 1, 1, 'FBM-2', false, 'stt_rec_kh']);

@@ -36,7 +36,7 @@ const PROPERTY_GATE_FILES = ['1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js'];
  * Cửa ra không lọc theo tên trường nên đây là chỗ chặn bí mật lọt vào kết quả, Log hay thông báo: tệp mới cần biết phiên đã có chưa thì hỏi `sessionAuthorized`.
  */
 const SESSION_SECRET_FILES = [
-  '1_ShinCRM_GAS/fbm_sync/read/GridRead.js', '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js', '1_ShinCRM_GAS/fbm_sync/state/State.js',
+  '1_ShinCRM_GAS/fbm_sync/read/GridRead.js', '1_ShinCRM_GAS/fbm_sync/transport/RequestSettings.js', '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js', '1_ShinCRM_GAS/fbm_sync/state/State.js',
   '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js', '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js', '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js',
   '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
 ];
@@ -140,7 +140,6 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 14,
-    '1_ShinCRM_GAS/fbm_sync/read/GridRead.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 12,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
@@ -175,7 +174,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 27,
-    '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 23,
+    '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 22,
     '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7,
     '1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js': 1,
     '2_ShinCRM_Extension/background/service_worker.js': 11,

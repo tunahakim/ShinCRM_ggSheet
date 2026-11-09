@@ -12,17 +12,17 @@ async function chay(so) {
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };
 
-  const newCustomer = builders.FbmSync.customerCreateRequest({ companyName: 'Mới', province: 'Hà Nội', note: 'nội bộ' }, 'ALT99999', '', gate);
-  check(so, 'mở form tạo Customer dùng type 0', builders.FbmSync.customerCreateOpenRequest().body.type, 0);
+  const newCustomer = builders.FbmSync.customerCreateRequest({ companyName: 'Mới', province: 'Hà Nội', note: 'nội bộ' }, 'ALT99999', '', gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
+  check(so, 'mở form tạo Customer dùng type 0', builders.FbmSync.customerCreateOpenRequest(builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.type, 0);
   builders.FbmSync.stateRead = () => ({ session: { cookie: '', userId: '', customerAuthorized: '', activityAuthorized: '' } });
-  check(so, 'authorize chưa có session dùng placeholder do GAS chỉ dẫn', builders.FbmSync.authorizeRequest('customer').body.cookie, '{{FBM_PAYLOAD_COOKIE}}');
+  check(so, 'authorize chưa có session dùng placeholder do GAS chỉ dẫn', builders.FbmSync.authorizeRequest('customer', builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.cookie, '{{FBM_PAYLOAD_COOKIE}}');
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
   check(so, 'ghi chú nội bộ không vào memvars FBM, field ghi_chu của form gửi rỗng khi tạo mới', newCustomer.body.memvars.filter((item) => item.Name === 'ghi_chu').map((item) => [item.OldValue, item.NewValue]), [[null, '']]);
   check(so, 'SELECT Customer đổi sang mã FBM', newCustomer.body.memvars.filter((item) => item.Name === 'dc_lh_tinh')[0].NewValue, 'HNI');
-  const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate);
+  const activity = builders.FbmSync.activityCreateRequest({ id: 'ACT-9', customerFbmCode: 'ALT99999', taskType: 'Gọi', content: 'Nội dung' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
   check(so, 'Activity mới gắn dấu nhận diện', activity.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung #SC-ACT-9');
   check(so, 'Activity tạo mới dùng type lưu form', activity.body.type, 1);
-  check(so, 'Activity sửa mở form dùng type đọc form', builders.FbmSync.activityEditOpenRequest('174813').body.type, 0);
+  check(so, 'Activity sửa mở form dùng type đọc form', builders.FbmSync.activityEditOpenRequest('174813', builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.type, 0);
   check(so, 'Activity không đẩy product nội bộ lên FBM', activity.body.memvars.filter((item) => item.Name === 'ma_sp')[0].NewValue, '');
   const linkedActivity = builders.FbmSync.linkActivityCustomers([{ customerFbmId: 'A9', customerFbmCode: 'ALT-OLD', fbmHash: 'old' }], [{ id: 'KH-2', fbmId: 'A8', fbmCustomerCode: 'ALT-OLD' }, { id: 'KH-1', fbmId: 'A9', fbmCustomerCode: 'ALT99999' }], gate);
   check(so, 'Khách cha của giao dịch nối theo stt_rec_kh của khách được đọc, không theo ma_kh', [linkedActivity.records[0].customerId, linkedActivity.orphaned], ['KH-1', 0]);

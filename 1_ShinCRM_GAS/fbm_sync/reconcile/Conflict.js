@@ -60,7 +60,7 @@ FbmSync.openConflict = function () {
     FbmSync.stateWrite(state);
     return { ok: true, empty: true, remaining: 0, status: FbmSync.statusView() };
   }
-  var item = queue[0], request = FbmSync.conflictRefreshRequest(item.entity, item);
+  var item = queue[0], request = FbmSync.conflictRefreshRequest(item.entity, item, FbmSync.scriptSettings(state));
   if (!request) { return FbmSync.conflictDropUnreadable(state, item.entity, item.id, 'không có ID FBM để đọc lại'); }
   // State chỉ giữ request đọc FBM đang chờ; bản người dùng xem nằm trong DTO ở Sidebar.
   state.metadata.conflictRefresh = { entity: item.entity, id: item.id };

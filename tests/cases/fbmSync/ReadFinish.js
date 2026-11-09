@@ -18,7 +18,7 @@ function chay(so) {
     recordGateReleaseOwner: () => {},
     PropertiesService: taoPropertiesService({}),
     FbmSync: {
-      stateRead: () => readFinishState,
+      stateRead: () => readFinishState, scriptSettings: () => ({ cookie: '', customerAuthorized: '' }),
       stateWrite: (next) => { readFinishState = next; return next; },
       staleRunCheck: () => null,
       responseRequestId: () => 'read-request', requestAnswered: (state, id) => !!id && String(state.activeRequestId || '') === id,

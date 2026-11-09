@@ -18,6 +18,7 @@ const NHOM = [
   require("./fbmSync/Protocol"),
   require("./fbmSync/Contract"),
   require("./fbmSync/Builders"),
+  require("./fbmSync/RequestSettings"),
   require("./fbmSync/RunMode"),
   require("./fbmSync/ReadFinish"),
   require("./fbmSync/PullActivity"),

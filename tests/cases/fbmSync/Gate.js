@@ -61,14 +61,14 @@ async function chay(so) {
   check(so, 'Khách mới trong danh sách FBM được tạo dòng cùng giao dịch; không có lần ghi Sheet nào trước bước ghi của lô', [ghiTruocLo, moi.local.customer.length, chaCua], [0, 3, ['FBM-C1', 'FBM-C2', 'FBM-C3']]);
 
   // Request tra mã khách không lọc quyền: hàm dựng riêng, chỉ trả stt_rec_kh, chặn giá trị lạ.
-  const traLa = [F.ownerLookupRequest('activity', "1' or '1"), F.ownerLookupRequest('activity', 'A-1'), F.ownerLookupRequest('customer', "A1' or '1"), F.ownerLookupRequest('customer', '')];
-  const traDung = F.ownerLookupRequest('activity', '800001');
+  const traLa = [F.ownerLookupRequest('activity', "1' or '1", undefined, F.scriptSettings(F.stateRead())), F.ownerLookupRequest('activity', 'A-1', undefined, F.scriptSettings(F.stateRead())), F.ownerLookupRequest('customer', "A1' or '1", undefined, F.scriptSettings(F.stateRead())), F.ownerLookupRequest('customer', '', undefined, F.scriptSettings(F.stateRead()))];
+  const traDung = F.ownerLookupRequest('activity', '800001', undefined, F.scriptSettings(F.stateRead()));
   const ketQua = F.ownerLookupParse(await catLuoi(traDung.meta.keep, luoiFbm(['stt_rec_kh', 'ten_kh'], [['FBM-C9', 'Công ty người khác']], 1)));
   check(so, "Tra mã khách không lọc quyền: id `1' or '1`, id không toàn chữ số, mã khách sai định dạng hoặc rỗng không sinh request; lệnh cắt chỉ giữ stt_rec_kh nên kết quả không chứa ten_kh", [
     traLa, traDung.meta.kind, JSON.stringify(traDung.body.externalKey).indexOf('GetCustomerValidate') < 0, traDung.meta.keep, ketQua, JSON.stringify(ketQua).indexOf('Công ty người khác') < 0
   ], [[null, null, null, null], 'owner_lookup', true, { fields: ['stt_rec_kh'] }, { ok: true, sttRecs: ['FBM-C9'], sourceFields: ['stt_rec_kh', 'ten_kh'] }, true]);
   // Lượt đã lưu tên cột gốc của khách: tra mã không xin tiêu đề, Extension cắt cột theo vị trí GAS tính; số cột lệch thì báo lỗi, không đọc nhầm cột.
-  const daLuu = ['ten_kh', 'stt_rec_kh'], khongTieuDe = F.ownerLookupRequest('customer', 'FBM-C9', daLuu);
+  const daLuu = ['ten_kh', 'stt_rec_kh'], khongTieuDe = F.ownerLookupRequest('customer', 'FBM-C9', daLuu, F.scriptSettings(F.stateRead()));
   const dongKhongTieuDe = (rows) => catLuoi(khongTieuDe.meta.keep, JSON.stringify({ d: { TotalRowCount: 0, Rows: rows } }));
   check(so, 'Tra mã khách khi lượt đã lưu tên cột: request type 1 không tiêu đề, cắt stt_rec_kh theo vị trí trong tên cột gốc, dòng lệch số cột trả FBM_GRID_SHAPE_CHANGED', [
     [khongTieuDe.body.type, khongTieuDe.body.gridPageIndex], khongTieuDe.meta.keep, F.ownerLookupParse(await dongKhongTieuDe([['Công ty', 'FBM-C9']])), F.ownerLookupParse(await dongKhongTieuDe([['FBM-C9']])).code

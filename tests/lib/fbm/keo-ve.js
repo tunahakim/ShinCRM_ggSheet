@@ -3,7 +3,7 @@
  */
 
 function ngCanhKeo(F) {
-  return { categoryGate: F.stateCategoryGate(F.stateRead()), accountName: typeof F.scriptSettings === 'function' ? F.scriptSettings().accountName : '', now: Date.now() };
+  return { categoryGate: F.stateCategoryGate(F.stateRead()), accountName: typeof F.scriptSettings === 'function' ? F.scriptSettings(F.stateRead()).accountName : '', now: Date.now() };
 }
 
 /** Bản ghi ca kiểm tự dựng (không qua `customerRecord`/`activityRecord`) thì tính dấu vân như hai hàm dựng, vì cửa ghi chỉ nhận bản ghi có sẵn dấu vân. */

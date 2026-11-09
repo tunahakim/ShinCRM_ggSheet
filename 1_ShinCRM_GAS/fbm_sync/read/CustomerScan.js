@@ -4,11 +4,10 @@
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Đầu vào của chặng, đọc qua cổng chủ một lần mỗi lát. Phạm vi chỉ cần ở gói đầu của trang đầu, khi chặng bắt đầu dò mã chỉ định. */
+/** Đầu vào của chặng, đọc qua cổng chủ một lần mỗi lát. Phạm vi đọc mỗi lát vì request gói kế cần nó; kho khách đã đọc trong cùng lần gọi nên không tốn thêm lần đọc Sheet. */
 FbmSync.customerScanInputs = function (state) {
-  var cursor = state.cursor || {}, all = state.scanPack === 'all', gate = FbmSync.stateCategoryGate(state);
-  var firstChunk = Number(cursor.page || 0) === 0 && Number(cursor.next || 0) === 0;
-  return { customers: FbmSync.readLocal('customer'), gate: gate, all: all, last: all ? null : FbmSync.lastActivityIndex(gate), pullAllowed: FbmSync.pullAllowedReader('customer'), scope: firstChunk ? FbmSync.scope() : null };
+  var all = state.scanPack === 'all', gate = FbmSync.stateCategoryGate(state);
+  return { customers: FbmSync.readLocal('customer'), gate: gate, all: all, last: all ? null : FbmSync.lastActivityIndex(gate), pullAllowed: FbmSync.pullAllowedReader('customer'), scope: FbmSync.scope() };
 };
 
 /**
@@ -22,7 +21,7 @@ FbmSync.customerScanStage = function (ctx) {
   var accepted = FbmSync.scanReplyCheck(ctx.reply, cursor);
   if (accepted.duplicate) {
     logs.push({ action: 'scan_chunk_duplicate', outcome: LOG_WARN, reason: 'Extension trả lại gói quét đã nhận (gói ' + accepted.duplicate + '); xin lại gói ' + Number(cursor.next || 0) + '.' });
-    return { patch: { logs: logs }, next: FbmSync.scanJobRequest(state) };
+    return { patch: { logs: logs }, next: FbmSync.scanJobRequest(state, ctx.settings, input.scope) };
   }
   var chunk = accepted.chunk, grid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(ctx.reply));
   var firstPage = Number(cursor.page || 0) === 0 && chunk.index === 0;
@@ -43,13 +42,13 @@ FbmSync.customerScanStage = function (ctx) {
   if (firstPage) { patch.progress = { done: 0, total: scan.total }; }
   // Tên cột gốc của bảng khách (chỉ trang có tiêu đề mới có) cho trang quét kế, lô đọc chi tiết và tra mã khách của lượt cắt cột mà không xin tiêu đề lần nữa.
   if (grid.sourceFields) { state.metadata.customerFields = grid.sourceFields; patch.metadata.customerFields = grid.sourceFields; }
-  if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state) }; }
+  if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state, ctx.settings, input.scope) }; }
   if (FbmSync.customerNext(state, { length: chunk.rowCount, firstItem: cursor.pageFirst || '', lastItem: cursor.pageLast || '', lastValue: cursor.pageLastValue || [] }, scan.total)) {
     var nextPage = state.cursor;
     nextPage.page = Number(nextPage.page || 0) + 1; nextPage.attempt = 0; nextPage.restarts = 0;
     FbmSync.scanJobOpen(state, nextPage);
     patch.cursor = state.cursor;
-    return { patch: patch, next: FbmSync.scanJobRequest(state) };
+    return { patch: patch, next: FbmSync.scanJobRequest(state, ctx.settings, input.scope) };
   }
   patch.cursor = cursor;
   return FbmSync.customerScanFinish(state, scan, patch);

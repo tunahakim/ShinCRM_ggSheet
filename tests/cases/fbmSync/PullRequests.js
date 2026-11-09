@@ -8,27 +8,27 @@ function chay(so) {
   const gate = congDanhMucThu();
   builders.FbmSync.readCategoryGate = () => gate;
   builders.FbmSync.stateRead = () => ({ session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: 'auth-c', activityAuthorized: 'auth-a' } });
-  const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate);
+  const edit = builders.FbmSync.customerEditRequest({ fbmId: 'A1', companyName: 'Đổi tên' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', ten_kh: 'Cũ', dien_thoai: '0123' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
   check(so, 'Customer sửa giữ OldValue field không đụng tới',
     edit.body.memvars.filter((item) => item.Name === 'dien_thoai')[0].NewValue,
     '0123');
-  const editWithShinId = builders.FbmSync.customerEditRequest({ id: 'CUS-020059', fbmId: 'A1', website: 'Mới' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', id: 0 }, gate).body.memvars.filter((item) => item.Name === 'id')[0];
+  const editWithShinId = builders.FbmSync.customerEditRequest({ id: 'CUS-020059', fbmId: 'A1', website: 'Mới' }, { stt_rec_kh: 'A1', ma_kh: 'ALT00010', id: 0 }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.memvars.filter((item) => item.Name === 'id')[0];
   check(so, 'FBM-046: Customer sửa không gửi mã CUS-* của Sheet vào memvar id của FBM',
     [editWithShinId.OldValue, editWithShinId.NewValue],
     [0, 0]);
-  const editNote = builders.FbmSync.customerEditRequest({ fbmId: 'A1', note: 'nội bộ ShinCRM' }, { stt_rec_kh: 'A1', ghi_chu: 'Ghi chú FBM' }, gate).body.memvars.filter((item) => item.Name === 'ghi_chu')[0];
-  const editGrids = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1' }, gate).body.memvars.filter((item) => Array.isArray(item.Items)).map((item) => [item.Name, item.Modified, item.Items.length]);
+  const editNote = builders.FbmSync.customerEditRequest({ fbmId: 'A1', note: 'nội bộ ShinCRM' }, { stt_rec_kh: 'A1', ghi_chu: 'Ghi chú FBM' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.memvars.filter((item) => item.Name === 'ghi_chu')[0];
+  const editGrids = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.memvars.filter((item) => Array.isArray(item.Items)).map((item) => [item.Name, item.Modified, item.Items.length]);
   check(so, 'FBM-046: Customer lưu form kèm hai bảng con rỗng, không đổi',
     editGrids,
     [['chiasekh', false, 0], ['crlhkh', false, 0]]);
-  const editProduct = builders.FbmSync.customerEditRequest({ fbmId: 'A1', product: 'Sản phẩm ShinCRM' }, { stt_rec_kh: 'A1', ma_sp: 'F1' }, gate).body.memvars.filter((item) => item.Name === 'ma_sp')[0];
+  const editProduct = builders.FbmSync.customerEditRequest({ fbmId: 'A1', product: 'Sản phẩm ShinCRM' }, { stt_rec_kh: 'A1', ma_sp: 'F1' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.memvars.filter((item) => item.Name === 'ma_sp')[0];
   check(so, 'FBM-051: sản phẩm Customer không đồng bộ, lệnh sửa gửi lại đúng ma_sp FBM đang có, không lấy sản phẩm ShinCRM',
     editProduct.NewValue,
     'F1');
   check(so, 'FBM-046: Customer sửa giữ nguyên ghi chú FBM, không gửi ghi chú ShinCRM',
     [editNote.OldValue, editNote.NewValue],
     ['Ghi chú FBM', 'Ghi chú FBM']);
-  const emptyDate = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1', ngay_tl: '' }, gate).body.memvars.filter((item) => item.Name === 'ngay_tl')[0];
+  const emptyDate = builders.FbmSync.customerEditRequest({ fbmId: 'A1' }, { stt_rec_kh: 'A1', ngay_tl: '' }, gate, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.memvars.filter((item) => item.Name === 'ngay_tl')[0];
   check(so, 'FBM-046: field ngày trống gửi null như form FBM, không gửi chuỗi rỗng',
     [emptyDate.OldValue, emptyDate.NewValue],
     [null, null]);
@@ -36,29 +36,29 @@ function chay(so) {
     [builders.FbmSync.stateRead().session.cookie, builders.FbmSync.stateRead().session.userId],
     ['461020379855cFHN_CRM_App', '2037']);
   check(so, 'Customer grid gắn điều kiện phân quyền theo userId trong payload cookie',
-    builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey[0].Name,
+    builders.FbmSync.customerGridRequest({ type: 0, scope: null }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.externalKey[0].Name,
     "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('2037')) and 1");
   builders.FbmSync.scope = () => ({ fbm: ['ALT00010', 'ALT00011'], shin: ['CUS-020061'] });
-  const customerGridKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
+  const customerGridKeys = builders.FbmSync.customerGridRequest({ type: 0, scope: builders.FbmSync.scope() }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.externalKey;
   check(so, 'Phạm vi giới hạn: chiều lấy lọc grid Customer theo các mã FBM GAS đã đổi ra, không đưa mã ShinCRM vào điều kiện grid',
     [customerGridKeys.length, customerGridKeys[1] && customerGridKeys[1].Name, customerGridKeys[1] && customerGridKeys[1].Value],
     [2, "ma_kh in ('ALT00010','ALT00011') and 1", 1]);
   builders.FbmSync.scope = () => ({ fbm: [], shin: ['CUS-020061'] });
-  const emptyScopeKeys = builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey;
+  const emptyScopeKeys = builders.FbmSync.customerGridRequest({ type: 0, scope: builders.FbmSync.scope() }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.externalKey;
   check(so, 'Phạm vi giới hạn mà không có mã FBM nào: grid Customer lọc ra không khách nào, không rơi thành quét toàn bộ',
     [emptyScopeKeys.length, emptyScopeKeys[1] && emptyScopeKeys[1].Name],
     [2, "ma_kh in ('') and 1"]);
   builders.FbmSync.scope = () => null;
   check(so, 'Không giới hạn phạm vi: grid Customer chỉ còn điều kiện phân quyền',
-    builders.FbmSync.customerGridRequest({ type: 0 }).body.externalKey.length,
+    builders.FbmSync.customerGridRequest({ type: 0, scope: builders.FbmSync.scope() }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead())).body.externalKey.length,
     1);
   builders.FbmSync.scope = () => ({ fbm: ['ALT00010'], shin: [] });
 
-  const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 });
+  const bulkActivity = builders.FbmSync.activityBulkRequest({ type: 0 }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
   check(so, 'Request giao dịch mọi khách không gắn mốc thời gian vào externalKey hay Customer đơn lẻ',
     [bulkActivity.body.controller, bulkActivity.body.externalKey.some((item) => item.Name === 'end_date' && item.Opr === '>='), bulkActivity.body.externalKey.some((item) => item.Name === 'stt_rec')],
     ['zccrAccountTask', false, false]);
-  const activityCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 });
+  const activityCustomer = builders.FbmSync.activityGridRequest('CUS-FBM-1', { type: 0 }, builders.FbmSync.scriptSettings(builders.FbmSync.stateRead()));
   check(so, 'Request giao dịch mọi khách và từng khách không gắn bộ lọc ngày',
     [bulkActivity.body.filter, activityCustomer.body.filter, activityCustomer.body.externalKey[0].Name],
     [[], [], 'stt_rec']);

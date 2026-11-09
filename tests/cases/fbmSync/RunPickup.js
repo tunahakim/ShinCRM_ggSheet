@@ -82,7 +82,7 @@ async function chay(so) {
   const reloadRetry = notReady(notReadyPick.id);
   check(so, 'tab không sẵn sàng lần đầu (tắt tự mở tab): GAS phát lại cùng bước kèm reloadFbmPage về trang khách hàng, không kèm lệnh mở tab, hạn envelope cộng thêm một lần chờ tab', [
     reloadRetry.ok, reloadRetry.code, reloadRetry.request && reloadRetry.request.meta.kind, reloadRetry.request && reloadRetry.request.meta.reloadFbmPage, !!(reloadRetry.request && reloadRetry.request.meta.openFbmContext), reloadRetry.request && reloadRetry.request.meta.timeoutMs - notReadyPick.meta.timeoutMs
-  ], [true, 'FBM_TAB_RETRY_REQUEST_READY', notReadyPick.meta.kind, FbmSync.scriptSettings().baseUrl + FbmSync.FBM_IDENTITY_PAGE_PATH, false, FbmSync.BUDGET.tabReadyMs]);
+  ], [true, 'FBM_TAB_RETRY_REQUEST_READY', notReadyPick.meta.kind, FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH, false, FbmSync.BUDGET.tabReadyMs]);
   const twiceNotReady = notReady(reloadRetry.request.id);
   check(so, 'tải lại rồi vẫn không sẵn sàng: không tải lại mãi, lượt về lỗi FBM_TAB_NOT_READY', [twiceNotReady.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_READY']);
 

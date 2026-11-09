@@ -17,7 +17,7 @@ async function chay(so) {
   pushed.FbmSync.stateRead = () => ({ metadata: {} });
   pushed.FbmSync.pushFailuresRead = () => ({ hashes: {}, details: {} });
   // Phép xét một dòng so người phụ trách Giao dịch với tài khoản đã liên kết; hộp này không nạp tệp cấu hình.
-  pushed.FbmSync.scriptSettings = () => ({ accountName: '' });
+  pushed.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: '' });
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
   const props = { data: {} };
   const propertyApi = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); } };
@@ -139,8 +139,8 @@ async function chay(so) {
   // Hộp này kiểm hàng đợi đẩy; lịch kiểm lại danh mục có test riêng.
   const pushLookupDueImpl = push.FbmSync.pushLookupDue;
   push.FbmSync.pushLookupDue = () => false;
-  push.FbmSync.scriptSettings = () => ({ accountName: 'FBM test', baseUrl: 'https://fbm.test' });
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'FBM test' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Lê Tuấn Anh' });
   datUngVienDay(push, () => [{ kind: 'edit', id: 'C-1', position: 0, record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }]);
   push.FbmSync.categoryGateCheck = () => [];
   const pushEligibilityErrors = push.FbmSync.pushEligibilityErrors;
@@ -235,7 +235,7 @@ async function chay(so) {
   });
   check(so, 'Customer vuot gioi han do dai bi chan', push.FbmSync.pushEligibilityErrors(Object.assign({}, requiredCustomer, { companyName: 'x'.repeat(1001) }), 'customer').length > 0, true);
   check(so, 'Activity vuot gioi han noi dung bi chan', push.FbmSync.pushEligibilityErrors({ taskType: 'Goi', content: 'x'.repeat(4001), workDate: '2026-09-09' }, 'activity').length > 0, true);
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Chu tai khoan dung' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Chu tai khoan dung' });
   let ownerMismatch = '';
   try {
     push.FbmSync.continuePush({ metadata: {}, cursor: { operation: 'activity_edit_open', entity: 'activity', candidate: { entity: 'activity', id: 'ACT-OWNER', record: { id: 'ACT-OWNER', fbmId: 'A-OWNER' } } } }, { d: { Row: ['A-OWNER'], InternalValues: [{ Name: 'owner', NewValue: 'Chu tai khoan khac' }] } });
@@ -320,7 +320,7 @@ async function chay(so) {
       [['CUS-OK'], ['ACT-OK']]);
   }
   const transportState = push.FbmSync.runOpen({ phase: 'read' });
-  push.FbmSync.scriptSettings = () => ({ baseUrl: 'https://fbm.test', cookie: 'cookie' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
   const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-transport-request' }] } });
@@ -400,7 +400,7 @@ async function chay(so) {
       { kind: 'edit', id: 'H-3', record: { id: 'H-3', fbmId: 'F-H3' }, hold: hold('Thiếu Mã số thuế.') },
       { kind: 'edit', id: 'P-1', record: { id: 'P-1', fbmId: 'F-P1', fbmHash: 'h-p1' } }
     ]);
-    const savedSettings = push.FbmSync.scriptSettings; push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test' });
+    const savedSettings = push.FbmSync.scriptSettings; push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Lê Tuấn Anh' });
     push.writeGateSave = (request) => { writes.push(request.records.map((row) => row.id + ':' + row.syncStatus)); return { ok: true }; };
     push.logEvent = (event) => skipLogs.push(event);
     const batchState = push.FbmSync.runOpen({ phase: 'push' });
@@ -419,23 +419,23 @@ async function chay(so) {
   datUngVienDay(push, () => [activityCandidate]);
   push.FbmSync.categoryGateCheck = () => [];
   push.FbmSync.pushEligibilityErrors = () => [];
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Lê Tuấn Anh', baseUrl: 'https://fbm.test', activityAuthorized: '1.test' });
-  const activityEditOpen = push.FbmSync.activityEditOpenRequest('174813');
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Lê Tuấn Anh', activityAuthorized: '1.test' });
+  const activityEditOpen = push.FbmSync.activityEditOpenRequest('174813', push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit mo form dung type 0 va token activity', [activityEditOpen.body.type, activityEditOpen.body.viewPage, activityEditOpen.body.authorized, activityEditOpen.meta.kind], [0, true, '1.test', 'activity_edit_open']);
-  const activityEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, ma_cv: 'GD', details: 'Noi dung cu', start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T00:00:00Z'), fileticket: 'ticket' }, {});
+  const activityEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, ma_cv: 'GD', details: 'Noi dung cu', start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T00:00:00Z'), fileticket: 'ticket' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit gui id FBM thay vi id noi bo', activityEdit.body.memvars.filter((item) => item.Name === 'id')[0].NewValue, 174813);
   check(so, 'Activity edit khong tra Date trong ket qua GAS', JSON.stringify(activityEdit).indexOf('2026-09-09T00:00:00.000Z') < 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue || '').indexOf('/Date(') === 0 && String(activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue || '').indexOf('/Date(') === 0, true);
   check(so, 'Activity edit doi ngay Sheet thanh Date .NET dung fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, activityEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788912000000)/']);
-  const unchangedDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T16:59:59Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  const unchangedDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'Gọi', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-09T00:00:00Z'), end_date: new Date('2026-09-09T16:59:59Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit Sheet không đổi ngày thì gửi lại đúng ngày của form ở dạng 0 giờ UTC', [unchangedDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue, unchangedDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue], ['/Date(1788912000000)/', '/Date(1788912000000)/']);
-  const formDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  const formDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit gửi ngày form dạng 0 giờ UTC theo ngày VN như giao diện FBM, không gửi lại mốc FBM trả (lùi 7 tiếng)', [
     formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].OldValue,
     formDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
   ], ['/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/']);
-  const changedWorkDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-10-11' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {});
+  const changedWorkDateEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008601', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-10-11' }, { id: 174813, start_date: new Date('2026-09-08T17:00:00Z'), end_date: new Date('2026-09-09T16:59:00Z'), details: 'Noi dung cu', fileticket: 'ticket' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit doi ngay phat sinh nhung giu ngay bat dau', [
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].OldValue,
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'start_date')[0].NewValue,
@@ -443,7 +443,7 @@ async function chay(so) {
     changedWorkDateEdit.body.memvars.filter((item) => item.Name === 'end_date')[0].NewValue
   ], ['/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1788912000000)/', '/Date(1791676800000)/']);
   // Ca gặp thật 2026-10-07: form trả 22/09 01:00 VN thành 21/09 18:00 UTC; gửi lại nguyên mốc thì FBM lưu thành 21/09.
-  const shiftedEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008616', fbmId: '176920', content: 'Noi dung', taskType: 'GD', workDate: '2026-09-22' }, { id: 176920, start_date: '/Date(1790010000000)/', end_date: '/Date(1790013600000)/', details: 'Noi dung #SC-ACT-008616', fileticket: 'ticket' }, {});
+  const shiftedEdit = push.FbmSync.activityEditRequest({ id: 'ACT-008616', fbmId: '176920', content: 'Noi dung', taskType: 'GD', workDate: '2026-09-22' }, { id: 176920, start_date: '/Date(1790010000000)/', end_date: '/Date(1790013600000)/', details: 'Noi dung #SC-ACT-008616', fileticket: 'ticket' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'Activity edit không lùi ngày khi form FBM trả mốc giờ VN lùi 7 tiếng (ACT-008616)', ['start_date', 'end_date'].map((name) => shiftedEdit.body.memvars.filter((item) => item.Name === name)[0].NewValue), ['/Date(1790035200000)/', '/Date(1790035200000)/']);
   check(so, 'Activity edit gui fileticket theo OldValue/NewValue cua fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'fileticket')[0].NewValue], ['', 'ticket']);
   check(so, 'Activity edit cap nhat datetime0 moi', activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].NewValue !== activityEdit.body.memvars.filter((item) => item.Name === 'datetime0')[0].OldValue, true);
@@ -452,7 +452,7 @@ async function chay(so) {
   check(so, 'Activity edit giu OldValue rong cho field form khong co Row', [activityEdit.body.memvars.filter((item) => item.Name === 'ma_kh')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'fileupload')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'filekey')[0].OldValue], ['', '', '']);
   check(so, 'Activity edit giu null cho field nullable cua fixture', [activityEdit.body.memvars.filter((item) => item.Name === 'ngay_nhac')[0].OldValue, activityEdit.body.memvars.filter((item) => item.Name === 'ma_nhom')[0].OldValue], [null, null]);
   const activityEditState = push.FbmSync.runOpen({ phase: 'push' });
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', baseUrl: 'https://fbm.test', activityAuthorized: '1.test' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Owner', activityAuthorized: '1.test' });
   // Mốc là bản FBM đang có (FBM chưa đổi từ lần đồng bộ trước), nên bước mở form được phép lưu.
   const activityEditBase = push.FbmSync.hash({ fbmId: '174813', content: 'Noi dung cu', taskType: 'GD', workDate: '2026-09-09' }, 'activity', { map: {} });
   activityEditState.cursor = { kind: 'push_wait', operation: 'activity_edit_open', entity: 'activity', index: 0, candidate: { entity: 'activity', id: 'ACT-008600', record: { id: 'ACT-008600', fbmId: '174813', content: 'Noi dung moi', taskType: 'GD', workDate: '2026-09-09', fbmHash: activityEditBase } } };
@@ -500,13 +500,13 @@ async function chay(so) {
   const keptRow = verifyRow.slice(); keptRow[15] = 'Noi dung #SC-ACT-KEPT';
   push.FbmSync.continuePush(push.FbmSync.stateRead(), { d: { Controller: 'zccrAccountTask', Row: keptRow } });
   check(so, 'G12: lệnh sửa không mang dấu mà FBM vẫn giữ dấu thì ghi "đẩy không ăn" để không xếp dọn lại mỗi lượt', [cleanWrites.slice(-1)[0].records[0].syncStatus, /chưa bỏ được dấu #SC/.test(push.FbmSync.stateRead().message)], [push.FbmSync.SYNC_STATUS.notApplied, true]);
-  const cleanEdit = push.FbmSync.activityEditRequest({ id: 'ACT-1', fbmId: 5, content: 'Nội dung' }, { id: 5, details: 'Nội dung #SC-ACT-1' }, {});
+  const cleanEdit = push.FbmSync.activityEditRequest({ id: 'ACT-1', fbmId: 5, content: 'Nội dung' }, { id: 5, details: 'Nội dung #SC-ACT-1' }, {}, push.FbmSync.scriptSettings(push.FbmSync.stateRead()));
   check(so, 'G12: lệnh sửa Activity không gắn dấu #SC, chỉ lệnh tạo gắn', cleanEdit.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, 'Nội dung');
   const createLocal = { id: 'CUS-CREATE', fbmId: '', fbmCustomerCode: '', companyName: 'Khach tao lai', taxNumber: '0100123456', contactPerson: 'Nguoi lien he', phone: '0900000000', email: 'a@example.com', address: 'Ha Noi', province: 'HNI', website: '', leadSource: 'Source', product: '', fbmSyncPermission: push.FbmSync.pullDefaultPermission() };
   const createCandidate = { entity: 'customer', kind: 'create', id: createLocal.id, autoCode: 'ALT00020', record: createLocal };
   push.FbmSync.readLocal = (entity) => entity === 'customer' ? [createLocal] : [];
   boUngVienDay(push);
-  push.FbmSync.scriptSettings = () => ({ accountName: 'Owner', userId: '2037', baseUrl: 'https://fbm.test', cookie: 'cookie', customerAuthorized: '1.test' });
+  push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Owner', userId: '2037', cookie: 'cookie', customerAuthorized: '1.test' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.runOpen({ phase: 'push' }); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
   const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });

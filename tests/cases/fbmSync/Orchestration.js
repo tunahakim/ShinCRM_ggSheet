@@ -80,7 +80,7 @@ async function chay(so) {
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.runOpen({ phase: 'idle' }));
   const bulkStarted = orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' });
   const bulkSnapshotState = orchestration.FbmSync.stateRead();
-  const bulkSnapshotRequest = orchestration.FbmSync.activityBulkRequest({ type: 0 });
+  const bulkSnapshotRequest = orchestration.FbmSync.activityBulkRequest({ type: 0 }, orchestration.FbmSync.scriptSettings(orchestration.FbmSync.stateRead()));
    check(so, 'start bulk Activity probe User truoc request bulk; request lấy toàn bộ giao dịch không lọc ngày',
      [bulkStarted.request.meta.kind, bulkSnapshotState.scan, bulkSnapshotRequest.body.filter],
      ['session_probe', 'activity_bulk', []]);

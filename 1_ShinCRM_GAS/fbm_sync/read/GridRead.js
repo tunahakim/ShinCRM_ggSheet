@@ -4,22 +4,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 // Một trang Customer kéo theo danh sách khách chờ quét Activity nằm trong cursor; trang nhỏ để state luôn dưới trần một DocumentProperty dù tổng số khách là bao nhiêu.
 FbmSync.CUSTOMER_PAGE_ROWS = 50;
 
-/** Đọc cấu hình runtime. Cookie, token và danh tính (mã người dùng, tên đầy đủ) lấy từ phiên; danh tính chỉ có khi phiên đã xác minh (`sessionVerifiedIdentity`). */
-FbmSync.scriptSettings = function () {
-  var currentState = FbmSync.stateRead() || {}, session = currentState.session || {};
-  var identity = FbmSync.sessionVerifiedIdentity(currentState);
-  var accountSettings = settingsValues(FbmSync.SETTING_SECTIONS.account);
-  return {
-    baseUrl: 'https://fbo.com.vn:8888',
-    cookie: String(session.cookie || ''),
-    customerAuthorized: String(session.customerAuthorized || ''),
-    activityAuthorized: String(session.activityAuthorized || ''),
-    userId: identity.userId,
-    accountName: identity.accountName,
-    customerPrefix: String(accountSettings.customerPrefix || ''),
-    customerCodeLength: String(accountSettings.customerCodeLength || '')
-  };
-};
 /** Đổi chuỗi /Date(ms)/ của .NET, giữ nguyên giá trị khác. */
 FbmSync.fbDate = function (value) {
   if (value === null || value === undefined || value === '') { return ''; }
@@ -50,15 +34,18 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
   /**
    * Tạo một trang grid; type 0 lấy tiêu đề, type 1 không lấy. Mọi request lưới mang `meta.keep` (`gridKeep`) để Extension chỉ trả các cột GAS đọc: mặc định `scanFields(entity)`, bên gọi cần ít hơn thì truyền `keepFields`.
    * Trang không tiêu đề phải có `sourceFields` (tên cột gốc lấy từ một trang có tiêu đề của lượt) để tính vị trí cột.
+   * Lưới khách nhận phạm vi bằng `opt.scope`: đối tượng phạm vi hoặc `null` (không giới hạn); bỏ trống là lỗi, vì đoán thì phạm vi giới hạn có thể rơi thành quét toàn bộ.
    */
-  FbmSync.gridRequest = function (entity, options) {
-    var cfg = FbmSync.scriptSettings(), opt = options || {}, payload = gridPayload(entity, opt, cfg);
+  FbmSync.gridRequest = function (entity, options, cfg) {
+    FbmSync.requestCfg(cfg, 'gridRequest');
+    var opt = options || {}, payload = gridPayload(entity, opt, cfg);
+    if (entity === 'customer' && opt.scope === undefined) { throw FbmSync.requestSettingsMissing('gridRequest', 'phạm vi khách (scope)'); }
     if (entity === 'customer') {
       // Thiếu mã người dùng mà vẫn gửi thì FBM trả mọi khách mình đọc được, kể cả khách người khác; chỉ hàm tra mã khách không lọc quyền được bỏ điều kiện này.
       if (!/^[A-Za-z0-9_-]+$/.test(String(cfg.userId || ''))) { var missingUser = new Error('phiên FBM chưa được xác minh tài khoản nên chưa có mã người dùng; không dựng request đọc khách.'); missingUser.code = 'FBM_USER_ID_MISSING'; throw missingUser; }
       payload.externalKey.push({ Name: "stt_rec_kh in (select stt_rec_kh from dbo.zcFastBusiness$Function$GetCustomerValidate('" + cfg.userId + "')) and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false });
     }
-    var scope = entity === 'customer' && opt.includeScope !== false ? FbmSync.scope() : null;
+    var scope = entity === 'customer' ? opt.scope : null;
     if (scope) {
       // Danh sách rỗng thành điều kiện không khớp ai, để phạm vi giới hạn không bao giờ rơi thành quét toàn bộ. Mã đã qua khuôn của trường `scopeCodes` nên không có dấu nháy.
       var inList = scope.fbm.length ? scope.fbm.map(function (code) { return "'" + code + "'"; }).join(',') : "''";
@@ -68,7 +55,7 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
       payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
     }
     var keep = FbmSync.gridKeep(opt.keepFields || FbmSync.scanFields(entity), payload.type === 0, opt.sourceFields);
-    return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'grid', entity: entity, keep: keep } };
+    return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'grid', entity: entity, keep: keep } };
   };
 
   /**
@@ -76,14 +63,15 @@ FbmSync.ACTIVITY_ID_PATTERN = /^\d+$/;
    * Không kèm điều kiện quyền và phạm vi nên Extension chỉ trả cột `stt_rec_kh` và kết quả chỉ được đọc qua `ownerLookupParse`. Mã sai định dạng thì không dựng request (trả `null`), vì mã đi thẳng vào câu SQL.
    * Lượt đã có tên cột gốc của bảng khách (`sourceFields`) thì không xin tiêu đề.
    */
-  FbmSync.ownerLookupRequest = function (kind, value, sourceFields) {
+  FbmSync.ownerLookupRequest = function (kind, value, sourceFields, cfg) {
+    FbmSync.requestCfg(cfg, 'ownerLookupRequest');
     var text = String(value === null || value === undefined ? '' : value).trim(), key;
     if (kind === 'activity' && FbmSync.ACTIVITY_ID_PATTERN.test(text)) { key = { Name: "stt_rec_kh in (select stt_rec from sysevents where id = '" + text + "') and 1", Opr: '=', Value: 1, Type: 'String', Ignore: false }; }
     else if (kind === 'customer' && FbmSync.STT_REC_PATTERN.test(text)) { key = { Name: 'stt_rec_kh', Opr: '=', Value: text, Type: 'String', Ignore: false }; }
     else { return null; }
-    var withHeader = !(Array.isArray(sourceFields) && sourceFields.length), cfg = FbmSync.scriptSettings(), payload = gridPayload('customer', { type: withHeader ? 0 : 1, count: 20, gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, externalKey: [key] }, cfg);
+    var withHeader = !(Array.isArray(sourceFields) && sourceFields.length), payload = gridPayload('customer', { type: withHeader ? 0 : 1, count: 20, gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, externalKey: [key] }, cfg);
     payload.memvars = [{ Name: 'user_id', OldValue: null, NewValue: '' }];
-    return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'owner_lookup', entity: 'customer', keep: FbmSync.gridKeep(FbmSync.OWNER_LOOKUP_FIELDS, withHeader, sourceFields) } };
+    return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid, body: payload, meta: { kind: 'owner_lookup', entity: 'customer', keep: FbmSync.gridKeep(FbmSync.OWNER_LOOKUP_FIELDS, withHeader, sourceFields) } };
   };
 })();
 
@@ -102,21 +90,21 @@ FbmSync.ownerLookupParse = function (item) {
  * Phần tử đọc khách của một lô cửa ghi: lọc theo quyền như danh sách khách và theo đúng các mã của lô. Mã sai định dạng không vào câu lọc; lô không còn mã nào thì không dựng.
  * Lượt đã có tên cột gốc của bảng khách (`sourceFields`) thì không xin tiêu đề, vì tiêu đề FBM nặng hơn dữ liệu cả lô (09/01 Kiến trúc và giao thức).
  */
-FbmSync.customerBatchRequest = function (sttRecs, sourceFields) {
+FbmSync.customerBatchRequest = function (sttRecs, sourceFields, scope, cfg) {
   var list = (sttRecs || []).map(function (value) { return String(value || '').trim(); }).filter(function (value) { return FbmSync.STT_REC_PATTERN.test(value); });
   if (!list.length) { return null; }
   var withHeader = !(Array.isArray(sourceFields) && sourceFields.length);
-  var request = FbmSync.customerGridRequest({ type: withHeader ? 0 : 1, count: Math.max(20, list.length), gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, sourceFields: sourceFields, externalKey: [{ Name: 'stt_rec_kh in (' + list.map(function (value) { return "'" + value + "'"; }).join(',') + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false }] });
+  var request = FbmSync.customerGridRequest({ type: withHeader ? 0 : 1, count: Math.max(20, list.length), gridPageIndex: withHeader ? -1 : FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, sourceFields: sourceFields, scope: scope, externalKey: [{ Name: 'stt_rec_kh in (' + list.map(function (value) { return "'" + value + "'"; }).join(',') + ') and 1', Opr: '=', Value: 1, Type: 'String', Ignore: false }] }, cfg);
   request.meta.kind = 'customer_batch';
   return request;
 };
 /** Tạo request grid Customer theo cursor hiện tại. */
-FbmSync.customerGridRequest = function (options) { return FbmSync.gridRequest('customer', options); };
+FbmSync.customerGridRequest = function (options, cfg) { return FbmSync.gridRequest('customer', options, cfg); };
 /** Request User do GAS cấp để đọc định danh phiên; Extension chỉ chuyển envelope và response thô. */
-FbmSync.identityUserRequest = function () {
-  var cfg = FbmSync.scriptSettings();
+FbmSync.identityUserRequest = function (cfg) {
+  FbmSync.requestCfg(cfg, 'identityUserRequest');
   return {
-    url: cfg.baseUrl + FbmSync.ENDPOINTS.grid,
+    url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid,
     body: {
       type: 0, count: 10, language: 'v', controller: FbmSync.CONTROLLERS.user, viewId: null, childObject: false,
       lastPageIndex: -1, firstPageItem: '', lastPageItem: '', lastRowCount: 0, memvars: [], externalKey: [],
@@ -127,9 +115,9 @@ FbmSync.identityUserRequest = function () {
   };
 };
 /** Request Customer full-scan dùng riêng cho kiểm tra liên kết Spreadsheet/FBM. */
-FbmSync.identityCheckCustomerRequest = function (options) {
-  var opt = Object.assign({ includeScope: false, sortExpression: 'stt_rec_kh' }, options || {});
-  return FbmSync.customerGridRequest(opt);
+FbmSync.identityCheckCustomerRequest = function (options, cfg) {
+  var opt = Object.assign({ sortExpression: 'stt_rec_kh' }, options || {}, { scope: null });
+  return FbmSync.customerGridRequest(opt, cfg);
 };
 /** Đổi ngày YYYY-MM-DD sang định dạng filter ngày mà grid FBM nhận; ngày không hợp lệ trả rỗng. */
 FbmSync.fbmFilterDate = function (value) {
@@ -140,31 +128,31 @@ FbmSync.fbmFilterDate = function (value) {
   return match[3] + '/' + match[2] + '/' + match[1];
 };
 /** Tạo request Activity luôn gắn với stt_rec của Customer. */
-FbmSync.activityGridRequest = function (sttRec, options) {
+FbmSync.activityGridRequest = function (sttRec, options, cfg) {
   var opt = Object.assign({}, options || {}, { externalKey: [{ Name: 'stt_rec', Opr: '=', Value: String(sttRec || ''), Type: 'String', Ignore: false }] });
-  return FbmSync.gridRequest('activity', opt);
+  return FbmSync.gridRequest('activity', opt, cfg);
 };
 /** Dựng request Activity của mọi khách; không gắn một Customer cụ thể. */
-FbmSync.activityBulkRequest = function (options) {
-  return FbmSync.gridRequest('activity', Object.assign({}, options || {}));
+FbmSync.activityBulkRequest = function (options, cfg) {
+  return FbmSync.gridRequest('activity', Object.assign({}, options || {}), cfg);
 };
 
 /** Đọc đích danh một giao dịch theo FBM ID, có tiêu đề cột; dùng để hỏi giao dịch đó còn hay không. */
-FbmSync.activityByIdRequest = function (fbmId) {
-  return FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: String(fbmId || ''), Type: 'String', Ignore: false }] });
+FbmSync.activityByIdRequest = function (fbmId, cfg) {
+  return FbmSync.gridRequest('activity', { type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, externalKey: [{ Name: 'id', Opr: '=', Value: String(fbmId || ''), Type: 'String', Ignore: false }] }, cfg);
 };
 
 /** Dựng request đọc lại đúng bản ghi đang xử lý conflict trước khi chốt. */
-FbmSync.conflictRefreshRequest = function (entity, item) {
+FbmSync.conflictRefreshRequest = function (entity, item, cfg) {
   var target = item || {}, fbmId = String(target.fbmId || '').trim();
   if (!fbmId) { return null; }
   if (entity === 'customer') {
     // Đọc đích danh theo ID FBM; phạm vi thử đã xét lúc bản ghi vào hàng đợi. Gắn thêm lọc mã khách thử thì khách mới tạo (mã khác ALT00010) bị coi là không còn trên FBM (FBM-052).
-    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, includeScope: false, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] });
+    var customerRequest = FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -1, gridRefresh: false, scope: null, externalKey: [{ Name: 'stt_rec_kh', Opr: '=', Value: fbmId, Type: 'String', Ignore: false }] }, cfg);
     customerRequest.meta.kind = 'conflict_refresh_grid'; customerRequest.meta.entity = 'customer'; customerRequest.meta.conflictId = String(target.id || '');
     return customerRequest;
   }
-  var activityRequest = FbmSync.activityByIdRequest(fbmId);
+  var activityRequest = FbmSync.activityByIdRequest(fbmId, cfg);
   activityRequest.meta.kind = 'conflict_refresh_grid'; activityRequest.meta.entity = 'activity'; activityRequest.meta.conflictId = String(target.id || '');
   return activityRequest;
 };
@@ -317,9 +305,9 @@ FbmSync.rowsToRecords = function (entity, response) {
   }) };
 };
 /** Request lấy danh mục động; không gửi mã danh mục hardcode. */
-FbmSync.completionRequest = function (controller, field) {
-  var cfg = FbmSync.scriptSettings();
-  return { url: cfg.baseUrl + FbmSync.ENDPOINTS.completion, body: { type: 2, prefixText: '', count: 100, language: 'v', controller: controller, cookie: cfg.cookie, pageItemEnd: '', variable: null, valueField: null, textField: null, dataTable: null, keyFilter: '', keyValid: '1=1', check: false, orderField: null, lookupPageIndex: -1, lookupRefresh: false, filter: [], sortExpression: null, element: null }, meta: { kind: 'completion', field: field } };
+FbmSync.completionRequest = function (controller, field, cfg) {
+  FbmSync.requestCfg(cfg, 'completionRequest');
+  return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.completion, body: { type: 2, prefixText: '', count: 100, language: 'v', controller: controller, cookie: cfg.cookie, pageItemEnd: '', variable: null, valueField: null, textField: null, dataTable: null, keyFilter: '', keyValid: '1=1', check: false, orderField: null, lookupPageIndex: -1, lookupRefresh: false, filter: [], sortExpression: null, element: null }, meta: { kind: 'completion', field: field } };
 };
 
 /** Lấy token authorized do request bootstrap trả về. */

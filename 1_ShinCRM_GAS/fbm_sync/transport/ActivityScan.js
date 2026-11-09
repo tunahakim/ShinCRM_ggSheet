@@ -43,12 +43,12 @@ FbmSync.activityWindowFilters = function (cursor) {
 };
 
 /** Request FBM của việc quét giao dịch; cursor chế độ cửa sổ thì lọc theo cửa sổ, không thì lấy mọi giao dịch. */
-FbmSync.activityScanRequest = function (cursor) {
-  return FbmSync.activityBulkRequest({ type: 0, count: FbmSync.BUDGET.scanActivityRows, gridPageIndex: -1, gridRefresh: false, filter: cursor.window ? FbmSync.activityWindowFilters(cursor) : [] });
+FbmSync.activityScanRequest = function (cursor, cfg) {
+  return FbmSync.activityBulkRequest({ type: 0, count: FbmSync.BUDGET.scanActivityRows, gridPageIndex: -1, gridRefresh: false, filter: cursor.window ? FbmSync.activityWindowFilters(cursor) : [] }, cfg);
 };
 
 /** Mở lớp 1 trên ô lượt được truyền vào, không ghi ô lượt. Sheet chưa có giao dịch FBM nào thì không có gì để đối soát: trả `null`, không gọi FBM. */
-FbmSync.beginActivityBulkPull = function (state) {
+FbmSync.beginActivityBulkPull = function (state, cfg) {
   state.phase = 'pull_activity'; state.entity = 'activity';
   FbmSync.businessStepStart(state, 'pull_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
   FbmSync.businessStepStart(state, 'reconcile_activity', { mode: state.mode, scan: state.scan, entity: 'activity' });
@@ -59,7 +59,7 @@ FbmSync.beginActivityBulkPull = function (state) {
   FbmSync.seenStoreBegin(FbmSync.ACTIVITY_BULK_STORE, local);
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: false });
   state.message = 'Đang lấy toàn bộ giao dịch đã có trên ShinCRM từ FBM...';
-  return FbmSync.scanJobRequest(state);
+  return FbmSync.scanJobRequest(state, cfg, null);
 };
 
 /** Ngày sớm nhất của giao dịch đang theo dõi, làm mốc cửa sổ; không đọc được ngày nào thì lấy `today` (một cửa sổ mở hai đầu). */
@@ -75,9 +75,9 @@ FbmSync.activityWindowStart = function (local, today) {
 
 /**
  * Lấy cả khoảng thời gian là quá sức: chuyển sang cửa sổ ngày ngay trong lượt và trả request cửa sổ đầu. Đã ở chế độ cửa sổ thì không chia tiếp: ném đúng mã lỗi kèm dòng Log, không gắn cờ "không thấy".
- * Thuần trên bản sao ô lượt; `windowStart` (ngày sớm nhất của giao dịch đang theo dõi) và `now` do người gọi truyền.
+ * Thuần trên bản sao ô lượt; `windowStart` (ngày sớm nhất của giao dịch đang theo dõi), `now` và cài đặt dựng request `cfg` do người gọi truyền.
  */
-FbmSync.activityWindowPlan = function (state, code, message, windowStart, now) {
+FbmSync.activityWindowPlan = function (state, code, message, windowStart, now, cfg) {
   var cursor = state.cursor, reason = String(message || '').slice(0, 240), days = FbmSync.BUDGET.activityWindowDays;
   if (cursor.window) {
     var window = FbmSync.activityWindow(cursor), text = 'Một khoảng ' + days + ' ngày giao dịch (' + (window.from || 'đầu') + ' đến ' + (window.to || 'nay') + ') vẫn quá lớn để lấy trong một lần: ' + reason + ' Đã dừng, không gắn cờ "không thấy bên FBM".';
@@ -88,7 +88,7 @@ FbmSync.activityWindowPlan = function (state, code, message, windowStart, now) {
   }
   FbmSync.scanJobOpen(state, { entity: 'activity', page: 0, window: true, windowIndex: 0, windowStart: windowStart, today: FbmSync.dateNormalize(new Date(now)) });
   var log = { action: 'activity_bulk_window', outcome: LOG_WARN, reason: 'Lấy toàn bộ giao dịch một lần không được (' + reason + '); chuyển sang từng khoảng ' + days + ' ngày trong lượt này.', detail: { code: code, windowStart: windowStart } };
-  return { patch: { cursor: state.cursor, message: 'Lấy toàn bộ giao dịch một lần quá lớn; đang lấy theo từng khoảng ' + days + ' ngày.', logs: [log] }, next: FbmSync.scanJobRequest(state) };
+  return { patch: { cursor: state.cursor, message: 'Lấy toàn bộ giao dịch một lần quá lớn; đang lấy theo từng khoảng ' + days + ' ngày.', logs: [log] }, next: FbmSync.scanJobRequest(state, cfg, null) };
 };
 
 /** Khách cha theo Sheet của các giao dịch đã biết, theo FBM ID giao dịch; `stt_rec_kh` của khách cha là mã vào danh sách đọc. */
@@ -130,12 +130,12 @@ FbmSync.activityScanStage = function (ctx) {
   var accepted = FbmSync.scanReplyCheck(ctx.reply, cursor);
   if (accepted.duplicate) {
     logs.push({ action: 'scan_chunk_duplicate', outcome: LOG_WARN, reason: 'Extension trả lại gói quét đã nhận (gói ' + accepted.duplicate + '); xin lại gói ' + Number(cursor.next || 0) + '.' });
-    return { patch: { logs: logs }, next: FbmSync.scanJobRequest(state) };
+    return { patch: { logs: logs }, next: FbmSync.scanJobRequest(state, ctx.settings, null) };
   }
   var chunk = accepted.chunk;
   if (chunk.index === 0 && chunk.rowCount < chunk.totalRowCount) {
     var today = FbmSync.dateNormalize(new Date(ctx.now));
-    return FbmSync.activityWindowPlan(state, 'FBM_SCAN_INCOMPLETE', 'FBM chỉ trả ' + chunk.rowCount + '/' + chunk.totalRowCount + ' giao dịch trong một lần lấy.', FbmSync.activityWindowStart(input.local, today), ctx.now);
+    return FbmSync.activityWindowPlan(state, 'FBM_SCAN_INCOMPLETE', 'FBM chỉ trả ' + chunk.rowCount + '/' + chunk.totalRowCount + ' giao dịch trong một lần lấy.', FbmSync.activityWindowStart(input.local, today), ctx.now, ctx.settings);
   }
   var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(ctx.reply)), oversize = chunk.index === 0 ? chunk.oversize : [];
   var imported = FbmSync.activityBulkAccept(grid.rows, oversize, input);
@@ -144,12 +144,12 @@ FbmSync.activityScanStage = function (ctx) {
   var patch = { metadata: { scanOversize: state.metadata.scanOversize }, logs: logs };
   // Cùng một lưới giao dịch với lô đọc chi tiết: lưu tên cột gốc để lô sau xin trang không tiêu đề.
   if (grid.sourceFields) { state.metadata.activityFields = grid.sourceFields; patch.metadata.activityFields = grid.sourceFields; }
-  if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state) }; }
+  if (!FbmSync.scanJobAdvance(cursor, chunk)) { patch.cursor = cursor; return { patch: patch, next: FbmSync.scanJobRequest(state, ctx.settings, null) }; }
   if (cursor.window && !FbmSync.activityWindow(cursor).last) {
     cursor.windowIndex = Number(cursor.windowIndex || 0) + 1; cursor.page = cursor.windowIndex; cursor.attempt = 0; cursor.restarts = 0;
     FbmSync.scanJobOpen(state, cursor);
     patch.cursor = state.cursor;
-    return { patch: patch, next: FbmSync.scanJobRequest(state) };
+    return { patch: patch, next: FbmSync.scanJobRequest(state, ctx.settings, null) };
   }
   patch.cursor = cursor;
   var absent = FbmSync.activityBulkAbsent(input, cursor.window ? Number(cursor.windowIndex || 0) + 1 : 0);

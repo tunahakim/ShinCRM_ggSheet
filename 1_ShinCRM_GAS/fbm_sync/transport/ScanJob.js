@@ -25,21 +25,26 @@ FbmSync.scanJobOpen = function (state, cursor) {
 };
 
 /** Request lấy danh sách toàn bộ khách tại vị trí trang của cursor; bước "Đếm khách" dựng từ chính hàm này với `count: 1` nên hai bên luôn cùng phạm vi, cùng bộ lọc. `keep` là `{ sourceFields }` hoặc `{ keepFields }` chuyển nguyên cho `gridRequest`. */
-FbmSync.customerListRequest = function (cursor, keep) {
+FbmSync.customerListRequest = function (cursor, keep, cfg) {
   var value = cursor || {};
-  return FbmSync.customerGridRequest(Object.assign({ type: Number(value.type || 0), count: Number(value.count || FbmSync.BUDGET.scanCustomerRows), gridPageIndex: value.pageIndex === undefined ? -1 : value.pageIndex, gridPageValue: value.pageValue || null, pageItems: value.pageItems || null, gridRefresh: false }, keep || {}));
+  return FbmSync.customerGridRequest(Object.assign({ type: Number(value.type || 0), count: Number(value.count || FbmSync.BUDGET.scanCustomerRows), gridPageIndex: value.pageIndex === undefined ? -1 : value.pageIndex, gridPageValue: value.pageValue || null, pageItems: value.pageItems || null, gridRefresh: false }, keep || {}), cfg);
 };
 
 /** Dựng request cho đúng vị trí cursor: chưa nhận gói nào thì gọi FBM, đã có thì xin gói kế từ RAM của tab. */
-FbmSync.scanJobRequest = function (state) {
+/** Phạm vi khách mà việc quét của cursor cần: quét khách đọc phạm vi qua cổng chủ, quét giao dịch không giới hạn phạm vi (`null`). Dành cho người điều phối dựng lại request quét. */
+FbmSync.scanJobScope = function (cursor) {
+  return String(cursor && cursor.entity || '') === 'activity' ? null : FbmSync.scope();
+};
+/** Request của việc quét; `cfg` là `scriptSettings(state)`, `scope` là phạm vi khách khi quét khách (`null` khi không giới hạn hoặc quét giao dịch). */
+FbmSync.scanJobRequest = function (state, cfg, scope) {
   var cursor = state.cursor || {}, budget = FbmSync.BUDGET;
+  FbmSync.requestCfg(cfg, 'scanJobRequest');
   if (Number(cursor.chunkCount || 0) > 0) {
-    var cfg = FbmSync.scriptSettings();
-    return { url: cfg.baseUrl + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
+    return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
   }
   var activity = cursor.entity === 'activity';
   // Trang khách sau trang đầu không có tiêu đề: cắt theo tên cột gốc trang đầu đã lưu. Cột giữ lại đi qua `meta.keep` do `gridRequest` dựng như mọi request đọc lưới.
-  var request = activity ? FbmSync.activityScanRequest(cursor) : FbmSync.customerListRequest(cursor, { sourceFields: (state.metadata || {}).customerFields });
+  var request = activity ? FbmSync.activityScanRequest(cursor, cfg) : FbmSync.customerListRequest(cursor, { sourceFields: (state.metadata || {}).customerFields, scope: scope }, cfg);
   request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
   // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha. Extension tìm id theo vị trí trong dòng đã cắt.
   request.meta.job = { jobId: cursor.jobId, idIndex: FbmSync.scanFields(cursor.entity).indexOf(FbmSync.SCAN_ID_FIELDS[cursor.entity]), keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
@@ -76,7 +81,7 @@ FbmSync.scanOversizeLogs = function (entity, ids) {
  * Tab không còn giữ việc quét: chạy lại cả việc với lần thử mới, tối đa `scanJobRestarts` lần rồi ném `FBM_SCAN_JOB_GONE` kèm dòng Log.
  * Thuần trên bản sao ô lượt; chỉ chạy khi `transportRecoverPlan` chọn `scan_restart` (cursor đang là việc quét, mã `FBM_SCAN_JOB_GONE`).
  */
-FbmSync.scanRestartPlan = function (state, message) {
+FbmSync.scanRestartPlan = function (state, message, cfg, scope) {
   var cursor = state.cursor, restarts = Number(cursor.restarts || 0), max = FbmSync.BUDGET.scanJobRestarts;
   if (restarts >= max) {
     var text = 'Tab FBM mất việc quét ' + (restarts + 1) + ' lần liên tiếp (tab tải lại hoặc Extension khởi động lại); đã dừng. Giữ tab FBM mở và chạy lại.', gone = new Error(text);
@@ -92,7 +97,7 @@ FbmSync.scanRestartPlan = function (state, message) {
   FbmSync.scanJobOpen(state, cursor);
   patch.cursor = state.cursor;
   patch.message = 'Tab FBM mất việc quét; đang chạy lại lần ' + cursor.restarts + '/' + max + '.';
-  return { patch: patch, next: FbmSync.scanJobRequest(state) };
+  return { patch: patch, next: FbmSync.scanJobRequest(state, cfg, scope) };
 };
 
 /**
@@ -102,7 +107,8 @@ FbmSync.scanRecoverRun = function (state, plan, code, message) {
   var now = Date.now(), windows = plan === 'activity_windows';
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = now;
   var windowStart = windows ? FbmSync.activityWindowStart(FbmSync.readLocal('activity'), FbmSync.dateNormalize(new Date(now))) : '';
-  var out = FbmSync.stageCall(state, function (copy) { return windows ? FbmSync.activityWindowPlan(copy, code, message, windowStart, now) : FbmSync.scanRestartPlan(copy, message); });
+  var cfg = FbmSync.scriptSettings(state), scope = FbmSync.scanJobScope(state.cursor || {});
+  var out = FbmSync.stageCall(state, function (copy) { return windows ? FbmSync.activityWindowPlan(copy, code, message, windowStart, now, cfg) : FbmSync.scanRestartPlan(copy, message, cfg, scope); });
   var result = { ok: true, request: FbmSync.nextEnvelope(out.next), status: FbmSync.statusView() };
   if (!windows) { result.restarted = true; }
   return result;

@@ -155,9 +155,8 @@ FbmSync.applyTransportSession = function (state, response) {
 };
 
 FbmSync.loginRequest = function (credentialRef, testOnly, force) {
-  var cfg = FbmSync.scriptSettings();
   // afterLoginUrl: trang Login gốc chuyển sang ../Default.aspx sau khi đăng nhập (ch02), nên tab FBM vào đúng màn hình làm việc mặc định.
-  return { url: cfg.baseUrl + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true, force: force === true, afterLoginUrl: cfg.baseUrl + '/Default.aspx' } };
+  return { url: FbmSync.FBM_BASE_URL + '/Main/Login.aspx/Login', body: {}, meta: { kind: 'login', credentialRef: String(credentialRef || ''), testOnly: testOnly === true, force: force === true, afterLoginUrl: FbmSync.FBM_BASE_URL + '/Default.aspx' } };
 };
 
 FbmSync.loginTestRequest = function (credentialRef, expectedIdentity, options) {
@@ -253,7 +252,7 @@ FbmSync.loginAdapterContinue = function (state, cursor, response) {
   state.cursor = FbmSync.loginCursorNext(cursor, 'login_identity_authorize');
   state.message = 'Đăng nhập thành công; đang xác minh đúng tài khoản FBM...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
 };
 
 /** Dấu hiệu an toàn của response đăng nhập hoặc authorize hỏng để Log chẩn đoán được: chỉ mã HTTP, độ dài, có phải JSON và tên khóa của `d`, không bao giờ ghi giá trị. */
@@ -286,7 +285,7 @@ FbmSync.loginAuthorizeContinue = function (state, cursor, response) {
   state.cursor = FbmSync.loginCursorNext(cursor, 'login_identity_user');
   state.message = 'Đã xác thực phiên; đang đọc mã và tên tài khoản FBM...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('identity_user_grid'), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sessionSystemEnvelope('identity_user_grid', null, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
 };
 
 FbmSync.loginIdentityContinue = function (state, cursor, response) {

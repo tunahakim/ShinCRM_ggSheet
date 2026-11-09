@@ -84,8 +84,8 @@ FbmSync.categoryField = function (categoryGate, source, value) {
   return FbmSync.categoryCode(categoryGate || { map: {} }, source, value);
 };
 /** Tạo form envelope chung cho Customer/Activity. */
-FbmSync.formEnvelope = function (entity, action, values, memvars) {
-  var cfg = FbmSync.scriptSettings();
+FbmSync.formEnvelope = function (entity, action, values, memvars, cfg) {
+  FbmSync.requestCfg(cfg, 'formEnvelope');
   var controller = FbmSync.CONTROLLERS[entity];
   // FBM phân biệt rõ mở form (type 0) và lưu form (type 1); gửi type 1 với memvars rỗng có thể trả HTTP 500.
   var fields = memvars || [];
@@ -97,12 +97,12 @@ FbmSync.formEnvelope = function (entity, action, values, memvars) {
   };
 };
 /** Bootstrap token cho controller bằng viewPage:false. */
-FbmSync.authorizeRequest = function (entity) {
+FbmSync.authorizeRequest = function (entity, cfg) {
   // FBM only returns a fresh token for viewPage:false + authorized:null.
-  var cfg = FbmSync.scriptSettings();
+  FbmSync.requestCfg(cfg, 'authorizeRequest');
   var controller = FbmSync.CONTROLLERS[entity];
   return {
-    url: cfg.baseUrl + FbmSync.ENDPOINTS.dir,
+    url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir,
     body: {
       type: 0, parentType: 'Dir', firstView: false, searchMode: false, viewPage: false,
       authorized: null, action: 'New', actionID: null, values: [], vars: FbmSync.AUTH_VARS[entity], memvars: [],
@@ -113,7 +113,8 @@ FbmSync.authorizeRequest = function (entity) {
   };
 };
 /** Chuẩn hóa field Activity và tạo memvars cho New/Edit. */
-FbmSync.activityValues = function (record, oldValues, categoryGate) {
+FbmSync.activityValues = function (record, oldValues, categoryGate, cfg) {
+  FbmSync.requestCfg(cfg, 'activityValues');
   var now = new Date();
   var date = function (value) { return FbmSync.formDate(value, '/Date(' + now.getTime() + ')/'); };
   var value = function (name, aliases, fallback) { return FbmSync.fieldValue(record, oldValues, name, aliases, fallback); };
@@ -126,7 +127,7 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
     // Activity id là khóa FBM; mã nội bộ ACT-* chỉ được dùng làm marker, không được gửi vào memvars.
     id: Number(FbmSync.value(record, 'fbmId', value('id', [], 0))) || Number(oldValues && oldValues.id || 0) || 0, event_yn: value('event_yn', [], 0), text: value('text', [], ''), ma_cv: FbmSync.categoryField(categoryGate, '@CAT_CONG_VIEC', value('ma_cv', ['taskType'], '')), assigned_name: value('assigned_name', [], ''), muc_do: value('muc_do', [], '2'),
     start_date: FbmSync.activityEditDate(record, oldValues, 'start_date', ['workDate'], '/Date(' + now.getTime() + ')/'), start_time: value('start_time', [], '00:00'), end_date: FbmSync.activityEditDate(record, oldValues, 'end_date', ['workDate'], '/Date(' + now.getTime() + ')/'), end_time: value('end_time', [], '01:00'), ngay_nhac: value('ngay_nhac', [], null), gio_nhac: value('gio_nhac', [], '00:00'), full_day: value('full_day', [], false),
-    details: details, private: value('private', [], false), share_user: value('share_user', [], ''), share_group: value('share_group', [], 0), ma_nhom: value('ma_nhom', [], ''), owner: value('owner', [], FbmSync.scriptSettings().accountName), comment: FbmSync.value(record, 'comment', null), nguoi_sua: value('nguoi_sua', [], ''), datetime0: date(now), status: value('status', [], '2'), gia_bao: value('gia_bao', [], 0), gia_dt: value('gia_dt', [], 0), ma_dt: value('ma_dt', [], ''), nd_chinh_sua: value('nd_chinh_sua', [], ''), ma_sp: value('ma_sp', [], ''), ma_module: value('ma_module', [], ''), ma_kh: value('ma_kh', ['customerFbmCode'], ''), stt_rec: value('stt_rec', [], ''), type: value('type', [], '1'), user_ref: value('user_ref', [], ''), fileupload: value('fileupload', [], ''), fileticket: value('fileticket', [], ''), filekey: value('filekey', [], '')
+    details: details, private: value('private', [], false), share_user: value('share_user', [], ''), share_group: value('share_group', [], 0), ma_nhom: value('ma_nhom', [], ''), owner: value('owner', [], cfg.accountName), comment: FbmSync.value(record, 'comment', null), nguoi_sua: value('nguoi_sua', [], ''), datetime0: date(now), status: value('status', [], '2'), gia_bao: value('gia_bao', [], 0), gia_dt: value('gia_dt', [], 0), ma_dt: value('ma_dt', [], ''), nd_chinh_sua: value('nd_chinh_sua', [], ''), ma_sp: value('ma_sp', [], ''), ma_module: value('ma_module', [], ''), ma_kh: value('ma_kh', ['customerFbmCode'], ''), stt_rec: value('stt_rec', [], ''), type: value('type', [], '1'), user_ref: value('user_ref', [], ''), fileupload: value('fileupload', [], ''), fileticket: value('fileticket', [], ''), filekey: value('filekey', [], '')
   };
   var memvars = FbmSync.memvars(FbmSync.ACTIVITY_MEMVARS, values, oldValues);
   if (oldValues) {
@@ -139,14 +140,14 @@ FbmSync.activityValues = function (record, oldValues, categoryGate) {
   return { values: values, memvars: memvars };
 };
 /** Tạo request New Activity. */
-FbmSync.activityCreateRequest = function (record, categoryGate) { var form = FbmSync.activityValues(record, null, categoryGate); return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'New', [], form.memvars), meta: { kind: 'activity_create', shinId: String(FbmSync.value(record, 'shinId', FbmSync.value(record, 'id', ''))) } }; };
+FbmSync.activityCreateRequest = function (record, categoryGate, cfg) { var form = FbmSync.activityValues(record, null, categoryGate, cfg); return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'New', [], form.memvars, cfg), meta: { kind: 'activity_create', shinId: String(FbmSync.value(record, 'shinId', FbmSync.value(record, 'id', ''))) } }; };
 /** Mở form Activity để lấy OldValue trước khi sửa. */
-FbmSync.activityEditOpenRequest = function (id) { return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'Edit', [String(id)], []), meta: { kind: 'activity_edit_open', id: String(id) } }; };
+FbmSync.activityEditOpenRequest = function (id, cfg) { return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'Edit', [String(id)], [], cfg), meta: { kind: 'activity_edit_open', id: String(id) } }; };
 /** Tạo request lưu Activity sau bước mở form. */
-FbmSync.activityEditRequest = function (record, oldValues, categoryGate) {
-  var form = FbmSync.activityValues(record, oldValues, categoryGate), ticket = String(form.values.fileticket || '');
+FbmSync.activityEditRequest = function (record, oldValues, categoryGate, cfg) {
+  var form = FbmSync.activityValues(record, oldValues, categoryGate, cfg), ticket = String(form.values.fileticket || '');
   form.memvars.forEach(function (item) { if (item.Name === 'fileticket') { item.OldValue = ''; item.NewValue = ticket; } });
-  return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'Edit', [String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0)))], form.memvars), meta: { kind: 'activity_edit_save', id: String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0))) } };
+  return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('activity', 'Edit', [String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0)))], form.memvars, cfg), meta: { kind: 'activity_edit_save', id: String(FbmSync.value(record, 'fbmId', FbmSync.value(record, 'id', 0))) } };
 };
 
 /** Chuẩn hóa field Customer và tạo memvars cho New/Edit. */
@@ -158,16 +159,16 @@ FbmSync.customerValues = function (record, oldValues, categoryGate) {
   return { values: values, memvars: FbmSync.memvars(FbmSync.CUSTOMER_MEMVARS, values, oldValues).concat(grids) };
 };
 /** Tạo request lưu Customer mới sau khi có mã tự sinh. */
-FbmSync.customerCreateOpenRequest = function () {
-  var cfg = FbmSync.scriptSettings();
-  return { url: cfg.baseUrl + FbmSync.ENDPOINTS.dir, body: {
+FbmSync.customerCreateOpenRequest = function (cfg) {
+  FbmSync.requestCfg(cfg, 'customerCreateOpenRequest');
+  return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: {
     type: 0, parentType: 'Dir', firstView: false, searchMode: false, viewPage: true, authorized: cfg.customerAuthorized,
     action: 'New', actionID: null, values: [], vars: FbmSync.AUTH_VARS.customer, memvars: [], language: 'v',
     controller: FbmSync.CONTROLLERS.customer, viewId: null, gridController: FbmSync.CONTROLLERS.customer, gridViewId: null, cookie: cfg.cookie
   }, meta: { kind: 'customer_create_open' } };
 };
-FbmSync.customerCreateRequest = function (record, autoCode, sttRec, categoryGate) { var form = FbmSync.customerValues(Object.assign({}, record, { ma_kh: autoCode, stt_rec_kh: sttRec || '' }), null, categoryGate); return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'New', [sttRec || ''], form.memvars), meta: { kind: 'customer_create_save', ma_kh: autoCode, stt_rec_kh: sttRec || '' } }; };
+FbmSync.customerCreateRequest = function (record, autoCode, sttRec, categoryGate, cfg) { var form = FbmSync.customerValues(Object.assign({}, record, { ma_kh: autoCode, stt_rec_kh: sttRec || '' }), null, categoryGate); return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'New', [sttRec || ''], form.memvars, cfg), meta: { kind: 'customer_create_save', ma_kh: autoCode, stt_rec_kh: sttRec || '' } }; };
 /** Mở form Customer để lấy OldValue trước khi sửa. */
-FbmSync.customerEditOpenRequest = function (sttRec) { return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'Edit', [String(sttRec)], []), meta: { kind: 'customer_edit_open', stt_rec_kh: String(sttRec) } }; };
+FbmSync.customerEditOpenRequest = function (sttRec, cfg) { return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'Edit', [String(sttRec)], [], cfg), meta: { kind: 'customer_edit_open', stt_rec_kh: String(sttRec) } }; };
 /** Tạo request lưu Customer đã sửa. */
-FbmSync.customerEditRequest = function (record, oldValues, categoryGate) { var id = FbmSync.value(record, 'fbmId', FbmSync.value(record, 'stt_rec_kh', '')); var form = FbmSync.customerValues(record, oldValues, categoryGate); return { url: FbmSync.scriptSettings().baseUrl + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'Edit', [String(id)], form.memvars), meta: { kind: 'customer_edit_save', stt_rec_kh: String(id) } }; };
+FbmSync.customerEditRequest = function (record, oldValues, categoryGate, cfg) { var id = FbmSync.value(record, 'fbmId', FbmSync.value(record, 'stt_rec_kh', '')); var form = FbmSync.customerValues(record, oldValues, categoryGate); return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.dir, body: FbmSync.formEnvelope('customer', 'Edit', [String(id)], form.memvars, cfg), meta: { kind: 'customer_edit_save', stt_rec_kh: String(id) } }; };

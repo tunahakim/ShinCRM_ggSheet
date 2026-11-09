@@ -124,7 +124,7 @@ FbmSync.replyIntake = function (state, rawResponse) {
 FbmSync.stageRun = function (entry, state, rawResponse) {
   FbmSync.replyIntake(state, rawResponse);
   FbmSync.stateWrite(state);
-  var inputs = entry.inputs ? entry.inputs(state) : {}, out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, now: Date.now() }); });
+  var inputs = entry.inputs ? entry.inputs(state) : {}, settings = FbmSync.scriptSettings(state), out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, settings: settings, now: Date.now() }); });
   if (out.session && out.session.suspected) {
     var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);
     return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };

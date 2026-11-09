@@ -20,8 +20,8 @@ FbmSync.customerBaselineWrite = function (total) {
  * Request đếm: cùng điều kiện lọc với danh sách toàn bộ khách nên `TotalRowCount` hai bên khớp khi FBM không đổi; khác `count: 1` và không xin tiêu đề cột (chỉ cần tổng, tiêu đề nặng hơn cả response).
  * Không giữ cột nào (`keepFields` rỗng): Extension chỉ trả tổng.
  */
-FbmSync.customerCountRequest = function () {
-  var request = FbmSync.customerListRequest({ count: 1, type: 1, pageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER }, { keepFields: [] });
+FbmSync.customerCountRequest = function (scope, cfg) {
+  var request = FbmSync.customerListRequest({ count: 1, type: 1, pageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER }, { keepFields: [], scope: scope }, cfg);
   request.meta.kind = 'customer_count'; request.meta.entity = 'customer';
   return request;
 };
@@ -66,7 +66,7 @@ FbmSync.runTail = function (result) {
   state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_count' };
   state.message = 'Đang đếm lại số khách FBM...';
   FbmSync.stateWrite(state);
-  return Object.assign({}, result, { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerCountRequest()), status: FbmSync.statusView() });
+  return Object.assign({}, result, { ok: true, request: FbmSync.nextEnvelope(FbmSync.customerCountRequest(FbmSync.scope(), FbmSync.scriptSettings(state))), status: FbmSync.statusView() });
 };
 
 /** Đầu vào của chặng đếm, đọc qua cổng chủ: số khách mốc. */

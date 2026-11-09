@@ -15,7 +15,7 @@ function fbmSyncApprovePush() {
   FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan });
   FbmSync.stateWrite(state);
   logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: LOG_OK, reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } });
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
 }
 /** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
 function fbmSyncRetryPushFailures() {

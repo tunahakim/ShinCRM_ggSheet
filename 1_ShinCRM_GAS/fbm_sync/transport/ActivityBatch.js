@@ -11,14 +11,14 @@ FbmSync.GATE_LOOKUP_PREFIX = 'FBM_SYNC_GATE_LOOKUP_';
 FbmSync.ACTIVITY_PAGED_SEEN_PREFIX = 'FBM_SYNC_PAGED_SEEN_';
 
 /** Mở cửa ghi cho một chặng đọc trên ô lượt được truyền vào; trả request lô đầu hoặc `null` khi chặng không có khách nào. Không ghi ô lượt. */
-FbmSync.gateOpen = function (state, cursorFields, message) {
+FbmSync.gateOpen = function (state, cursorFields, message, cfg, scope) {
   state.phase = 'pull_activity'; state.entity = 'activity';
   ['pull_customer', 'reconcile_customer', 'pull_activity', 'reconcile_activity'].forEach(function (step) { FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: step.indexOf('customer') >= 0 ? 'customer' : 'activity' }); });
   state.cursor = Object.assign({ kind: 'activity_grid', customers: [], count: FbmSync.BUDGET.activityCustomerRows }, cursorFields || {});
   state.message = message;
   FbmSync.activityBatchPlan(state.cursor, state.metadata);
   FbmSync.activityLayerProgress(state);
-  return FbmSync.activityBatchRequest(state);
+  return FbmSync.activityBatchRequest(state, cfg, scope);
 };
 
 /** Lấp lô kế khi lô trước đã ghi xong: lớp 3, Vòng xoay hoặc danh sách đọc. Đang ở vòng tra mã thì giữ nguyên. `metadata` là của ô lượt, Vòng xoay ghi vị trí đã đọc xong vào đó. */
@@ -39,21 +39,21 @@ FbmSync.gateLookupChunk = function (cursor) {
  * Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
  * Mỗi bảng (khách, giao dịch) chỉ lấy tiêu đề khi lượt chưa có tên cột gốc của bảng đó; có rồi thì Extension cắt cột theo vị trí tính từ tên cột gốc. Chưa có tên cột gốc giao dịch thì mọi phần tử giao dịch đầu trang của lô lấy tiêu đề, vì vị trí cột phải biết lúc dựng request.
  */
-FbmSync.activityBatchRequest = function (state) {
+FbmSync.activityBatchRequest = function (state, cfg, scope) {
   var cursor = state.cursor || {}, metadata = state.metadata || {};
   if (cursor.lookup) {
-    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), metadata.customerFields); });
+    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), metadata.customerFields, cfg); });
     return lookups.length ? { items: lookups, meta: { kind: 'batch', entity: 'customer' } } : null;
   }
   var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), activityFields = Array.isArray(metadata.activityFields) && metadata.activityFields.length ? metadata.activityFields : null;
-  var customerItem = FbmSync.customerBatchRequest(customers, metadata.customerFields);
+  var customerItem = FbmSync.customerBatchRequest(customers, metadata.customerFields, scope, cfg);
   if (!customerItem) { return null; }
   var pages = cursor.pages || {};
   return { items: [customerItem].concat(customers.map(function (sttRec) {
     var page = pages[sttRec];
     // Khách đang đọc dở nhiều trang luôn đã có tên cột gốc (trang trước có hoặc đã dùng nó).
-    if (page) { return FbmSync.activityGridRequest(String(sttRec), { type: 1, count: count, gridPageIndex: page.pageIndex, gridPageValue: page.pageValue, pageItems: page.pageItems, gridRefresh: false, sourceFields: activityFields }); }
-    return FbmSync.activityGridRequest(String(sttRec), activityFields ? { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, sourceFields: activityFields } : { type: 0, count: count, gridPageIndex: -1, gridRefresh: false });
+    if (page) { return FbmSync.activityGridRequest(String(sttRec), { type: 1, count: count, gridPageIndex: page.pageIndex, gridPageValue: page.pageValue, pageItems: page.pageItems, gridRefresh: false, sourceFields: activityFields }, cfg); }
+    return FbmSync.activityGridRequest(String(sttRec), activityFields ? { type: 1, count: count, gridPageIndex: FbmSync.GRID_FIRST_PAGE_NO_HEADER, gridRefresh: false, sourceFields: activityFields } : { type: 0, count: count, gridPageIndex: -1, gridRefresh: false }, cfg);
   })), meta: { kind: 'batch', entity: 'activity' } };
 };
 
@@ -152,11 +152,11 @@ FbmSync.gateTransferCustomer = function (flags, local, customer, reason) {
 };
 
 /**
- * Đầu vào của chặng lô đọc chi tiết, đọc qua cổng chủ một lần mỗi lát: cổng danh mục và tên tài khoản cho `pullPageApply`; chỉ mục Sheet khi lô được ghi Sheet hoặc đang tra mã; phạm vi chỉ ở vòng tra mã.
+ * Đầu vào của chặng lô đọc chi tiết, đọc qua cổng chủ một lần mỗi lát: cổng danh mục cho `pullPageApply`; chỉ mục Sheet khi lô được ghi Sheet hoặc đang tra mã; phạm vi khách cho request lô kế và cho vòng tra mã. Tên tài khoản lấy ở `ctx.settings`.
  */
 FbmSync.activityGridInputs = function (state) {
   var lookup = !!(state.cursor && state.cursor.lookup), local = lookup || FbmSync.canWriteSheet(state.mode);
-  return { categoryGate: FbmSync.stateCategoryGate(state), accountName: FbmSync.scriptSettings().accountName, local: local ? FbmSync.gateLocalIndex() : null, scope: lookup ? FbmSync.scope() : null };
+  return { categoryGate: FbmSync.stateCategoryGate(state), local: local ? FbmSync.gateLocalIndex() : null, scope: FbmSync.scope() };
 };
 
 /**
@@ -169,13 +169,13 @@ FbmSync.activityGridStage = function (ctx) {
   var checks = FbmSync.activityBatchCheck(ctx.reply, chunk ? chunk.length : (cursor.customers || []).length + 1);
   if (checks.some(function (entry) { return entry.check.code === 'SESSION_SUSPECTED'; })) { return { patch: {}, session: { suspected: 'Phản hồi FBM đáng ngờ trong lô đọc chi tiết; chưa ghi gì, đang probe lại phiên.' } }; }
   state.metadata = state.metadata || {};
-  var imported = chunk ? FbmSync.gateLookupContinue(state, checks, chunk, input, logs) : FbmSync.gateReadContinue(state, checks, input, { categoryGate: input.categoryGate, accountName: input.accountName, now: ctx.now }, logs);
+  var imported = chunk ? FbmSync.gateLookupContinue(state, checks, chunk, input, logs) : FbmSync.gateReadContinue(state, checks, input, { categoryGate: input.categoryGate, accountName: ctx.settings.accountName, now: ctx.now }, logs);
   var patch = function () { return { cursor: state.cursor, counts: state.counts, metadata: state.metadata, progress: state.progress, message: state.message, logs: logs }; };
   if (!state.cursor.lookup) {
     FbmSync.activityBatchPlan(state.cursor, state.metadata);
     FbmSync.activityLayerProgress(state);
   }
-  var request = FbmSync.activityBatchRequest(state);
+  var request = FbmSync.activityBatchRequest(state, ctx.settings, input.scope);
   if (!request && state.cursor.layer === 'top') { logs.push(FbmSync.activityTopScanLine(state.cursor)); }
   return request ? { patch: patch(), next: request } : { patch: patch(), end: { imported: imported } };
 };

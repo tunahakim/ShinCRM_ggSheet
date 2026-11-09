@@ -42,13 +42,13 @@ function chay(so) {
   gate.map['@CAT_CONG_VIECGọi'] = 'GOI'; gate.valid['@CAT_CONG_VIEC'] = { 'Gọi': true, GOI: true };
   const markedIncoming = builders.FbmSync.activityRecord({ id: 'FBM-9', ma_kh: 'ALT99999', end_date: '/Date(1757386800000)/', ten_cv: 'Gọi', details: 'Nội dung #SC-ACT-9', owner: 'Chủ tài khoản' }, gate, { sttRec: 'S9' });
   let markedWrite = null;
-  builders.FbmSync.scriptSettings = () => ({ accountName: 'Chủ tài khoản' });
+  builders.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Chủ tài khoản' });
   builders.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'KH-1', fbmId: 'S9', fbmCustomerCode: 'ALT99999' }] : [{ id: 'ACT-9', fbmId: 'FBM-9', customerId: 'KH-1', content: 'Nội dung', taskType: 'Gọi', workDate: '/Date(1757386800000)/', enteredBy: 'Chủ tài khoản', fbmHash: markedIncoming.fbmHash, syncStatus: builders.FbmSync.SYNC_STATUS.synced }];
   builders.writeGateSave = (request) => { markedWrite = request; return { ok: true }; };
   keoVe(builders.FbmSync, 'activity', [Object.assign({}, markedIncoming)]);
   const ownMarked = markedWrite && markedWrite.records[0].syncStatus;
   markedWrite = null;
-  builders.FbmSync.scriptSettings = () => ({ accountName: 'Đồng nghiệp' });
+  builders.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Đồng nghiệp' });
   keoVe(builders.FbmSync, 'activity', [Object.assign({}, markedIncoming)]);
   check(so, 'G12: lượt kéo xếp "chờ đối soát" cho giao dịch của mình còn dấu #SC trên FBM, không đụng giao dịch tài khoản khác',
     [ownMarked, markedWrite && markedWrite.records[0].syncStatus],

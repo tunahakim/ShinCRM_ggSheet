@@ -12,7 +12,7 @@ async function chay(so) {
   builders.FbmSync.stateRead = () => bulkState;
   builders.FbmSync.stateWrite = (next) => { bulkState = next; return next; };
   builders.FbmSync.readLocal = () => [{ id: 'ACT-000001', fbmId: 'F-LOCAL', recordStatus: 'active' }];
-  const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState);
+  const bulkStart = builders.FbmSync.beginActivityBulkPull(bulkState, builders.FbmSync.scriptSettings(bulkState));
   check(so, 'Lấy toàn bộ giao dịch mở một việc quét chỉ giữ FBM ID đã có trên Sheet, có trần cỡ response, không gắn Customer; cursor không mang danh sách id',
     [bulkState.cursor.kind, bulkState.cursor.entity, bulkStart.meta.kind, bulkStart.meta.job.keepIds, bulkStart.meta.job.maxResponseBytes, bulkStart.body.externalKey.some((item) => item.Name === 'stt_rec'), JSON.stringify(bulkState.cursor).indexOf('F-LOCAL')],
     ['scan_job', 'activity', 'scan_job', ['F-LOCAL'], 64 * 1024 * 1024, false, -1]);

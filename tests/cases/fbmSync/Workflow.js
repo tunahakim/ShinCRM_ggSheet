@@ -210,13 +210,13 @@ async function chay(so) {
   const legacyAccount = workflowGas();
   legacyAccount.hop.FbmSync.configValue = (name) => name === 'FBM_ACCOUNT_NAME' ? 'Tên còn sót trong Config' : '';
   legacyAccount.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
-  const ownerBeforeVerify = legacyAccount.hop.FbmSync.scriptSettings().accountName;
+  const ownerBeforeVerify = legacyAccount.hop.FbmSync.scriptSettings(legacyAccount.hop.FbmSync.stateRead()).accountName;
   const verifiedOwner = legacyAccount.hop.FbmSync.stateRead();
   legacyAccount.hop.FbmSync.sessionIdentityVerify(verifiedOwner, { userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
   legacyAccount.hop.FbmSync.stateWrite(verifiedOwner);
   check(so, 'owner lay tu phien da xac minh (chua xac minh thi rong), khong lay tu lien ket hay Config cu; Config cu khong the rebind hay khoa phien', [
     ownerBeforeVerify,
-    legacyAccount.hop.FbmSync.scriptSettings().accountName,
+    legacyAccount.hop.FbmSync.scriptSettings(legacyAccount.hop.FbmSync.stateRead()).accountName,
     legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' }).status,
     legacyAccount.hop.FbmSync.identityStatus({ userId: '2037', username: 'ANHLT', accountName: 'Tên còn sót trong Config' }).status
   ], ['', 'Lê Tuấn Anh', 'BOUND', 'REBIND_REQUIRED']);
@@ -770,7 +770,7 @@ async function chay(so) {
   waitFlow.hop.FbmSync.start({ mode: 'read' });
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
   waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
-  const gapGrid = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
+  const gapGrid = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const gapChunk = waitFlow.hop.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
   const gapBudget = waitFlow.hop.FbmSync.BUDGET;
@@ -782,11 +782,11 @@ async function chay(so) {
   check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.ok, gapTooLong.ok], [false, false]);
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
   waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
-  const gapNone = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false }));
+  const gapNone = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const truocCap = Date.now();
-  const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false })), meta: { kind: 'batch', entity: 'activity' } });
+  const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
     loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
@@ -798,11 +798,11 @@ async function chay(so) {
   deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
   // FBM-031: hạn của request vừa nhận đã qua nhưng lời gọi GAS mới bắt đầu thì vẫn cấp request kế; trần tính từ lúc lời gọi bắt đầu.
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now());
-  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }));
+  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   check(so, 'trần thời gian GAS tính từ lúc lời gọi bắt đầu, không từ hạn request vừa nhận', [!!notBlockedByRequestDeadline, deadlineFlow.hop.FbmSync.stateRead().lastFailureCode], [true, '']);
   deadlineFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now() - deadlineFlow.hop.FbmSync.BUDGET.gasSoftMs - 1);
-  const blockedByDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }));
+  const blockedByDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
   deadlineFlow.hop.FbmSync.logStatus(deadlineStatus, 'runtime_limit');
@@ -1346,7 +1346,7 @@ async function chay(so) {
   };
   const conTrang = soBuoc('read');
   const hetKhach = soBuoc('read');
-  hetKhach.F.gateOpen(hetKhach.st, { layer: 'list' }, 'Đang đọc chi tiết');
+  hetKhach.F.gateOpen(hetKhach.st, { layer: 'list' }, 'Đang đọc chi tiết', hetKhach.F.scriptSettings(hetKhach.st), null);
   hetKhach.F.recordIssueAdd('pull', 'activity', 'synced', 'ACT-1', 'Nối lại mã khách', 'warn');
   hetKhach.st.phase = 'done'; hetKhach.F.stateWrite(hetKhach.st);
   const viTri = (log, action) => log.indexOf(action);

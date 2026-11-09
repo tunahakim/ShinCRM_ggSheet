@@ -77,6 +77,10 @@ function capTruocTep(hopCat, duongDan, duongDans) {
   if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.documentPropertyJson === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
     vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
   }
+  // Hàm dựng lưới cần cổng cài đặt dựng request (tách khỏi GridRead); hộp nạp GridRead mà không kê tệp đó thì nạp kèm.
+  if (duongDan === 'fbm_sync/read/GridRead.js' && duongDans.indexOf('fbm_sync/transport/RequestSettings.js') < 0 && !(hopCat.FbmSync && hopCat.FbmSync.requestCfg)) {
+    vm.runInContext(docTep('fbm_sync/transport/RequestSettings.js'), hopCat, { filename: 'fbm_sync/transport/RequestSettings.js' });
+  }
 }
 
 /** Sau khi chạy một tệp: ngầm định kéo cho mọi tệp đồng bộ, danh tính phiên thử cho tệp dựng request. */

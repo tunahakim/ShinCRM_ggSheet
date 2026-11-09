@@ -19,7 +19,7 @@ async function chay(so) {
     [/Chưa có tên tài khoản/.test(F.ownerCheck({ owner: '' }, '')), /Chưa có tên tài khoản/.test(F.ownerCheck({ owner: 'A' }, '  ')), F.ownerCheck({ owner: '' }, 'A'), F.ownerCheck({ owner: ' A ' }, 'A'), /khác tài khoản/.test(F.ownerCheck({ owner: 'B' }, 'A'))],
     [true, true, '', '', true]);
 
-  hop.FbmSync.scriptSettings = () => ({ accountName: 'Owner đúng', customerPrefix: 'KH', customerCodeLength: '5' });
+  hop.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Owner đúng', customerPrefix: 'KH', customerCodeLength: '5' });
   hop.FbmSync.scope = () => null;
   hop.FbmSync.readCategoryGate = () => ({ map: { '@CAT_CONG_VIEC\u001fGọi điện': 'GD', '@CAT_TINH_THANH\u001fHà Nội': '01', '@CAT_NGUON_KH\u001fWeb': 'WEB' }, valid: null });
   const cp = 'Cho phép';
@@ -35,7 +35,7 @@ async function chay(so) {
   const giaoDich = [gd('ACT-1', 'CUS-A'), gd('ACT-2', 'CUS-B'), gd('ACT-3', 'CUS-A', { owner: 'Người khác' }), gd('ACT-4', 'CUS-A', { taskType: 'Lạ' }), gd('ACT-5', 'CUS-D')];
   hop.FbmSync.readLocal = (entity) => entity === 'customer' ? khach : giaoDich;
 
-  const scan = F.localScan(), context = F.pushReviewContext(F.stateRead(), scan, F.scriptSettings());
+  const scan = F.localScan(), context = F.pushReviewContext(F.stateRead(), scan, F.scriptSettings(F.stateRead()));
   const xet = (entity, id) => { const record = scan.records(entity).find((r) => r.id === id); const parent = entity === 'activity' ? khach.find((c) => c.id === record.customerId) : null; const v = F.pushEligible(entity, record, parent, context); return v.eligible ? v.kind : v.reason; };
   check(so, 'pushEligible: mỗi dòng một kết luận theo thứ tự lý do cố định (tạm, xung đột, quyền, cha chưa sẵn sàng...)',
     [xet('customer', 'CUS-A'), xet('customer', 'CUS-B'), xet('customer', 'CUS-C'), xet('customer', 'CUS-D'), xet('customer', 'TMP-E'), xet('activity', 'ACT-1'), xet('activity', 'ACT-2'), xet('activity', 'ACT-5')],

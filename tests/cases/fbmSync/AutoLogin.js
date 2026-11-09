@@ -107,7 +107,7 @@ async function chay(so) {
   ], [true, 'session_probe', '', 'login']);
   let identityUserRequests = 0;
   const identityUserBuilder = heartbeat.FbmSync.identityUserRequest;
-  heartbeat.FbmSync.identityUserRequest = function () { identityUserRequests += 1; return identityUserBuilder(); };
+  heartbeat.FbmSync.identityUserRequest = function (cfg) { identityUserRequests += 1; return identityUserBuilder(cfg); };
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: false, identitySessionId: '', sessionId: '' } });
   const probeStart = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
   const probeResponse = heartbeat.FbmSync.continue({ ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: probeStart.request.id }] } });
