@@ -256,6 +256,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\ActivityBatch.js Lô giao dịch nhiều khách một lần gọi GAS: kế hoạch lô trong cursor, vị trí trang ở khóa riêng, lỗi từng khách.
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
+    ├── control\PushCommands.js  Hai lệnh của chiều đẩy không mở lượt: chấp thuận tập chờ đẩy theo dấu tập (`approve_push`) và mở lại nhóm bản ghi lỗi đẩy (`retry_push_failures`).
     ├── control\SettingsCommands.js Lệnh cài đặt của cửa lệnh (`save_settings`, `set_master`, `set_background`, `reset_settings`) và gói cài đặt cho màn đồng bộ, đều đi qua cổng cài đặt chung.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\RequestWatch.js     Canh request GAS phát cho Extension trong một lời gọi: request đang chờ, đã trả lời, nộp lặp; request quá hạn bị bỏ thì ghi phát hiện, bước đóng lời gọi của phạm vi `fbm_sync` ghi Log.
@@ -337,7 +338,8 @@ tests\
 │   │   ├── tab-fbm-gia.js        Tab FBM giả chạy executor thật của Extension (`tabGia`), cùng hàm dựng response lưới và trả lời giả cho phần tử cửa ghi.
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
-│   │   └── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
+│   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
+│   │   └── hang-day.js           Hộp thử chiều đẩy: hộp GAS với Sheet giả trong RAM và hàng đợi đẩy dựng sẵn đầu chặng; ma trận production và ca cổng chặng đẩy cùng dựng từ đây.
 │   ├── view\
 │   │   └── nen-view.js           Hoàn cảnh chung cho ca kiểm sheet quản trị: hộp có tệp server/view, sheet !Lead, hai khách và ba giao dịch mẫu.
 │   └── quet\                     Công cụ quét mã nguồn.
@@ -480,6 +482,7 @@ tests\
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
     │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
+    │   ├── PushGate.js            Cổng chặng đẩy: phép quyết bỏ chặng, ngưỡng chấp thuận và dấu tập; lượt nền khớp dấu không đọc Sheet; chạm ngưỡng thì chờ lời duyệt gắn đúng dấu tập.
     │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.
     │   ├── lib.js                 Điều phối phép kiểm cho chính khung test ở tests/lib.
