@@ -44,7 +44,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/fbm_sync/read/GridRead.js', 319, 27386, 'B8', 'đọc lưới FBM; thêm lệnh cắt cột meta.keep và một cửa đọc lưới đã cắt (gridKeep, gridPicked); cài đặt dựng request đã tách sang RequestSettings.js'],
   ['1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js', 243, 22027, 'B9', 'một việc'],
   ['1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js', 305, 25395, 'B11', 'liên kết tài khoản, kiểm danh tính, dựng record; hai hàm dựng tự tính dấu vân một lần trên bản ghi'],
-  ['1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js', 269, 23252, 'B8', 'một cửa ghi kéo về pullPageApply, nhận ngữ cảnh lời gọi qua tham số; dòng đăng ký người gác xóa hẳn phải nằm cùng tệp với hàm gác'],
+  ['1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js', 270, 23806, 'B8', 'một cửa ghi kéo về pullPageApply, nhận ngữ cảnh lời gọi qua tham số; dòng đăng ký người gác xóa hẳn phải nằm cùng tệp với hàm gác'],
   ['1_ShinCRM_GAS/fbm_sync/report/Report.js', 236, 22255, 'B12', 'nhãn, statusView, ghi issue, preview, bản xem máy chạy nền'],
   ['1_ShinCRM_GAS/fbm_sync/state/State.js', 420, 35250, 'B4', 'ô lượt, sổ đã thấy, kho đẩy, vòng đời lượt; thêm trường activeRequestReplay vào ô lượt mặc định'],
   ['1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js', 286, 23447, 'B8', 'một việc (lô giao dịch); chặng theo hợp đồng chung trả dòng Log thay vì tự ghi'],

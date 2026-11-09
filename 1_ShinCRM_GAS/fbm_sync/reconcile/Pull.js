@@ -51,10 +51,11 @@ FbmSync.compareFbmId = function (a, b) {
 
 /**
  * Kéo về một lô bản ghi FBM: quyết từng bản ghi và ghi Sheet trong một lần cầm khóa; chỉ ghi bản ghi mới hoặc đổi an toàn, không bao giờ xóa, không ghi đè thay đổi cục bộ (chỉ đánh dấu chờ đẩy hoặc xung đột).
- * `ctx`: `{ categoryGate, now, accountName }` do người điều phối truyền; hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `fbmHash` (dấu vân FBM tính một lần lúc dựng).
+ * `ctx`: `{ categoryGate, now, accountName, pending }` do người điều phối truyền; `pending` là sổ chờ đẩy (`entity:id` → mục chờ xác nhận) đọc một lần mỗi lô, thiếu thì ném `PULL_PENDING_MISSING` (đọc sổ bên trong hàm quyết là đọc kho giữa lúc quyết). Hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `fbmHash` (dấu vân FBM tính một lần lúc dựng).
  * Không ghi ô lượt và không xóa mục chờ xác nhận: khách bị chặn danh tính (`identityBlocks`) và mục chờ xác nhận đã khớp (`pendingClears`) trả về cho người điều phối.
  */
 FbmSync.pullPageApply = function (entity, records, ctx) {
+  if (!ctx || !ctx.pending || typeof ctx.pending !== 'object') { var missing = new Error('Kéo về ' + entity + ' thiếu sổ chờ đẩy (ctx.pending); người điều phối lô phải đọc pendingPushesRead một lần rồi truyền vào.'); missing.code = 'PULL_PENDING_MISSING'; throw missing; }
   if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, conflictsKept: 0, conflictsCleared: 0, skipped: 0, sheetWriteBatches: 0, identityBlocks: [], pendingClears: [] }; }
   var unhashed = records.filter(function (record) { return !String(record && record.fbmHash || ''); })[0];
   if (unhashed) { var error = new Error('Bản ghi ' + entity + ' FBM ' + String(unhashed.fbmId || '') + ' chưa có dấu vân FBM; chỉ bản ghi dựng qua customerRecord/activityRecord mới được kéo về.'); error.code = 'PULL_RECORD_UNHASHED'; throw error; }
@@ -173,7 +174,7 @@ FbmSync.pullPageApply = function (entity, records, ctx) {
       return;
     }
     if (String(current.syncStatus || '') === FbmSync.SYNC_STATUS.pushed) {
-      var previousHash = String(current.fbmHash || '').trim(), pendingItem = FbmSync.pendingPushGet(entity, current.id), pendingHash = String(pendingItem && (pendingItem.hSHIN || pendingItem.hash) || '').trim();
+      var previousHash = String(current.fbmHash || '').trim(), pendingItem = ctx.pending[entity + ':' + String(current.id || '')] || null, pendingHash = String(pendingItem && (pendingItem.hSHIN || pendingItem.hash) || '').trim();
       if (pendingHash && incomingHash === pendingHash) {
         pendingClears.push({ entity: entity, id: current.id });
         var confirmedStatus = localHash === pendingHash ? FbmSync.SYNC_STATUS.synced : FbmSync.SYNC_STATUS.pending;

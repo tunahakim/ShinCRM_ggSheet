@@ -20,6 +20,7 @@ const NHOM = [
   require("./fbmSync/Builders"),
   require("./fbmSync/RequestSettings"),
   require("./fbmSync/BatchDecide"),
+  require("./fbmSync/PullApplyInput"),
   require("./fbmSync/RunMode"),
   require("./fbmSync/ReadFinish"),
   require("./fbmSync/PullActivity"),

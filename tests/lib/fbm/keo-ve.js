@@ -14,7 +14,7 @@ function coDauVan(F, entity, records, ctx) {
 /** Như `pullPageApply` cộng phần người điều phối xóa mục chờ xác nhận. */
 function keoVe(F, entity, records) {
   const ctx = ngCanhKeo(F);
-  const result = F.pullPageApply(entity, coDauVan(F, entity, records, ctx), ctx);
+  const result = F.pullPageApply(entity, coDauVan(F, entity, records, ctx), Object.assign({ pending: typeof F.pendingPushesRead === 'function' ? F.pendingPushesRead() : {} }, ctx));
   if (typeof F.pendingPushClear === 'function') { result.pendingClears.forEach((item) => F.pendingPushClear(item.entity, item.id)); }
   return result;
 }
