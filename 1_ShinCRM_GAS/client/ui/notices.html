@@ -2,7 +2,7 @@
 /*
  * Thông báo của Sidebar: nơi duy nhất giữ các việc người dùng cần biết đang còn (nạp lại bị hoãn vì form đang mở, lỗi sheet quản trị đang đứng, Extension không chạy, sheet quản trị chưa cập nhật), dòng báo ở đáy và màn thông báo dùng chung.
  * Nguồn nào cũng chỉ gọi `noticeSet(key, notice)`; thứ tự, chữ ở dòng đáy và lúc thân Sidebar chuyển sang màn thông báo đều quyết ở đây. Dòng đáy nhường chỗ cho dải hoàn tác trong lúc đếm ngược và ẩn khi màn đồng bộ FBM giữ khung.
- * Thông báo của GAS (cổng thông báo, Tài liệu 10 Phần 8) đổ vào đây qua `noticeServerApply` dưới khóa `server:<key>`: Sidebar là một adapter đọc danh sách đó, màu theo `level`, nút ✕ gọi `shinNoticeDismiss`.
+ * Thông báo của GAS (cổng thông báo, Tài liệu 10 Phần 8) đổ vào đây qua `noticeServerApply` dưới khóa `server:<key>`: Sidebar là một adapter đọc danh sách đó, màu theo `level`, mỗi `actions` thành một nút gọi `ACTIONS[action]` kèm `value`, nút ✕ gọi `shinNoticeDismiss`.
  * `notice`: `{ line, blocks, button, takeover }` — `line` là chữ ở dòng đáy; `blocks` là các khối của màn thông báo (xem `client/schema/status/notices.html`); `button` (`{ label, action }`) là nút ở dòng đáy; `takeover` là việc thay hẳn thân Sidebar ngay khi xuất hiện.
  */
 
@@ -80,7 +80,8 @@ function noticeServerApply(list) {
   list.forEach(function (item) {
     var key = NOTICE_SERVER_PREFIX + item.key;
     keep[key] = true;
-    var block = { variant: item.level === 'info' ? 'normal' : item.level, title: item.title, lines: item.lines || [], hint: item.hint || '', button: { label: 'Đóng ✕', action: 'noticeDismiss', value: item.key } };
+    var buttons = (item.actions || []).map(function (act) { return { label: act.label, action: act.action, value: act.value || '' }; }).concat([{ label: 'Đóng ✕', action: 'noticeDismiss', value: item.key }]);
+    var block = { variant: item.level === 'info' ? 'normal' : item.level, title: item.title, lines: item.lines || [], hint: item.hint || '', buttons: buttons };
     var next = { level: item.level, line: item.title, blocks: [block] };
     var previous = NOTICES[key];
     if (previous && JSON.stringify(previous) === JSON.stringify(next)) { return; }

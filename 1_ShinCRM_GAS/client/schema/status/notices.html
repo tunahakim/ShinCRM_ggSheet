@@ -1,7 +1,7 @@
 <script>
 /*
  * Màn thông báo dùng chung: mỗi việc cần người dùng biết là một khối có tiêu đề và phần chi tiết, nhiều việc cùng lúc thì xếp nhiều khối theo thứ tự bên gọi đưa vào.
- * Khối chỉ mang dữ liệu: `title`, `lines`, `hint`, mức `variant` (`error`, `warning`), và tùy chọn `table` (bảng sheet của ngân sách ô) hoặc `button` (`{ label, action, busy, value }`; `value` thành `data-value` cho hành động đọc).
+ * Khối chỉ mang dữ liệu: `title`, `lines`, `hint`, mức `variant` (`error`, `warning`), và tùy chọn `table` (bảng sheet của ngân sách ô) hoặc nút: `button` (một nút) hay `buttons` (nhiều nút cùng một hàng), mỗi nút `{ label, action, busy, value }`; `value` thành `data-value` cho hành động đọc.
  */
 STATUS_SCHEMA.notices = function (model) {
   var screen = statusSchemaRoot(model.infoText, (model.blocks || []).map(statusSchemaNoticeBlock), NOTICE_SCREEN_ROOT_ID);
@@ -14,12 +14,15 @@ function statusSchemaNoticeBlock(block) {
   (block.lines || []).forEach(function (line) { elements.push(statusSchemaText(line)); });
   if (block.table) { elements.push(statusSchemaTable(block.table)); }
   if (block.hint) { elements.push(statusSchemaText(block.hint)); }
-  if (block.button) {
-    var data = block.button.busy || block.button.value ? {} : undefined;
-    if (block.button.busy) { data.busy = block.button.busy; }
-    if (block.button.value) { data.value = block.button.value; }
-    elements.push(Row({ elements: [Button({ label: block.button.label, action: block.button.action, data: data })] }));
-  }
+  var buttons = block.buttons || (block.button ? [block.button] : []);
+  if (buttons.length) { elements.push(Row({ elements: buttons.map(statusSchemaNoticeButton) })); }
   return statusSchemaBox(elements, block.variant || 'error');
+}
+
+function statusSchemaNoticeButton(button) {
+  var data = button.busy || button.value ? {} : undefined;
+  if (button.busy) { data.busy = button.busy; }
+  if (button.value) { data.value = button.value; }
+  return Button({ label: button.label, action: button.action, data: data });
 }
 </script>

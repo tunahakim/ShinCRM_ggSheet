@@ -26,8 +26,8 @@ function fbmSyncRunActionBlock(status) {
   status = status || {};
   var statusReady = typeof fbmSyncStatusReady === 'function' ? fbmSyncStatusReady() : FBM_SYNC_CLIENT.statusReady === true;
   // Chỉ lượt tay mới có nút dừng ở đây; lượt nền đang chạy vẫn hiện nút chạy, bấm vào thì GAS trả mã để Sidebar hỏi dừng hay chờ, không có đường hủy nền mà không hỏi.
-  var active = fbmSyncRunManualActive(status), awaiting = status.phase === 'awaiting_approval', cancelling = FBM_SYNC_CLIENT.cancelRequested === true, backgroundStopping = FBM_SYNC_CLIENT.backgroundStopping === true;
-  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.ids.approve : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (backgroundStopping ? FBM_SYNC_RUN_SCHEMA.action.backgroundStopping : cancelling ? 'Đang dừng…' : active ? FBM_SYNC_RUN_SCHEMA.action.cancel : awaiting ? FBM_SYNC_RUN_SCHEMA.action.approve : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(cancelling ? 'cancel' : active ? 'cancel' : awaiting ? 'approve' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false || cancelling || backgroundStopping });
+  var active = fbmSyncRunManualActive(status), cancelling = FBM_SYNC_CLIENT.cancelRequested === true, backgroundStopping = FBM_SYNC_CLIENT.backgroundStopping === true;
+  return Button({ id: active ? FBM_SYNC_RUN_SCHEMA.action.ids.cancel : FBM_SYNC_RUN_SCHEMA.action.ids.start, label: statusReady ? (backgroundStopping ? FBM_SYNC_RUN_SCHEMA.action.backgroundStopping : cancelling ? 'Đang dừng…' : active ? FBM_SYNC_RUN_SCHEMA.action.cancel : FBM_SYNC_RUN_SCHEMA.action.start) : FBM_SYNC_RUN_SCHEMA.action.loading, className: uiResolveActionClass(cancelling ? 'cancel' : active ? 'cancel' : 'start', 'button'), disabled: !statusReady || status.masterEnabled === false || status.enabled === false || cancelling || backgroundStopping });
 }
 function fbmSyncRunBackgroundSettingsBlock(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.action;
@@ -81,11 +81,17 @@ function fbmSyncRunMachineBlocks(status) {
   if (!notice) { return []; }
   return [Notice({ kind: notice.level, text: notice.text }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.settingsId, label: schema.settings, className: uiResolveActionClass('edit', 'button'), data: { 'sync-screen': 'settings', 'sync-settings-target': 'machine' } }))];
 }
+/** Tập bản ghi chờ chấp thuận theo cổng chặng đẩy GAS (`status.pendingApproval`); nút Chấp thuận mang dấu tập đang hiện, GAS chỉ nhận khi dấu còn khớp. */
+function fbmSyncRunApprovalBlocks(status) {
+  var pending = status && status.pendingApproval, schema = FBM_SYNC_RUN_SCHEMA.approval;
+  if (!pending) { return []; }
+  if (pending.approved) { return [Notice({ kind: 'info', text: schema.approved(pending.count) })]; }
+  return [Notice({ kind: 'warning', text: schema.text(pending.count) }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('approve', 'button'), data: { fingerprint: pending.fingerprint }, disabled: !!FBM_SYNC_CLIENT.running }))];
+}
 function fbmSyncRunDetailsBlocks(status) {
-  var reset = fbmSyncRunScopeBlocks().concat(fbmSyncRunMachineBlocks(status), fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));
+  var reset = fbmSyncRunScopeBlocks().concat(fbmSyncRunMachineBlocks(status), fbmSyncRunApprovalBlocks(status), fbmSyncRunResetBlocks(status), fbmSyncRunForceLoginBlocks(status));
   if (!fbmSyncRunHasSnapshot(status)) { return reset; }
-  var awaiting = status.phase === 'awaiting_approval';
-  return reset.concat(awaiting ? [Text({ className: FBM_SYNC_RUN_UI.classes.muted, text: FBM_SYNC_RUN_SCHEMA.awaitingMessage })] : []).concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
+  return reset.concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
 }
 function fbmSyncPatchLivePipeline(panel, status) {
   if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pipeline]) { return false; }
@@ -114,10 +120,10 @@ function fbmSyncPatchRun(panel, status) {
 }
 function fbmSyncRunHasSnapshot(status) {
   status = status || {};
-  var active = status.running === true, awaiting = status.phase === 'awaiting_approval';
+  var active = status.running === true;
   var explicitPipeline = status.pipeline && Array.isArray(status.pipeline.steps);
   // Lỗi Sidebar tự phát hiện (hết hạn chờ GAS, mất kết nối) chưa có runId nhưng vẫn phải hiện, nếu không màn Chạy đồng bộ trống trơn khi phiên đã dừng.
   var clientError = status.phase === 'error' && !!String(status.lastError || status.message || '').trim();
-  return active || awaiting || !!explicitPipeline || clientError || ((status.phase === 'done' || status.phase === 'error' || status.phase === 'paused') && !!status.runId);
+  return active || !!explicitPipeline || clientError || ((status.phase === 'done' || status.phase === 'error' || status.phase === 'paused') && !!status.runId);
 }
 </script>

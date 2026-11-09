@@ -606,7 +606,7 @@ function fbmSyncInstall() {
     } else if (target.id === 'fbm-sync-login-test') { fbmSyncTestLogin(target);
     } else if (target.id === FBM_SYNC_CONFLICT_SCHEMA.ids.save) { fbmSyncSaveConflict(target);
     } else if (target.id === 'fbm-sync-back') { syncScreenClose(); }
-    else if (target.id === 'fbm-sync-approve') { fbmSyncApprovePush(); }
+    else if (target.id === 'fbm-sync-approve') { fbmSyncApprovePush(target.getAttribute('data-fingerprint')); }
     else if (target.id === 'fbm-sync-start') { fbmSyncRun(FBM_SYNC_CLIENT.mode); }
     else if (target.id === 'fbm-sync-cancel') { fbmSyncCancel(); }
     else if (target.id === FBM_SYNC_RUN_SCHEMA.reset.id) { fbmSyncResetState(); }
@@ -1065,7 +1065,8 @@ function fbmSyncRetryPushFailures() {
   var ticket = fbmSyncStatusTicket();
   return callServer('fbmRetryPushFailures').then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không mở lại được bản ghi lỗi.'); }
-    return fbmSyncStatusFromResult(result, ticket);
+    // Lệnh không mở lượt nên lời báo của GAS đi trong kết quả, không trong ô lượt.
+    return fbmSyncStatusFromResult(Object.assign({}, result, { status: Object.assign({}, result.status, { message: result.message }) }), ticket);
   });
 }
 /** Hiển thị lỗi thao tác ngay trong màn hình hiện tại, không để Promise bị từ chối im lặng. */
@@ -1520,18 +1521,29 @@ function fbmSyncRotateRelay() {
     return null;
   });
 }
-function fbmSyncApprovePush() {
-  fbmSyncSetRunning(true);
-  return fbmSyncDrive('approve_push', {}, 'run').then(function (value) {
-    if (!value || (value.ok === false && value.code !== 'SYNC_BACKGROUND_SKIPPED' && !FBM_SYNC_CLIENT.ownRunId)) { throw fbmSyncDriveFailure(value, 'Không chấp thuận được phiên ghi.'); }
-    fbmSyncSetRunning(false);
-    if (value.status) { fbmSyncPaint(value.status); }
-    return value;
+/**
+ * Chấp thuận tập bản ghi chờ đẩy: gửi đúng dấu tập đang hiện (trên màn Chạy đồng bộ hoặc trên thông báo), không mở lượt. GAS trả `PUSH_APPROVAL_STALE` khi tập đã đổi: vẽ lại theo status mới để người dùng thấy số mới rồi chấp thuận lại.
+ * Kết quả mang danh sách thông báo GAS để thông báo chờ duyệt mất ngay, không chờ lần nạp sau. Lỗi đã ghi Log và vẽ lên màn ở đây nên trả `null`, không ném tiếp cho nút hay bảng ACTIONS báo lần hai.
+ */
+function fbmSyncApprovePush(fingerprint) {
+  var ticket = fbmSyncStatusTicket();
+  return callServer('fbmApprovePush', [String(fingerprint || '')]).then(function (result) {
+    if (!result || !result.status) { throw new Error('GAS không trả trạng thái sau khi chấp thuận.'); }
+    noticeServerApply(result.notices);
+    if (result.ok === false && result.code !== 'PUSH_APPROVAL_STALE' && result.code !== 'PUSH_APPROVAL_NOT_REQUIRED') { throw new Error(result.message || result.code); }
+    if (FBM_SYNC_CLIENT.active) { fbmSyncStatusFromResult(result, ticket); }
+    return result;
   }).catch(function (error) {
-    fbmSyncSetRunning(false);
-    fbmSyncLogClientError(error, 'Không tiếp tục được phiên ghi.', 'approve_push');
-    fbmSyncPaint(fbmSyncClientErrorStatus(String(error && error.message || error)));
+    fbmSyncLogClientError(error, 'Không chấp thuận được tập bản ghi chờ đẩy.', 'approve_push');
+    if (FBM_SYNC_CLIENT.active) { fbmSyncPaintError(error, 'Không chấp thuận được tập bản ghi chờ đẩy.'); }
     return null;
+  });
+}
+/** Nút "Kiểm lại ngay" của thông báo chờ chấp thuận: mở màn đồng bộ rồi chạy một lượt tay chiều Đẩy để GAS dựng lại tập ứng viên và quyết hỏi lại, đẩy hay báo sạch. */
+function fbmSyncPushRecheck() {
+  return Promise.resolve(syncPanelToggle()).then(function () {
+    FBM_SYNC_CLIENT.mode = 'push';
+    return fbmSyncRun('push');
   });
 }
 /**
