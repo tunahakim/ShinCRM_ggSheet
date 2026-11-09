@@ -223,34 +223,52 @@ function chay(so) {
     [mat.ok, mat.gone, o('@CUS_GHI_CHU')],
     [false, ['KH000404'], ghiChuTruoc]);
 
-  section('Cửa xóa: người điều phối thuần, điểm cắm hỏi một lần cho cả danh sách');
+  section('Cửa xóa: người điều phối thuần, mỗi người gác trong sổ hỏi một lần cho cả danh sách');
   ghiO(xd, 'Customer', 5, '@CUS_MA_KH', 'KH000002');
   ghiO(xd, 'Customer', 6, '@CUS_MA_KH', 'KH000003');
   const hoi = [];
-  h.beforeHardDelete = (entity, ids) => { hoi.push(ids.slice()); return { soft: { KH000002: 'FBM còn giữ' } }; };
+  h.HARD_DELETE_GUARDS.thu = (entity, ids) => { hoi.push(ids.slice()); return { soft: { KH000002: 'FBM còn giữ' } }; };
   const xoa = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000777', ' KH000002 ', 'KH000404', 'KH000002', 'KH000003'] }));
   const trangThai = xoa.soft.rows.map((row) => row[xoa.soft.fields.indexOf('id')] + ':' + row[xoa.soft.fields.indexOf('recordStatus')]);
   const conLai = xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1, 3, 1).getValues().map((r) => r[0]);
-  check(so, 'xóa lô lẫn mã trùng, mã vắng: hỏi điểm cắm đúng một lần với các mã còn trên sheet; xóa hẳn, xóa mềm ghi deleted, mã vắng trả gone',
+  check(so, 'xóa lô lẫn mã trùng, mã vắng: hỏi người gác đúng một lần với các mã còn trên sheet; xóa hẳn, xóa mềm ghi deleted, mã vắng trả gone',
     [hoi, xoa.hard, trangThai, xoa.gone, Object.keys(xoa.reasons), conLai],
     [[['KH000777', 'KH000002', 'KH000003']], ['KH000777', 'KH000003'], ['KH000002:deleted'], ['KH000404'], ['KH000002'], ['KH000002', '', '']]);
 
-  h.beforeHardDelete = () => { throw new Error('module hỏng'); };
+  h.HARD_DELETE_GUARDS.thu = () => { throw new Error('module hỏng'); };
   h.flushLog();
   const xoaLoi = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
   h.flushLog();
-  check(so, 'điểm cắm lỗi thì giữ lại bản ghi (xóa mềm), báo lý do và ghi Log mức lỗi',
-    [xoaLoi.hard, xoaLoi.soft.rows.length, /module hỏng/.test(xoaLoi.reasons.KH000002), JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('beforeHardDelete') >= 0],
+  check(so, 'người gác lỗi thì giữ lại bản ghi (xóa mềm), báo lý do nêu tên module và ghi Log mức lỗi',
+    [xoaLoi.hard, xoaLoi.soft.rows.length, /"thu".*module hỏng/.test(xoaLoi.reasons.KH000002), JSON.stringify(xd.Log.sheet.getRange(1, 1, Math.max(xd.Log.sheet.getLastRow(), 1), 12).getValues()).indexOf('hardDeleteGuard') >= 0],
     [[], 1, true, true]);
-  h.beforeHardDelete = () => ({ soft: ['KH000002'] });
+  h.HARD_DELETE_GUARDS.thu = () => ({ soft: ['KH000002'] });
   const xoaSaiHinh = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
-  delete h.beforeHardDelete;
+  h.HARD_DELETE_GUARDS.thu = 'không phải hàm';
+  const xoaKhongHam = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
   h.flushLog();
-  const xoaVang = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
-  h.flushLog();
-  check(so, 'điểm cắm trả sai hình dạng hoặc vắng hẳn thì không xóa hẳn mã nào: giữ lại ở dạng xóa mềm và báo lý do',
-    [xoaSaiHinh.hard, xoaSaiHinh.soft.rows.length, /sai hình dạng/.test(xoaSaiHinh.reasons.KH000002), xoaVang.hard, xoaVang.soft.rows.length, /beforeHardDelete/.test(xoaVang.reasons.KH000002), xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1).getValue()],
+  check(so, 'người gác trả sai hình dạng hoặc mục đăng ký không phải hàm thì không xóa hẳn mã nào: giữ lại ở dạng xóa mềm và báo lý do',
+    [xoaSaiHinh.hard, xoaSaiHinh.soft.rows.length, /sai hình dạng/.test(xoaSaiHinh.reasons.KH000002), xoaKhongHam.hard, xoaKhongHam.soft.rows.length, /không phải hàm/.test(xoaKhongHam.reasons.KH000002), xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1).getValue()],
     [[], 1, true, [], 1, true, 'KH000002']);
+
+  ghiO(xd, 'Customer', 6, '@CUS_MA_KH', 'KH000003');
+  h.HARD_DELETE_GUARDS.thu = () => ({ soft: { KH000002: 'module một giữ' } });
+  h.HARD_DELETE_GUARDS.thu2 = () => ({ soft: { KH000002: 'module hai giữ', KH000003: 'module hai giữ' } });
+  const xoaHai = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002', 'KH000003'] }));
+  h.HARD_DELETE_GUARDS.thu2 = () => { throw new Error('module hai hỏng'); };
+  const xoaMotHong = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002', 'KH000003'] }));
+  h.flushLog();
+  check(so, 'hai người gác: gộp mã cả hai giữ (lý do của người đầu tiên); một người gác hỏng thì giữ mọi mã dù người kia cho xóa',
+    [xoaHai.hard, xoaHai.reasons, xoaMotHong.hard, Object.keys(xoaMotHong.reasons)],
+    [[], { KH000002: 'module một giữ', KH000003: 'module hai giữ' }, [], ['KH000002', 'KH000003']]);
+
+  delete h.HARD_DELETE_GUARDS.thu;
+  delete h.HARD_DELETE_GUARDS.thu2;
+  const xoaSoTrong = trongLanGoi(h, () => h.deleteGateRemove({ entity: 'customer', ids: ['KH000002'] }));
+  h.flushLog();
+  check(so, 'sổ người gác trống (ShinCRM chạy không có module nào cần giữ dòng) thì xóa hẳn, không ghi Log lỗi',
+    [xoaSoTrong.hard, xoaSoTrong.reasons, xd.Customer.sheet.getRange(4, xd.Customer.codes.indexOf('@CUS_MA_KH') + 1).getValue()],
+    [['KH000002'], {}, '']);
   check(so, 'hàm thuần chia nhóm',
     h.deleteGateSplit(['A', 'B', 'C'], ['C'], { B: 'giữ' }),
     { hard: ['A'], soft: ['B'], gone: ['C'] });

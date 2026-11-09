@@ -126,6 +126,14 @@ async function chay(so) {
   const giu = pushed.beforeHardDelete('customer', ['CUS-KEEP', 'CUS-MISSING']).soft;
   check(so, 'beforeHardDelete chan xoa cung record co FBM ID', Object.prototype.hasOwnProperty.call(giu, 'CUS-KEEP'), true);
   check(so, 'beforeHardDelete cho xoa cung record chua co FBM ID', Object.prototype.hasOwnProperty.call(giu, 'CUS-MISSING'), false);
+  // Sổ trống thì cửa xóa xóa hẳn, nên tệp đồng bộ có mặt mà thiếu dòng đăng ký là đường mất khách đã liên kết FBM.
+  const truocCua = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
+  napServer(truocCua, 'fbm_sync/reconcile/Pull.js', 'server/gate/DeleteGate.js');
+  const sauCua = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
+  napServer(sauCua, 'server/gate/DeleteGate.js', 'fbm_sync/reconcile/Pull.js');
+  check(so, 'tệp kéo về tự đăng ký người gác xóa hẳn vào sổ của cửa xóa, nạp trước hay sau cửa xóa đều còn',
+    [pushed.HARD_DELETE_GUARDS.fbm_sync === pushed.beforeHardDelete, truocCua.HARD_DELETE_GUARDS.fbm_sync === truocCua.beforeHardDelete, sauCua.HARD_DELETE_GUARDS.fbm_sync === sauCua.beforeHardDelete, typeof truocCua.deleteGateAskHook],
+    [true, true, true, 'function']);
 }
 
 module.exports = { chay };

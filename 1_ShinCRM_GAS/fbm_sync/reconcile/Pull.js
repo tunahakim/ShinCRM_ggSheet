@@ -263,3 +263,7 @@ function beforeHardDelete(entity, ids) {
   });
   return { soft: soft };
 }
+
+/** Đăng ký người gác xóa hẳn ngay dưới hàm gác: tệp có mặt trên GAS là có đăng ký, nên không có cảnh có đồng bộ mà cửa xóa không hỏi. */
+var HARD_DELETE_GUARDS = typeof HARD_DELETE_GUARDS !== 'undefined' ? HARD_DELETE_GUARDS : {};
+HARD_DELETE_GUARDS.fbm_sync = beforeHardDelete;

@@ -106,14 +106,14 @@ function chay(so) {
     [true, true, 'schema', true, true, true, 0]);
 
   const deletedEnv = taoHop();
-  deletedEnv.hop.beforeHardDelete = () => ({ soft: {} });
+  deletedEnv.hop.HARD_DELETE_GUARDS.thu = () => ({ soft: {} });
   const deleted = trongLanGoi(deletedEnv.hop, () => deletedEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate hard delete cũng phát signal cho mã biến mất, không vẽ',
     [deleted.ok, deleted.hard, deleted.recordIds, deleted.reloadDecision.kind, dongSoCuoi(deletedEnv.hop).customer, (deletedEnv.hop.reloadStateRead().viewsStaleRevision === deletedEnv.hop.reloadStateRead().revision), deletedEnv.hop.rendered],
     [true, ['KH000001'], ['KH000001'], 'records', ['KH000001'], true, 0]);
 
   const softEnv = taoHop();
-  softEnv.hop.beforeHardDelete = (entity, ids) => ({ soft: { [ids[0]]: 'FBM còn giữ bản ghi' } });
+  softEnv.hop.HARD_DELETE_GUARDS.thu = (entity, ids) => ({ soft: { [ids[0]]: 'FBM còn giữ bản ghi' } });
   const softDeleted = trongLanGoi(softEnv.hop, () => softEnv.hop.deleteGateRemove({ entity: 'customer', ids: ['KH000001'] }));
   check(so, 'DeleteGate soft delete cũng phát signal cho mã bị đổi trạng thái',
     [softDeleted.ok, softDeleted.soft.rows.length, softDeleted.recordIds, softDeleted.reloadDecision.kind, dongSoCuoi(softEnv.hop).customer, (softEnv.hop.reloadStateRead().viewsStaleRevision === softEnv.hop.reloadStateRead().revision)],
