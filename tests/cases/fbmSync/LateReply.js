@@ -9,7 +9,7 @@ function hopChoGhi() {
   const logs = [], dem = { apKetQua: 0, ghiSheet: 0 };
   const { hop } = workflowGas({ logEvent: (line) => logs.push(line) });
   const F = hop.FbmSync;
-  F.markPushResult = () => { dem.apKetQua += 1; };
+  F.pushResultSent = () => { dem.apKetQua += 1; };
   hop.writeGateSave = () => { dem.ghiSheet += 1; return { ok: true }; };
   const state = F.runOpen({ phase: 'push', mode: 'write' });
   state.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_edit_save', candidate: { entity: 'customer', id: 'C-1', record: { id: 'C-1', fbmId: 'A-1' } } };

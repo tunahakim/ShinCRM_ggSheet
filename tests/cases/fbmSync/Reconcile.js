@@ -1,5 +1,6 @@
 /** Kiểm tra missing, tombstone, khóa và ứng viên push. */
 const { section, check } = require("../../lib/assert");
+const { ungVienDay } = require('../../lib/fbm/buoc-day');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require("../../lib/load-gas");
 const { taoBoTest } = require('./Sidebar');
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
@@ -85,9 +86,9 @@ async function chay(so) {
   edges.FbmSync.stateRead = () => ({ metadata: {} });
   edges.FbmSync.pushFailuresRead = () => ({ hashes: { 'customer:C-FAIL': failedHash }, details: {} });
   edges.FbmSync.readLocal = () => [failedRecord];
-  check(so, 'push loi cung hash khong bi lap lai', edges.FbmSync.pushCandidates('customer').length, 0);
+  check(so, 'push loi cung hash khong bi lap lai', ungVienDay(edges.FbmSync, 'customer').length, 0);
   edges.FbmSync.readLocal = () => [Object.assign({}, failedRecord, { companyName: 'Đã sửa' })];
-  check(so, 'push loi duoc phep thu lai khi hash doi', edges.FbmSync.pushCandidates('customer').length, 1);
+  check(so, 'push loi duoc phep thu lai khi hash doi', ungVienDay(edges.FbmSync, 'customer').length, 1);
 
   let notAppliedWrite;
   const pushedRecord = { id: 'C-PUSHED', fbmId: 'FBM-PUSHED', fbmCustomerCode: 'ALT00010', companyName: 'Mới ở Shin', fbmSyncPermission: 'Chỉ lấy từ FBM', syncStatus: edges.FbmSync.SYNC_STATUS.pushed };
@@ -108,19 +109,19 @@ async function chay(so) {
   pushed.FbmSync.stateRead = () => ({ metadata: {} });
   pushed.FbmSync.pushFailuresRead = () => ({ hashes: {}, details: {} });
   pushed.FbmSync.readLocal = () => [{ id: 'CUS-1', fbmId: 'A1', fbmCustomerCode: 'ALT1', companyName: 'X', fbmSyncPermission: 'Cho phép', syncStatus: pushed.FbmSync.SYNC_STATUS.pushed, fbmHash: '' }];
-  check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', pushed.FbmSync.pushCandidates('customer').length, 0);
+  check(so, 'bản ghi đã đẩy chờ xác nhận không bị đẩy lặp', ungVienDay(pushed.FbmSync, 'customer').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: 'Cấm đồng bộ' }]
     : [{ id: 'ACT-STOP', customerId: 'CUS-PARENT', fbmSyncPermission: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
-  check(so, 'Customer ngừng đồng bộ chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
+  check(so, 'Customer ngừng đồng bộ chặn Activity push', ungVienDay(pushed.FbmSync, 'activity').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: 'Chỉ lấy từ FBM' }]
     : [{ id: 'ACT-NO-PERM', customerId: 'CUS-PARENT', fbmSyncPermission: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
-  check(so, 'Customer chưa cho phép chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
+  check(so, 'Customer chưa cho phép chặn Activity push', ungVienDay(pushed.FbmSync, 'activity').length, 0);
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
     ? [{ id: 'CUS-PARENT', fbmId: '', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: 'Cho phép' }]
     : [{ id: 'ACT-NO-ID', customerId: 'CUS-PARENT', fbmSyncPermission: 'Cho phép', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09' }];
-  check(so, 'Customer thiếu FBM ID chặn Activity push', pushed.FbmSync.pushCandidates('activity').length, 0);
+  check(so, 'Customer thiếu FBM ID chặn Activity push', ungVienDay(pushed.FbmSync, 'activity').length, 0);
 
   pushed.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-KEEP', fbmId: 'FBM-1' }] : [];
   const giu = pushed.beforeHardDelete('customer', ['CUS-KEEP', 'CUS-MISSING']).soft;

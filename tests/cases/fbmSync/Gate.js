@@ -1,5 +1,6 @@
 /** Cửa ghi chiều lấy về: danh sách đọc của lượt, request tra mã không lọc quyền, bảng vắng mặt và chuyển quyền (09/05 Phần 9), xét lại hai trạng thái đóng băng. */
 const { section, check } = require('../../lib/assert');
+const { ungVienDay } = require('../../lib/fbm/buoc-day');
 const { scanHarness } = require('./ScanJob');
 const { catLuoi, luoiFbm } = require('../../lib/fbm/tab-fbm-gia');
 
@@ -140,7 +141,7 @@ async function chay(so) {
   giaoDich.syncStatus = sync.missing; giaoDich.content = 'Sửa trên Sheet lúc đóng băng';
   // Vòng xoay bỏ qua khách mang cờ; danh sách toàn bộ khách thấy lại khách thì khách vào danh sách đọc.
   await xet.run({ pack: 'all' });
-  const dayKe = xet.F.pushCandidates('activity').map((item) => item.id);
+  const dayKe = ungVienDay(xet.F, 'activity').map((item) => item.id);
   check(so, 'Xét lại: khách "đã chuyển cho người khác" thấy lại, không sửa gì thì về "đã đồng bộ"; giao dịch "không thấy bên FBM" sửa trên Sheet lúc đóng băng, thấy lại mà FBM không đổi thì vào danh sách đẩy, nội dung sửa còn nguyên', [
     xet.cus(2).syncStatus, xet.act('800003').syncStatus === sync.missing, xet.act('800003').content, dayKe.indexOf(giaoDich.id) >= 0
   ], [sync.synced, false, 'Sửa trên Sheet lúc đóng băng', true]);

@@ -39,6 +39,9 @@ async function chay(so) {
   probe.FbmSync.scope = () => ({ codes: ['CUS-ALT'], fbm: [], shin: ['CUS-ALT'], notFound: [] });
   const probeScan = { records: (entity) => entity === 'customer' ? [{ id: 'CUS-ALT', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' }] : [] };
   probe.FbmSync.localScan = () => probeScan;
+  probe.FbmSync.stateRead = () => ({ metadata: {} });
+  probe.FbmSync.stateCategoryGate = () => ({ map: {} });
+  probe.FbmSync.pushFailuresRead = () => ({ hashes: {} });
   probe.FbmSync.pushCandidates = (entity, scan) => scan === probeScan && entity === 'customer' ? [{ entity: 'customer', kind: 'edit', id: 'CUS-OTHER', record: { id: 'CUS-OTHER', fbmCustomerCode: 'ALT00011' } }] : [];
   const blocked = probe.fbmProbeAltState();
   check(so, 'probe ALT00010 fail-closed khi co ung vien ngoai pham vi', [blocked.ok, blocked.scopeViolations.length, blocked.writesToFbm, blocked.deletesToFbm], [false, 1, 0, 0]);

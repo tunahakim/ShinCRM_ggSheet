@@ -41,7 +41,7 @@ function makeSync() {
     'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js',
     'fbm_sync/write/RequestBuilders.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
-    'fbm_sync/transport/PushFlow.js',
+    'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js',
     'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
     'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/control/PushCommands.js');
   hop.FbmSync.readLocal = (entity) => local[entity].map(clone);
@@ -100,13 +100,13 @@ const pushOk = (q) => {
   const st = q.F.stateRead(), id = st.cursor.candidate.id;
   q.F.pushRowChange('customer', id, { release: true, build: (local) => ({ patch: { id, syncStatus: 'đã đồng bộ', fbmHash: q.F.hash(local, 'customer', q.F.stateCategoryGate(st)) } }) });
   const after = q.F.stateRead(); after.cursor = q.F.pushCursorNext(after.cursor, true); after.current = ''; q.F.stateWrite(after);
-  return q.F.nextPushRequest(q.F.stateRead());
+  return q.F.pushStageResume(q.F.stateRead());
 };
 
 /** Đẩy liên tục tới khi chặng hết request; `onStep(id, lần)` chạy trước khi bản ghi đó ghi xong, để ca kiểm chen sửa Sheet giữa lượt. */
 const pushDrive = (q, onStep) => {
   const tried = [];
-  let request = q.F.nextPushRequest(q.F.stateRead());
+  let request = q.F.pushStageResume(q.F.stateRead());
   for (let guard = 0; guard < 20 && request; guard += 1) {
     const id = q.F.stateRead().cursor.candidate.id; tried.push(id);
     if (onStep) { onStep(id, tried.length); }

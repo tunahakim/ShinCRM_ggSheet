@@ -33,11 +33,11 @@ async function chay(so) {
     const q = pushQueue([]);
     q.run.local.customer.push(syncedCustomer(q, 'A'));
     q.run.hop.reloadJournalRead = () => ({ rev: 41 });
-    const end = q.F.pushStageBegin(q.F.stateRead()), clean = gateOf(q);
+    const end = q.F.pushStageOpen(q.F.stateRead()), clean = gateOf(q);
     const capped = pushQueue(['A', 'B'].map(editCustomer));
     capped.F.pushGateWrite({ status: 'clean', mark: { rev: 1 }, at: 1 });
     capped.F.SHARD_LIST_BYTES = 8; capped.F.BUDGET.pushPassesMax = 1;
-    const cappedFirst = capped.F.pushStageBegin(capped.F.stateRead()), openAtBegin = gateOf(capped).status;
+    const cappedFirst = capped.F.pushStageOpen(capped.F.stateRead()), openAtBegin = gateOf(capped).status;
     pushOk(capped);
     check(so, 'C1: chặng đẩy quét không còn ứng viên thì ghi cổng sạch kèm dấu đọc trước lần quét; chặng có việc ghi cổng đang mở ngay từ đầu; dừng không sạch thì cổng vẫn đang mở',
       [end, clean.status, clean.mark, !!cappedFirst, openAtBegin, capped.F.stateRead().phase, gateOf(capped).status],
@@ -55,7 +55,7 @@ async function chay(so) {
     const mark = q.F.pushGateMark();
     q.F.pushGateWrite({ status: 'clean', mark, at: 1 });
     const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
-    const stepped = q.F.preflightLocalStep(q.F.stateRead()), gated = q.F.stateRead(), stage = q.F.pushStageBegin(gated);
+    const stepped = q.F.preflightLocalStep(q.F.stateRead()), gated = q.F.stateRead(), stage = q.F.pushStageOpen(gated);
     const closedTrace = q.run.logs.filter((event) => event.action === 'push_gate_closed');
     const full = q.F.stateRead(); full.scan = 'full'; full.pushGate = undefined; q.F.stateWrite(full);
     const fullState = q.F.stateRead(); q.F.preflightLocalStep(fullState);
@@ -80,7 +80,7 @@ async function chay(so) {
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
-    const first = q.F.nextPushRequest(q.F.stateRead()), pending = gateOf(q);
+    const first = q.F.pushStageResume(q.F.stateRead()), pending = gateOf(q);
     check(so, 'K6: tập chạm ngưỡng thì không phát lệnh ghi FBM, lượt xong bình thường, cổng chờ duyệt giữ dấu tập và số bản ghi, thông báo chờ duyệt bật, Log ghi lý do',
       [first, q.F.stateRead().phase, pending.status, pending.count, /^[0-9a-f]{8}-2$/.test(pending.fingerprint), pending.approvedFingerprint, approvalNotices(q), q.run.logs.filter((e) => e.action === 'push_awaiting_approval').length, q.run.writes.length],
       [null, 'done', 'pending', 2, true, '', ['raise'], 1, 0]);
@@ -103,19 +103,19 @@ async function chay(so) {
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
-    q.F.nextPushRequest(q.F.stateRead());
+    q.F.pushStageResume(q.F.stateRead());
     const asked = gateOf(q).fingerprint;
     q.run.local.customer[1].companyName = 'Cty B sửa sau khi hiện thông báo';
     q.F.runPushApprovalCommand({ fingerprint: asked });
     reopenPush(q);
-    const again = q.F.nextPushRequest(q.F.stateRead());
+    const again = q.F.pushStageResume(q.F.stateRead());
     check(so, 'K6: có người sửa dòng sau lúc hiện thông báo thì lời duyệt không phủ tập mới: lượt kế không đẩy, hỏi lại với dấu tập mới',
       [again, gateOf(q).status, gateOf(q).fingerprint !== asked, gateOf(q).approvedFingerprint], [null, 'pending', true, '']);
   }
   {
     const q = pushQueue(['A', 'B', 'C'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
-    q.F.nextPushRequest(q.F.stateRead());
+    q.F.pushStageResume(q.F.stateRead());
     q.F.runPushApprovalCommand({ fingerprint: gateOf(q).fingerprint });
     reopenPush(q);
     const pushed = pushDrive(q, (id) => { if (id === 'CUS-A') { q.run.local.customer[1].companyName = 'Cty B sửa giữa lượt'; q.run.local.customer[2].companyName = 'Cty C sửa giữa lượt'; } });
@@ -126,17 +126,17 @@ async function chay(so) {
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
-    q.F.nextPushRequest(q.F.stateRead());
+    q.F.pushStageResume(q.F.stateRead());
     q.run.local.customer.splice(0, 2, syncedCustomer(q, 'A'), syncedCustomer(q, 'B'));
     reopenPush(q);
-    const end = q.F.nextPushRequest(q.F.stateRead());
+    const end = q.F.pushStageResume(q.F.stateRead());
     check(so, 'K6: Sheet quay về khớp FBM trước khi duyệt thì lượt kế quét sạch: cổng sạch, thông báo chờ duyệt gỡ, lời duyệt cũ không còn gì để duyệt',
       [end, gateOf(q).status, approvalNotices(q).slice(-1), q.F.runPushApprovalCommand({ fingerprint: 'x' }).code], [null, 'clean', ['resolve'], 'PUSH_APPROVAL_NOT_REQUIRED']);
   }
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
-    q.F.nextPushRequest(q.F.stateRead());
+    q.F.pushStageResume(q.F.stateRead());
     const options = { origin: 'background', scan: 'detail', mode: 'write' };
     const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
     const waiting = q.F.pushGateCheck(q.F.stateRead(), options);

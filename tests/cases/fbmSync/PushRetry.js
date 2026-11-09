@@ -1,5 +1,6 @@
 /** Ứng viên đẩy sau lỗi: cùng hash thì không lặp lại, hash đổi thì được thử lại. */
 const { section, check } = require('../../lib/assert');
+const { ungVienDay } = require('../../lib/fbm/buoc-day');
 const { hopKeoBien } = require('../../lib/fbm/hop-keo');
 
 function chay(so) {
@@ -11,9 +12,9 @@ function chay(so) {
   edges.FbmSync.stateRead = () => ({ metadata: {} });
   edges.FbmSync.pushFailuresRead = () => ({ hashes: { 'customer:C-FAIL': failedHash }, details: {} });
   edges.FbmSync.readLocal = () => [failedRecord];
-  check(so, 'push loi cung hash khong bi lap lai', edges.FbmSync.pushCandidates('customer').length, 0);
+  check(so, 'push loi cung hash khong bi lap lai', ungVienDay(edges.FbmSync, 'customer').length, 0);
   edges.FbmSync.readLocal = () => [Object.assign({}, failedRecord, { companyName: 'Đã sửa' })];
-  check(so, 'push loi duoc phep thu lai khi hash doi', edges.FbmSync.pushCandidates('customer').length, 1);
+  check(so, 'push loi duoc phep thu lai khi hash doi', ungVienDay(edges.FbmSync, 'customer').length, 1);
 
   return so;
 }

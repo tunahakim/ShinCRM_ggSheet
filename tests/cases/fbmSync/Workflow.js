@@ -1,5 +1,6 @@
 /** Kiểm use case xuyên GAS -> Extension -> GAS theo hợp đồng tài liệu 09. */
 const fs = require('fs');
+const { buocDay, buocDayLoi } = require('../../lib/fbm/buoc-day');
 const path = require('path');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
@@ -440,11 +441,11 @@ async function chay(so) {
     const state = F.runOpen({ phase: 'push' });
     state.mode = 'push'; state.phase = 'push'; state.entity = 'customer'; state.session = verified; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     F.stateWrite(state);
-    let envelope = F.nextEnvelope(F.nextPushRequest(F.stateRead())), lastStep = null;
+    let envelope = F.nextEnvelope(F.pushStageResume(F.stateRead())), lastStep = null;
     for (let guard = 0; envelope && guard < 60; guard += 1) {
       if (envelope.meta.kind !== 'batch') {
         const current = F.stateRead(); issued.push(current.cursor.candidate.id);
-        lastStep = F.continueAfterPushError(current, current.cursor, { reason: options && options.longReason ? 'FBM từ chối trường địa chỉ liên hệ của khách. '.repeat(30) : 'Giả lập FBM từ chối để đi tiếp hàng đợi', code: 'FBM_ERROR' });
+        lastStep = buocDayLoi(F, { reason: options && options.longReason ? 'FBM từ chối trường địa chỉ liên hệ của khách. '.repeat(30) : 'Giả lập FBM từ chối để đi tiếp hàng đợi', code: 'FBM_ERROR' });
         envelope = lastStep.request; continue;
       }
       lookupAt.push(F.stateRead().cursor.at);
@@ -522,7 +523,7 @@ async function chay(so) {
   // Chụp state ngay trước khi đối chiếu Category: đó là lúc danh mục FBM còn nằm trong state.
   let compactLookupSnapshot = '';
   const compactPrepare = compactLookupFlow.hop.FbmSync.prepareCategoryGate;
-  compactLookupFlow.hop.FbmSync.prepareCategoryGate = (state) => { compactLookupSnapshot = JSON.stringify(state); return compactPrepare(state); };
+  compactLookupFlow.hop.FbmSync.prepareCategoryGate = (state, logs) => { compactLookupSnapshot = JSON.stringify(state); return compactPrepare(state, logs); };
   const compactLast = compactContinue(null, compactLookupFlow.hop.FbmSync.SYNC_LOOKUPS.map((item, index) => {
     const rows = Object.keys(compactLookupNames[item.key]).map((code) => [code, compactLookupNames[item.key][code]]);
     rows.push(...Array.from({ length: 700 }, (_, rowIndex) => ['NOISE-' + index + '-' + rowIndex, 'Tên dài để mô phỏng danh mục lớn']));
@@ -549,7 +550,7 @@ async function chay(so) {
   const blockLookups = {};
   blockFlow.hop.FbmSync.SYNC_LOOKUPS.forEach((item) => { blockLookups[item.key] = { pairs: item.key === '@CAT_NGUON_KH' ? { HDDV: 'Hóa đơn đầu vào - đầu ra' } : { X: 'x' } }; });
   blockLookups['@CAT_CONG_VIEC'] = { pairs: {} };
-  blockFlow.hop.FbmSync.prepareCategoryGate({ mode: 'push', metadata: {}, session: { lookups: blockLookups } });
+  blockFlow.hop.FbmSync.prepareCategoryGate({ mode: 'push', metadata: {}, session: { lookups: blockLookups } }, blockLogs);
   const blockRows = blockLogs.filter((event) => event.action === 'category_block');
   check(so, 'mã danh mục bị chặn vào Sheet Log kèm tên FBM hiện tại; thiếu danh sách FBM là lỗi chặn cả chiều đẩy (tài liệu 09/03)',
     [blockRows.length, blockRows.map((event) => event.outcome).sort().join(','), blockRows.some((event) => event.recordId === 'HDDV' && /Hóa đơn đầu vào - đầu ra/.test(event.reason)), blockRows.some((event) => /@CAT_CONG_VIEC/.test(event.reason) && /toàn bộ chiều đẩy/.test(event.reason))],
@@ -573,7 +574,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
-  const pushRequest = compactLookupFlow.hop.FbmSync.nextPushRequest(pushState);
+  const pushRequest = compactLookupFlow.hop.FbmSync.pushStageResume(pushState);
   const pushWaitState = compactLookupFlow.hop.FbmSync.stateRead();
   const pushRawState = compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1 || '';
   let pushRawParsed = null; try { pushRawParsed = JSON.parse(pushRawState); } catch (ignorePushRaw) {}
@@ -601,7 +602,8 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.customerCreateRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_create_save' } });
   compactLookupFlow.hop.FbmSync.extractAutoCustomerCode = () => 'ALT00099';
   compactLookupFlow.hop.FbmSync.validateAutoCustomerCode = () => ({ ok: true });
-  compactLookupFlow.hop.FbmSync.continuePush(createState, { d: { ClientScript: "_ma_kh_auto = 'ALT00099';" } });
+  compactLookupFlow.hop.FbmSync.pushOperationStep(createState, { d: { ClientScript: "_ma_kh_auto = 'ALT00099';" } }, {});
+  compactLookupFlow.hop.FbmSync.stateWrite(createState);
   check(so, 'candidate compact giữ mã Customer tự sinh cho nhánh khôi phục', compactLookupFlow.hop.FbmSync.stateRead().cursor.candidate.autoCode, 'ALT00099');
   compactLookupFlow.documentProperties.setProperty('FBM_SYNC_STATE_V1', pushRawState);
   // Chữ có dấu 3 byte: mười khách đủ dài là vượt trần một khóa; bản xem trước phải tự bỏ bớt dòng chứ không làm hỏng lần ghi.
@@ -635,9 +637,10 @@ async function chay(so) {
   const orderStateWrite = orderFlow.hop.FbmSync.stateWrite;
   let orderWriteCount = 0;
   orderFlow.hop.FbmSync.stateWrite = (state) => { orderWriteCount += 1; if (orderWriteCount === 1) { const error = new Error('quota'); error.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; throw error; } return orderStateWrite(state); };
-  let orderError = null;
-  try { orderFlow.hop.FbmSync.nextPushRequest(orderState); } catch (error) { orderError = error; }
-  check(so, 'state push được chốt trước khi đánh dấu Sheet đang đẩy', [orderError && orderError.code, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 0, 'push_scan']);
+  let orderError = null, orderRequest = 'chưa chạy';
+  try { orderRequest = orderFlow.hop.FbmSync.pushStageResume(orderState); } catch (error) { orderError = error; }
+  // Chặng chạy trên bản sao nên dòng được đánh dấu trước khi patch ghi xuống kho (trong lát, kho cũng chỉ ghi ở cuối lát). Bất biến cần giữ: ghi ô lượt hỏng thì không request nào rời GAS; dòng "đang đẩy" mà không có lệnh ghi thì lượt sau đi đường khôi phục (FBM-027), không gửi lại mù.
+  check(so, 'ghi ô lượt đẩy hỏng thì không phát request ghi FBM, ô lượt giữ dấu trang cũ, dòng ở "đang đẩy" cho lượt sau khôi phục', [orderError && orderError.code, orderRequest, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 'chưa chạy', 1, 'push_scan']);
   // FBM-045: bước nạp Category gọi nextPushRequest rồi tự ghi lại object state của nó; khóa phải đặt trên chính object đó.
   const aliasFlow = workflowGas();
   const aliasState = aliasFlow.hop.FbmSync.runOpen({ phase: 'push' });
@@ -649,7 +652,7 @@ async function chay(so) {
   ['categoryGateCheck', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
   aliasFlow.hop.writeGateSave = () => ({ ok: true });
   aliasFlow.hop.FbmSync.customerEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_edit_open' } });
-  const aliasRequest = aliasFlow.hop.FbmSync.nextPushRequest(aliasState);
+  const aliasRequest = aliasFlow.hop.FbmSync.pushStageResume(aliasState);
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
   const aliasStored = aliasFlow.hop.FbmSync.stateRead();
   check(so, 'FBM-045: hàm gọi ghi lại object state sau khi phát lệnh đẩy vẫn giữ cursor push_wait; bản ghi nằm trong sổ bận nên ghi đè state không thả nó',
@@ -667,7 +670,7 @@ async function chay(so) {
   pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
   let pushingRequest = 'chưa gọi', pushingError = null;
-  try { pushingRequest = pushingFlow.hop.FbmSync.nextPushRequest(pushingFlow.hop.FbmSync.stateRead()); } catch (error) { pushingError = error; }
+  try { pushingRequest = pushingFlow.hop.FbmSync.pushStageResume(pushingFlow.hop.FbmSync.stateRead()); } catch (error) { pushingError = error; }
   check(so, 'không ghi được trạng thái "đang đẩy" thì không phát lệnh ghi FBM và báo lỗi có tên bản ghi',
     [pushingError && pushingError.code, pushingRequest, /ACT-PUSHING/.test(pushingError && pushingError.message)],
     ['FBM_SHEET_WRITE_FAILED', 'chưa gọi', true]);
@@ -1345,7 +1348,7 @@ async function chay(so) {
   ], [true, true, true, true]);
   const sangDay = soBuoc('write');
   ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
-  sangDay.F.nextPushRequest = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return null; };
+  sangDay.F.pushNext = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return { end: { kind: 'done', remaining: 0 } }; };
   sangDay.F.pullFinishOrPush(sangDay.st, {});
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
 }

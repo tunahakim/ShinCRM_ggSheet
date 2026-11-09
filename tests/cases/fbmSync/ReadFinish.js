@@ -27,7 +27,7 @@ function chay(so) {
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
       pullPageApply: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
-      nextPushRequest: () => { readFinishPushRequests += 1; return {}; },
+      pushStageOpen: () => { readFinishPushRequests += 1; return {}; },
       runInProgress: (state) => !!state.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(state.phase) < 0, businessFinishOpenSteps: () => {}, RECORD_HOLDER: 'fbm',
       runDoneMessage: () => 'Đồng bộ hoàn tất.',
       statusView: () => ({ phase: readFinishState.phase, mode: readFinishState.mode })

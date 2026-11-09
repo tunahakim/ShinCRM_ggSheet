@@ -1,10 +1,11 @@
 /** So ba bản trước khi lưu FBM (`09/04` "So trước khi đẩy"): hash form bằng hash lưới, và bước mở form không ghi đè bản FBM đã đổi sau mốc. */
 const { section, check } = require("../../lib/assert");
+const { buocDay, buocDayLoi } = require('../../lib/fbm/buoc-day');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhiDongBo, soBan } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
 
-const TEP = ['fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js'];
+const TEP = ['fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js'];
 
 /** Danh mục như trên Sheet Category: lưới FBM trả tên, form trả mã. */
 const GATE = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI', '@CAT_NGUON_KH\u001fKhách tự tìm': 'KDTUTIM', '@CAT_CONG_VIEC\u001fGọi điện': 'GD' } };
@@ -81,7 +82,7 @@ async function chay(so) {
   const xungDot = F.runOpen({ phase: 'push' });
   xungDot.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(xungDot);
-  const sauXungDot = F.continuePush(F.stateRead(), formKhach(khachFbm));
+  const sauXungDot = buocDay(F, formKhach(khachFbm));
   const stXungDot = F.stateRead();
   check(so, 'FBM đổi sau mốc và ShinCRM cũng đổi: không phát lệnh lưu, dòng thành xung đột chờ quyết, nhả bản ghi, phiên không dừng mà mở form bản ghi kế', [sheet[0].syncStatus, sheet[0].fbmHash === khachA.fbmHash, !!soBan(hop)['customer:CUS-A'], sauXungDot && sauXungDot.meta.kind, sauXungDot && sauXungDot.meta.id, stXungDot.phase, stXungDot.counts.conflict], [F.SYNC_STATUS.conflict, true, false, 'customer_edit_open', 'B-1', 'push', 1]);
   const nhomLog = Object.keys(F.recordIssues).map((key) => F.recordIssues[key]).filter((group) => group.direction === 'push' && group.status === F.SYNC_STATUS.conflict)[0] || { reason: '' };
@@ -93,7 +94,7 @@ async function chay(so) {
   const khop = F.runOpen({ phase: 'push' });
   khop.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(khop);
-  F.continuePush(F.stateRead(), formKhach(khachFbm));
+  buocDay(F, formKhach(khachFbm));
   check(so, 'FBM = ShinCRM: không gửi lệnh lưu, mốc = hash FBM, đã đồng bộ, nhả bản ghi', [sheet[0].fbmHash, sheet[0].syncStatus, !!soBan(hop)['customer:CUS-A'], F.stateRead().cursor.operation === 'customer_edit_save'], [mocKhach, F.SYNC_STATUS.synced, false, false]);
 
   // 5. Chỉ FBM đổi (ShinCRM = mốc): không lưu, trả về đã đồng bộ, mốc giữ nguyên để chiều lấy về kéo.
@@ -103,7 +104,7 @@ async function chay(so) {
   const chiFbm = F.runOpen({ phase: 'push' });
   chiFbm.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(chiFbm);
-  F.continuePush(F.stateRead(), formKhach(fbmDoi));
+  buocDay(F, formKhach(fbmDoi));
   check(so, 'Chỉ FBM đổi: không gửi lệnh lưu, dòng về đã đồng bộ, mốc giữ nguyên', [sheet[0].fbmHash, sheet[0].syncStatus, F.stateRead().cursor.operation === 'customer_edit_save'], [mocKhach, F.SYNC_STATUS.synced, false]);
 
   // 6. FBM = mốc: lưu như cũ.
@@ -111,7 +112,7 @@ async function chay(so) {
   const luu = F.runOpen({ phase: 'push' });
   luu.cursor = { kind: 'push_wait', operation: 'customer_edit_open', entity: 'customer', index: 0, candidate: { entity: 'customer', kind: 'edit', id: 'CUS-A' } };
   F.stateWrite(luu);
-  const lenhLuu = F.continuePush(F.stateRead(), formKhach(khachFbm));
+  const lenhLuu = buocDay(F, formKhach(khachFbm));
   const tenMoi = lenhLuu.body.memvars.filter((item) => item.Name === 'ten_kh')[0];
   check(so, 'FBM = mốc: dựng lệnh lưu với giá trị ShinCRM', [F.stateRead().cursor.operation, tenMoi.OldValue, tenMoi.NewValue], ['customer_edit_save', 'Test', 'ShinCRM sửa']);
 
@@ -125,7 +126,7 @@ async function chay(so) {
   const gdState = F.runOpen({ phase: 'push' });
   gdState.cursor = { kind: 'push_wait', operation: 'activity_edit_open', entity: 'activity', index: 0, candidate: { entity: 'activity', kind: 'edit', id: 'ACT-008600' } };
   F.stateWrite(gdState);
-  const gdKetQua = F.continuePush(F.stateRead(), formGiaoDich(Object.assign({}, gdFbm, { details: 'Đồng nghiệp sửa trên FBM' })));
+  const gdKetQua = buocDay(F, formGiaoDich(Object.assign({}, gdFbm, { details: 'Đồng nghiệp sửa trên FBM' })));
   check(so, 'Giao dịch cũ bị sửa trên FBM và ShinCRM cũng sửa: không gửi lệnh lưu, dòng thành xung đột, phiên đi tiếp tới hết', [gdKetQua, gdSheetRows[0].syncStatus, F.stateRead().phase, F.stateRead().counts.conflict], [null, F.SYNC_STATUS.conflict, 'done', 1]);
 
   // 8. Đọc lại sau lưu khác dữ liệu vừa ghi: dòng thành xung đột nhưng phiên không dừng.
@@ -136,7 +137,7 @@ async function chay(so) {
   const verify = F.runOpen({ phase: 'push' });
   verify.cursor = { kind: 'push_wait', operation: 'activity_verify', entity: 'activity', index: 0, candidate: { entity: 'activity', kind: 'edit', id: 'ACT-V' } };
   F.stateWrite(verify);
-  const sauVerify = F.continuePush(F.stateRead(), formGiaoDich({ id: 42, ma_cv: 'GD', end_date: new Date('2026-09-09T08:00:00+07:00'), details: 'Người khác sửa ngay sau', owner: 'Owner' }));
+  const sauVerify = buocDay(F, formGiaoDich({ id: 42, ma_cv: 'GD', end_date: new Date('2026-09-09T08:00:00+07:00'), details: 'Người khác sửa ngay sau', owner: 'Owner' }));
   check(so, 'Đọc xác nhận ra xung đột: dòng thành xung đột chờ quyết, phiên không dừng ở trạng thái xung đột', [sauVerify, gdSheetRows[0].syncStatus, F.stateRead().phase, F.stateRead().counts.conflict, !!soBan(hop)['activity:ACT-V']], [null, F.SYNC_STATUS.conflict, 'done', 1, false]);
 }
 

@@ -1,5 +1,6 @@
 /** Ma trận offline cho kỳ đồng bộ nhiều Customer/Activity và lỗi vận chuyển. */
 const { section, check } = require('../../lib/assert');
+const { buocDay, buocDayLoi, ungVienDay } = require('../../lib/fbm/buoc-day');
 const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require('../../lib/load-gas');
 const { clone, makeSync, pushQueue, editCustomer, pushOk, pushDrive } = require('../../lib/fbm/hang-day');
@@ -135,32 +136,32 @@ async function chay(so) {
 
   const skipOnError = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnError = [];
-  let errorRequest = skipOnError.F.nextPushRequest(skipOnError.F.stateRead());
+  let errorRequest = skipOnError.F.pushStageResume(skipOnError.F.stateRead());
   for (let guard = 0; guard < 5 && errorRequest; guard += 1) {
     const current = skipOnError.F.stateRead(); triedOnError.push(current.cursor.candidate.id);
-    errorRequest = skipOnError.F.continueAfterPushError(current, current.cursor, { reason: 'FBM từ chối', code: 'FBM_ERROR' }).request;
+    errorRequest = buocDayLoi(skipOnError.F, { reason: 'FBM từ chối', code: 'FBM_ERROR' }).request;
   }
   check(so, 'FBM-032: ba Customer liên tiếp bị FBM từ chối thì phiên vẫn thử đủ cả ba, không bỏ sót bản ghi ở giữa', triedOnError, ['CUS-A', 'CUS-B', 'CUS-C']);
 
   const skipOnSuccess = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnSuccess = [];
-  let successRequest = skipOnSuccess.F.nextPushRequest(skipOnSuccess.F.stateRead());
+  let successRequest = skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead());
   for (let guard = 0; guard < 5 && successRequest; guard += 1) {
     const current = skipOnSuccess.F.stateRead(), id = current.cursor.candidate.id;
     triedOnSuccess.push(id);
-    // Như finishPushVerification: bản ghi đã đồng bộ rời danh sách ứng viên, cursor tiến qua dòng của nó.
+    // Như pushResultVerify: bản ghi đã đồng bộ rời danh sách ứng viên, cursor tiến qua dòng của nó.
     const row = skipOnSuccess.run.local.customer.find((item) => item.id === id);
     row.syncStatus = 'đã đồng bộ'; row.fbmHash = skipOnSuccess.F.hash(row, 'customer', NO_CATEGORY);
     current.cursor = { kind: 'push_scan', entity: 'customer', index: current.cursor.index + 1 };
     skipOnSuccess.F.stateWrite(current);
-    successRequest = skipOnSuccess.F.nextPushRequest(skipOnSuccess.F.stateRead());
+    successRequest = skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead());
   }
   check(so, 'FBM-032: bản ghi vừa đẩy xong rời danh sách ứng viên thì bản ghi kế tiếp vẫn được đẩy', triedOnSuccess, ['CUS-A', 'CUS-B', 'CUS-C']);
 
   const stuckActivity = { id: 'ACT-STUCK', customerId: 'CUS-A', fbmId: '', workDate: '2026-09-19', taskType: 'Gọi điện', content: 'Gọi lại', owner: 'Le Tuan Anh', fbmSyncPermission: 'Cho phép', syncStatus: 'đang đẩy' };
   const stuck = pushQueue([editCustomer('A')], [stuckActivity]);
   stuck.run.local.customer[0].fbmHash = stuck.F.hash(stuck.run.local.customer[0], 'customer', NO_CATEGORY);
-  const stuckRequest = stuck.F.nextPushRequest(stuck.F.stateRead());
+  const stuckRequest = stuck.F.pushStageResume(stuck.F.stateRead());
   stuck.F.recordIssuesFlush();
   const stuckState = stuck.F.stateRead(), stuckLog = stuck.run.logs.find((event) => event.action === 'push_record_issue');
   check(so, 'FBM-027: Activity "đang đẩy" chưa có ID FBM không được gửi lại lệnh tạo; giữ "đang đẩy", phiên báo lỗi và Log có ID bản ghi',
@@ -171,24 +172,22 @@ async function chay(so) {
   const customerGridFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
   const taxRows = (rows) => luoiTheoTen(sync.hop.FbmSync, 'customer', customerGridFields, rows);
   const recoverFound = pushQueue([lostCustomer]);
-  const lookup = recoverFound.F.nextPushRequest(recoverFound.F.stateRead());
+  const lookup = recoverFound.F.pushStageResume(recoverFound.F.stateRead());
   check(so, 'FBM-027: Customer "đang đẩy" chưa có ID FBM ở phiên sau chỉ phát request tra theo MST, không phát lệnh tạo',
     [lookup && lookup.meta && lookup.meta.kind, JSON.stringify(lookup && lookup.body && lookup.body.filter), recoverFound.F.stateRead().cursor.operation],
     ['grid', JSON.stringify(['ma_so_thue:**0101234567']), 'customer_create_recover']);
-  const afterFound = recoverFound.F.continuePush(recoverFound.F.stateRead(), await taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }, { stt_rec_kh: 'FBM-LOST', ma_kh: 'ALT00077', ma_so_thue: '0101234567', ten_kh: 'Tên đã sửa bên FBM' }]));
+  const afterFound = buocDay(recoverFound.F, await taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }, { stt_rec_kh: 'FBM-LOST', ma_kh: 'ALT00077', ma_so_thue: '0101234567', ten_kh: 'Tên đã sửa bên FBM' }]));
   const foundRow = recoverFound.run.local.customer[0];
   check(so, 'FBM-027: tra thấy đúng một Customer khớp chính xác MST thì vá stt_rec_kh và ma_kh, baseline rỗng, không tạo lại; lần quét lại của chặng mở form để so hai bên chứ không lưu',
     [foundRow.fbmId, foundRow.fbmCustomerCode, foundRow.fbmHash, afterFound && afterFound.meta && afterFound.meta.kind, recoverFound.F.stateRead().counts.error],
     ['FBM-LOST', 'ALT00077', '', 'customer_edit_open', 0]);
 
   const recoverMissing = pushQueue([Object.assign({}, lostCustomer)]);
-  recoverMissing.F.nextPushRequest(recoverMissing.F.stateRead());
-  let missingError = null;
-  try { recoverMissing.F.continuePush(recoverMissing.F.stateRead(), await taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }])); } catch (error) { missingError = error; }
-  const missingState = recoverMissing.F.stateRead();
-  const afterMissing = recoverMissing.F.continueAfterPushError(missingState, missingState.cursor, missingError && missingError.message);
+  recoverMissing.F.pushStageResume(recoverMissing.F.stateRead());
+  const afterMissing = buocDay(recoverMissing.F, await taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }]));
+  const missingReason = (recoverMissing.F.pushFailuresRead().details['customer:CUS-LOST'] || {}).reason || '';
   check(so, 'FBM-027: tra không thấy Customer khớp chính xác MST thì báo lỗi, giữ "đang đẩy" và không phát lệnh tạo lại',
-    [/không tự tạo lại/i.test(missingError && missingError.message), recoverMissing.run.local.customer[0].syncStatus, afterMissing.request, recoverMissing.F.stateRead().counts.error],
+    [/không tự tạo lại/i.test(missingReason), recoverMissing.run.local.customer[0].syncStatus, afterMissing, recoverMissing.F.stateRead().counts.error],
     [true, 'đang đẩy', null, 1]);
 
   const openFailed = pushQueue([Object.assign({}, lostCustomer)]);
@@ -198,7 +197,7 @@ async function chay(so) {
   check(so, 'FBM-027: lỗi ở bước mở form tạo (lệnh lưu chưa phát) thì chuyển "đẩy lỗi"; lỗi sau khi đã phát lệnh lưu thì giữ "đang đẩy"',
     [openFailed.run.local.customer[0].syncStatus, sentFailed.run.local.customer[0].syncStatus], ['đẩy lỗi', 'đang đẩy']);
 
-  // Chặng đẩy theo danh sách mã: bước đẩy giả lập thành công đi qua đúng cửa bản ghi (nhả sổ bận, ghi baseline) rồi sang mã kế như finishPushVerification.
+  // Chặng đẩy theo danh sách mã: bước đẩy giả lập thành công đi qua đúng cửa bản ghi (nhả sổ bận, ghi baseline) rồi sang mã kế như pushResultVerify.
   const pushListKey = (q) => String(q.run.documentProperties.data.FBM_SYNC_PUSH_LIST_0 || '');
   {
     const scanBox = pushQueue(['A', 'B'].map(editCustomer).concat([Object.assign(editCustomer('C'), { fbmHash: '' }), Object.assign(editCustomer('D'), { phone: '' })]), [Object.assign({ id: 'ACT-1', customerId: 'CUS-A', fbmId: '9001', workDate: '2026-10-01', taskType: 'Gọi điện', content: 'Gọi', owner: 'Người khác', fbmSyncPermission: 'Cho phép', fbmHash: 'cũ' })]);
@@ -220,19 +219,19 @@ async function chay(so) {
   {
     const q = pushQueue(['A', 'B', 'C', 'D', 'E'].map(editCustomer));
     q.F.SHARD_LIST_BYTES = 40;
-    const first = q.F.nextPushRequest(q.F.stateRead()), firstCursor = q.F.stateRead().cursor;
+    const first = q.F.pushStageResume(q.F.stateRead()), firstCursor = q.F.stateRead().cursor;
     const { tried } = (() => { const out = [q.F.stateRead().cursor.candidate.id]; let r = first; for (let g = 0; g < 20 && r; g += 1) { r = pushOk(q); if (r) { out.push(q.F.stateRead().cursor.candidate.id); } } return { tried: out }; })();
     check(so, 'C0: danh sách không vừa một khóa thì chỉ ghi phần đầu; lần quét lại nhặt phần còn lại, không sót bản ghi',
       [firstCursor.size, tried, q.F.stateRead().phase, pushListKey(q)], [2, ['CUS-A', 'CUS-B', 'CUS-C', 'CUS-D', 'CUS-E'], 'done', '']);
   }
   {
     const broken = pushQueue(['A', 'B'].map(editCustomer));
-    broken.F.nextPushRequest(broken.F.stateRead());
+    broken.F.pushStageResume(broken.F.stateRead());
     broken.run.documentProperties.setProperty('FBM_SYNC_PUSH_LIST_0', 'hỏng');
     pushOk(broken);
     const brokenLog = broken.run.logs.filter((event) => event.action === 'push_list_read');
     const missing = pushQueue(['A', 'B'].map(editCustomer));
-    missing.F.nextPushRequest(missing.F.stateRead());
+    missing.F.pushStageResume(missing.F.stateRead());
     missing.run.documentProperties.deleteProperty('FBM_SYNC_PUSH_LIST_0'); missing.run.documentProperties.deleteProperty('FBM_SYNC_PUSH_LIST_SHARDS');
     pushOk(missing);
     check(so, 'C0: khóa danh sách hỏng thì ghi Log lỗi rồi quét lại; khóa mất thì quét lại không cần Log; cả hai vẫn đẩy tiếp bản ghi còn lại',
@@ -242,14 +241,14 @@ async function chay(so) {
   {
     const capped = pushQueue(['A', 'B'].map(editCustomer));
     capped.F.SHARD_LIST_BYTES = 8; capped.F.BUDGET.pushPassesMax = 1;
-    capped.F.nextPushRequest(capped.F.stateRead());
+    capped.F.pushStageResume(capped.F.stateRead());
     const cappedNext = pushOk(capped), cappedEnd = capped.F.stateRead(), cappedLog = capped.run.logs.find((event) => event.action === 'push_unfinished') || {};
     const busy = pushQueue(['A', 'B'].map(editCustomer));
     busy.F.pushRowChange = () => ({ status: 'busy', busy: { reason: 'đang có người sửa' } });
-    const busyRequest = busy.F.nextPushRequest(busy.F.stateRead()), busyEnd = busy.F.stateRead(), busyLog = busy.run.logs.find((event) => event.action === 'push_unfinished') || {};
+    const busyRequest = busy.F.pushStageResume(busy.F.stateRead()), busyEnd = busy.F.stateRead(), busyLog = busy.run.logs.find((event) => event.action === 'push_unfinished') || {};
     const paused = pushQueue(['A'].map(editCustomer));
-    paused.F.nextPushRequest(paused.F.stateRead());
-    paused.F.pushStagePause(paused.F.stateRead(), 'Tạm dừng thử');
+    paused.F.pushStageResume(paused.F.stateRead());
+    paused.F.pushEndApply(paused.F.stateRead(), { kind: 'pause', message: 'Tạm dừng thử' });
     check(so, 'C0: đạt pushPassesMax hoặc vòng đứng yên (mọi mã đều hoãn) thì dừng không sạch, Log cảnh báo nêu số còn lại; dừng, tạm dừng hay sạch đều xóa danh sách',
       [cappedNext, cappedEnd.phase, /Còn 1 bản ghi/.test(cappedEnd.message), cappedLog.outcome, cappedLog.detail && cappedLog.detail.remaining, cappedLog.detail && cappedLog.detail.stalled, pushListKey(capped),
         busyRequest, busyEnd.phase, busyLog.detail && busyLog.detail.stalled, busyLog.detail && busyLog.detail.remaining, pushListKey(busy), paused.F.stateRead().phase, pushListKey(paused)],
@@ -298,7 +297,7 @@ async function chay(so) {
   check(so, 'FBM-024: pull lần sau so lại dòng đang xung đột chờ quyết; còn xung đột thì giữ nguyên, không ghi đè, không cộng vào số chờ quyết nhưng vẫn báo là xung đột, không tính Bỏ qua',
     [cfRepull.conflicts, cfRepull.conflictsKept, cfRepull.skipped, cf.local.customer.map((row) => row.companyName), cf.local.customer[0].syncStatus], [0, 3, 0, ['Tên Shin 1', 'Tên Shin 2', 'Tên Shin 3'], 'xung đột chờ quyết']);
   CF.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
-  check(so, 'FBM-024: dòng đang xung đột chờ quyết không vào danh sách đẩy', CF.pushCandidates('customer').length, 0);
+  check(so, 'FBM-024: dòng đang xung đột chờ quyết không vào danh sách đẩy', ungVienDay(CF, 'customer').length, 0);
 
   // Xung đột không khóa đồng bộ: mỗi kỳ pull so ba chiều lại với baseline cũ. Bốn khách: FBM đổi cho khớp ShinCRM, FBM quay về gốc, ShinCRM quay về gốc, vẫn khác nhau.
   const rv = makeSync(), RV = rv.hop.FbmSync;
@@ -409,7 +408,7 @@ async function chay(so) {
     [cfShinChanged.code, cfShinShot.old.companyName], ['CONFLICT_SHEET_CHANGED', 'Tên Shin 2 sửa trên Sheet']);
   const cfShinRow = cf.local.customer[1];
   check(so, 'FBM-024 PA2: lấy ShinCRM giữ giá trị ShinCRM, baseline là hash FBM mới, trạng thái chờ đối soát và vào danh sách đẩy',
-    [cfShin.ok, cfOpen2.request.meta.conflictId, cfShinRow.companyName, cfShinRow.syncStatus, cfShinRow.fbmHash === CF.hash(CF.customerRecord(fbmRow('F-2', 'ALT00002', 'Tên FBM 2'), NO_CATEGORY), 'customer', NO_CATEGORY), CF.pushCandidates('customer').map((item) => item.id)],
+    [cfShin.ok, cfOpen2.request.meta.conflictId, cfShinRow.companyName, cfShinRow.syncStatus, cfShinRow.fbmHash === CF.hash(CF.customerRecord(fbmRow('F-2', 'ALT00002', 'Tên FBM 2'), NO_CATEGORY), 'customer', NO_CATEGORY), ungVienDay(CF, 'customer').map((item) => item.id)],
     [true, 'CUS-000002', 'Tên Shin 2', 'chờ đối soát', true, ['CUS-000002']]);
 
   const cfOpen3 = CF.openConflict();

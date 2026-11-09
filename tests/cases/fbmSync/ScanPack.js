@@ -89,7 +89,7 @@ async function chay(so) {
   haiChieu.F.canWriteFbm = () => true;
   // Danh mục FBM của chiều đẩy không thuộc phần đang kiểm; harness việc quét không giả lập nó.
   haiChieu.F.needsFbmLookups = () => false;
-  haiChieu.F.nextPushRequest = (state) => { pushCounts.push([state.counts.missingCustomer, state.counts.missingActivity]); pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === '700002').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
+  haiChieu.F.pushStageOpen = (state) => { pushCounts.push([state.counts.missingCustomer, state.counts.missingActivity]); pushAt.push([haiChieu.local.activity.find((item) => item.fbmId === '700002').syncStatus, haiChieu.local.customer.find((item) => item.id === 'CUS-900001').syncStatus]); state.phase = 'done'; haiChieu.F.stateWrite(state); return null; };
   await haiChieu.run({ pack: 'quick', startOptions: { mode: 'write' } });
   check(so, 'Đồng bộ hai chiều: giao dịch đã xóa bên FBM của khách đã đọc và khách không còn bên FBM bị gắn "không thấy bên FBM" trước khi sang bước đẩy', pushAt, [[haiChieu.F.SYNC_STATUS.missing, haiChieu.F.SYNC_STATUS.missing]]);
   check(so, 'Đồng bộ hai chiều: bộ đếm phiên có số khách và giao dịch "không thấy bên FBM" để thẻ Trạng thái phiên hiện', pushCounts, [[1, 1]]);
