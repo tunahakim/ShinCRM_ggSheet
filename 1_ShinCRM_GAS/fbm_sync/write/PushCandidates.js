@@ -2,17 +2,17 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
- * Thứ phép xét một dòng cần, đọc một lần cho cả lần quét hoặc cả một lần gọi của chặng đẩy. `scan` là bản đọc `localScan` khi xét trên lần quét (băm có nhớ), thiếu thì băm thẳng dòng đọc theo mã; `settings` là cấu hình bên gọi đã đọc, thiếu thì đọc khi một Giao dịch cần so người phụ trách.
+ * Thứ phép xét một dòng cần, đọc một lần cho cả lần quét hoặc cả một lần gọi của chặng đẩy. `state` là ô lượt bên gọi đang cầm (cổng danh mục của lượt), bắt buộc: công cụ không tự đọc ô lượt. `scan` là bản đọc `localScan` khi xét trên lần quét (băm có nhớ), thiếu thì băm thẳng dòng đọc theo mã; `settings` là cấu hình bên gọi đã đọc, thiếu thì đọc khi một Giao dịch cần so người phụ trách.
  * Đọc hỏng thì ném lên cổng báo lỗi chung: coi sổ lỗi đẩy là rỗng sẽ đẩy lại âm thầm bản ghi từng lỗi.
  */
 FbmSync.pushReviewContext = function (state, scan, settings) {
-  var current = state || FbmSync.stateRead(), categoryGate = FbmSync.stateCategoryGate(current), cached = settings;
+  var categoryGate = FbmSync.stateCategoryGate(state), cached = settings;
   return {
     categoryGate: categoryGate,
     pushFailures: FbmSync.pushFailuresRead().hashes,
-    scope: typeof FbmSync.scope === 'function' ? FbmSync.scope() : null,
+    scope: FbmSync.scope(),
     hash: function (record, entity) { return scan ? scan.hash(record, entity, categoryGate) : FbmSync.hash(record, entity, categoryGate); },
-    settings: function () { if (!cached) { cached = FbmSync.scriptSettings(current); } return cached; }
+    settings: function () { if (!cached) { cached = FbmSync.scriptSettings(state); } return cached; }
   };
 };
 
@@ -90,8 +90,7 @@ FbmSync.pushScanRows = function (entity, scan) {
 
 /** Quét một thực thể trên bản đọc `scan` (đọc cả sheet một lần): mọi dòng có việc theo `pushReview`, theo thứ tự dòng. */
 FbmSync.pushCandidates = function (entity, scan, context) {
-  var local = scan || FbmSync.localScan(), review = context || FbmSync.pushReviewContext(FbmSync.stateRead(), local);
-  return FbmSync.pushScanRows(entity, local).map(function (row) { return FbmSync.pushReview(entity, row.record, row.parent, review); }).filter(Boolean);
+  return FbmSync.pushScanRows(entity, scan).map(function (row) { return FbmSync.pushReview(entity, row.record, row.parent, context); }).filter(Boolean);
 };
 
 /**

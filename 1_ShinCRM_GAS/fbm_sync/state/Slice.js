@@ -84,6 +84,16 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.customerScanStage(ctx); },
     end: function (state) { return FbmSync.customerScanEnd(state); }
   },
+  push_lookup: {
+    inputs: function () { return FbmSync.pushInputs(); },
+    stage: function (ctx) { return FbmSync.pushStage(ctx); },
+    end: function (state, end) { return FbmSync.pushEnd(state, end); }
+  },
+  push_wait: {
+    inputs: function () { return FbmSync.pushInputs(); },
+    stage: function (ctx) { return FbmSync.pushStage(ctx); },
+    end: function (state, end) { return FbmSync.pushEnd(state, end); }
+  },
   run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
   scan_job: {
     inputs: function (state) { return FbmSync.activityScanInputs(state); },

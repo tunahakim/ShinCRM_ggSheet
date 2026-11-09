@@ -15,7 +15,7 @@ function fbmProbeAltState() {
   var summarizeActivity = function (record) {
     return { id: record.id || '', fbmId: record.fbmId || '', customerId: record.customerId || '', taskType: record.taskType || '', workDate: record.workDate || '', syncStatus: record.syncStatus || '', fbmSyncPermission: record.fbmSyncPermission || '' };
   };
-  var candidates = FbmSync.pushCandidatesAll(scan).map(function (item) {
+  var candidates = FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan)).map(function (item) {
     return { entity: item.entity, kind: item.kind, id: item.id, customerId: item.entity === 'activity' && item.record ? String(item.record.customerId || '') : '' };
   });
   var violations = candidates.filter(function (candidate) { return !selectedIds[String(candidate.entity === 'customer' ? candidate.id : candidate.customerId).trim()]; });

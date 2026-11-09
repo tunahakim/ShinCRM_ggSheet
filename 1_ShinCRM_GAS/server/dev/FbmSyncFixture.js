@@ -140,7 +140,7 @@ function fbmProbeCreateCustomer() {
     syncStatus: record.syncStatus || '', recordStatus: record.recordStatus || '', fbmSyncPermission: record.fbmSyncPermission || '',
     permission: FbmSync.syncPermission(record, 'customer'), eligibilityErrors: FbmSync.pushEligibilityErrors(record, 'customer'),
     categoryErrors: FbmSync.categoryGateCheck(record, 'customer', gate), fbmCodes: FbmSync.toFbmCodes(record, 'customer', gate),
-    scope: settingsValue('fbm_run', 'scopeCodes'), candidates: FbmSync.pushCandidates('customer').map(function (item) { return item.kind + ':' + item.id; })
+    scope: settingsValue('fbm_run', 'scopeCodes'), candidates: (function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidates('customer', scan, FbmSync.pushReviewContext(FbmSync.stateRead(), scan)); }()).map(function (item) { return item.kind + ':' + item.id; })
   };
 }
 /** Mở phạm vi ghi thử cho đúng khách được phép tạo thật, cạnh mã FBM `ALT00010`. */

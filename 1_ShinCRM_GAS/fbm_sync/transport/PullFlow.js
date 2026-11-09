@@ -150,7 +150,8 @@ FbmSync.preflightLocalStep = function (state) {
 
 /** Quyết lượt có bỏ chặng đẩy không: đọc cổng đã lưu và dấu hiện tại rồi so (`pushGateSkip`). Chỉ lượt nền mới đọc, vì lượt tay luôn chạy chặng đẩy. */
 FbmSync.pushGateCheck = function (state, options) {
-  var stored = options.origin === 'background' ? FbmSync.pushGateLoad(state) : null;
+  var gateLogs = [], stored = options.origin === 'background' ? FbmSync.pushGateLoad(gateLogs) : null;
+  FbmSync.stagePatchApply(state, { logs: gateLogs });
   var gate = FbmSync.pushGateSkip(options, stored, stored ? FbmSync.pushGateMark() : null);
   if (!gate.open) { FbmSync.scheduleTrace('push_gate_closed', FbmSync.PUSH_GATE_CLOSED_TRACE, { scan: String(options.scan || ''), mode: String(options.mode || '') }); }
   return gate;
@@ -241,11 +242,10 @@ FbmSync.activityStagesContinue = function (state, extra) {
 
 /** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
 FbmSync.beginCustomerPull = function (state) {
-  if (state.mode === 'push') {
-    FbmSync.prepareCategoryGate(state);
-    return FbmSync.pushStageBegin(state);
-  }
-  FbmSync.prepareCategoryGate(state);
+  var categoryLogs = [];
+  FbmSync.prepareCategoryGate(state, categoryLogs);
+  FbmSync.stagePatchApply(state, { logs: categoryLogs });
+  if (state.mode === 'push') { return FbmSync.pushStageOpen(state); }
   if (typeof FbmSync.businessStepStart === 'function' && state.scan === 'full') {
     FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
     FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
@@ -269,7 +269,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
     if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
-    result.request = FbmSync.nextEnvelope(FbmSync.pushStageBegin(state)); result.status = FbmSync.statusView();
+    result.request = FbmSync.nextEnvelope(FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
     return result;
   }
   FbmSync.finishPullRun(state);
@@ -313,7 +313,7 @@ FbmSync.continueStep = function (rawResponse) {
   // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
   var success = cursor.kind === 'session_probe' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse) ? { ok: true } : FbmSync.protocol.assertSuccess(rawResponse);
   if (!success.ok) {
-    if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'push_wait' && cursor.kind !== 'session_probe') {
+    if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'session_probe') {
       var suspicionProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.');
       return suspicionProbe ? { ok: true, request: suspicionProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
     }
@@ -322,16 +322,6 @@ FbmSync.continueStep = function (rawResponse) {
       if (gateFailure) { return gateFailure; }
     }
     var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM trả về lỗi nghiệp vụ';
-    if (cursor.kind === 'push_wait' && cursor.candidate) {
-      if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
-        return FbmSync.continueAfterPushVerificationError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
-      }
-      if (cursor.operation === 'customer_create_save' && cursor.candidate.kind === 'create' && typeof FbmSync.customerCreateRecoveryRequest === 'function') {
-        var recovery = FbmSync.customerCreateRecoveryRequest(state, cursor);
-        if (recovery) { return { ok: true, request: FbmSync.nextEnvelope(recovery), status: FbmSync.statusView() }; }
-      }
-      return FbmSync.continueAfterPushError(state, cursor, { code: success.code, status: success.status, fieldName: success.bug && success.bug.FieldName, reason: failureReason });
-    }
     state.lastFailureCode = String(success.code || 'FBM_ERROR');
     state.retryable = success.retryable === true;
     if (success.code === 'SESSION_EXPIRED') {
@@ -426,19 +416,6 @@ FbmSync.continueStep = function (rawResponse) {
     return { ok: true, request: FbmSync.nextEnvelope(resumedRequest), status: FbmSync.statusView(), sessionVerified: true };
   }
 
-  if (cursor.kind === 'push_wait') {
-    try {
-      var pushRequest = FbmSync.continuePush(state, response);
-      return { ok: true, request: FbmSync.nextEnvelope(pushRequest), status: FbmSync.statusView() };
-    } catch (pushError) {
-      if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') {
-        return FbmSync.continueAfterPushVerificationError(state, cursor, pushError && pushError.message || pushError);
-      }
-      // Giữ nguyên object lỗi có mã để markPushError chọn đúng trạng thái (ví dụ FBM_RECORD_NOT_FOUND).
-      return FbmSync.continueAfterPushError(state, cursor, pushError && pushError.code ? pushError : (pushError && pushError.message || pushError));
-    }
-  }
-
   // Hai bước đầu chỉ lấy authorized token cho từng controller.
   if (cursor.kind === 'authorize_customer') {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('customer', response)), status: FbmSync.statusView() };
@@ -467,13 +444,12 @@ FbmSync.continueStep = function (rawResponse) {
     FbmSync.stateWrite(state);
     return { ok: true, status: FbmSync.statusView() };
   }
-  // Chế độ ghi phải nạp danh mục trước khi dựng payload ghi; chiều đẩy nạp lại giữa các lô (`push_lookup`).
-  if (cursor.kind === 'lookup' || cursor.kind === 'push_lookup') {
+  // Chế độ ghi phải nạp danh mục trước khi dựng payload ghi; chiều đẩy nạp lại giữa các lô ở chặng đẩy (`push_lookup`).
+  if (cursor.kind === 'lookup') {
     if (!FbmSync.lookupBatchApply(state, rawResponse)) {
       var lookupProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ khi đọc danh mục; chưa đối chiếu gì, đang probe lại phiên.');
       return lookupProbe ? { ok: true, request: lookupProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
     }
-    if (cursor.kind === 'push_lookup') { return FbmSync.continuePushLookup(state, cursor); }
     if (FbmSync.canWriteFbm(state.mode)) {
       // Category is user-owned configuration; sync only reads and validates it.
       state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';

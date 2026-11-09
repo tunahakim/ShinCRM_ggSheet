@@ -166,7 +166,7 @@ FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet
 
 /**
  * Bản ghi đẩy lỗi: `hashes` là hash lúc lỗi, chặn gửi lại khi dữ liệu chưa đổi; `details` chỉ để Sidebar hiển thị, bản đầy đủ nằm ở Log.
- * Ở khóa riêng vì state phiên chỉ 9 KB. Khóa này có trần cố định vì chiều đẩy dừng khi chạm `pushFailuresMax` (`pushFailuresGuard`), chi tiết chỉ giữ `pushFailureDetailsMax` mục mới nhất với lý do cắt ngắn.
+ * Ở khóa riêng vì state phiên chỉ 9 KB. Khóa này có trần cố định vì chiều đẩy dừng khi chạm `pushFailuresMax` (`pushFailuresTripped`), chi tiết chỉ giữ `pushFailureDetailsMax` mục mới nhất với lý do cắt ngắn.
  */
 FbmSync.PUSH_FAILURES_KEY = 'FBM_SYNC_PUSH_FAILURES_V1';
 FbmSync.pushFailuresRead = function () {
