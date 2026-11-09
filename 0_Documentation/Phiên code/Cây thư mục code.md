@@ -249,6 +249,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\TransportCore.js Hợp đồng request, retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại).
     ├── transport\PushFlow.js    Điều phối chiều đẩy và khóa an toàn trước khi ghi FBM.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
+    ├── transport\RequestSettings.js Cài đặt dựng request: hằng địa chỉ FBM, `scriptSettings(state)` của một lát, phép kiểm `requestCfg` đầu mọi hàm dựng (thiếu cfg thì ném `FBM_REQUEST_SETTINGS_MISSING`).
     ├── transport\ScanJob.js     Việc quét: cấp scan_job/scan_chunk, đối chiếu gói với cursor, chạy lại khi tab mất việc.
     ├── transport\CustomerCount.js Bước đếm khách cuối lượt và thân Giữ phiên: số khách mốc, request đếm cùng bộ lọc với lượt lấy danh sách, lệch mốc thì chạy Quét nhanh.
     ├── transport\ActivityScan.js Lấy toàn bộ giao dịch bằng việc quét giữ id đã biết: chia khoảng ngày khi quá lớn, đọc lại theo id trước khi gắn cờ "không thấy".
@@ -435,6 +436,7 @@ tests\
     │   ├── PushRetry.js           Kiểm ứng viên đẩy sau lỗi: cùng hash không lặp lại, hash đổi thì thử lại.
     │   ├── PullGateRule.js        Kiểm cửa ghi Sheet không có luật nào từ chối nội dung trường kéo từ FBM về.
     │   ├── LookupFlow.js          Kiểm chặng tra danh mục: lỗi đường truyền dừng đóng lỗi, lô không dòng vẫn đi tiếp.
+    │   ├── RequestSettings.js     Kiểm hàm dựng request nhận cfg và phạm vi qua tham số: thiếu hoặc nhầm thì ném; quét thân hàm dựng không tự đọc cài đặt hay phạm vi.
     │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách.
     │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
