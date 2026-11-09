@@ -53,7 +53,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js', 590, 47000, 'B4/B8', 'cờ, cổng phiên, phát phong bì; bảng khai REQUEST_REPLAY nằm cạnh cổng phát requestIssue vì chỉ cổng đó và bảng lỗi đường truyền dùng nó'],
   ['1_ShinCRM_GAS/server/Triggers.js', 228, 12605, 'giữ', 'trigger Sheet'],
   ['1_ShinCRM_GAS/fbm_sync/state/Slice.js', 221, 17200, 'B8', 'một việc: khung lát (lát, bảng cursor, cửa nhận response, khung chạy chặng theo hợp đồng chung); thêm dòng bảng cho chặng đọc lô giao dịch và quét giao dịch, `stageCall` dùng chung cho chặng và đường cứu việc quét; nhánh dừng khi lượt chạm trần phát lại request'],
-  ['1_ShinCRM_GAS/server/dev/FbmPerfProbe.js', 219, 16524, 'dev', 'một việc: bộ bọc đo thời gian đồng bộ (bọc, gộp số, báo cáo); thêm tên bọc pushEligible, preflightPushReview; tên bọc chặng quét khách'],
+  ['1_ShinCRM_GAS/server/dev/FbmPerfProbe.js', 235, 18000, 'dev', 'một việc: bộ bọc đo thời gian đồng bộ (bọc, gộp số, báo cáo); thêm tên bọc lần hỏi nền và cất riêng lần gọi chậm'],
   ['1_ShinCRM_GAS/server/dev/FbmSyncFixture.js', 205, 17225, 'dev', 'một việc: dựng dữ liệu thử đồng bộ trên Sheet DEV qua cửa bản ghi'],
   ['1_ShinCRM_GAS/server/dev/SeedFake.js', 239, 12511, 'dev', 'một việc: dữ liệu giả; hàm còn dùng'],
   ['1_ShinCRM_GAS/server/dev/reload/ReloadMatrixProbe.js', 322, 19303, 'dev', 'một ma trận reload; mỗi ca ghi, kiểm rồi trả lại ô nên dài'],

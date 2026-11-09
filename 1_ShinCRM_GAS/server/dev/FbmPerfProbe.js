@@ -23,11 +23,15 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'logPreflight', 'identityPreflight', 'pushCandidates',
   'continueSessionGate', 'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
   'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure',
-  'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors'
+  'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors',
+  'heartbeatRun', 'stopPendingApply', 'backgroundSettle', 'machineAskRecord', 'staleRunCheck', 'backgroundNext', 'backgroundTail', 'processBookRead', 'pushGateCheck', 'startRun', 'runTail', 'runOpen', 'runSlice', 'preflightLocal'
 ];
+/** Lần gọi GAS chạy lâu từ ngưỡng này được cất riêng (không gộp vào bảng tổng), vì một lần chậm hiếm bị số trung bình của các lần nhanh che mất. */
+var FBM_PERF_SLOW_MS = 20000;
+var FBM_PERF_SLOW_KEEP = 5;
 var FBM_PERF_PROTOCOL_FUNCTIONS = ['parse', 'assertSuccess', 'isLiveSessionResponse'];
 /** Hàm toàn cục của lõi ShinCRM mà đồng bộ gọi tới: đọc Sheet, cửa ghi, Log. */
-var FBM_PERF_GLOBAL_FUNCTIONS = ['entityReadAllCombined', 'entityReadAll', 'writeGateSave', 'logEvent', 'logTrace', 'flushLog', 'flushLogIfTraced', 'shinCorePreflight'];
+var FBM_PERF_GLOBAL_FUNCTIONS = ['entityReadAllCombined', 'entityReadAll', 'writeGateSave', 'logEvent', 'logTrace', 'flushLog', 'flushLogIfTraced', 'shinCorePreflight', 'fbmEnsureSyncColumns'];
 /** Cặp mốc phía client: [tên đoạn, mốc bắt đầu, mốc kết thúc]. Chỉ ghi cặp mà Extension còn phát (`executor.js`). */
 var FBM_PERF_CLIENT_SEGMENTS = [
   ['extension_fetch_fbm', 'fetch_started', 'fetch_finished']
@@ -162,6 +166,12 @@ function fbmPerfEndUnsafe(perf, failed) {
   });
   Object.keys(perf.callers).forEach(function (edge) { agg.callers[edge] = Number(agg.callers[edge] || 0) + perf.callers[edge]; });
   fbmPerfClientSegments(perf, run, kind);
+  if (serverMs >= FBM_PERF_SLOW_MS) {
+    var slow = store.slow || (store.slow = []);
+    var cells = Object.keys(perf.buckets).sort(function (a, b) { return perf.buckets[b].selfMs - perf.buckets[a].selfMs; }).slice(0, 15).map(function (label) { return label + ' ×' + perf.buckets[label].n + ' tự thân ' + perf.buckets[label].selfMs + ' ms, cả con ' + perf.buckets[label].totalMs + ' ms'; });
+    slow.push({ at: perf.startedAt, kind: kind, runId: runKey, serverMs: serverMs, failed: !!failed, cells: cells });
+    while (slow.length > FBM_PERF_SLOW_KEEP) { slow.shift(); }
+  }
   var text = JSON.stringify(store);
   fbmPerfCache().put(FBM_PERF_STORE_KEY, text, FBM_PERF_TTL_SECONDS);
 }
@@ -199,6 +209,10 @@ function fbmPerfReport() {
   if (!raw) { return 'Chưa có số liệu đo (chưa bật fbmPerfOn, chưa chạy lượt nào, hoặc Cache đã hết hạn).'; }
   var store = JSON.parse(raw), lines = [], perfError = fbmPerfCache().get('FBM_PERF_ERROR');
   if (perfError) { lines.push('!!! ' + perfError); }
+  (store.slow || []).forEach(function (item) {
+    lines.push('*** Lần gọi chậm ' + new Date(item.at).toISOString() + ' ' + item.kind + ' (lượt ' + item.runId + '): ' + item.serverMs + ' ms' + (item.failed ? ', lỗi' : ''));
+    item.cells.forEach(function (cell) { lines.push('   ' + cell); });
+  });
   store.order.forEach(function (runKey) {
     var run = store.runs[runKey];
     lines.push('=== Lượt ' + runKey + ' (' + Math.round((run.lastAt - run.firstAt) / 1000) + ' giây từ lần gọi đầu đến lần cuối) ===');
