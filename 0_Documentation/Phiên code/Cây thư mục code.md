@@ -274,6 +274,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
     ├── read\CustomerScan.js      Chặng quét khách theo hợp đồng chung: mỗi gói tính lý do đọc từng khách, đánh dấu danh sách đọc, tiến cursor; gói cuối kiểm đủ số, xét khách vắng, để tổng thành số khách mốc chờ đóng lượt.
     ├── read\ActivityLayers.js    Kho của lớp giao dịch (danh sách đọc, thứ tự top, khách vắng) và chọn khách cần đọc: lớp 2 so giao dịch cuối, lớp 3 quét từ khách mới nhất xuống, lớp 4 Vòng xoay đi theo số CUS; tập khách và thứ tự ở khóa riêng theo số CUS.
+    ├── read\BatchDecide.js       Hàm quyết thuần của lô đọc chi tiết: ghép lô thành bản ghi và lỗi từng khách (`batchRecordsOf`), đối chiếu vắng mặt (`absentFind`), kết quả vòng tra mã (`lookupDecide`); không đọc kho, không ghi.
     ├── write\RequestBuilders.js  Builder Customer/Activity create/edit.
     ├── write\PushCandidates.js   Phép xét một dòng của chặng đẩy (pushEligible), dựng ứng viên và phép chờ sửa; preflight dùng chung.
     ├── write\FormValues.js       Trích giá trị từ response mở form FBM để dựng lệnh ghi tiếp theo.
@@ -437,6 +438,7 @@ tests\
     │   ├── PullGateRule.js        Kiểm cửa ghi Sheet không có luật nào từ chối nội dung trường kéo từ FBM về.
     │   ├── LookupFlow.js          Kiểm chặng tra danh mục: lỗi đường truyền dừng đóng lỗi, lô không dòng vẫn đi tiếp.
     │   ├── RequestSettings.js     Kiểm hàm dựng request nhận cfg và phạm vi qua tham số: thiếu hoặc nhầm thì ném; quét thân hàm dựng không tự đọc cài đặt hay phạm vi.
+    │   ├── BatchDecide.js         Hàm quyết của lô đọc chi tiết chạy trên dữ liệu dựng tay với mọi cổng kho đều ném; người điều phối thiếu đầu vào lớp thì ném `FBM_BATCH_SOURCE_MISSING`.
     │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách.
     │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
