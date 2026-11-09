@@ -95,6 +95,23 @@ function testCua(so) {
     [thuTu, kqD.value, kqD.ok],
     [['đọc An', 'ghi An Mới'], 1, true]);
 
+  const dong = { customer: [{ id: 'C1' }, { id: 'C2' }] };
+  const may = (decide) => { const c = taoCua({ dong }); return { c, loi: nem(() => c.hop.recordGateRun({ by: 'fbm', decide })) }; };
+  const chuaDoc = may(() => ({ save: [{ entity: 'customer', records: [{ id: 'C1', ten: 'x' }], source: 'pull' }] }));
+  const docMaKhac = may((gate) => { gate.readById('customer', {}, 'C2'); return { save: [{ entity: 'customer', records: [{ id: 'C1', ten: 'x' }], source: 'push' }] }; });
+  const docKhacBang = may((gate) => { gate.read('activity', {}); return { save: [{ entity: 'customer', records: [{ id: 'C1', ten: 'x' }], source: 'pull' }] }; });
+  check(so, 'nguồn máy sửa bản ghi chưa đọc trong lần cầm khóa (không đọc, đọc mã khác, đọc thực thể khác) thì ném lỗi nêu mã và không gọi cửa ghi', [
+    /chưa đọc trong lần cầm khóa này: customer:C1/.test(chuaDoc.loi), chuaDoc.c.ghi, /customer:C1/.test(docMaKhac.loi), docMaKhac.c.ghi, /customer:C1/.test(docKhacBang.loi), docKhacBang.c.ghi
+  ], [true, [], true, [], true, []]);
+  const docDungMa = may((gate) => { gate.readById('customer', {}, ' C1 '); return { save: [{ entity: 'customer', records: [{ id: 'C1', ten: 'x' }], source: 'pull' }] }; });
+  const docCaBang = may((gate) => { gate.read('customer', {}); return { save: [{ entity: 'customer', records: [{ id: 'C1' }, { id: 'C2' }], source: 'pull' }] }; });
+  const banMoi = may(() => ({ save: [{ entity: 'customer', records: [{ companyName: 'Khách mới' }], source: 'pull' }] }));
+  const nguoiDung = taoCua({ dong });
+  const loiNguoiDung = nem(() => nguoiDung.hop.recordGateRun({ by: 'sidebar', decide: () => ({ save: [{ entity: 'customer', records: [{ id: 'C1', ten: 'x' }], source: 'user', old: [{ ten: '' }] }] }) }));
+  check(so, 'nguồn máy đọc đúng mã hoặc cả thực thể trong khóa thì ghi được; bản ghi mới (chưa có mã) và nguồn user không bị phép này chặn', [
+    docDungMa.loi, docDungMa.c.ghi, docCaBang.loi, docCaBang.c.ghi, banMoi.loi, banMoi.c.ghi.length, loiNguoiDung, nguoiDung.ghi
+  ], ['', [['C1']], '', [['C1', 'C2']], '', 1, '', [['C1']]]);
+
   check(so, 'cửa thiếu chủ hoặc thiếu hàm quyết thì ném lỗi', [
     /cần `by`/.test(nem(() => taoCua().hop.recordGateRun({ decide: () => ({}) }))), /cần `decide`/.test(nem(() => taoCua().hop.recordGateRun({ by: 'sidebar' })))
   ], [true, true]);
