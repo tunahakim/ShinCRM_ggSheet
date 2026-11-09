@@ -16,33 +16,62 @@ FbmSync.gateOpen = function (state, cursorFields, message, cfg, scope) {
   ['pull_customer', 'reconcile_customer', 'pull_activity', 'reconcile_activity'].forEach(function (step) { FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: step.indexOf('customer') >= 0 ? 'customer' : 'activity' }); });
   state.cursor = Object.assign({ kind: 'activity_grid', customers: [], count: FbmSync.BUDGET.activityCustomerRows }, cursorFields || {});
   state.message = message;
-  FbmSync.activityBatchPlan(state.cursor, state.metadata);
-  FbmSync.activityLayerProgress(state);
-  return FbmSync.activityBatchRequest(state, cfg, scope);
-};
-
-/** Lấp lô kế khi lô trước đã ghi xong: lớp 3, Vòng xoay hoặc danh sách đọc. Đang ở vòng tra mã thì giữ nguyên. `metadata` là của ô lượt, Vòng xoay ghi vị trí đã đọc xong vào đó. */
-FbmSync.activityBatchPlan = function (cursor, metadata) {
-  if (cursor.lookup || (cursor.customers || []).length) { return cursor.customers || []; }
-  if (cursor.layer === 'top') { FbmSync.activityTopRefill(cursor); }
-  else if (cursor.rotation) { FbmSync.activityRotationRefill(cursor, metadata); }
-  else { cursor.customers = FbmSync.readListNext(FbmSync.BUDGET.activityBatchCustomers); }
-  return cursor.customers;
-};
-
-FbmSync.gateLookupChunk = function (cursor) {
-  var from = Number(cursor.lookupPos || 0);
-  return FbmSync.shardListRead(FbmSync.GATE_LOOKUP_PREFIX).slice(from, from + FbmSync.BUDGET.activityBatchCustomers);
+  var source = FbmSync.activityBatchSource(state.cursor);
+  FbmSync.activityBatchPlan(state.cursor, state.metadata, source);
+  FbmSync.activityLayerProgress(state, source);
+  return FbmSync.activityBatchRequest(state, cfg, scope, null);
 };
 
 /**
- * Dựng lại lô từ cursor; cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
+ * Đọc thứ lớp đang chạy cần để lấp lô kế và tính tiến trình; gọi sau khi lô trước đã ghi xong vì khách mới ghi trong lô làm đổi danh sách. Lô kế đã có sẵn (vòng tra mã, khách đọc dở trang) thì lớp 3 và Vòng xoay không đọc.
+ * Lớp 3 trả `top`, Vòng xoay trả `ring`, danh sách đọc trả `list` cùng `pending` (số khách còn chờ, mẫu số tiến trình).
+ */
+FbmSync.activityBatchSource = function (cursor) {
+  var refill = !cursor.lookup && !(cursor.customers || []).length;
+  if (cursor.layer === 'top') { return refill ? { top: FbmSync.activityTopSource() } : {}; }
+  if (cursor.rotation) { return refill ? { ring: FbmSync.activityRotationRing(Number(cursor.rotation.start)) } : {}; }
+  var all = FbmSync.readListNext(Infinity);
+  return { list: all.slice(0, FbmSync.BUDGET.activityBatchCustomers), pending: all.length };
+};
+
+/** Thiếu phần đầu vào lớp cần là lỗi người điều phối: ném, không coi như hết khách (hết khách thì chặng kết thúc âm thầm). */
+FbmSync.activityBatchSourceMissing = function (what) {
+  var error = new Error('Lô đọc chi tiết thiếu "' + what + '" của lớp đang chạy; người điều phối phải đọc qua activityBatchSource (hoặc gateLookupChunk) trước.');
+  error.code = 'FBM_BATCH_SOURCE_MISSING';
+  return error;
+};
+
+/** Lấp lô kế khi lô trước đã ghi xong: lớp 3, Vòng xoay hoặc danh sách đọc, từ `source` của `activityBatchSource`. Đang ở vòng tra mã hoặc còn khách đọc dở thì giữ nguyên. `metadata` là của ô lượt, Vòng xoay ghi vị trí đã đọc xong vào đó. */
+FbmSync.activityBatchPlan = function (cursor, metadata, source) {
+  if (cursor.lookup || (cursor.customers || []).length) { return cursor.customers || []; }
+  var key = cursor.layer === 'top' ? 'top' : cursor.rotation ? 'ring' : 'list';
+  if (!source || !source[key]) { throw FbmSync.activityBatchSourceMissing(key); }
+  if (key === 'top') { FbmSync.activityTopRefill(cursor, source.top); }
+  else if (key === 'ring') { FbmSync.activityRotationRefill(cursor, metadata, source.ring); }
+  else { cursor.customers = source.list.slice(); }
+  return cursor.customers;
+};
+
+/** Phần mã cần tra của lô kế trong danh sách mã chờ tra, tính từ vị trí `pos`. */
+FbmSync.gateLookupSlice = function (list, pos) {
+  var from = Number(pos || 0);
+  return (list || []).slice(from, from + FbmSync.BUDGET.activityBatchCustomers);
+};
+
+/** Đọc phần mã cần tra của lô hiện tại từ khóa riêng; chỉ người điều phối gọi (dựng lại request khi cứu đường truyền). */
+FbmSync.gateLookupChunk = function (cursor) {
+  return FbmSync.gateLookupSlice(FbmSync.shardListRead(FbmSync.GATE_LOOKUP_PREFIX), cursor.lookupPos);
+};
+
+/**
+ * Dựng lại lô từ cursor; vòng tra mã nhận phần mã cần tra qua `chunk` (người điều phối đọc). Cùng cursor luôn ra cùng lô nên chạy lại sau probe hoặc thử lại là idempotent.
  * Mỗi bảng (khách, giao dịch) chỉ lấy tiêu đề khi lượt chưa có tên cột gốc của bảng đó; có rồi thì Extension cắt cột theo vị trí tính từ tên cột gốc. Chưa có tên cột gốc giao dịch thì mọi phần tử giao dịch đầu trang của lô lấy tiêu đề, vì vị trí cột phải biết lúc dựng request.
  */
-FbmSync.activityBatchRequest = function (state, cfg, scope) {
+FbmSync.activityBatchRequest = function (state, cfg, scope, chunk) {
   var cursor = state.cursor || {}, metadata = state.metadata || {};
   if (cursor.lookup) {
-    var lookups = FbmSync.gateLookupChunk(cursor).map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), metadata.customerFields, cfg); });
+    if (!Array.isArray(chunk)) { throw FbmSync.activityBatchSourceMissing('chunk'); }
+    var lookups = chunk.map(function (entry) { return FbmSync.ownerLookupRequest(entry.charAt(0) === 'c' ? 'customer' : 'activity', entry.slice(2), metadata.customerFields, cfg); });
     return lookups.length ? { items: lookups, meta: { kind: 'batch', entity: 'customer' } } : null;
   }
   var customers = cursor.customers || [], count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), activityFields = Array.isArray(metadata.activityFields) && metadata.activityFields.length ? metadata.activityFields : null;
@@ -152,11 +181,21 @@ FbmSync.gateTransferCustomer = function (flags, local, customer, reason) {
 };
 
 /**
- * Đầu vào của chặng lô đọc chi tiết, đọc qua cổng chủ một lần mỗi lát: cổng danh mục cho `pullPageApply`; chỉ mục Sheet khi lô được ghi Sheet hoặc đang tra mã; phạm vi khách cho request lô kế và cho vòng tra mã. Tên tài khoản lấy ở `ctx.settings`.
+ * Đầu vào của chặng lô đọc chi tiết, đọc qua cổng chủ một lần mỗi lát trước mọi lần ghi: cổng danh mục; phạm vi khách; chỉ mục Sheet và hàng chờ đọc dở khi lô được ghi Sheet hoặc đang tra mã; giao dịch đã thấy ở trang trước khi có khách đọc dở trang; chỉ mục mới cho vòng đọc; danh sách mã chờ tra, tập đã đọc và quyền kéo cho vòng tra. Tên tài khoản lấy ở `ctx.settings`.
  */
 FbmSync.activityGridInputs = function (state) {
-  var lookup = !!(state.cursor && state.cursor.lookup), local = lookup || FbmSync.canWriteSheet(state.mode);
-  return { categoryGate: FbmSync.stateCategoryGate(state), local: local ? FbmSync.gateLocalIndex() : null, scope: FbmSync.scope() };
+  var cursor = state.cursor || {}, lookup = !!cursor.lookup, local = lookup || FbmSync.canWriteSheet(state.mode);
+  return {
+    categoryGate: FbmSync.stateCategoryGate(state),
+    scope: FbmSync.scope(),
+    local: local ? FbmSync.gateLocalIndex() : null,
+    waits: local ? FbmSync.readWaitRead() : {},
+    pagedSeen: !lookup && Object.keys(cursor.pages || {}).length ? FbmSync.shardListRead(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX) : [],
+    isFresh: lookup ? null : FbmSync.activityFreshIndex(),
+    lookupList: lookup ? FbmSync.shardListRead(FbmSync.GATE_LOOKUP_PREFIX) : [],
+    isDone: lookup ? FbmSync.readListDoneReader() : null,
+    pullAllowed: lookup ? FbmSync.pullAllowedReader('customer') : null
+  };
 };
 
 /**
@@ -165,17 +204,19 @@ FbmSync.activityGridInputs = function (state) {
  */
 FbmSync.activityGridStage = function (ctx) {
   var state = ctx.state, cursor = state.cursor, input = ctx.inputs, logs = [];
-  var chunk = cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null;
+  var chunk = cursor.lookup ? FbmSync.gateLookupSlice(input.lookupList, cursor.lookupPos) : null;
   var checks = FbmSync.activityBatchCheck(ctx.reply, chunk ? chunk.length : (cursor.customers || []).length + 1);
   if (checks.some(function (entry) { return entry.check.code === 'SESSION_SUSPECTED'; })) { return { patch: {}, session: { suspected: 'Phản hồi FBM đáng ngờ trong lô đọc chi tiết; chưa ghi gì, đang probe lại phiên.' } }; }
   state.metadata = state.metadata || {};
-  var imported = chunk ? FbmSync.gateLookupContinue(state, checks, chunk, input, logs) : FbmSync.gateReadContinue(state, checks, input, { categoryGate: input.categoryGate, accountName: ctx.settings.accountName, now: ctx.now }, logs);
+  var step = chunk ? FbmSync.gateLookupContinue(state, checks, chunk, input, logs) : FbmSync.gateReadContinue(state, checks, input, { categoryGate: input.categoryGate, accountName: ctx.settings.accountName, now: ctx.now }, logs);
+  var imported = step.imported;
   var patch = function () { return { cursor: state.cursor, counts: state.counts, metadata: state.metadata, progress: state.progress, message: state.message, logs: logs }; };
   if (!state.cursor.lookup) {
-    FbmSync.activityBatchPlan(state.cursor, state.metadata);
-    FbmSync.activityLayerProgress(state);
+    var source = FbmSync.activityBatchSource(state.cursor);
+    FbmSync.activityBatchPlan(state.cursor, state.metadata, source);
+    FbmSync.activityLayerProgress(state, source);
   }
-  var request = FbmSync.activityBatchRequest(state, ctx.settings, input.scope);
+  var request = FbmSync.activityBatchRequest(state, ctx.settings, input.scope, state.cursor.lookup ? FbmSync.gateLookupSlice(step.lookupList, state.cursor.lookupPos) : null);
   if (!request && state.cursor.layer === 'top') { logs.push(FbmSync.activityTopScanLine(state.cursor)); }
   return request ? { patch: patch(), next: request } : { patch: patch(), end: { imported: imported } };
 };
@@ -186,157 +227,60 @@ FbmSync.activityGridEnd = function (state, end) {
 };
 
 /**
- * Vòng đọc của lô: ghi khách rồi giao dịch, đối chiếu vắng mặt, ghi cờ không cần tra; còn vắng mặt thì mở vòng tra mã (`cursor.lookup`). Sửa trên `state` của chặng, trả số bản ghi đã nhận.
+ * Vòng đọc của lô (người điều phối con của chặng): hàm quyết ghép lô và đối chiếu vắng mặt trên đầu vào đã đọc, rồi ghi khách, giao dịch, cờ không cần tra, hàng chờ, danh sách đọc theo thứ tự; còn vắng mặt thì mở vòng tra mã (`cursor.lookup`). Sửa trên `state` của chặng, trả `{ imported, lookupList }`.
  * Cursor chỉ tiến sau khi ghi xong: ghi lỗi giữa chừng thì lát lỗi, ô lượt còn cursor cũ và lần sau dựng lại đúng lô này (ghi lại là idempotent).
  */
 FbmSync.gateReadContinue = function (state, checks, input, pull, logs) {
-  var cursor = state.cursor, customers = cursor.customers || [], gate = input.categoryGate, write = FbmSync.canWriteSheet(state.mode), count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0];
-  var returned = {}, readOk = {}, customerRecords = [], activityRecords = [], failed = [], outcomes = [], isFresh = FbmSync.activityFreshIndex();
-  var pages = cursor.pages || {}, nextPages = {}, pagedSeen = Object.keys(pages).length ? FbmSync.shardListRead(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX) : [], pagedNew = [];
-  if (!customerCheck.check.ok) {
-    // Không biết khách nào còn nên không kết luận vắng mặt cho ai: báo lỗi từng khách của lô, không ghi, không tra.
-    var reason = 'FBM trả lỗi khi đọc thông tin khách của lô; khách này chưa được đọc và không bị gắn cờ trong lượt. ' + String(customerCheck.check.bug && (customerCheck.check.bug.Message || customerCheck.check.bug.message) || '');
-    customers.forEach(function (sttRec) { failed.push({ customer: sttRec, code: String(customerCheck.check.code || 'FBM_ERROR'), status: Number(customerCheck.check.status || 0), reason: reason }); outcomes.push({ sttRec: sttRec, fresh: null }); });
-  } else {
-    try {
-      var customerGrid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item));
-      if (customerGrid.sourceFields) { state.metadata.customerFields = customerGrid.sourceFields; }
-      customerGrid.rows.forEach(function (row) {
-        var sttRec = String(row.stt_rec_kh || '').trim();
-        if (customers.indexOf(sttRec) >= 0 && !FbmSync.isTemporaryRecord('customer', row)) { returned[sttRec] = row; }
-      });
-      customers.forEach(function (sttRec, position) {
-        var row = returned[sttRec], entry = checks[position + 1];
-        if (!row) { return; }
-        customerRecords.push(FbmSync.customerRecord(row, gate));
-        if (!entry.check.ok) {
-          failed.push({ customer: String(row.ma_kh || sttRec), code: String(entry.check.code || 'FBM_ERROR'), status: Number(entry.check.status || 0), reason: String(entry.check.bug && (entry.check.bug.Message || entry.check.bug.message) || 'FBM trả lỗi khi đọc giao dịch của khách') });
-          outcomes.push({ sttRec: sttRec, fresh: null });
-          return;
-        }
-        var grid = FbmSync.rowsToRecords('activity', FbmSync.protocol.parse(entry.item));
-        if (grid.sourceFields) { state.metadata.activityFields = grid.sourceFields; }
-        var records = grid.rows.filter(function (item) { return !FbmSync.isTemporaryRecord('activity', item); }).map(function (item) { return FbmSync.activityRecord(item, gate, { sttRec: sttRec, maKh: row.ma_kh }); });
-        var page = pages[sttRec], fresh = !!(page && page.fresh) || isFresh(records);
-        activityRecords = activityRecords.concat(records);
-        if (grid.rows.length >= count) {
-          // Khách chạm trần một lần đọc: ghi phần đã đọc, lô sau xin trang kế của riêng khách; chưa vào tập "đã đọc" và chưa xét vắng tới khi hết trang.
-          var next = FbmSync.activityPageNext(page, grid.rows, grid.total);
-          if (!next) { failed.push({ customer: String(row.ma_kh || sttRec), code: 'FBM_ACTIVITY_PAGE_STUCK', status: 0, reason: 'FBM trả lại đúng trang giao dịch đã đọc khi xin trang kế; đã ghi phần đã đọc, phần còn lại chưa đọc và giao dịch của khách không bị kết luận vắng.' }); outcomes.push({ sttRec: sttRec, fresh: null }); return; }
-          next.fresh = fresh;
-          nextPages[sttRec] = next;
-          records.forEach(function (record) { pagedNew.push(sttRec + ':' + String(record.fbmId || '').trim()); });
-          return;
-        }
-        readOk[sttRec] = { complete: true };
-        outcomes.push({ sttRec: sttRec, fresh: fresh, complete: true });
-      });
-    } catch (shapeError) {
-      // Khối này chỉ ghép dòng theo tiêu đề cột: lỗi ở đây là FBM trả lệch cấu trúc (thiếu, trùng, đổi số cột), dừng cả lô chứ không đoán.
-      throw FbmSync.activityBatchError(String(shapeError && shapeError.message || shapeError), shapeError && shapeError.code || 'FBM_BATCH_ITEM_MISMATCH');
-    }
-  }
-  // Đối chiếu trên bản chụp Sheet đọc trước khi ghi: ghi xong thì giao dịch đổi khách đã nằm dưới khách mới.
-  var local = input.local, inBatch = {}, lookups = [], moved = [], flags = { customer: [], activity: [] }, waits = write ? FbmSync.readWaitRead() : {};
-  activityRecords.forEach(function (record) { inBatch[String(record.fbmId || '').trim()] = String(record.customerFbmId || ''); });
-  // Giao dịch thấy ở trang trước của khách đọc nhiều trang cũng là đã thấy trong lần đọc khách đó.
-  pagedSeen.forEach(function (entry) { var at = entry.indexOf(':'), id = entry.slice(at + 1); if (inBatch[id] === undefined) { inBatch[id] = entry.slice(0, at); } });
-  if (write) {
-    customers.forEach(function (sttRec) { if (customerCheck.check.ok && !returned[sttRec] && local.byStt[sttRec]) { lookups.push('c:' + sttRec); } });
-    Object.keys(local.activitiesOf).forEach(function (cus) {
-      var parent = local.byCus[cus], owner = String(parent && parent.fbmId || '').trim();
-      local.activitiesOf[cus].forEach(function (activity) {
-        var fbmId = String(activity.fbmId).trim(), holder = inBatch[fbmId];
-        // Giao dịch thấy dưới khách khác của lô: cửa ghi nối sang khách đó, khách cha cũ vào danh sách đọc.
-        if (holder !== undefined) { if (holder !== owner) { moved.push(owner); } return; }
-        if (readOk[owner] && readOk[owner].complete && FbmSync.ACTIVITY_ID_PATTERN.test(fbmId)) { lookups.push('a:' + fbmId); }
-      });
-    });
-    // Giao dịch chờ nối vào khách của lô (09/05 Phần 9).
-    customers.forEach(function (sttRec) {
-      var waiting = waits[sttRec];
-      if (!waiting) { return; }
-      delete waits[sttRec];
-      waiting.forEach(function (fbmId) {
-        var activity = local.activityById[fbmId];
-        if (!activity || inBatch[fbmId] !== undefined) { return; }
-        if (customerCheck.check.ok && !returned[sttRec]) { flags.activity.push({ record: activity, status: FbmSync.SYNC_STATUS.transferred, reason: 'FBM báo giao dịch thuộc khách ' + sttRec + ' nhưng khách đó không còn trong quyền của tài khoản; giữ dưới khách cũ.' }); return; }
-        if (readOk[sttRec] && readOk[sttRec].complete) { logs.push(FbmSync.gateOwnerMismatch(activity, sttRec, 'FBM báo khách ' + sttRec + ' đang giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.')); }
-      });
-    });
-  }
-  if (customerRecords.length) { FbmSync.pullBatchApply(state, 'customer', customerRecords, pull); FbmSync.previewRecords('customer', customerRecords); }
-  if (activityRecords.length) { FbmSync.pullBatchApply(state, 'activity', activityRecords, pull); FbmSync.previewRecords('activity', activityRecords); }
+  var cursor = state.cursor, customers = cursor.customers || [], write = FbmSync.canWriteSheet(state.mode);
+  var batch = FbmSync.batchRecordsOf(checks, cursor, input);
+  if (batch.customerFields) { state.metadata.customerFields = batch.customerFields; }
+  if (batch.activityFields) { state.metadata.activityFields = batch.activityFields; }
+  var absent = FbmSync.absentFind(batch, customers, input, write), nextPages = batch.nextPages, pagedSeen = input.pagedSeen || [];
+  Array.prototype.push.apply(logs, absent.logs);
+  if (batch.customerRecords.length) { FbmSync.pullBatchApply(state, 'customer', batch.customerRecords, pull); FbmSync.previewRecords('customer', batch.customerRecords); }
+  if (batch.activityRecords.length) { FbmSync.pullBatchApply(state, 'activity', batch.activityRecords, pull); FbmSync.previewRecords('activity', batch.activityRecords); }
   var carried = Object.keys(nextPages);
   state.cursor.customers = carried;
   state.cursor.pages = nextPages;
-  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, failed));
-  if (pagedSeen.length || pagedNew.length) { FbmSync.shardListWrite(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX, pagedSeen.filter(function (entry) { return nextPages[entry.slice(0, entry.indexOf(':'))]; }).concat(pagedNew)); }
+  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, batch.failed));
+  if (pagedSeen.length || batch.pagedNew.length) { FbmSync.shardListWrite(FbmSync.ACTIVITY_PAGED_SEEN_PREFIX, pagedSeen.filter(function (entry) { return nextPages[entry.slice(0, entry.indexOf(':'))]; }).concat(batch.pagedNew)); }
   if (write) {
-    FbmSync.gateFlagWrite(state, 'activity', flags.activity);
-    FbmSync.readWaitWrite(waits);
-    FbmSync.readListAdd(moved);
+    FbmSync.gateFlagWrite(state, 'activity', absent.flags.activity);
+    FbmSync.readWaitWrite(absent.waits);
+    FbmSync.readListAdd(absent.moved);
   }
   FbmSync.readListDone(customers.filter(function (sttRec) { return carried.indexOf(sttRec) < 0; }));
-  FbmSync.activityReadMark(outcomes.filter(function (item) { return item.complete; }).map(function (item) { return item.sttRec; }), outcomes.filter(function (item) { return item.fresh; }).map(function (item) { return item.sttRec; }));
+  FbmSync.activityReadMark(batch.outcomes.filter(function (item) { return item.complete; }).map(function (item) { return item.sttRec; }), batch.outcomes.filter(function (item) { return item.fresh; }).map(function (item) { return item.sttRec; }));
   FbmSync.progressCustomersDone(state, customers.length - carried.length);
   if (cursor.layer === 'top') {
     // Vị trí lớp top đi theo khách: khách còn ở lô sau giữ đúng vị trí của mình để bộ đếm im lặng tính đúng khi khách đó xong.
     var positions = cursor.topPositions || [];
-    state.cursor.customers = customers; FbmSync.activityTopAccount(state.cursor, outcomes);
+    state.cursor.customers = customers; FbmSync.activityTopAccount(state.cursor, batch.outcomes);
     state.cursor.customers = carried; state.cursor.topPositions = carried.map(function (sttRec) { return positions[customers.indexOf(sttRec)]; });
   }
-  if (lookups.length) {
-    FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, lookups);
+  if (absent.lookups.length) {
+    FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, absent.lookups);
     state.cursor.lookup = true; state.cursor.lookupPos = 0;
-    state.message = 'Đang tra ' + lookups.length + ' mã vắng mặt trước khi gắn cờ...';
+    state.message = 'Đang tra ' + absent.lookups.length + ' mã vắng mặt trước khi gắn cờ...';
   }
-  return customerRecords.length + activityRecords.length;
+  return { imported: batch.customerRecords.length + batch.activityRecords.length, lookupList: absent.lookups };
 };
 
 /**
- * Vòng tra mã: mỗi phần tử một mã, theo bảng 09/05 Phần 9 "Vắng mặt và chuyển quyền". Lỗi tra thì không gắn cờ, Sidebar và Log báo; hai lần đọc FBM nói khác nhau thì không ghi, Log `activity_owner_mismatch`.
- * Hết mã thì tắt vòng tra để chặng lấp lô kế. Trả 0 vì vòng tra không nhận bản ghi nào.
+ * Vòng tra mã (người điều phối con của chặng): `lookupDecide` quyết trên đầu vào đã đọc, rồi ghi cờ, hàng chờ, danh sách đọc. Hết mã thì tắt vòng tra để chặng lấp lô kế. Trả `{ imported: 0, lookupList }` vì vòng tra không nhận bản ghi nào.
  */
 FbmSync.gateLookupContinue = function (state, checks, chunk, input, logs) {
-  var local = input.local, waits = FbmSync.readWaitRead(), isDone = FbmSync.readListDoneReader(), pullAllowed = FbmSync.pullAllowedReader('customer'), scope = input.scope, sync = FbmSync.SYNC_STATUS;
-  var flags = { customer: [], activity: [] }, adds = [], failed = [];
-  chunk.forEach(function (entry, position) {
-    var value = entry.slice(2), result = FbmSync.ownerLookupParse(checks[position].item);
-    if (entry.charAt(0) === 'c') {
-      var customer = local.byStt[value];
-      if (!customer) { return; }
-      if (!result.ok) { failed.push({ customer: String(customer.fbmCustomerCode || value), code: result.code, status: result.status, reason: 'Không kiểm tra được khách vắng còn tồn tại trên FBM; khách chưa bị gắn cờ. ' + result.reason }); return; }
-      if (result.sttRecs.length) { FbmSync.gateTransferCustomer(flags, local, customer, 'Khách không còn trong quyền của tài khoản nhưng vẫn tồn tại trên FBM.'); }
-      else { flags.customer.push({ record: customer, status: sync.missing, reason: 'Không thấy khách bên FBM; không suy ra xóa.' }); }
-      return;
-    }
-    var activity = local.activityById[value], parent = activity && local.byCus[String(activity.customerId || '').trim()], current = String(parent && parent.fbmId || '').trim();
-    if (!activity) { return; }
-    if (!result.ok) { failed.push({ customer: 'giao dịch ' + value, code: result.code, status: result.status, reason: 'Không tra được khách đang giữ giao dịch vắng; giao dịch chưa bị gắn cờ. ' + result.reason }); return; }
-    var owner = result.sttRecs[0] || '', next = local.byStt[owner];
-    if (!owner) { flags.activity.push({ record: activity, status: sync.missing, reason: 'Không thấy giao dịch bên FBM; không suy ra xóa.' }); return; }
-    if (owner === current) { logs.push(FbmSync.gateOwnerMismatch(activity, owner, 'FBM báo khách cũ vẫn giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.')); return; }
-    if (isDone(owner)) { logs.push(FbmSync.gateOwnerMismatch(activity, owner, 'FBM báo khách ' + owner + ' đang giữ giao dịch nhưng lần đọc khách đó trong lượt không có giao dịch này.')); return; }
-    if (next && (String(next.recordStatus || 'active') === 'deleted' || !pullAllowed(next))) {
-      // Khách mới đã xóa mềm hoặc không cho lấy về: không đọc khách đó, chỉ đổi khách cha, giữ nội dung.
-      flags.activity.push({ record: activity, patch: { customerId: String(next.id || '').trim() } });
-      logs.push({ action: 'activity_parent_blocked', outcome: LOG_WARN, entity: 'activity', recordId: String(activity.id || ''), reason: 'Giao dịch ' + String(activity.id || '') + ' đã chuyển sang khách ' + String(next.id || '') + ' nhưng khách đó đã xóa hoặc không cho lấy về; chỉ đổi khách cha, giữ nội dung.', detail: { fbmId: value, from: String(activity.customerId || ''), to: String(next.id || '') } });
-      return;
-    }
-    if (scope && !(next && FbmSync.inScope(next, scope))) { flags.activity.push({ record: activity, status: sync.transferred, reason: 'Giao dịch đã chuyển sang khách ngoài phạm vi đồng bộ; giữ dưới khách cũ.' }); return; }
-    adds.push(owner);
-    (waits[owner] = waits[owner] || []).push(value);
-  });
-  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, failed));
-  FbmSync.gateFlagWrite(state, 'customer', flags.customer);
-  FbmSync.gateFlagWrite(state, 'activity', flags.activity);
-  FbmSync.readWaitWrite(waits);
-  FbmSync.readListAdd(adds);
+  var decided = FbmSync.lookupDecide(chunk, checks, input);
+  Array.prototype.push.apply(logs, decided.logs);
+  Array.prototype.push.apply(logs, FbmSync.activityCustomerErrors(state, decided.failed));
+  FbmSync.gateFlagWrite(state, 'customer', decided.flags.customer);
+  FbmSync.gateFlagWrite(state, 'activity', decided.flags.activity);
+  FbmSync.readWaitWrite(decided.waits);
+  FbmSync.readListAdd(decided.adds);
   state.cursor.lookupPos = Number(state.cursor.lookupPos || 0) + chunk.length;
-  if (!FbmSync.gateLookupChunk(state.cursor).length) {
+  if (!FbmSync.gateLookupSlice(input.lookupList, state.cursor.lookupPos).length) {
     FbmSync.shardListWrite(FbmSync.GATE_LOOKUP_PREFIX, []);
     state.cursor.lookup = false; state.cursor.lookupPos = 0;
   }
-  return 0;
+  return { imported: 0, lookupList: input.lookupList };
 };

@@ -81,6 +81,10 @@ function capTruocTep(hopCat, duongDan, duongDans) {
   if (duongDan === 'fbm_sync/read/GridRead.js' && duongDans.indexOf('fbm_sync/transport/RequestSettings.js') < 0 && !(hopCat.FbmSync && hopCat.FbmSync.requestCfg)) {
     vm.runInContext(docTep('fbm_sync/transport/RequestSettings.js'), hopCat, { filename: 'fbm_sync/transport/RequestSettings.js' });
   }
+  // Chặng lô đọc chi tiết gọi các hàm quyết thuần tách sang `read/BatchDecide.js`; hộp nạp ActivityBatch mà không kê tệp đó thì nạp kèm.
+  if (duongDan === 'fbm_sync/transport/ActivityBatch.js' && duongDans.indexOf('fbm_sync/read/BatchDecide.js') < 0 && !(hopCat.FbmSync && hopCat.FbmSync.batchRecordsOf)) {
+    vm.runInContext(docTep('fbm_sync/read/BatchDecide.js'), hopCat, { filename: 'fbm_sync/read/BatchDecide.js' });
+  }
 }
 
 /** Sau khi chạy một tệp: ngầm định kéo cho mọi tệp đồng bộ, danh tính phiên thử cho tệp dựng request. */

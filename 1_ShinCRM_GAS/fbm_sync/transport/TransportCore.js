@@ -588,7 +588,7 @@ FbmSync.requestForCursor = function (state) {
   }
   if (FbmSync.isScanCursor(cursor)) { return FbmSync.scanJobRequest(state, cfg, FbmSync.scanJobScope(cursor)); }
   if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(FbmSync.scope(), cfg); }
-  if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state, cfg, FbmSync.scope()); }
+  if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state, cfg, FbmSync.scope(), cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null); }
   if (cursor.kind === 'conflict_refresh') { return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }, cfg); }
   return null;
 };

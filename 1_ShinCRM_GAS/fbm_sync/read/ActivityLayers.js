@@ -86,7 +86,6 @@ FbmSync.readListNext = function (limit) {
   if (picked.length < max) { picked = picked.concat(FbmSync.shardListRead(FbmSync.READ_NEW_PREFIX).filter(function (fbmId) { return picked.indexOf(fbmId) < 0; })); }
   return picked.slice(0, max);
 };
-FbmSync.readListPendingCount = function () { return FbmSync.readListNext(Infinity).length; };
 
 /** Đánh dấu khách đã đọc trong lượt, kể cả đọc lỗi (lỗi đã báo một lần). Gọi sau khi lô đã ghi khách để khách mới đã có số CUS. */
 FbmSync.readListDone = function (sttRecs) {
@@ -181,20 +180,26 @@ FbmSync.activityFreshIndex = function () {
   return function (records) { return records.some(function (record) { var id = String(record.fbmId || '').trim(); return !Object.prototype.hasOwnProperty.call(known, id) || known[id] !== String(record.fbmHash || ''); }); };
 };
 
+/** Đầu vào của lớp 3 cho một lần lấp lô: thứ tự khách mới nhất, khách đủ điều kiện theo vị trí trong danh sách đọc, tập đã đọc, đã đọc đủ và có giao dịch mới. */
+FbmSync.activityTopSource = function () {
+  var eligible = FbmSync.readListEligibleReader(), byIndex = {};
+  FbmSync.readLocal('customer').forEach(function (record) { if (eligible(record)) { byIndex[FbmSync.seenStoreIndex(FbmSync.READ_LIST_STORE, record)] = record; } });
+  return { order: FbmSync.topOrderAll(), byIndex: byIndex, isDone: FbmSync.seenStoreReader(FbmSync.READ_DONE_STORE), hasRead: FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh: FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE) };
+};
+
 /**
- * Lớp 3: đi từ khách mới nhất xuống, lấy một dải khách chưa đọc liên tiếp làm lô. Khách đã đọc trong lượt dùng luôn kết quả lần đọc đó cho bộ đếm.
+ * Lớp 3: đi từ khách mới nhất xuống, lấy một dải khách chưa đọc liên tiếp làm lô. Khách đã đọc trong lượt dùng luôn kết quả lần đọc đó cho bộ đếm. `top` là đầu vào của `activityTopSource`.
  * Lô không dài quá số khách còn thiếu để đủ chuỗi im lặng, nên lượt dừng đúng sau `activityTopScanQuietStreak` khách liên tiếp không có gì mới, không đọc dư.
  */
-FbmSync.activityTopRefill = function (cursor) {
-  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = FbmSync.topOrderAll(), byIndex = {}, isDone = FbmSync.seenStoreReader(FbmSync.READ_DONE_STORE), hasRead = FbmSync.seenStoreReader(FbmSync.ACTIVITY_READ_STORE), hasFresh = FbmSync.seenStoreReader(FbmSync.ACTIVITY_FRESH_STORE), eligible = FbmSync.readListEligibleReader();
-  FbmSync.readLocal('customer').forEach(function (record) { if (eligible(record)) { byIndex[FbmSync.seenStoreIndex(FbmSync.READ_LIST_STORE, record)] = record; } });
+FbmSync.activityTopRefill = function (cursor, top) {
+  var streak = FbmSync.BUDGET.activityTopScanQuietStreak, order = top.order, byIndex = top.byIndex;
   var pos = Number(cursor.topPos || 0), quiet = Number(cursor.topQuiet || 0), picked = [], positions = [];
   while (pos < order.length && quiet < streak) {
     var record = byIndex[order[pos]];
-    if (record && isDone(record)) {
+    if (record && top.isDone(record)) {
       if (picked.length) { break; }
       // Khách đọc lỗi hoặc chưa đọc đủ thì chưa biết có gì mới: không cộng vào chuỗi im lặng.
-      if (hasFresh(record)) { quiet = 0; cursor.topDeepest = pos + 1; } else if (hasRead(record)) { quiet += 1; }
+      if (top.hasFresh(record)) { quiet = 0; cursor.topDeepest = pos + 1; } else if (top.hasRead(record)) { quiet += 1; }
     } else if (record) {
       if (picked.length >= Math.min(FbmSync.BUDGET.activityBatchCustomers, streak - quiet)) { break; }
       picked.push(String(record.fbmId).trim()); positions.push(pos + 1);
@@ -218,10 +223,11 @@ FbmSync.activityTopAccount = function (cursor, outcomes) {
  * Mẫu số tiến trình của chặng đọc là số khách sẽ đọc, không phải số khách của lượt: danh sách đọc còn bao nhiêu khách, lớp 3 còn bao nhiêu khách nữa thì đủ chuỗi, Vòng xoay giữ tổng lúc mở.
  * Tính trên tổng số khách thì Quét nhanh dừng ở vài phần trăm và người dùng tưởng lượt bị kẹt.
  */
-FbmSync.activityLayerProgress = function (state) {
+FbmSync.activityLayerProgress = function (state, source) {
   var cursor = state.cursor || {}, done = Number(state.progress && state.progress.done || 0);
   if (cursor.rotation) { return; }
-  var left = cursor.layer === 'top' ? Math.max(0, FbmSync.BUDGET.activityTopScanQuietStreak - Number(cursor.topQuiet || 0)) : FbmSync.readListPendingCount();
+  if (cursor.layer !== 'top' && !(source && typeof source.pending === 'number')) { throw FbmSync.activityBatchSourceMissing('pending'); }
+  var left = cursor.layer === 'top' ? Math.max(0, FbmSync.BUDGET.activityTopScanQuietStreak - Number(cursor.topQuiet || 0)) : source.pending;
   state.progress = { done: done, total: done + left };
 };
 
@@ -271,14 +277,14 @@ FbmSync.activityRotationBegin = function (state, cfg, scope) {
 };
 
 /**
- * Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên khách cuối của lô đó là vị trí đã đọc xong, rồi lấy lô kế đến khi đủ N.
+ * `ring` là vòng khách của `activityRotationRing`, người điều phối đọc sau khi lô trước ghi xong. Lô trước đã ghi xong (kế hoạch lô rỗng mới gọi tới đây) nên khách cuối của lô đó là vị trí đã đọc xong, rồi lấy lô kế đến khi đủ N.
  * Vị trí chỉ để ở `metadata.rotationCursor`; `runClose` ghi bền khi lượt xong. Lượt hỏng ở lô sau hoặc ở chặng đẩy thì lượt sau đọc lại cả N khách, không khách nào bị bỏ qua mà chưa đọc.
  * Khách đọc lỗi đã có dòng Log `activity_customer_failed` và hiện ở Sidebar; vị trí vẫn đi qua để một khách hỏng không chặn cả vòng.
  */
-FbmSync.activityRotationRefill = function (cursor, metadata) {
+FbmSync.activityRotationRefill = function (cursor, metadata, ring) {
   var rotation = cursor.rotation, taken = Number(rotation.taken || 0);
   if (Number(rotation.last) >= 0) { metadata.rotationCursor = Number(rotation.last); }
-  var ring = FbmSync.activityRotationRing(Number(rotation.start)), end = Math.min(Number(rotation.limit), ring.length, taken + FbmSync.BUDGET.activityBatchCustomers), picked = ring.slice(taken, Math.max(taken, end));
+  var end = Math.min(Number(rotation.limit), ring.length, taken + FbmSync.BUDGET.activityBatchCustomers), picked = ring.slice(taken, Math.max(taken, end));
   cursor.customers = picked.map(function (item) { return item.sttRec; });
   rotation.taken = taken + picked.length;
   rotation.last = picked.length ? picked[picked.length - 1].index : -1;
