@@ -23,7 +23,9 @@ var NOTICE_TOPICS = {
   /** Bảng tra nhanh cú pháp lọc, mở từ lệnh menu. */
   filter_reference: { level: 'info', clear: 'dismiss' },
   /** Máy khác vừa tự nhận chạy nền FBM thay máy được giao im quá ngưỡng. Không phạm vi: lần nhận thay sau ghi đè lần trước; còn tới khi người dùng bấm ✕ dù mở Sidebar lúc nào, vì máy được giao im là việc cần xem lại máy đó. */
-  fbm_machine_takeover: { level: 'warning', clear: 'dismiss' }
+  fbm_machine_takeover: { level: 'warning', clear: 'dismiss' },
+  /** Tập bản ghi sắp đẩy lên FBM chạm ngưỡng chấp thuận (cổng chặng đẩy `pending`). Không phạm vi: một tập chờ một lúc. Hai nút: Chấp thuận (mang dấu tập) và Kiểm lại ngay; tự hết khi người dùng chấp thuận hoặc lần quét sau sạch hay dưới ngưỡng. */
+  fbm_push_approval: { level: 'warning', clear: 'on_success' }
 };
 
 /** Thứ tự mức độ trong danh sách thông báo: số nhỏ đứng trước. */

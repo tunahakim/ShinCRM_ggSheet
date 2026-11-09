@@ -70,8 +70,8 @@ function fbmProbeCustomerActivities(customerId) {
 /** Giờ chạy xong của từng tiến trình nền, số phút còn tới hạn và các cờ quyết định lần hỏi nền có chạy hay không, kèm cổng của chặng đẩy mà Giữ phiên kế tiếp sẽ gặp. */
 function fbmProbeScheduleMarkers() {
   var props = FbmSync.props(), state = FbmSync.stateRead(), now = Date.now(), markers = {}, schedule = FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background));
-  var stored = FbmSync.pushCleanRead(), current = FbmSync.pushCleanNow();
-  var gate = { direction: settingsValue(FbmSync.SETTING_SECTIONS.background, 'direction'), stored: stored, now: current, keepalive: FbmSync.pushGateDecide({ origin: 'background', scan: 'keepalive' }, stored, current), lastRun: { scan: state.scan, mode: state.mode, scheduleMode: state.scheduleMode, pushGate: state.pushGate, message: state.message } };
+  var stored = FbmSync.pushGateRead(), current = FbmSync.pushGateMark();
+  var gate = { direction: settingsValue(FbmSync.SETTING_SECTIONS.background, 'direction'), stored: stored, now: current, keepalive: FbmSync.pushGateSkip({ origin: 'background', scan: 'keepalive' }, stored, current), lastRun: { scan: state.scan, mode: state.mode, scheduleMode: state.scheduleMode, pushGate: state.pushGate, message: state.message } };
   // Bản ghi chặng đẩy kế tiếp sẽ chọn, kèm mã khách FBM của khách (hoặc khách cha), để nghiệm thu chắc chỉ chạm khách thử. Đọc cả hai sheet nên tốn vài giây.
   var scan = FbmSync.localScan(), byId = {};
   scan.records('customer').forEach(function (row) { byId[String(row.id)] = String(row.fbmCustomerCode || ''); });

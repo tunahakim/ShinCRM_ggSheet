@@ -198,28 +198,28 @@ FbmSync.pushFailuresRemove = function (keys) {
  */
 FbmSync.PUSH_LIST_PREFIX = 'FBM_SYNC_PUSH_LIST_';
 FbmSync.PUSH_LIST_TAGS = { customer: 'c', activity: 'a' };
-/** Trả số mã đã ghi (đầu danh sách, vừa một khóa). */
+/** Mỗi phần tử là `tag:mã|dấu vân lúc chọn`, để bước đẩy không đẩy nội dung khác tập đã qua cổng. Trả số mã đã ghi (đầu danh sách, vừa một khóa). */
 FbmSync.pushListWrite = function (candidates) {
-  return FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, (candidates || []).map(function (item) { return FbmSync.PUSH_LIST_TAGS[item.entity] + ':' + String(item.id || ''); }), 1);
+  return FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, (candidates || []).map(function (item) { return FbmSync.PUSH_LIST_TAGS[item.entity] + ':' + String(item.id || '') + '|' + String(item.hash || ''); }), 1);
 };
 /** Phần tử không đúng dạng là khóa hỏng: ném lỗi để bên gọi ghi Log rồi quét lại, không coi là rỗng. */
 FbmSync.pushListRead = function () {
   var entities = {};
   Object.keys(FbmSync.PUSH_LIST_TAGS).forEach(function (entity) { entities[FbmSync.PUSH_LIST_TAGS[entity]] = entity; });
   return FbmSync.shardListRead(FbmSync.PUSH_LIST_PREFIX).map(function (text) {
-    var at = text.indexOf(':'), entity = at > 0 ? entities[text.slice(0, at)] : '', id = at > 0 ? text.slice(at + 1) : '';
-    if (!entity || !id) { throw new Error('Danh sách đẩy hỏng ở phần tử "' + text.slice(0, 40) + '".'); }
-    return { entity: entity, id: id };
+    var at = text.indexOf(':'), bar = text.lastIndexOf('|'), entity = at > 0 ? entities[text.slice(0, at)] : '', id = at > 0 && bar > at ? text.slice(at + 1, bar) : '', hash = bar > at ? text.slice(bar + 1) : '';
+    if (!entity || !id || !hash) { throw new Error('Danh sách đẩy hỏng ở phần tử "' + text.slice(0, 40) + '".'); }
+    return { entity: entity, id: id, hash: hash };
   });
 };
 FbmSync.pushListClear = function () { FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, []); };
 
 /**
- * Dấu lần đẩy sạch: mọi thứ ngoài dòng Sheet mà phép xét đẩy dựa vào. Dòng Sheet đại diện bằng `rev` của sổ nạp lại (mọi cửa ghi và trigger sửa tay đều tăng nó, kể cả Category và Cài đặt); sổ lỗi đẩy, phạm vi trong cài đặt và tài khoản FBM đã liên kết đọc thẳng. Chỉ là quyền bỏ qua một lần quét, không phải nguồn sự thật: thiếu hay hỏng thì quét.
- * Đọc từ bản chụp DocumentProperties của lần gọi nên không thêm lần gọi kho.
+ * Cổng chặng đẩy `{ status, mark, fingerprint, count, at, approvedFingerprint }`: `clean` là lần quét gần nhất không còn ứng viên, `pending` là tập vượt ngưỡng đang chờ duyệt, `open` là chặng đang chạy hoặc dừng giữa chừng. Chỉ là quyền bỏ qua một lần quét và nơi giữ lời duyệt, không phải nguồn sự thật: thiếu hay hỏng thì quét.
+ * `mark` là mọi thứ ngoài dòng Sheet mà phép xét đẩy dựa vào. Dòng Sheet đại diện bằng `rev` của sổ nạp lại (mọi cửa ghi và trigger sửa tay đều tăng nó, kể cả Category và Cài đặt); sổ lỗi đẩy, phạm vi trong cài đặt và tài khoản FBM đã liên kết đọc thẳng. Đọc từ bản chụp DocumentProperties của lần gọi nên không thêm lần gọi kho.
  */
-FbmSync.PUSH_CLEAN_KEY = 'FBM_SYNC_PUSH_CLEAN_V1';
-FbmSync.pushCleanNow = function () {
+FbmSync.PUSH_GATE_KEY = 'FBM_SYNC_PUSH_GATE_V1';
+FbmSync.pushGateMark = function () {
   var hashes = FbmSync.pushFailuresRead().hashes, run = settingsValues(FbmSync.SETTING_SECTIONS.run);
   return {
     rev: Number(reloadJournalRead().rev),
@@ -228,12 +228,11 @@ FbmSync.pushCleanNow = function () {
     account: FbmSync.boundIdentity().accountName
   };
 };
-/** Dấu đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
-FbmSync.pushCleanRead = function () { return FbmSync.documentPropertyJson(FbmSync.PUSH_CLEAN_KEY, 'dấu lần đẩy sạch'); };
-FbmSync.pushCleanWrite = function (mark) {
-  FbmSync.documentPropertySet(FbmSync.PUSH_CLEAN_KEY, JSON.stringify(mark), 'push_clean');
+/** Cổng đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
+FbmSync.pushGateRead = function () { return FbmSync.documentPropertyJson(FbmSync.PUSH_GATE_KEY, 'cổng chặng đẩy'); };
+FbmSync.pushGateWrite = function (gate) {
+  FbmSync.documentPropertySet(FbmSync.PUSH_GATE_KEY, JSON.stringify(gate), 'push_gate');
 };
-FbmSync.pushCleanClear = function () { FbmSync.props().deleteProperty(FbmSync.PUSH_CLEAN_KEY); };
 /**
  * Bản ô lượt của lát đang chạy: `runSlice` mở, đóng và ghi xuống kho một lần ở cuối lát. Trong lát mọi lần `stateRead` trả cùng một bản, nên hai hàm sửa hai trường khác nhau không đè mất thay đổi của nhau; `stateWrite` một bản khác bản của lát thì ném `SLICE_FOREIGN_STATE` trước khi kịp đè.
  * `null` khi không có lát nào mở: đọc và ghi đi thẳng xuống kho như cũ.

@@ -18,7 +18,7 @@ FbmSync.pushReviewContext = function (state, scan, settings) {
 
 /**
  * Dòng có được đẩy không, và vì sao: phép xét duy nhất của chiều đẩy, dùng cho lần quét cả sheet, cho từng bước đẩy trên dòng đọc lại theo mã và cho số liệu của preflight, nên ba nơi không thể quyết khác nhau. `customer` là khách cha của Giao dịch. Chỉ xét, không ghi gì.
- * Trả `{ eligible, kind, reason }`: `reason` là mã lý do không đẩy (theo thứ tự xét: `temporary`, `deleted`, `conflict`, `outOfScope`, `parentNotReady`, `permissionInvalid`, `noPermission`, `frozen`, `pushFailed`, `awaitingConfirmation`, `unchanged`); được đẩy thì `kind` là `edit`, `create`, `recover` hoặc `stuck`.
+ * Trả `{ eligible, kind, reason }`: `reason` là mã lý do không đẩy (theo thứ tự xét: `temporary`, `deleted`, `conflict`, `outOfScope`, `parentNotReady`, `permissionInvalid`, `noPermission`, `frozen`, `pushFailed`, `awaitingConfirmation`, `unchanged`); được đẩy thì kèm `hash` (dấu vân dòng đã tính) và `kind` là `edit`, `create`, `recover` hoặc `stuck`.
  * Bản ghi `đang đẩy` chưa có ID FBM là lệnh tạo đã phát mà không biết kết quả; tạo lại có thể sinh bản ghi trùng (`09/04`, FBM-027). Customer đi đường tra theo MST (`recover`), Activity không có đường tra nên chỉ báo người dùng (`stuck`).
  */
 FbmSync.pushEligible = function (entity, record, customer, context) {
@@ -38,7 +38,7 @@ FbmSync.pushEligible = function (entity, record, customer, context) {
     if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return no('awaitingConfirmation'); }
     if (String(record.fbmId || '').trim() && !FbmSync.pushChanged(record, currentHash)) { return no('unchanged'); }
   }
-  return { eligible: true, kind: unconfirmed ? (entity === 'customer' ? 'recover' : 'stuck') : String(record.fbmId || '').trim() ? 'edit' : 'create', reason: '' };
+  return { eligible: true, kind: unconfirmed ? (entity === 'customer' ? 'recover' : 'stuck') : String(record.fbmId || '').trim() ? 'edit' : 'create', reason: '', hash: currentHash };
 };
 
 /** Dòng có nội dung ShinCRM chưa lên FBM: chưa có mốc, dấu vân khác mốc, hoặc đang chờ đối soát. `currentHash` là dấu vân bên gọi đã tính. */
@@ -59,7 +59,7 @@ FbmSync.pushReview = function (entity, record, customer, context) {
 /** Dựng ứng viên từ dòng `pushEligible` đã cho qua (`verdict`); `null` khi dòng đã mang đúng trạng thái chờ sửa. */
 FbmSync.pushCandidateBuild = function (entity, record, customer, verdict, context) {
   // `raw` là dòng Sheet lúc chọn, chỉ sống trong bộ nhớ: bước ghi so nó với dòng đọc lại trong cửa để không đẩy dòng vừa có người sửa.
-  var candidate = { kind: verdict.kind, entity: entity, id: String(record.id || ''), record: record, raw: record };
+  var candidate = { kind: verdict.kind, entity: entity, id: String(record.id || ''), hash: String(verdict.hash || ''), record: record, raw: record };
   if (customer && entity === 'activity') { candidate.record = Object.assign({}, record, { customerFbmCode: customer.fbmCustomerCode || '', stt_rec: customer.fbmId || '' }); }
   if (verdict.kind === 'recover' || verdict.kind === 'stuck') { return candidate; }
   var hold = FbmSync.pushHold(candidate, context);
@@ -94,14 +94,57 @@ FbmSync.pushCandidates = function (entity, scan, context) {
   return FbmSync.pushScanRows(entity, local).map(function (row) { return FbmSync.pushReview(entity, row.record, row.parent, review); }).filter(Boolean);
 };
 
-/** Cổng của chặng đẩy, thuần: `options` là chiều và loại quét của lượt, `mark` là dấu đã lưu, `now` là dấu hiện tại. Trả `{ open, reason }`; đóng chỉ khi lượt nền không thuộc loại bỏ qua và bốn phần đều khớp. */
-FbmSync.pushGateDecide = function (options, mark, now) {
+/**
+ * Có bỏ chặng đẩy trước khi đọc Sheet không, thuần: `options` là chiều và loại quét của lượt, `gate` là cổng đã lưu, `mark` là dấu hiện tại. Trả `{ open, reason }`.
+ * Chỉ lượt nền mới được bỏ, và chỉ khi cổng `clean` hoặc `pending` mà dấu bốn phần còn khớp: cổng `pending` đã có lời duyệt thì chạy để đẩy tập vừa duyệt; cổng `open` là chặng trước chưa xong nên luôn chạy.
+ */
+FbmSync.pushGateSkip = function (options, gate, mark) {
   var opt = options || {};
   if (opt.origin !== 'background') { return { open: true, reason: 'manual' }; }
   if (FbmSync.PUSH_GATE_BYPASS_SCANS.indexOf(String(opt.scan || '')) >= 0) { return { open: true, reason: 'bypass_scan' }; }
-  if (!mark) { return { open: true, reason: 'no_mark' }; }
-  var changed = ['rev', 'failures', 'scope', 'account'].filter(function (part) { return String(mark[part]) !== String(now[part]); });
-  return changed.length ? { open: true, reason: 'changed:' + changed.join(',') } : { open: false, reason: 'clean' };
+  if (!gate || !gate.mark) { return { open: true, reason: 'no_gate' }; }
+  if (gate.status === 'pending' && gate.approvedFingerprint) { return { open: true, reason: 'approved' }; }
+  if (gate.status !== 'clean' && gate.status !== 'pending') { return { open: true, reason: 'unfinished' }; }
+  var changed = ['rev', 'failures', 'scope', 'account'].filter(function (part) { return String(gate.mark[part]) !== String(mark[part]); });
+  return changed.length ? { open: true, reason: 'changed:' + changed.join(',') } : { open: false, reason: gate.status };
+};
+
+/** Khóa của một ứng viên trong dấu tập và trong danh sách đẩy: mã kèm dấu vân dòng lúc chọn, nên cùng mã mà nội dung đổi là phần tử khác. */
+FbmSync.pushCandidateKey = function (item) {
+  return String(item.entity || '') + ':' + String(item.id || '') + '|' + String(item.hash || '');
+};
+
+/** Dấu tập ứng viên: hash của danh sách khóa đã sắp. Thứ tự dòng trên Sheet không làm đổi dấu. */
+FbmSync.candidateSetFingerprint = function (candidates) {
+  var text = (candidates || []).map(FbmSync.pushCandidateKey).sort().join(',');
+  var hash = 2166136261;
+  for (var i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = (hash * 16777619) >>> 0; }
+  return ('00000000' + hash.toString(16)).slice(-8) + '-' + (candidates || []).length;
+};
+
+/** Ứng viên sẽ phát lệnh tới FBM: dòng chỉ cần ghi trạng thái chờ sửa (`hold`) không tính vào ngưỡng chấp thuận. */
+FbmSync.pushWriteCandidates = function (candidates) {
+  return (candidates || []).filter(function (item) { return !item.hold; });
+};
+
+/**
+ * Quyết của đầu chặng đẩy trên tập vừa quét, thuần. `threshold` là ngưỡng chấp thuận (0 là luôn hỏi khi có ứng viên), `gate` là cổng đã lưu.
+ * Trả `{ code, fingerprint, count }`: `PUSH_CLEAN` khi không còn gì làm; `PUSH_AWAITING_APPROVAL` khi chạm ngưỡng mà lời duyệt không gắn đúng tập này; `PUSH_APPROVED_RUN` khi lời duyệt khớp dấu tập; `PUSH_RUN` khi dưới ngưỡng.
+ */
+FbmSync.pushGateDecide = function (input) {
+  var all = input.candidates || [], writes = FbmSync.pushWriteCandidates(all), count = writes.length, fingerprint = FbmSync.candidateSetFingerprint(writes);
+  var result = function (code) { return { code: code, fingerprint: fingerprint, count: count }; };
+  if (!all.length) { return result('PUSH_CLEAN'); }
+  if (count > 0 && count >= Number(input.threshold)) {
+    return input.gate && input.gate.approvedFingerprint === fingerprint ? result('PUSH_APPROVED_RUN') : result('PUSH_AWAITING_APPROVAL');
+  }
+  return result('PUSH_RUN');
+};
+
+/** Lời duyệt người dùng gửi lên có gắn đúng tập đang chờ không, thuần. `fingerprint` là dấu tập Sidebar đang hiện. */
+FbmSync.approvalDecide = function (gate, fingerprint) {
+  if (!gate || gate.status !== 'pending' || !gate.fingerprint) { return 'no_pending'; }
+  return String(fingerprint || '') === String(gate.fingerprint) ? 'approved' : 'stale';
 };
 
 /** Quét cả hai thực thể, Khách trước Giao dịch: Giao dịch của khách mới chỉ đẩy được sau khi khách có mã FBM. */

@@ -50,7 +50,7 @@ function noticeShape(input) {
   if (Array.isArray(input.lines) && lines.length < input.lines.length) { lines.push('… (còn nữa, đã cắt bớt)'); }
   var hint = room > 0 ? noticeText(input.hint, room) : '';
   var actions = (Array.isArray(input.actions) ? input.actions : []).map(function (item) {
-    return { label: String(item && item.label || ''), action: String(item && item.action || '') };
+    return { label: String(item && item.label || ''), action: String(item && item.action || ''), value: String(item && item.value || '') };
   });
   return {
     key: noticeKey(topic, input.scope),

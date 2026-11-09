@@ -39,7 +39,7 @@ function fbmSettingsSections() {
     {
       name: FbmSync.SETTING_SECTIONS.run, owner: 'fbm_sync', label: 'Tham số phiên FBM',
       fields: {
-        approvalThreshold: { kind: 'number', label: 'Ngưỡng yêu cầu chấp thuận', min: 0, default: 10, hint: 'Số bản ghi chờ đẩy lên FBM vượt ngưỡng này thì lượt dừng chờ người dùng chấp thuận. 0 = luôn hỏi.' },
+        approvalThreshold: { kind: 'number', label: 'Ngưỡng yêu cầu chấp thuận', min: 0, default: 10, hint: 'Số bản ghi sắp đẩy lên FBM chạm ngưỡng này thì lượt không đẩy mà hiện thông báo chờ người dùng chấp thuận; lượt kế đẩy đúng tập đã chấp thuận. 0 = luôn hỏi.' },
         scopeLimited: { kind: 'boolean', label: 'Giới hạn phạm vi khách', default: true, hint: 'Bật thì lượt đồng bộ chỉ đọc và ghi các khách trong danh sách chỉ định.' },
         scopeCodes: {
           kind: 'codeList', label: 'Danh sách khách chỉ định', pattern: /^[A-Za-z0-9._-]{1,32}$/, maxItems: 40,

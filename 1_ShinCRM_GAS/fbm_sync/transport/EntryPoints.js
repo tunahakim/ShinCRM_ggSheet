@@ -1,48 +1,6 @@
 /** Entry point cho Sidebar, DEV runner va Web App relay. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Người dùng chấp thuận phiên push lớn; chỉ sau đó mới cấp request authorize đầu tiên. */
-function fbmSyncApprovePush() {
-  var state = FbmSync.stateRead();
-  if (String(state.phase || '') !== 'awaiting_approval' || !state.metadata || state.metadata.approvalRequired !== true) {
-    return { ok: false, code: 'PUSH_APPROVAL_NOT_REQUIRED', status: FbmSync.statusView() };
-  }
-  state.phase = 'checking_session';
-  state.entity = '';
-  state.cursor = { kind: 'authorize_customer' };
-  state.metadata.approvalGranted = true;
-  state.message = 'Đã chấp thuận; đang kiểm tra phiên FBM...';
-  FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan });
-  FbmSync.stateWrite(state);
-  logEvent({ source: 'fbm_sync', action: 'push_batch_approved', outcome: LOG_OK, reason: 'Người dùng chấp thuận phiên có hơn 10 bản ghi thay đổi.', detail: { candidateCount: Number(state.metadata.approvalCount || 0) } });
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
-}
-/** Mở lại toàn bộ nhóm lỗi sau khi người dùng đã sửa nguyên nhân; không lặp request FBM tại đây. Đọc và ghi trong một hàm quyết; bản ghi đang bận giữ nguyên dấu lỗi để lần mở lại sau xét tiếp. */
-function fbmSyncRetryPushFailures() {
-  var state = FbmSync.stateRead(), failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures);
-  if (!keys.length) { return { ok: false, code: 'PUSH_FAILURES_NOT_FOUND', message: 'Không có nhóm bản ghi lỗi đẩy cần mở lại.' }; }
-  var opened = FbmSync.recordChange(function (gate) {
-    var byEntity = { customer: [], activity: [] }, present = { customer: {}, activity: {} }, reset = [], missing = [];
-    ['customer', 'activity'].forEach(function (entity) {
-      gate.read(entity, FbmSync.recordSchemas()).forEach(function (record) { present[entity][String(record && record.id || '')] = true; });
-    });
-    keys.forEach(function (key) {
-      var split = key.indexOf(':'), entity = split < 0 ? '' : key.slice(0, split), id = split < 0 ? '' : key.slice(split + 1);
-      if (!byEntity[entity] || !id || !present[entity][id]) { missing.push(key); return; }
-      if (gate.busy(entity, [id])[id]) { return; }
-      byEntity[entity].push({ id: id, syncStatus: FbmSync.SYNC_STATUS.pending });
-      reset.push(key);
-    });
-    return { save: ['customer', 'activity'].map(function (entity) { return { entity: entity, records: byEntity[entity], source: 'pull' }; }), value: { reset: reset, missing: missing } };
-  }).value, reset = opened.reset, missing = opened.missing;
-  // Bản ghi không còn trên Sheet thì dấu chặn gửi lại vô nghĩa; giữ lại thì nó chiếm chỗ của cầu dao lỗi đẩy mãi mãi.
-  FbmSync.pushFailuresRemove(reset.concat(missing));
-  state.message = 'Đã mở lại ' + reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.';
-  FbmSync.stateWrite(state);
-  logEvent({ source: 'fbm_sync', action: 'push_retry_batch_enabled', outcome: LOG_OK, reason: 'Người dùng chủ động mở lại nhóm bản ghi lỗi đẩy.', detail: { total: keys.length, reset: reset.length, missing: missing.length } });
-  return { ok: true, total: keys.length, reset: reset.length, missing: missing.length, status: FbmSync.statusView() };
-}
-
 /**
  * Địa chỉ Web App relay thuộc về bản triển khai của từng script, không thuộc code: code đi theo mọi bản sao Sheet nên hằng số trong code sẽ chỉ Extension của bản sao về Web App của Sheet gốc.
  * Nguồn duy nhất là `ScriptApp.getService().getUrl()` đọc lúc GAS đang chạy trong chính Web App (trong ngữ cảnh Sidebar nó có thể trả địa chỉ @HEAD). Kèm `scriptId` vì bản sao mang theo ScriptProperties của script gốc.

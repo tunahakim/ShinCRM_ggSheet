@@ -110,8 +110,8 @@ FbmSync.pullBatchApply = function (state, entity, records, ctx) {
 };
 
 /**
- * Áp kết quả một phần kiểm tra trước phiên vào state: thêm vấn đề vào kết quả lượt, ghi Log, dừng lượt khi có lỗi chặn, chờ chấp thuận khi số bản ghi sắp đẩy chạm ngưỡng. Trả kết quả dừng lượt, hoặc `null` để chạy tiếp.
- * Chấp thuận hỏi một lần mỗi lượt: người dùng đồng ý thì lượt kiểm lại phiên và dữ liệu nhưng không hỏi lại.
+ * Áp kết quả một phần kiểm tra trước phiên vào state: thêm vấn đề vào kết quả lượt, ghi Log, dừng lượt khi có lỗi chặn. Trả kết quả dừng lượt, hoặc `null` để chạy tiếp.
+ * Ngưỡng chấp thuận không xét ở đây: tập sẽ đẩy chỉ biết sau khi kéo về ghi Sheet, nên cổng chấp thuận nằm ở đầu chặng đẩy (`pushPassNext`).
  */
 FbmSync.preflightApply = function (state, preflight) {
   state.metadata = state.metadata || {};
@@ -125,16 +125,6 @@ FbmSync.preflightApply = function (state, preflight) {
     FbmSync.runFail(state, 'SYNC_PREFLIGHT_FAILED', 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.'));
     FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
-  }
-  var count = Number(preflight.candidateCount || 0);
-  if (FbmSync.canWriteFbm(state.mode) && count > 0 && count >= settingsValue(FbmSync.SETTING_SECTIONS.run, 'approvalThreshold') && state.metadata.approvalGranted !== true) {
-    state.phase = 'awaiting_approval'; state.entity = '';
-    state.cursor = { kind: 'push_approval', candidateCount: count };
-    state.message = 'Có ' + count + ' bản ghi thay đổi; cần người dùng chấp thuận trước khi ghi FBM.';
-    state.metadata.approvalRequired = true;
-    state.metadata.approvalCount = count;
-    FbmSync.stateWrite(state);
-    return { ok: true, request: null, status: FbmSync.statusView(), approvalRequired: true };
   }
   return null;
 };
@@ -158,16 +148,10 @@ FbmSync.preflightLocalStep = function (state) {
   return FbmSync.preflightApply(state, preflight);
 };
 
-/** Quyết cổng của chặng đẩy cho lượt: đọc dấu đã lưu và dấu hiện tại rồi so. Dấu hỏng thì ghi Log cảnh báo và mở, không coi là không có dấu một cách im lặng. */
+/** Quyết lượt có bỏ chặng đẩy không: đọc cổng đã lưu và dấu hiện tại rồi so (`pushGateSkip`). Chỉ lượt nền mới đọc, vì lượt tay luôn chạy chặng đẩy. */
 FbmSync.pushGateCheck = function (state, options) {
-  var mark = null;
-  if (options.origin === 'background') {
-    try { mark = FbmSync.pushCleanRead(); } catch (markError) {
-      if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'push_clean_read', outcome: typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn', cycleId: String(state.runId || ''), reason: String(markError && markError.message || markError) + ' Quét lại cả hai sheet.' }); }
-      return { open: true, reason: 'mark_corrupt' };
-    }
-  }
-  var gate = FbmSync.pushGateDecide(options, mark, mark ? FbmSync.pushCleanNow() : null);
+  var stored = options.origin === 'background' ? FbmSync.pushGateLoad(state) : null;
+  var gate = FbmSync.pushGateSkip(options, stored, stored ? FbmSync.pushGateMark() : null);
   if (!gate.open) { FbmSync.scheduleTrace('push_gate_closed', FbmSync.PUSH_GATE_CLOSED_TRACE, { scan: String(options.scan || ''), mode: String(options.mode || '') }); }
   return gate;
 };
@@ -459,11 +443,11 @@ FbmSync.continueStep = function (rawResponse) {
   if (cursor.kind === 'authorize_customer') {
     return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('customer', response)), status: FbmSync.statusView() };
   }
-  // Sau xác thực Activity lượt có thể dừng (liên kết sai, kiểm tra dữ liệu chặn, chờ chấp thuận): trả đúng lý do dừng chứ không trả "không có request".
+  // Sau xác thực Activity lượt có thể dừng (liên kết sai, kiểm tra dữ liệu chặn): trả đúng lý do dừng chứ không trả "không có request".
   if (cursor.kind === 'authorize_activity') {
     var activityRequest = FbmSync.authContinue('activity', response), after = activityRequest ? null : FbmSync.stateRead();
     if (after && after.phase === 'error') { return { ok: false, code: after.lastFailureCode, request: null, status: FbmSync.statusView(), error: after.lastError }; }
-    return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView(), approvalRequired: !!after && after.phase === 'awaiting_approval' };
+    return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView() };
   }
   if (cursor.kind === 'identity_user_grid') {
     var identityUser = FbmSync.identityUser(response);
