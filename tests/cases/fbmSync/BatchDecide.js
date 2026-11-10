@@ -54,11 +54,16 @@ function chay(so) {
   const isFresh = (records) => records.some((record) => record.fbmHash === 'moi');
   const batch = F.batchRecordsOf(checks, cursor, { categoryGate: {}, isFresh });
   check(so, 'batchRecordsOf: khách, giao dịch, lỗi từng khách, trang kế và tên cột gốc',
-    [batch.customerOk, batch.customerRecords.map((r) => r.fbmId), batch.activityRecords.map((r) => r.fbmId), batch.failed.map((f) => f.customer + ':' + f.code), Object.keys(batch.readOk), Object.keys(batch.nextPages), batch.pagedNew, batch.outcomes, batch.customerFields, batch.activityFields],
-    [true, ['S1', 'S2', 'S4'], ['800001', '800009', '800041', '800042', '800043'], ['K2:FBM_500'], ['S1'], ['S4'], ['S4:800041', 'S4:800042', 'S4:800043'], [{ sttRec: 'S1', fresh: true, complete: true }, { sttRec: 'S2', fresh: null }], ['stt_rec_kh'], ['id']]);
+    [batch.customerRecords.map((r) => r.fbmId), batch.activityRecords.map((r) => r.fbmId), batch.failed.map((f) => f.customer + ':' + f.code), Object.keys(batch.readOk), Object.keys(batch.nextPages), batch.pagedNew, batch.outcomes, batch.customerFields, batch.activityFields],
+    [['S1', 'S2', 'S4'], ['800001', '800009', '800041', '800042', '800043'], ['K2:FBM_500'], ['S1'], ['S4'], ['S4:800041', 'S4:800042', 'S4:800043'], [{ sttRec: 'S1', fresh: true, complete: true }, { sttRec: 'S2', fresh: null }], ['stt_rec_kh'], ['id']]);
   check(so, 'batchRecordsOf không sửa cursor đầu vào', cursor, { customers: ['S1', 'S2', 'S3', 'S4'], count: 3, pages: {} });
-  const hong = F.batchRecordsOf([loi('FBM_503'), ok({ rows: [] })], { customers: ['S1'] }, { categoryGate: {}, isFresh });
-  check(so, 'Đọc khách của lô lỗi: mọi khách vào lỗi, không kết luận gì', [hong.customerOk, hong.failed.map((f) => f.customer), hong.outcomes, hong.customerRecords.length], [false, ['S1'], [{ sttRec: 'S1', fresh: null }], 0]);
+  let hong = null;
+  try { F.batchRecordsOf([loi('FBM_503'), ok({ rows: [] })], { customers: ['S1'] }, { categoryGate: {}, isFresh }); } catch (error) { hong = error; }
+  check(so, 'Đọc khách chung của lô lỗi: dừng cả lô một lỗi (một dòng Log), không nhân thành lỗi từng khách', [hong && hong.code, hong && hong.logs.length, hong && hong.logs[0].action], ['FBM_503', 1, 'activity_batch_mismatch']);
+  // Ô lượt có trần một khóa: danh sách khách lỗi chỉ giữ mã, câu lỗi dài (thông báo FBM) chỉ vào dòng Log.
+  const oLoi = { metadata: {}, counts: {} }, cauDai = 'x'.repeat(5000);
+  const dongLoi = F.activityCustomerErrors(oLoi, Array.from({ length: 30 }, (_, i) => ({ customer: 'A0000' + String(100000 + i), code: 'TRANSPORT_ERROR', status: 500, reason: cauDai })));
+  check(so, 'khách lỗi: ô lượt giữ 20 mục chỉ có mã (dưới 2 KB dù câu lỗi dài), dòng Log vẫn đủ câu', [oLoi.metadata.customerErrors.total, oLoi.metadata.customerErrors.recent.length, Object.keys(oLoi.metadata.customerErrors.recent[0]), Buffer.byteLength(JSON.stringify(oLoi.metadata.customerErrors)) < 2000, dongLoi.length, dongLoi[0].reason.length], [30, 20, ['customer', 'code', 'status'], true, 30, 5000]);
   check(so, 'Trang kế kẹt thì báo lỗi khách, không đánh dấu đã đọc', F.batchRecordsOf([ok({ rows: [{ stt_rec_kh: 'S1' }] }), ok({ rows: [{ id: '1', ket: true }, { id: '2' }, { id: '3' }] })], { customers: ['S1'], count: 3 }, { categoryGate: {}, isFresh }).failed.map((f) => f.code), ['FBM_ACTIVITY_PAGE_STUCK']);
 
   // Bản chụp Sheet trước khi ghi: S1 (CUS-1) giữ 800001 (có trong lô) và 800002 (vắng), S3 (CUS-3) vắng khỏi lô, 800005 đang dưới CUS-3 nhưng lô thấy dưới S1.

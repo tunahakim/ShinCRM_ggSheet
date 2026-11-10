@@ -1099,6 +1099,12 @@ async function chay(so) {
     idLaState.phase, idLaState.lastFailureCode, idLa.fullWrites.filter((item) => item.entity === 'activity').length, idLa.fullLogs.some((event) => event.action === 'activity_batch_mismatch'),
     thieu.fullBatches.map(khoaLo), thieu.fullLocal.customer.length + thieu.fullLocal.activity.length, thieu.fullStep.status.phase, thieu.fullStep.status.lastFailureCode
   ], ['error', 'FBM_BATCH_ITEM_MISMATCH', 0, true, [['FBM-C1', 'FBM-C2', 'FBM-C3', 'FBM-C4', 'FBM-C5']], 0, 'error', 'FBM_BATCH_ITEM_MISMATCH']);
+  // Yêu cầu đọc khách chung của lô hỏng (HTTP 500): sự cố của FBM hoặc phiên, không phải lỗi từng khách; dừng cả lô một dòng Log, ô lượt không giữ danh sách khách lỗi.
+  const khachChungLoi = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw, lan) => lan === 1 ? Object.assign(raw, { items: raw.items.map((item, index) => index === 0 ? Object.assign({}, item, { ok: false, status: 500, body: loiHttp.body }) : item) }) : raw });
+  const khachChungState = khachChungLoi.fullFlow.hop.FbmSync.stateRead();
+  check(so, 'yêu cầu đọc khách chung của lô hỏng: lượt đóng lỗi, không ghi giao dịch, một dòng activity_batch_mismatch, không dòng activity_customer_failed nào', [
+    khachChungState.phase, khachChungLoi.fullWrites.filter((item) => item.entity === 'activity').length, khachChungLoi.fullLogs.filter((event) => event.action === 'activity_batch_mismatch').length, khachChungLoi.fullLogs.filter((event) => event.action === 'activity_customer_failed').length, !!(khachChungState.metadata.customerErrors)
+  ], ['error', 0, 1, 0, false]);
   const nhieuTrang = await fullPipeline(false, 'read', { customers: 120, scanCustomerRows: 50 });
   check(so, 'quét toàn bộ nhiều trang Customer: số trang tăng dần, khóa trang đúng dạng FBM, ghi đủ khách và giao dịch, phiên kết thúc done; chưa biết tên cột giao dịch thì chỉ các khách của lô đầu xin tiêu đề, các lô sau đọc trang không tiêu đề', [
     nhieuTrang.activityItemTypes.filter((type) => type === 0).length === nhieuTrang.fullBatches[0].items.length - 1, nhieuTrang.activityItemTypes.length, nhieuTrang.customerPageIndexes, nhieuTrang.fullLocal.customer.length, nhieuTrang.fullLocal.activity.length, nhieuTrang.fullStep.status.phase, nhieuTrang.fullStep.status.lastFailureCode || ''

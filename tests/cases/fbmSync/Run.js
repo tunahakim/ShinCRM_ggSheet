@@ -85,7 +85,13 @@ async function chay(so) {
   tayNhan.F.issueContext = { channel: 'relay' };
   tayNhan.F.logContextNote(tayNhan.F.stateRead());
   const nhanNgoai = tayNhan.F.logContextText();
+  const nhanDongLuot = tayNhan.F.logContextText({ cycleId: tayNhan.F.stateRead().runId });
   tayNhan.F.issueContext = null;
+  nenNhan.F.withOrchestrationLock(() => nenNhan.F.stateWrite(nenNhan.F.runClose(nenNhan.F.stateRead(), 'error')));
+  nenNhan.F.logContextNote(nenNhan.F.stateRead());
+  check(so, 'nhãn lượt: dòng mang mã lượt vừa đóng vẫn lấy nhãn của lượt, không đoán theo kênh gọi (lượt nền lưu ô lượt hỏng lúc chốt từng ghi "Tay")', [
+    nenNhan.F.logContextText({ cycleId: nenNhan.F.stateRead().runId }), nenNhan.F.logContextText(), nhanDongLuot
+  ], [nenNhan.F.stateRead().runLabel, 'Tay', tayNhan.F.stateRead().runLabel]);
   check(so, 'nhãn lượt: lượt tay ghi "Tay", lượt nền ghi "Nền" ngay lúc mở; Log trong lượt dùng nhãn đó; ngoài lượt thì theo kênh gọi (relay là Nền)', [
     tayNhan.F.stateRead().runLabel.split(' · ')[0], nenNhan.F.stateRead().runLabel.split(' · ')[0], nhanTay === tayNhan.F.stateRead().runLabel, nhanNgoai
   ], ['Tay', 'Nền', true, 'Nền']);
