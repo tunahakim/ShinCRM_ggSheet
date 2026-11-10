@@ -1,17 +1,25 @@
 /** Noi dinh danh va anh xa ban ghi FBM sang schema noi bo. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Khóa liên kết Spreadsheet ↔ tài khoản FBM; không lưu cookie hay mật khẩu. */
-FbmSync.BINDING_KEY = 'FBM_SYNC_BINDING_V1';
-FbmSync.BINDING_CLEAR_KEY = 'FBM_SYNC_BINDING_CLEAR_V1';
+/** Kho kết nối một khóa `{ binding, clearedFrom }`: liên kết Spreadsheet ↔ tài khoản FBM và dấu tài khoản vừa gỡ (chặn liên kết sang tài khoản khác khi Sheet còn dữ liệu). Không lưu cookie hay mật khẩu. */
+FbmSync.CONNECTION_KEY = 'FBM_CONNECTION_V1';
+FbmSync.CONNECTION_OLD_KEYS = ['FBM_SYNC_BINDING_V1', 'FBM_SYNC_BINDING_CLEAR_V1'];
+/** Cổng đọc duy nhất của kho kết nối; hỏng thì ném có mã, không coi như chưa liên kết (trả rỗng mở đường đọc khách không lọc quyền và hiện sai "chưa liên kết"). */
+FbmSync.connectionRead = function () {
+  var stored = FbmSync.mergedStoreRead(FbmSync.CONNECTION_KEY, 'Kho kết nối tài khoản FBM', FbmSync.CONNECTION_OLD_KEYS) || {}, pick = function (value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; };
+  return { binding: pick(stored.binding), clearedFrom: pick(stored.clearedFrom) };
+};
+/** Cổng ghi duy nhất của kho kết nối: cả hai phần rỗng thì xóa khóa. */
+FbmSync.connectionWrite = function (connection) {
+  var binding = connection.binding || {}, clearedFrom = connection.clearedFrom || {};
+  return FbmSync.propertyJsonWrite(FbmSync.CONNECTION_KEY, binding.spreadsheetId || clearedFrom.spreadsheetId ? { binding: binding, clearedFrom: clearedFrom } : null);
+};
 /** Không đọc được file thì ném cho cửa vào ghi Log: trả rỗng làm mọi phép so Spreadsheet bị bỏ qua và lưu được liên kết của file khác. */
 FbmSync.currentSpreadsheetId = function () {
   return String(shinOpenBook().getId() || '');
 };
-/** Bản lưu thô của liên kết; kho hỏng thì ném lỗi có mã, không coi như chưa liên kết (trả rỗng sẽ mở đường đọc khách không lọc quyền và hiện sai "chưa liên kết"). */
-FbmSync.bindingRead = function () {
-  return FbmSync.documentPropertyJson(FbmSync.BINDING_KEY, 'liên kết tài khoản FBM') || {};
-};
+/** Bản lưu thô của liên kết. */
+FbmSync.bindingRead = function () { return FbmSync.connectionRead().binding; };
 /** Bốn trường nhận diện ở dạng chuẩn; giữ nguyên văn (không trim, không đổi hoa thường) vì mọi phép đối chiếu so nguyên văn. */
 FbmSync.identityNormalize = function (value) {
   var input = value && typeof value === 'object' ? value : {};
@@ -33,12 +41,9 @@ FbmSync.bindingClear = function () {
   var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {}, phase = String(state && state.phase || '');
   var active = !!(state && state.activeRequestId) || (!!(state && state.runId) && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(phase) < 0);
   if (active) { return { ok: false, code: 'SYNC_BUSY', message: 'Đang có phiên đồng bộ; hãy dừng phiên trước khi hủy liên kết tài khoản.' }; }
-  var props = FbmSync.props(), previous = FbmSync.bindingRead();
-  if (previous.spreadsheetId) {
-    props.setProperty(FbmSync.BINDING_CLEAR_KEY, JSON.stringify({ spreadsheetId: String(previous.spreadsheetId || ''), userId: String(previous.userId || ''), username: String(previous.username || ''), accountName: String(previous.accountName || ''), clearedAt: Date.now() }));
-  }
-  if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_KEY); }
-  else { props.setProperty(FbmSync.BINDING_KEY, ''); }
+  var connection = FbmSync.connectionRead(), previous = connection.binding;
+  var clearedFrom = previous.spreadsheetId ? { spreadsheetId: String(previous.spreadsheetId || ''), userId: String(previous.userId || ''), username: String(previous.username || ''), accountName: String(previous.accountName || ''), clearedAt: Date.now() } : connection.clearedFrom;
+  FbmSync.connectionWrite({ binding: {}, clearedFrom: clearedFrom });
   var status = FbmSync.identityStatus();
   return { ok: true, code: 'IDENTITY_BINDING_CLEARED', binding: {}, identityStatus: status, message: 'Đã hủy liên kết tài khoản. Đồng bộ bị khóa cho đến khi liên kết lại.' };
 };
@@ -48,24 +53,21 @@ FbmSync.bindingWrite = function (binding) {
   if (!spreadsheetId || !userId || !username || !accountName) { return { ok: false, code: 'IDENTITY_BINDING_INCOMPLETE', message: 'Thiếu SpreadsheetId, mã số user, tên đăng nhập hoặc tên đầy đủ FBM.' }; }
   var actual = FbmSync.currentSpreadsheetId();
   if (actual !== spreadsheetId) { return { ok: false, code: 'SPREADSHEET_MISMATCH', message: 'SpreadsheetId liên kết không khớp file đang chạy.' }; }
-  var previous = FbmSync.bindingRead();
+  var connection = FbmSync.connectionRead(), previous = connection.binding, cleared = connection.clearedFrom;
   var nextIdentity = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName };
-  var cleared = FbmSync.documentPropertyJson(FbmSync.BINDING_CLEAR_KEY, 'dấu gỡ liên kết tài khoản FBM') || {};
   var sameBinding = previous.spreadsheetId === spreadsheetId && previous.userId === userId && String(previous.username || '') === username && previous.accountName === accountName;
   var rebindBlocked = FbmSync.bindingHasLinkedData() && !sameBinding && !FbmSync.bindingCanUpgradeUsername(previous, nextIdentity) && (previous.spreadsheetId || cleared.spreadsheetId);
   if (rebindBlocked) {
     return { ok: false, code: 'REBIND_REQUIRED', message: 'Spreadsheet còn dữ liệu đã liên kết FBM; xử lý dữ liệu cũ rồi kiểm tra lại trước khi đổi tài khoản.' };
   }
   var saved = { spreadsheetId: spreadsheetId, userId: userId, username: username, accountName: accountName, updatedAt: Date.now() };
-  var props = FbmSync.props();
-  props.setProperty(FbmSync.BINDING_KEY, JSON.stringify(saved));
-  if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); }
+  FbmSync.connectionWrite({ binding: saved, clearedFrom: {} });
   return { ok: true, binding: { spreadsheetId: saved.spreadsheetId, userId: saved.userId, username: saved.username, accountName: saved.accountName, updatedAt: saved.updatedAt } };
 };
 /* Lưu cả nhận diện và credential dưới cùng lock; không để hệ thống rơi vào trạng thái nửa A nửa B. */
 FbmSync.connectionSave = function (input) {
   var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = FbmSync.props();
-  var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldBindingRaw = props.getProperty(FbmSync.BINDING_KEY), oldLoginRaw = props.getProperty(loginKey), oldClearRaw = props.getProperty(FbmSync.BINDING_CLEAR_KEY);
+  var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldConnectionRaw = props.getProperty(FbmSync.CONNECTION_KEY), oldLoginRaw = props.getProperty(loginKey);
   var identity = { spreadsheetId: String(binding.spreadsheetId || '').trim(), userId: String(binding.userId || '').trim(), username: String(binding.username || '').trim(), accountName: String(binding.accountName || '').trim() };
   var allEmpty = !identity.spreadsheetId && !identity.userId && !identity.username && !identity.accountName;
   if (!allEmpty && (!identity.spreadsheetId || !identity.userId || !identity.username || !identity.accountName)) {
@@ -93,12 +95,9 @@ FbmSync.connectionSave = function (input) {
   } catch (error) {
     var rollbackFailure = '';
     try {
-      if (oldBindingRaw === null || oldBindingRaw === undefined || oldBindingRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_KEY); } else { props.setProperty(FbmSync.BINDING_KEY, ''); } }
-      else { props.setProperty(FbmSync.BINDING_KEY, oldBindingRaw); }
-      if (oldLoginRaw === null || oldLoginRaw === undefined || oldLoginRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(loginKey); } else { props.setProperty(loginKey, ''); } }
-      else { props.setProperty(loginKey, oldLoginRaw); }
-      if (oldClearRaw === null || oldClearRaw === undefined || oldClearRaw === '') { if (typeof props.deleteProperty === 'function') { props.deleteProperty(FbmSync.BINDING_CLEAR_KEY); } else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, ''); } }
-      else { props.setProperty(FbmSync.BINDING_CLEAR_KEY, oldClearRaw); }
+      [[FbmSync.CONNECTION_KEY, oldConnectionRaw], [loginKey, oldLoginRaw]].forEach(function (pair) {
+        if (pair[1] === null || pair[1] === '') { props.deleteProperty(pair[0]); } else { props.setProperty(pair[0], pair[1]); }
+      });
     } catch (rollbackError) { rollbackFailure = String(rollbackError && rollbackError.message || rollbackError); }
     // Khôi phục cũng hỏng thì liên kết và credential có thể nửa cũ nửa mới: phải nói rõ để người dùng lưu lại, không báo như đã khôi phục.
     var failed = rollbackFailure

@@ -9,7 +9,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.PROCESS_BOOK_KEY = 'FBM_SYNC_PROCESS_BOOK_V1';
 FbmSync.PROCESS_KINDS = ['customerFull', 'activityFull', 'detail', 'heartbeat'];
-/** Khóa cũ trước khi gộp sổ; còn khóa nào mà sổ chưa có thì cổng đọc ném, không đọc thành sổ rỗng (lịch nền sẽ chạy lại hết, mốc khách mất). Xóa cùng hàm chuyển `fbmStoresMigrate`. */
+/** Khóa cũ trước khi gộp sổ; còn khóa nào mà sổ chưa có thì cổng đọc ném, không đọc thành sổ rỗng (lịch nền chạy lại hết, mốc khách mất). */
 FbmSync.PROCESS_BOOK_OLD_KEYS = ['FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', 'FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', 'FBM_SYNC_DONE_DETAIL_SCAN', 'FBM_SYNC_DONE_HEARTBEAT', 'FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN', 'FBM_SYNC_RETRY_ACTIVITY_FULL_SCAN', 'FBM_SYNC_RETRY_DETAIL_SCAN', 'FBM_SYNC_RETRY_HEARTBEAT', 'FBM_SYNC_CUSTOMER_BASELINE_V1', 'FBM_SYNC_DETAIL_CURSOR_V1'];
 /** Chuẩn hóa sổ đã lưu (thiếu mục nào thì mục đó là "chưa từng chạy"). Hàm thuần. */
 FbmSync.processBookShape = function (stored) {
@@ -25,12 +25,7 @@ FbmSync.processBookShape = function (stored) {
 };
 /** Cổng đọc duy nhất của sổ. Đọc một lần mỗi lời gọi rồi truyền cho các công cụ tính. */
 FbmSync.processBookRead = function () {
-  var stored = FbmSync.documentPropertyJson(FbmSync.PROCESS_BOOK_KEY, 'sổ tiến trình nền');
-  if (!stored) {
-    var props = FbmSync.props(), left = FbmSync.PROCESS_BOOK_OLD_KEYS.filter(function (key) { return props.getProperty(key) !== null; });
-    if (left.length) { var pending = new Error('Sổ tiến trình nền chưa được chuyển từ ' + left.length + ' khóa cũ; chạy hàm chuyển fbmStoresMigrate trước.'); pending.code = 'FBM_STORES_MIGRATION_PENDING'; pending.detail = { keys: left }; throw pending; }
-  }
-  return FbmSync.processBookShape(stored);
+  return FbmSync.processBookShape(FbmSync.mergedStoreRead(FbmSync.PROCESS_BOOK_KEY, 'Sổ tiến trình nền', FbmSync.PROCESS_BOOK_OLD_KEYS));
 };
 /** Cổng ghi duy nhất của sổ. */
 FbmSync.processBookWrite = function (book) { return FbmSync.propertyJsonWrite(FbmSync.PROCESS_BOOK_KEY, FbmSync.processBookShape(book)); };

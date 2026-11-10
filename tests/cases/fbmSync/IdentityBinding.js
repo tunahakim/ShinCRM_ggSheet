@@ -1,5 +1,6 @@
 /** Liên kết Spreadsheet với tài khoản FBM: yêu cầu REBIND khi file có FBM ID chưa liên kết, không tự nâng cấp liên kết cũ, không ghi đè khi còn dữ liệu FBM cũ. */
 const { section, check } = require('../../lib/assert');
+const { lienKetLuu } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
 
@@ -18,15 +19,15 @@ function chay(so) {
   check(so, 'luu lien ket dung Spreadsheet va tai khoan',
     [savedBinding.ok, identity.FbmSync.identityStatus({ userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' }).status],
     [true, 'BOUND']);
-  bindingStore[identity.FbmSync.BINDING_KEY] = JSON.stringify({ spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' });
-  const legacyBeforeRead = bindingStore[identity.FbmSync.BINDING_KEY];
+  bindingStore[identity.FbmSync.CONNECTION_KEY] = JSON.stringify({ binding: { spreadsheetId: 'sheet-a', userId: 'user-a', accountName: 'Tai khoan A' } });
+  const legacyBeforeRead = lienKetLuu(bindingStore);
   const legacyStatus = identity.FbmSync.identityStatus({ userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' });
   check(so, 'doc binding cu thieu username khong tu ghi nang cap',
-    [legacyStatus.status, bindingStore[identity.FbmSync.BINDING_KEY]],
+    [legacyStatus.status, lienKetLuu(bindingStore)],
     ['REBIND_REQUIRED', legacyBeforeRead]);
   const upgradedLegacyBinding = identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-a', username: 'ANHLT', accountName: 'Tai khoan A' });
   check(so, 'chi thao tac luu ro rang moi nang cap username cho binding cu',
-    [upgradedLegacyBinding.ok, JSON.parse(bindingStore[identity.FbmSync.BINDING_KEY]).username],
+    [upgradedLegacyBinding.ok, JSON.parse(lienKetLuu(bindingStore)).username],
     [true, 'ANHLT']);
   check(so, 'khong cho ghi de lien ket khi du lieu FBM cu van con',
     [identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', username: 'USERB', accountName: 'Tai khoan B' }).ok, identity.FbmSync.bindingWrite({ spreadsheetId: 'sheet-a', userId: 'user-b', username: 'USERB', accountName: 'Tai khoan B' }).code],

@@ -57,5 +57,10 @@ function vaSoNen(F, patch) {
   F.processBookWrite(so);
   return F.processBookRead();
 }
+/** Liên kết đang lưu trong kho kết nối `FBM_CONNECTION_V1` của dữ liệu kho giả (chuỗi JSON để so nguyên văn), `undefined` khi chưa liên kết. */
+function lienKetLuu(data) {
+  const raw = data.FBM_CONNECTION_V1, binding = raw ? JSON.parse(raw).binding : null;
+  return binding && binding.spreadsheetId ? JSON.stringify(binding) : undefined;
+}
 
-module.exports = { datCaiDat, datPhan, datCongTac, datNen, docPhan, lichNenPatch, datLichNen, docLichNen, vaSoNen };
+module.exports = { datCaiDat, datPhan, datCongTac, datNen, docPhan, lichNenPatch, datLichNen, docLichNen, vaSoNen, lienKetLuu };

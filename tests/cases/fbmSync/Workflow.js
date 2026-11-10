@@ -239,7 +239,7 @@ async function chay(so) {
   ], [firstRequest.url, 'User', '461020379855cFHN_CRM_App']);
   const finished = engine.hop.FbmSync.continue(executorRaw(transport.reply, firstRequest.id));
   check(so, 'tu dong dien: GAS nhan response Extension va tra draft chua luu binding', [
-    finished.ok, finished.request || null, finished.status.phase, finished.status.metadata.identityProbe, engine.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
+    finished.ok, finished.request || null, finished.status.phase, finished.status.metadata.identityProbe, engine.hop.FbmSync.bindingRead().spreadsheetId || null
   ], [true, null, 'done', { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' }, null]);
 
   const incomplete = workflowGas();
@@ -250,7 +250,7 @@ async function chay(so) {
     transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: incompleteStarted.request.id }] }
   });
   check(so, 'tu dong dien: FBM thieu nhan dien phai ket thuc loi ro rang, khong tu luu', [
-    incompleteResult.ok, incompleteResult.code, incompleteResult.status.phase, incomplete.documentProperties.getProperty('FBM_SYNC_BINDING_V1')
+    incompleteResult.ok, incompleteResult.code, incompleteResult.status.phase, incomplete.hop.FbmSync.bindingRead().spreadsheetId || null
   ], [false, 'IDENTITY_PROBE_INCOMPLETE', 'error', null]);
 
   const identityCheck = workflowGas();
@@ -268,7 +268,7 @@ async function chay(so) {
   check(so, 'kiem tra lien ket: chi quet Customer va tra tong hop n/N, khong cap Activity hoac ghi binding', [
     identityGridStep.request.meta.entity, identityDone.request || null, identityDone.status.phase,
     identityDone.status.metadata.identityCheck.total, identityDone.status.metadata.identityCheck.matched, identityDone.status.metadata.identityCheck.missing,
-    identityCheck.documentProperties.getProperty('FBM_SYNC_BINDING_V1') === null
+    !identityCheck.hop.FbmSync.bindingRead().spreadsheetId
   ], ['customer', null, 'done', 1, 1, 0, false]);
 
   // Kiểm liên kết với bản nháp chưa lưu: bước kiểm phiên so tài khoản FBM với bản nháp, không với liên kết đã lưu.
@@ -322,14 +322,14 @@ async function chay(so) {
   const bindingSaved = binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const bindingCleared = binding.hop.FbmSync.bindingWrite({});
   check(so, 'xoa lien ket rong: chi xoa binding, giu Sheet va khoa dong bo thuong', [
-    bindingSaved.ok, bindingCleared.code, binding.documentProperties.getProperty('FBM_SYNC_BINDING_V1'), bindingCleared.identityStatus.status
+    bindingSaved.ok, bindingCleared.code, binding.hop.FbmSync.bindingRead().spreadsheetId || null, bindingCleared.identityStatus.status
   ], [true, 'IDENTITY_BINDING_CLEARED', null, 'UNBOUND']);
   binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   const activeBindingState = binding.hop.FbmSync.stateRead();
   activeBindingState.runId = 'binding-request'; activeBindingState.phase = 'checking_session'; activeBindingState.activeRequestId = 'request-binding';
   binding.hop.FbmSync.stateWrite(activeBindingState);
   const rejectedClear = binding.hop.FbmSync.bindingWrite({});
-  check(so, 'xoa lien ket bi chan khi request FBM dang bay', [rejectedClear.ok, rejectedClear.code, Boolean(binding.documentProperties.getProperty('FBM_SYNC_BINDING_V1'))], [false, 'SYNC_BUSY', true]);
+  check(so, 'xoa lien ket bi chan khi request FBM dang bay', [rejectedClear.ok, rejectedClear.code, Boolean(binding.hop.FbmSync.bindingRead().spreadsheetId || null)], [false, 'SYNC_BUSY', true]);
 
   const gates = workflowGas().hop.FbmSync;
   check(so, 'phan quyen ghi theo mode: check khong ghi, read chi ghi Sheet, push chi ghi FBM', [

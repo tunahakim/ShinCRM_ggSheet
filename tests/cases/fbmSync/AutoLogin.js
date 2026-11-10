@@ -409,21 +409,25 @@ async function chay(so) {
   try { connection.FbmSync.bindingWrite({ spreadsheetId: 'sheet-other', userId: 'user-x', username: 'USERX', accountName: 'Tai khoan X' }); } catch (err) { bookError = String(err && err.message); }
   connection.shinOpenBook = savedBook;
   check(so, 'không đọc được Spreadsheet ID thì lưu liên kết ném lỗi thật, không bỏ qua phép so Spreadsheet', [/timed out/.test(bookError), connection.FbmSync.bindingRead().spreadsheetId || ''], [true, '']);
-  // Dấu gỡ liên kết hỏng: báo lỗi qua cửa đọc JSON và khôi phục, không coi như chưa từng gỡ.
+  // Kho kết nối hỏng: báo lỗi qua cửa đọc JSON và không ghi gì, không coi như chưa từng liên kết.
   const connectionLogs = [];
   connection.logEvent = (event) => connectionLogs.push(event);
   connection.FbmSync.bindingWrite({ spreadsheetId: 'sheet-connection', userId: 'user-a', username: 'USERA', accountName: 'Tai khoan A' });
-  connectionData.FBM_SYNC_BINDING_CLEAR_V1 = '{hỏng';
-  const corruptClear = connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-d', username: 'USERD', accountName: 'Tai khoan D' }, credential: { mode: 'preserve' } });
-  check(so, 'dấu gỡ liên kết hỏng thì lưu liên kết dừng, khôi phục bản cũ và ghi Log', [corruptClear.code, connection.FbmSync.bindingRead().userId, connectionLogs.map((e) => e.action + ':' + e.detail.code)], ['CONNECTION_SAVE_ROLLED_BACK', 'user-a', ['connection_save_failed:CONNECTION_SAVE_ROLLED_BACK']]);
-  delete connectionData.FBM_SYNC_BINDING_CLEAR_V1;
+  const connectionGood = connectionData.FBM_CONNECTION_V1;
+  connectionData.FBM_CONNECTION_V1 = '{hỏng';
+  let corruptCode = '';
+  try { connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-d', username: 'USERD', accountName: 'Tai khoan D' }, credential: { mode: 'preserve' } }); } catch (err) { corruptCode = err.code; }
+  check(so, 'kho kết nối hỏng thì lưu liên kết ném DOCUMENT_PROPERTY_CORRUPT, không ghi đè kho hỏng', [corruptCode, connectionData.FBM_CONNECTION_V1], ['DOCUMENT_PROPERTY_CORRUPT', '{hỏng']);
+  connectionData.FBM_CONNECTION_V1 = connectionGood;
   // Khôi phục cũng hỏng: báo rõ trạng thái có thể nửa cũ nửa mới, không báo như đã khôi phục.
   connectionLogs.length = 0;
   failLoginWrite = true;
-  const savedDelete = connectionProps.deleteProperty;
-  connectionProps.deleteProperty = (key) => { if (key === 'FBM_LOGIN_CONFIG_V1' || key === 'FBM_SYNC_BINDING_CLEAR_V1') { throw new Error('ROLLBACK_FAILED'); } savedDelete(key); };
+  // Lần ghi kho kết nối thứ hai là lần khôi phục bản cũ: cho nó hỏng.
+  const savedSet = connectionProps.setProperty;
+  let connectionWrites = 0;
+  connectionProps.setProperty = (key, value) => { if (key === 'FBM_CONNECTION_V1' && ++connectionWrites === 2) { throw new Error('ROLLBACK_FAILED'); } return savedSet(key, value); };
   const rollbackBroken = connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-e', username: 'USERE', accountName: 'Tai khoan E' }, credential: { mode: 'save', credentialRef: 'cred-save-e', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'USERE' } } });
-  connectionProps.deleteProperty = savedDelete;
+  connectionProps.setProperty = savedSet;
   failLoginWrite = false;
   check(so, 'khôi phục sau lỗi lưu liên kết cũng hỏng thì trả mã riêng, nêu cả hai lỗi và ghi Log', [rollbackBroken.code, /ROLLBACK_FAILED/.test(rollbackBroken.message), connectionLogs.map((e) => e.detail.code)], ['CONNECTION_ROLLBACK_FAILED', true, ['CONNECTION_ROLLBACK_FAILED']]);
 

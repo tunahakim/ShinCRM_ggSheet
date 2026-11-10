@@ -165,7 +165,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 12,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 7,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 4,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 7,
     '1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js': 1,
@@ -185,7 +185,7 @@ const EXCEPTIONS = {
   propertyWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 7,
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 14,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
