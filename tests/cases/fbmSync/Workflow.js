@@ -8,6 +8,7 @@ const { datCongTac, datNen, datPhan, docPhan, datLichNen, docLichNen, vaSoNen } 
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const { workflowGas, khoDongBo } = require('../../lib/fbm/hop-dong-bo');
+const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -813,11 +814,11 @@ async function chay(so) {
 
   const quotaData = {}, quotaLogs = [];
   let quotaFull = false;
-  const quotaProperties = {
-    getProperty(key) { return Object.prototype.hasOwnProperty.call(quotaData, key) ? quotaData[key] : null; },
-    setProperty(key, value) { if (quotaFull) { throw new Error('DocumentProperties quota exceeded'); } quotaData[key] = String(value); },
-    deleteProperty(key) { delete quotaData[key]; }
-  };
+  const quotaBase = taoKhoThuocTinh(quotaData), quotaThrow = () => { if (quotaFull) { throw new Error('DocumentProperties quota exceeded'); } };
+  const quotaProperties = Object.assign({}, quotaBase, {
+    setProperty(key, value) { quotaThrow(); return quotaBase.setProperty(key, value); },
+    setProperties(values, deleteAllOthers) { quotaThrow(); return quotaBase.setProperties(values, deleteAllOthers); }
+  });
   const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
   quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {} });
   quotaFull = true;

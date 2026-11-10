@@ -94,11 +94,10 @@ function documentLockSettle() {
   if (error) { throw error; }
 }
 
-/** Nạp cả kho một lần; giá trị đã có trong bản đọc (vừa ghi hoặc đang chờ ghi) được giữ đè lên. Kho giả trong test có thể thiếu `getProperties`. */
+/** Nạp cả kho một lần; giá trị đã có trong bản đọc (vừa ghi hoặc đang chờ ghi) được giữ đè lên. */
 function documentStoreLoad() {
-  var store = documentStoreReal();
-  if (DOCUMENT_STORE.loaded || typeof store.getProperties !== 'function') { return false; }
-  var all = store.getProperties() || {};
+  if (DOCUMENT_STORE.loaded) { return false; }
+  var all = documentStoreReal().getProperties() || {};
   Object.keys(DOCUMENT_STORE.values).forEach(function (key) { all[key] = DOCUMENT_STORE.values[key]; });
   DOCUMENT_STORE.values = all;
   DOCUMENT_STORE.loaded = true;
@@ -138,7 +137,7 @@ function documentStoreFacade(defer) {
       var self = this;
       var keys = Object.keys(values || {});
       var store = documentStoreReal();
-      if (deferLayer() || typeof store.setProperties !== 'function') {
+      if (deferLayer()) {
         keys.forEach(function (key) { self.setProperty(key, values[key]); });
         return this;
       }
@@ -210,8 +209,7 @@ function documentStoreFlush(layer) {
   if (!keys.length) { return 0; }
   keys.forEach(function (key) { if (DOCUMENT_STORE.values[key] === null) { removed.push(key); } else { batch[key] = DOCUMENT_STORE.values[key]; } });
   var store = documentStoreReal();
-  // Kho giả trong test có thể thiếu `setProperties`; kho thật của Google luôn có.
-  if (typeof store.setProperties === 'function') { if (Object.keys(batch).length) { store.setProperties(batch, false); } } else { Object.keys(batch).forEach(function (key) { store.setProperty(key, batch[key]); }); }
+  if (Object.keys(batch).length) { store.setProperties(batch, false); }
   removed.forEach(function (key) { store.deleteProperty(key); });
   keys.forEach(function (key) { delete DOCUMENT_STORE.dirty[key]; });
   return keys.length;
@@ -219,19 +217,20 @@ function documentStoreFlush(layer) {
 
 /**
  * Bọc phần việc chạy trong khóa điều phối của đồng bộ: ghi qua `documentPropsDeferred()` chờ tới lúc ra khỏi lớp ngoài cùng.
- * `onFlushError(error, failed)` do bên gọi cấp để ghi Log; phần việc đã ném lỗi thì lỗi ghi gộp không thay lỗi gốc.
+ * `onFlushError(error)` do bên gọi cấp, dựng lỗi có mã theo ngữ cảnh của nó (không ghi Log). Phần việc đã ném lỗi thì lỗi ghi gộp không thay lỗi gốc mà đi kèm trong `detail.flushFailure` của lỗi gốc, để cửa vào ghi cả hai trên một dòng Log.
  */
 function withDocumentStoreDeferred(work, onFlushError) {
-  var failed = false;
+  var original = null;
   if (DOCUMENT_STORE.lockDepth === 0) { documentStoreRefresh(); }
   DOCUMENT_STORE.lockDepth += 1;
-  try { return work(); } catch (error) { failed = true; throw error; } finally {
+  try { return work(); } catch (error) { original = error || new Error(String(error)); throw original; } finally {
     DOCUMENT_STORE.lockDepth -= 1;
     if (DOCUMENT_STORE.lockDepth === 0) {
       try { documentStoreFlush(); } catch (flushError) {
         documentStoreClear();
-        var reported = typeof onFlushError === 'function' ? onFlushError(flushError, failed) : flushError;
-        if (!failed) { throw reported || flushError; }
+        var reported = onFlushError(flushError);
+        if (!original) { throw reported; }
+        if (typeof original === 'object') { original.detail = Object.assign({}, original.detail, { flushFailure: { code: String(reported.code || ''), message: String(reported.message || ''), detail: reported.detail || {} } }); }
       }
     }
   }

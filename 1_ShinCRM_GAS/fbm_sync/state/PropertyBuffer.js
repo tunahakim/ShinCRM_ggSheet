@@ -64,20 +64,20 @@ FbmSync.shardListWrite = function (prefix, items, maxShards) {
   return written;
 };
 
-/** Ghi gộp hỏng: thêm một dòng Log mang runId/phase/cursor (đọc thêm kho một lần chỉ ở nhánh hỏng) rồi trả lỗi có mã để bên gọi ném. */
+/** Ghi gộp hỏng: dựng lỗi có mã kèm `detail` runId/phase/cursor của state đang lưu (đọc thêm kho một lần chỉ ở nhánh hỏng). Không tự ghi Log: cửa vào ghi lỗi ném ra, kể cả khi nó chỉ đi kèm lỗi gốc (`withDocumentStoreDeferred`). */
 FbmSync.propertyFlushFailed = function (err) {
   var failure = new Error('Không thể lưu state đồng bộ vào DocumentProperties.');
   failure.code = 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED';
   var stored = null;
   try { stored = documentPropertyJson(documentStoreReal(), FbmSync.STATE_KEY, 'state đồng bộ', 'object'); } catch (storedFailed) { stored = { runId: '', phase: 'không đọc được state cũ: ' + (storedFailed.code || storedFailed.message) }; }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'state_write', outcome: typeof LOG_ERROR === 'undefined' ? 'error' : LOG_ERROR, reason: failure.code, detail: { context: 'flush', error: String(err && err.message || err), runId: stored && String(stored.runId || ''), phase: stored && String(stored.phase || ''), cursor: stored && stored.cursor || {} } }); }
+  failure.detail = { context: 'flush', error: String(err && err.message || err), runId: stored && String(stored.runId || ''), phase: stored && String(stored.phase || ''), cursor: stored && stored.cursor || {} };
   return failure;
 };
 
 /**
  * Bọc phần việc chạy trong khóa điều phối. Khóa không tái nhập nhưng vẫn đếm độ sâu để lỡ lồng thì chỉ lớp ngoài cùng ghi.
  * Lấy khóa thì bỏ bản đọc kho cùng bản đọc Sheet (`documentStoreRefresh`), vì lượt khác có thể vừa ghi trong lúc chờ khóa.
- * Phần việc ném lỗi mà ghi gộp cũng hỏng thì giữ lỗi gốc, lỗi ghi chỉ thêm một dòng Log.
+ * Phần việc ném lỗi mà ghi gộp cũng hỏng thì giữ lỗi gốc, lỗi ghi đi kèm trong `detail.flushFailure` của nó.
  */
 FbmSync.withPropertyBuffer = function (work) {
   return withDocumentStoreDeferred(work, FbmSync.propertyFlushFailed);
