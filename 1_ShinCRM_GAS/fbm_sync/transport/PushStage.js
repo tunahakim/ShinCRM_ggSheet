@@ -89,7 +89,7 @@ FbmSync.pushPassNext = function (state, settings, logs, threshold) {
   var cursor = FbmSync.pushCursor(state.cursor), stalled = cursor.pass > 0 && cursor.at >= cursor.size && !cursor.progress;
   // Đọc trước khi đọc Sheet: lần quét này sạch thì dấu là đúng bản này, mọi sửa sau lúc đọc đều làm dấu lệch.
   var mark = FbmSync.pushGateMark();
-  var found = FbmSync.withLocalSnapshot(function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(state, scan, settings)); });
+  var found = FbmSync.withLocalSnapshot(function () { var scan = FbmSync.localScan(); if (cursor.pass === 0) { FbmSync.pendingSweepApply(scan, logs, Date.now()); } return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(state, scan, settings)); });
   ['customer', 'activity'].forEach(function (entity) {
     var step = 'push_' + entity;
     FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: entity });

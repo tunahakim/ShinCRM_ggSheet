@@ -30,6 +30,8 @@ FbmSync.BUDGET = {
   pushFailuresMax: 20,
   pushFailureDetailsMax: 10,
   pushFailureReasonChars: 160,
+  // Mục chờ xác nhận cũ hơn chừng này phút mà chưa đọc lại được từ FBM thì báo người dùng xem (không xóa, xóa là mở đường tạo trùng). Bình thường mục hết ngay trong lượt gửi hoặc lần kéo về sau.
+  pendingPushStaleMinutes: 1440,
   // Số lần quét tối đa của một chặng đẩy. Thường hai lần là sạch (lần đầu đẩy, lần sau xác nhận không còn gì); trần chặn trường hợp FBM chuẩn hóa dữ liệu khiến bản ghi lệch hash sau mỗi lần đẩy, khi đó không có trần thì chặng lặp mãi và tốn hạn mức FBM.
   pushPassesMax: 5,
   // Việc quét (scan job): một request FBM lấy cả danh sách nên chờ lâu hơn request thường (bulk giao dịch đo khoảng 19 giây).

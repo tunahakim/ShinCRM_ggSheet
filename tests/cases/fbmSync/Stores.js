@@ -54,6 +54,41 @@ function chay(so) {
     F.connectionWrite({ binding: {}, clearedFrom: {} });
     check(so, 'kho kết nối rỗng cả hai phần thì xóa hẳn khóa', khoaFbm(), []);
   }
+  section('FBM sync - sổ chờ xác nhận và sổ lỗi đẩy');
+  {
+    const notices = [], resolved = [];
+    const flow = workflowGas({ LOG_WARN: 'warn', noticeRaise: (notice) => { const moi = !notices.some((n) => n.title === notice.title); notices.push(notice); return moi; }, noticeResolve: (topic) => { resolved.push(topic); } }), F = flow.hop.FbmSync;
+    const T = Date.UTC(2026, 10, 10, 8, 0), PHUT = 60000, tuoi = F.BUDGET.pendingPushStaleMinutes * PHUT;
+    const pending = {
+      'customer:CUS-1': { hSHIN: 'h1', sentAt: T, fbmId: '' },
+      'customer:CUS-2': { hSHIN: 'h2', sentAt: T, fbmId: 'F2' },
+      'customer:CUS-3': { hSHIN: 'h3', sentAt: T - tuoi - PHUT, fbmId: '' },
+      'activity:ACT-9': { hSHIN: 'h9', sentAt: T, fbmId: 'A9' },
+      'customer:CUS-4': { hSHIN: 'h4', sentAt: T - tuoi - PHUT, fbmId: 'F4' }
+    };
+    const local = { customer: [{ id: 'CUS-1', fbmHash: '' }, { id: 'CUS-2', fbmHash: 'h2' }, { id: 'CUS-3', fbmHash: '' }, { id: 'CUS-4', fbmHash: 'cu' }], activity: [] };
+    const sweep = F.pendingSweep(pending, local, T, tuoi);
+    check(so, 'pendingSweep: mồ côi là bản ghi đã xóa khỏi Sheet hoặc FBM đã giữ đúng bản gửi; bản ghi tạo khách mất phản hồi (chưa có dấu vân) không bao giờ mồ côi dù quá tuổi; quá tuổi chỉ để báo',
+      [sweep.orphans.sort(), sweep.stale.sort()], [['activity:ACT-9', 'customer:CUS-2'], ['customer:CUS-3', 'customer:CUS-4']]);
+    F.pendingPushesWrite(pending);
+    const scan = { records: (entity) => local[entity] }, logs = [];
+    F.pendingSweepApply(scan, logs, T);
+    const sauLan1 = Object.keys(F.pendingPushesRead()).sort(), log1 = logs.map((l) => l.action);
+    logs.length = 0;
+    F.pendingSweepApply(scan, logs, T + PHUT);
+    check(so, 'pendingSweepApply: xóa mồ côi trong một lần ghi, giữ mục quá tuổi và mục tạo khách mất phản hồi; thông báo quá tuổi chỉ ghi Log khi mới bật',
+      [sauLan1, log1, logs.map((l) => l.action), notices.length, notices[0].topic], [['customer:CUS-1', 'customer:CUS-3', 'customer:CUS-4'], ['pending_push_orphans', 'pending_push_stale'], [], 2, 'fbm_pending_stale']);
+    F.pendingPushesWrite({});
+    F.pendingSweepApply(scan, logs, T);
+    check(so, 'sổ chờ rỗng thì xóa hẳn khóa và gỡ thông báo quá tuổi', [flow.documentProperties.getProperty(F.PENDING_PUSHES_KEY), resolved.indexOf('fbm_pending_stale') >= 0], [null, true]);
+  }
+  {
+    const F = workflowGas().hop.FbmSync, max = F.BUDGET.pushFailuresMax, hashes = {};
+    for (let i = 0; i <= max; i += 1) { hashes['customer:CUS-' + i] = 'h' + i; }
+    let ma = '';
+    try { F.pushFailuresWrite({ hashes, details: {} }); } catch (err) { ma = err.code; }
+    check(so, 'sổ lỗi đẩy vượt trần pushFailuresMax thì cổng ghi ném PUSH_FAILURES_OVER_CAP, không cắt bớt im lặng và không ghi gì', [ma, F.pushFailuresRead().hashes], ['PUSH_FAILURES_OVER_CAP', {}]);
+  }
 }
 
 module.exports = { chay };

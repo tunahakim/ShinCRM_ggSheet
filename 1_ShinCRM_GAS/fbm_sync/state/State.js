@@ -89,22 +89,6 @@ FbmSync.stateDefault = function () {
   return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', process: '', pollAt: 0, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', activeRequestReplay: false, closedRequestId: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, approvedFingerprint: '', lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
 };
 
-/** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
-/** Hash của lần ghi đang chờ xác nhận; không đưa metadata kỹ thuật vào Sheet. */
-FbmSync.pendingPushesRead = function () {
-  return FbmSync.documentPropertyJson('FBM_SYNC_PENDING_PUSHES_V1', 'hash chờ xác nhận') || {};
-};
-FbmSync.pendingPushGet = function (entity, id) {
-  return FbmSync.pendingPushesRead()[String(entity || '') + ':' + String(id || '')] || null;
-};
-FbmSync.pendingPushSet = function (entity, id, value) {
-  var key = String(entity || '') + ':' + String(id || ''), all = FbmSync.pendingPushesRead();
-  if (value && typeof value === 'object') { all[key] = value; } else { delete all[key]; }
-  FbmSync.documentPropertySet('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify(all), 'pending_push');
-  return value || null;
-};
-FbmSync.pendingPushClear = function (entity, id) { return FbmSync.pendingPushSet(entity, id, null); };
-
 /**
  * Bản ghi đẩy lỗi: `hashes` là hash lúc lỗi, chặn gửi lại khi dữ liệu chưa đổi; `details` chỉ để Sidebar hiển thị, bản đầy đủ nằm ở Log.
  * Ở khóa riêng vì state phiên chỉ 9 KB. Khóa này có trần cố định vì chiều đẩy dừng khi chạm `pushFailuresMax` (`pushFailuresTripped`), chi tiết chỉ giữ `pushFailureDetailsMax` mục mới nhất với lý do cắt ngắn.
@@ -114,7 +98,10 @@ FbmSync.pushFailuresRead = function () {
   var stored = FbmSync.documentPropertyJson(FbmSync.PUSH_FAILURES_KEY, 'bản ghi đẩy lỗi') || {};
   return { hashes: stored.hashes || {}, details: stored.details || {} };
 };
+/** Cổng ghi duy nhất của sổ lỗi đẩy. Cầu dao dừng chặng đẩy khi chạm `pushFailuresMax`, nên vượt trần là lỗi lập trình: ném `PUSH_FAILURES_OVER_CAP`, không cắt bớt im lặng (cắt là bỏ chặn gửi lại bản ghi lỗi). */
 FbmSync.pushFailuresWrite = function (store) {
+  var count = Object.keys(store.hashes).length;
+  if (count > FbmSync.BUDGET.pushFailuresMax) { var over = new Error('Sổ lỗi đẩy có ' + count + ' bản ghi, vượt trần ' + FbmSync.BUDGET.pushFailuresMax + '; cầu dao lỗi đẩy lẽ ra đã dừng chặng đẩy.'); over.code = 'PUSH_FAILURES_OVER_CAP'; throw over; }
   var budget = FbmSync.BUDGET, details = {}, keys = Object.keys(store.details || {}).filter(function (key) { return store.hashes[key] !== undefined; });
   keys.slice(-budget.pushFailureDetailsMax).forEach(function (key) { details[key] = Object.assign({}, store.details[key], { reason: String(store.details[key] && store.details[key].reason || '').slice(0, budget.pushFailureReasonChars) }); });
   FbmSync.documentPropertySet(FbmSync.PUSH_FAILURES_KEY, JSON.stringify({ hashes: store.hashes, details: details }), 'push_failures');
