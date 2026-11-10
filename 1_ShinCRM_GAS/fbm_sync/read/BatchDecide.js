@@ -17,12 +17,11 @@ FbmSync.readWaitCopy = function (waits) {
  */
 FbmSync.batchRecordsOf = function (checks, cursor, input) {
   var customers = cursor.customers || [], gate = input.categoryGate, count = Number(cursor.count || FbmSync.BUDGET.activityCustomerRows), customerCheck = checks[0], pages = cursor.pages || {};
-  var batch = { customerOk: !!customerCheck.check.ok, customerRecords: [], activityRecords: [], returned: {}, readOk: {}, failed: [], outcomes: [], nextPages: {}, pagedNew: [], customerFields: null, activityFields: null };
-  if (!batch.customerOk) {
-    // Không biết khách nào còn nên không kết luận vắng mặt cho ai: báo lỗi từng khách của lô, không ghi, không tra.
-    var reason = 'FBM trả lỗi khi đọc thông tin khách của lô; khách này chưa được đọc và không bị gắn cờ trong lượt. ' + String(customerCheck.check.bug && (customerCheck.check.bug.Message || customerCheck.check.bug.message) || '');
-    customers.forEach(function (sttRec) { batch.failed.push({ customer: sttRec, code: String(customerCheck.check.code || 'FBM_ERROR'), status: Number(customerCheck.check.status || 0), reason: reason }); batch.outcomes.push({ sttRec: sttRec, fresh: null }); });
-    return batch;
+  var batch = { customerRecords: [], activityRecords: [], returned: {}, readOk: {}, failed: [], outcomes: [], nextPages: {}, pagedNew: [], customerFields: null, activityFields: null };
+  if (!customerCheck.check.ok) {
+    // Cả lô dùng chung một yêu cầu đọc khách: hỏng là sự cố của FBM hoặc phiên, không phải của từng khách. Dừng cả lô (không ghi, vị trí vòng xoay không tiến) để lượt sau đọc lại đúng các khách này.
+    var check = customerCheck.check, status = Number(check.status || 0);
+    throw FbmSync.activityBatchError('FBM trả lỗi khi đọc thông tin ' + customers.length + ' khách của lô' + (status ? ' (HTTP ' + status + ')' : '') + '; chưa ghi gì, lượt sau đọc lại đúng các khách này.', String(check.code || 'FBM_ERROR'), { status: status, fbmMessage: String(check.bug && (check.bug.Message || check.bug.message) || '') });
   }
   try {
     var customerGrid = FbmSync.rowsToRecords('customer', FbmSync.protocol.parse(customerCheck.item));
@@ -75,7 +74,7 @@ FbmSync.absentFind = function (batch, customers, input, write) {
   batch.activityRecords.forEach(function (record) { inBatch[String(record.fbmId || '').trim()] = String(record.customerFbmId || ''); });
   // Giao dịch thấy ở trang trước của khách đọc nhiều trang cũng là đã thấy trong lần đọc khách đó.
   (input.pagedSeen || []).forEach(function (entry) { var at = entry.indexOf(':'), id = entry.slice(at + 1); if (inBatch[id] === undefined) { inBatch[id] = entry.slice(0, at); } });
-  customers.forEach(function (sttRec) { if (batch.customerOk && !batch.returned[sttRec] && local.byStt[sttRec]) { found.lookups.push('c:' + sttRec); } });
+  customers.forEach(function (sttRec) { if (!batch.returned[sttRec] && local.byStt[sttRec]) { found.lookups.push('c:' + sttRec); } });
   Object.keys(local.activitiesOf).forEach(function (cus) {
     var parent = local.byCus[cus], owner = String(parent && parent.fbmId || '').trim();
     local.activitiesOf[cus].forEach(function (activity) {
@@ -92,7 +91,7 @@ FbmSync.absentFind = function (batch, customers, input, write) {
     waiting.forEach(function (fbmId) {
       var activity = local.activityById[fbmId];
       if (!activity || inBatch[fbmId] !== undefined) { return; }
-      if (batch.customerOk && !batch.returned[sttRec]) { found.flags.activity.push({ record: activity, status: FbmSync.SYNC_STATUS.transferred, reason: 'FBM báo giao dịch thuộc khách ' + sttRec + ' nhưng khách đó không còn trong quyền của tài khoản; giữ dưới khách cũ.' }); return; }
+      if (!batch.returned[sttRec]) { found.flags.activity.push({ record: activity, status: FbmSync.SYNC_STATUS.transferred, reason: 'FBM báo giao dịch thuộc khách ' + sttRec + ' nhưng khách đó không còn trong quyền của tài khoản; giữ dưới khách cũ.' }); return; }
       if (batch.readOk[sttRec] && batch.readOk[sttRec].complete) { found.logs.push(FbmSync.gateOwnerMismatch(activity, sttRec, 'FBM báo khách ' + sttRec + ' đang giữ giao dịch nhưng lần đọc khách đó không có giao dịch này.')); }
     });
   });

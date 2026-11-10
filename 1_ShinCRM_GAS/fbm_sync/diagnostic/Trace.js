@@ -272,11 +272,11 @@ FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
   if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
-/** Lượt đang chạy thì lấy nhãn chốt lúc mở lượt (`runLabel`), không suy lại từ ô lượt. Ngoài lượt thì chọn theo kênh của lời gọi: Extension chuyển hộ (relay) là Nền, còn lại là Tay. */
-FbmSync.logContextText = function () {
-  var state = FbmSync._logContextState;
+/** Dòng của lượt (lượt đang chạy, hoặc `cycleId` đúng mã lượt vừa đóng) lấy nhãn chốt lúc mở (`runLabel`); ngoài lượt thì theo kênh gọi: relay là Nền, còn lại là Tay. */
+FbmSync.logContextText = function (entry) {
+  var state = FbmSync._logContextState, cycleId = String(entry && entry.cycleId || '');
   if (!state) { return ''; }
-  if (FbmSync.runInProgress(state)) { return state.runLabel || FbmSync.runLabelOf(state); }
+  if (FbmSync.runInProgress(state) || (cycleId && cycleId === String(state.runId || ''))) { return state.runLabel || FbmSync.runLabelOf(state); }
   var relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
   return relay ? 'Nền' : 'Tay';
 };

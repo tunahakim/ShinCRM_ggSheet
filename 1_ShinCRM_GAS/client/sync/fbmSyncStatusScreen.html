@@ -90,7 +90,7 @@ function fbmSyncRecordIssueBlocks(metadata) {
   }
   if (customerErrorTotal) {
     elements.push(Text({ className: ui.classes.error, text: schema.customerErrors.message.replace('{count}', customerErrorTotal) }));
-    (Array.isArray(customerErrors.recent) ? customerErrors.recent : []).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.customerErrors.item + String(item && item.customer || '') + schema.separator + String(item && item.reason || '') + schema.code + String(item && item.code || '') + (item && item.status ? schema.http + String(item.status) : '') + schema.closeCode })); });
+    (Array.isArray(customerErrors.recent) ? customerErrors.recent : []).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.customerErrors.item + String(item && item.customer || '') + schema.code + String(item && item.code || '') + (item && item.status ? schema.http + String(item.status) : '') + schema.closeCode })); });
   }
   categories.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.category + String(item && item.source || schema.categoryFallback) + (item && item.code ? schema.separator + String(item.code) : '') + (item && item.reason ? schema.separator + String(item.reason) : '') })); });
   activityMissing.slice(-20).forEach(function (item) { elements.push(Text({ className: ui.classes.preview, text: schema.activityMissing + String(item && item.id || '') + (item && item.fbmId ? schema.separator + schema.fbmPrefix + String(item.fbmId) : '') })); });

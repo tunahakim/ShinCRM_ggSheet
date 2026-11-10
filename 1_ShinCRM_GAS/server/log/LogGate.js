@@ -81,7 +81,7 @@ function logPush(entry, isTrace) {
       recordId: safe.recordId,
       reason: safe.reason,
       cycleId: safe.cycleId,
-      detail: logWithContext(safe.source, safe.detail)
+      detail: logWithContext(safe.source, safe.detail, safe)
     };
 
     console.log('[ShinCRM] ' + line.at + ' ' + String(line.source) + ' ' + String(line.action) + ' ' + String(line.outcome) + ' — ' + String(line.reason));
@@ -112,12 +112,12 @@ function logRegisterContext(source, provider) {
   LOG_SOURCE_CONTEXT[String(source)] = provider;
 }
 
-/** Gắn ngữ cảnh của nguồn vào `detail`. Hàm ngữ cảnh hỏng thì ghi rõ trong chính dòng đó, không làm mất dòng (luật 2 của tệp). */
-function logWithContext(source, detail) {
+/** Gắn ngữ cảnh của nguồn (hàm ngữ cảnh nhận cả dòng) vào `detail`. Hàm ngữ cảnh hỏng thì ghi rõ trong chính dòng đó, không làm mất dòng (luật 2 của tệp). */
+function logWithContext(source, detail, entry) {
   var provider = LOG_SOURCE_CONTEXT[String(source)];
   if (typeof provider !== 'function') { return detail; }
   var context;
-  try { context = provider(); } catch (hong) { context = 'không đọc được ngữ cảnh: ' + String(hong && hong.message || hong); }
+  try { context = provider(entry || {}); } catch (hong) { context = 'không đọc được ngữ cảnh: ' + String(hong && hong.message || hong); }
   if (!context) { return detail; }
   if (detail && typeof detail === 'object' && !Array.isArray(detail)) { return Object.assign({ luot: context }, detail); }
   return detail === undefined || detail === null || detail === '' ? { luot: context } : { luot: context, detail: detail };

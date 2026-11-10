@@ -86,20 +86,20 @@ FbmSync.activityBatchRequest = function (state, cfg, scope, chunk) {
   })), meta: { kind: 'batch', entity: 'activity' } };
 };
 
-/** Lỗi của một khách không làm hỏng lô: Sidebar thấy 20 khách gần nhất cùng tổng số; trả dòng Log từng khách để chặng đưa vào patch. */
+/** Lỗi một khách không hỏng lô: Sidebar thấy mã 20 khách gần nhất cùng tổng số; câu lỗi (thông báo FBM dài tùy FBM) chỉ ở dòng Log trả cho chặng, vì ô lượt có trần một khóa. */
 FbmSync.activityCustomerErrors = function (state, failed) {
   if (!failed.length) { return []; }
-  var previous = state.metadata.customerErrors || { total: 0, recent: [] };
-  state.metadata.customerErrors = { total: Number(previous.total || 0) + failed.length, recent: (previous.recent || []).concat(failed).slice(-20) };
+  var previous = state.metadata.customerErrors || { total: 0, recent: [] }, codes = failed.map(function (item) { return { customer: String(item.customer || ''), code: String(item.code || ''), status: Number(item.status || 0) }; });
+  state.metadata.customerErrors = { total: Number(previous.total || 0) + failed.length, recent: (previous.recent || []).concat(codes).slice(-20) };
   state.counts.error = Number(state.counts.error || 0) + failed.length;
   return failed.map(function (item) { return { action: 'activity_customer_failed', outcome: LOG_ERROR, reason: item.reason, detail: { customer: item.customer, code: item.code, status: item.status } }; });
 };
 
-/** Lô lệch kế hoạch hoặc lệch cấu trúc cột là lỗi của cả lô: lỗi có mã kèm dòng Log để chặng ném, lượt đóng lỗi và không ghi gì. */
-FbmSync.activityBatchError = function (message, failureCode) {
+/** Lô lệch kế hoạch, lệch cột hoặc hỏng yêu cầu đọc khách chung là lỗi cả lô: lỗi có mã kèm dòng Log (`detail` chỉ vào Log) để chặng ném, lượt đóng lỗi, không ghi gì. */
+FbmSync.activityBatchError = function (message, failureCode, detail) {
   var error = new Error(message);
   error.code = failureCode || 'FBM_BATCH_ITEM_MISMATCH';
-  error.logs = [{ action: 'activity_batch_mismatch', outcome: LOG_ERROR, reason: message, detail: { code: error.code } }];
+  error.logs = [{ action: 'activity_batch_mismatch', outcome: LOG_ERROR, reason: message, detail: Object.assign({ code: error.code }, detail || {}) }];
   return error;
 };
 
