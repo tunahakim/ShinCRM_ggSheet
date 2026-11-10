@@ -1522,28 +1522,12 @@ function fbmSyncRotateRelay() {
   });
 }
 /**
- * Chấp thuận tập bản ghi chờ đẩy: gửi đúng dấu tập đang hiện (trên màn Chạy đồng bộ hoặc trên thông báo), không mở lượt. GAS trả `PUSH_APPROVAL_STALE` khi tập đã đổi: vẽ lại theo status mới để người dùng thấy số mới rồi chấp thuận lại.
- * Kết quả mang danh sách thông báo GAS để thông báo chờ duyệt mất ngay, không chờ lần nạp sau. Lỗi đã ghi Log và vẽ lên màn ở đây nên trả `null`, không ném tiếp cho nút hay bảng ACTIONS báo lần hai.
+ * Nút Chấp thuận (thông báo chờ đẩy hoặc màn Chạy đồng bộ): mở màn đồng bộ rồi chạy ngay một lượt tay chiều Đẩy mang dấu tập đang hiện. Không có lệnh duyệt riêng: GAS chỉ đẩy khi tập dựng lại trong chính lượt này khớp dấu, lệch thì lượt không đẩy gì và hiện phiếu mới.
  */
 function fbmSyncApprovePush(fingerprint) {
-  var ticket = fbmSyncStatusTicket();
-  return callServer('fbmApprovePush', [String(fingerprint || '')]).then(function (result) {
-    if (!result || !result.status) { throw new Error('GAS không trả trạng thái sau khi chấp thuận.'); }
-    noticeServerApply(result.notices);
-    if (result.ok === false && result.code !== 'PUSH_APPROVAL_STALE' && result.code !== 'PUSH_APPROVAL_NOT_REQUIRED') { throw new Error(result.message || result.code); }
-    if (FBM_SYNC_CLIENT.active) { fbmSyncStatusFromResult(result, ticket); }
-    return result;
-  }).catch(function (error) {
-    fbmSyncLogClientError(error, 'Không chấp thuận được tập bản ghi chờ đẩy.', 'approve_push');
-    if (FBM_SYNC_CLIENT.active) { fbmSyncPaintError(error, 'Không chấp thuận được tập bản ghi chờ đẩy.'); }
-    return null;
-  });
-}
-/** Nút "Kiểm lại ngay" của thông báo chờ chấp thuận: mở màn đồng bộ rồi chạy một lượt tay chiều Đẩy để GAS dựng lại tập ứng viên và quyết hỏi lại, đẩy hay báo sạch. */
-function fbmSyncPushRecheck() {
   return Promise.resolve(syncPanelToggle()).then(function () {
     FBM_SYNC_CLIENT.mode = 'push';
-    return fbmSyncRun('push');
+    return fbmSyncRun('push', { approvedFingerprint: String(fingerprint || '') });
   });
 }
 /**
@@ -1660,24 +1644,25 @@ function fbmSyncClientErrorStatus(reason, extra) {
   return Object.assign({}, FBM_SYNC_CLIENT.lastStatus || {}, extra || {}, { running: false, phase: 'error', label: 'Có lỗi', message: reason, lastError: reason });
 }
 /** Mở phiên mới; chặn click trùng khi phiên đang chạy. */
-function fbmSyncRun(mode) {
+function fbmSyncRun(mode, extra) {
   if (!fbmSyncStatusReady()) { return Promise.resolve(null); }
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
   fbmSyncSetRunning(true);
   return fbmSyncRequireBridge('sync_run').then(function (missing) {
-    if (!missing) { return fbmSyncRunStart(mode); }
+    if (!missing) { return fbmSyncRunStart(mode, extra); }
     fbmSyncSetRunning(false);
     fbmSyncPaint(missing);
     return missing;
   });
 }
-function fbmSyncRunStart(mode) {
+/** `extra` là trường thêm cho lệnh `start` (dấu tập của nút Chấp thuận); nút Đồng bộ thường không gửi. */
+function fbmSyncRunStart(mode, extra) {
   FBM_SYNC_CLIENT.cancelRequested = false;
   FBM_SYNC_CLIENT.traceEvents = [];
   FBM_SYNC_CLIENT.viewEpoch += 1;
   fbmSyncPaint({ running: true, phase: 'checking_session', label: 'Đang chuẩn bị đồng bộ', direction: 'Kết nối FBM', entityLabel: 'Chuẩn bị phiên', message: 'Đang chuẩn bị phiên đồng bộ...', counts: {} });
   var chosen = mode || 'read';
-  var work = fbmSyncDrive('start', { kind: 'sync', mode: chosen, pack: fbmSyncRunPack(chosen), clientTrace: FBM_SYNC_CLIENT.traceEvents.slice() }, 'run').then(function (result) {
+  var work = fbmSyncDrive('start', Object.assign({}, extra || {}, { kind: 'sync', mode: chosen, pack: fbmSyncRunPack(chosen), clientTrace: FBM_SYNC_CLIENT.traceEvents.slice() }), 'run').then(function (result) {
     if (result && result.code === 'SYNC_BACKGROUND_SKIPPED') { return result; }
     if (!result) { throw new Error('GAS không trả kết quả đồng bộ.'); }
     // Hạ cờ trước khi vẽ: vẽ trong lúc `cancelRequested` còn bật thì nút kẹt ở "Đang dừng…" tới lần hỏi trạng thái kế tiếp.

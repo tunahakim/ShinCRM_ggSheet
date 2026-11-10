@@ -85,7 +85,6 @@ function fbmSyncRunMachineBlocks(status) {
 function fbmSyncRunApprovalBlocks(status) {
   var pending = status && status.pendingApproval, schema = FBM_SYNC_RUN_SCHEMA.approval;
   if (!pending) { return []; }
-  if (pending.approved) { return [Notice({ kind: 'info', text: schema.approved(pending.count) })]; }
   return [Notice({ kind: 'warning', text: schema.text(pending.count) }), FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.id, label: schema.label, className: uiResolveActionClass('approve', 'button'), data: { fingerprint: pending.fingerprint }, disabled: !!FBM_SYNC_CLIENT.running }))];
 }
 function fbmSyncRunDetailsBlocks(status) {

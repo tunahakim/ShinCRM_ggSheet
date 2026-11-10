@@ -136,8 +136,6 @@ ACTIONS.toggleNotices = function () {
 /** Nút Chấp thuận của thông báo chờ đẩy (GAS `fbm_push_approval`). `value` là dấu tập bản ghi thông báo đang hiện. */
 ACTIONS.fbmPushApprove = function (payload) { return fbmSyncApprovePush(payload.value); };
 
-/** Nút Kiểm lại ngay của thông báo chờ đẩy: mở màn đồng bộ và chạy lượt tay chiều Đẩy. */
-ACTIONS.fbmPushRecheck = function () { return fbmSyncPushRecheck(); };
 
 /** Bấm ✕ trên một thông báo. `value` là khóa thông báo. */
 ACTIONS.noticeDismiss = function (payload) { return noticeDismissKey(payload.value); };

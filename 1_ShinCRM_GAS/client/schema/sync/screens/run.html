@@ -57,7 +57,7 @@ var FBM_SYNC_RUN_SCHEMA = {
   },
   scope: { on: 'Phạm vi đang giới hạn, chỉ chạy cho khách chỉ định: ', empty: 'Phạm vi đang giới hạn nhưng danh sách khách chỉ định trống nên lượt đồng bộ sẽ bị chặn. Vào Cài đặt phiên để thêm mã hoặc bỏ giới hạn.' },
   machine: { settings: 'Mở cài đặt máy chạy nền', settingsId: 'fbm-sync-open-machine-settings' },
-  approval: { id: 'fbm-sync-approve', label: 'Chấp thuận', text: function (count) { return count + ' bản ghi ShinCRM chờ chấp thuận trước khi đẩy lên FBM. Chấp thuận thì lượt đồng bộ kế đẩy đúng các bản ghi này; sửa thêm trên Sheet trước lượt đó thì sẽ hỏi lại.'; }, approved: function (count) { return 'Đã chấp thuận ' + count + ' bản ghi; lượt đồng bộ có đẩy kế tiếp sẽ gửi lên FBM.'; } },
+  approval: { id: 'fbm-sync-approve', label: 'Chấp thuận', text: function (count) { return count + ' bản ghi ShinCRM chờ chấp thuận trước khi đẩy lên FBM. Chấp thuận thì đồng bộ chiều Đẩy chạy ngay và đẩy đúng các bản ghi này; có người sửa thêm trên Sheet thì không đẩy gì và hỏi lại.'; } },
   phaseTitles: { done: 'Pipeline đã hoàn tất', error: 'Pipeline dừng vì lỗi', paused: 'Pipeline đã tạm dừng', running: 'Pipeline đang chạy' },
   pipeline: {
     title: 'Pipeline đang chạy',
