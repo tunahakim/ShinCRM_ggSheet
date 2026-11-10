@@ -5,7 +5,6 @@
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-FbmSync.ACTIVITY_BULK_STORE = 'activity_bulk';
 // Mã lỗi Extension báo khi một request lấy cả khoảng thời gian là quá sức; lỗi phiên và lỗi mạng khác không đổi cách lấy.
 FbmSync.ACTIVITY_WINDOW_CODES = ['FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'];
 

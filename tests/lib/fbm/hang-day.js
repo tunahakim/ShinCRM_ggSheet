@@ -2,15 +2,12 @@
  * Hộp thử chiều đẩy dùng chung: hộp GAS nạp đủ tệp đồng bộ thật với Sheet giả trong RAM (cửa ghi bản ghi kiểm xung đột như cửa thật), và hàng đợi đẩy dựng sẵn ở đầu chặng đẩy. Ma trận production và ca cổng chặng đẩy cùng dựng từ đây.
  */
 const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../load-gas');
+const { taoKhoThuocTinh } = require('../gas/kho-thuoc-tinh');
 
+/** Kho chung của hộp thử kèm `data` để ca soi thẳng các khóa. */
 function propertyStore() {
   const data = {};
-  return {
-    getProperty(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
-    setProperty(key, value) { data[key] = String(value); },
-    deleteProperty(key) { delete data[key]; },
-    data
-  };
+  return Object.assign(taoKhoThuocTinh(data), { data });
 }
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }

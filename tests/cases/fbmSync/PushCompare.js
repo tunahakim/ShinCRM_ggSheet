@@ -1,5 +1,6 @@
 /** So ba bản trước khi lưu FBM (`09/04` "So trước khi đẩy"): hash form bằng hash lưới, và bước mở form không ghi đè bản FBM đã đổi sau mốc. */
 const { section, check } = require("../../lib/assert");
+const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { buocDay, buocDayLoi } = require('../../lib/fbm/buoc-day');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhiDongBo, soBan } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
@@ -12,7 +13,7 @@ const GATE = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI', '@CAT_NGUON_KH\u0
 
 function taoHop() {
   const props = { data: {} };
-  const api = { getProperty: (key) => props.data[key] || null, setProperty: (key, value) => { props.data[key] = String(value); }, deleteProperty: (key) => { delete props.data[key]; } };
+  const api = taoKhoThuocTinh(props.data);
   const logs = [];
   const hop = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => api, getScriptProperties: () => api }, writeGateSave: () => ({ ok: true }), logEvent: (event) => { logs.push(event); } });
   napServer(hop, ...TEP);

@@ -261,6 +261,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── control\PushCommands.js  Lệnh mở lại nhóm bản ghi lỗi đẩy (`retry_push_failures`), không mở lượt.
     ├── control\SettingsCommands.js Lệnh cài đặt của cửa lệnh (`save_settings`, `set_master`, `set_background`, `reset_settings`) và gói cài đặt cho màn đồng bộ, đều đi qua cổng cài đặt chung.
     ├── state\State.js            DocumentProperties, cursor và progress.
+    ├── state\WorkStores.js       Kho làm việc của một lượt: bảng `RUN_WORK_STORES` khai mọi tên kho (kho bit, danh sách nhiều khóa, khóa đơn), kho bit "đã thấy", `workStoreClear` xóa hẳn ở mở và đóng lượt.
     ├── state\RequestWatch.js     Canh request GAS phát cho Extension trong một lời gọi: request đang chờ, đã trả lời, nộp lặp; request quá hạn bị bỏ thì ghi phát hiện, bước đóng lời gọi của phạm vi `fbm_sync` ghi Log.
     ├── state\Run.js              Mở và đóng Lượt (`runOpen` và nhãn lượt, `runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`, thu hồi lượt quá hạn).
     ├── state\RunStop.js          Lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.

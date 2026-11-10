@@ -1,5 +1,6 @@
 /** Kiểm tra cấu hình envelope và phục hồi cursor auto-login phía GAS. */
 const { section, check } = require('../../lib/assert');
+const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datPhan, docPhan } = require('../../lib/fbm/cai-dat-thu');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -16,7 +17,7 @@ function hoiNen(hop) {
 async function chay(so) {
   section('FBM sync - auto-login');
   const data = {};
-  const props = { getProperty: (key) => data[key] || null, setProperty: (key, value) => { data[key] = String(value); } };
+  const props = taoKhoThuocTinh(data);
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent() {}, LOG_OK: 'ok', LOG_ERROR: 'error' });
   napServer(hop, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'auto-login mặc định bật nhưng chưa cấu hình', [docPhan(hop, 'loginPolicy').enabled, hop.FbmSync.loginConfigPublic().configured], [true, false]);
@@ -51,7 +52,7 @@ async function chay(so) {
   check(so, 'login test không coi Login.aspx là thành công', hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }), true);
   // Các tiến trình khác vừa chạy xong nên chưa đến hạn: lần hỏi nào đến hạn chỉ là Giữ phiên.
   const heartbeatData = { FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_ACTIVITY_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_DETAIL_SCAN: String(Date.now()) };
-  const heartbeatProps = { getProperty: (key) => heartbeatData[key] || null, setProperty: (key, value) => { heartbeatData[key] = String(value); } };
+  const heartbeatProps = taoKhoThuocTinh(heartbeatData);
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatProps, getScriptProperties: () => heartbeatProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-test' }) });
   napServer(heartbeat, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   heartbeat.FbmSync.configValue = () => '';
@@ -367,11 +368,8 @@ async function chay(so) {
 
   const connectionData = {};
   let failLoginWrite = false;
-  const connectionProps = {
-    getProperty: (key) => connectionData[key] || null,
-    setProperty: (key, value) => { if (failLoginWrite && key === 'FBM_LOGIN_CONFIG_V1') { throw new Error('LOGIN_WRITE_FAILED'); } connectionData[key] = String(value); },
-    deleteProperty: (key) => { delete connectionData[key]; }
-  };
+  const connectionProps = taoKhoThuocTinh(connectionData), connectionSet = connectionProps.setProperty;
+  connectionProps.setProperty = (key, value) => { if (failLoginWrite && key === 'FBM_LOGIN_CONFIG_V1') { throw new Error('LOGIN_WRITE_FAILED'); } return connectionSet(key, value); };
   const connection = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => connectionProps }, shinOpenBook: () => ({ getId: () => 'sheet-connection' }) });
   napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   connection.FbmSync.configValue = () => '';
@@ -431,7 +429,7 @@ async function chay(so) {
   check(so, 'khôi phục sau lỗi lưu liên kết cũng hỏng thì trả mã riêng, nêu cả hai lỗi và ghi Log', [rollbackBroken.code, /ROLLBACK_FAILED/.test(rollbackBroken.message), connectionLogs.map((e) => e.detail.code)], ['CONNECTION_ROLLBACK_FAILED', true, ['CONNECTION_ROLLBACK_FAILED']]);
 
   const clearData = {};
-  const clearProps = { getProperty: (key) => clearData[key] || null, setProperty: (key, value) => { clearData[key] = String(value); }, deleteProperty: (key) => { delete clearData[key]; } };
+  const clearProps = taoKhoThuocTinh(clearData);
   const cleared = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => clearProps }, shinOpenBook: () => ({ getId: () => 'sheet-clear' }) });
   napServer(cleared, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   cleared.FbmSync.configValue = () => '';
@@ -443,7 +441,7 @@ async function chay(so) {
 
   // Gặp thật 2026-10-20 00:04: lượt nền mở lượt mới (xóa phiên) rồi hỏng ở request đầu, Giữ phiên 5 phút sau ném "thiếu mã người dùng FBM" vì không qua bước kiểm tra phiên. Giữ phiên phải probe trước, rồi lọc quyền theo mã đọc từ grid User, không theo liên kết hay cookie.
   const afterWipeData = { FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_ACTIVITY_FULL_SCAN: String(Date.now()), FBM_SYNC_DONE_DETAIL_SCAN: String(Date.now()) };
-  const afterWipeProps = { getProperty: (key) => afterWipeData[key] || null, setProperty: (key, value) => { afterWipeData[key] = String(value); } };
+  const afterWipeProps = taoKhoThuocTinh(afterWipeData);
   const afterWipe = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => afterWipeProps, getScriptProperties: () => afterWipeProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-wipe' }) });
   napServer(afterWipe, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   afterWipe.FbmSync.configValue = () => '';

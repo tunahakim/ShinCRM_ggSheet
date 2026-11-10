@@ -1,12 +1,13 @@
 /** Kiểm tra probe nghiệm thu ALT00010. */
 const { section, check } = require("../../lib/assert");
+const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { taoHopCat, napServer } = require("../../lib/load-gas");
 
 async function chay(so) {
   section("FBM sync — audit");
   const auditPull = taoHopCat({
     FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {},
-    PropertiesService: { getDocumentProperties: () => ({ getProperty: () => '' }) }
+    PropertiesService: { getDocumentProperties: () => taoKhoThuocTinh({}) }
   });
   napServer(auditPull, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   const gate = { map: { '@CAT_TINH_THANH\u001fHà Nội': 'HNI' }, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true, HNI: true } } };

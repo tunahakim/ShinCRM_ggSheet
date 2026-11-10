@@ -37,6 +37,7 @@ function chay(so) {
   // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
   readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
   readFinish.FbmSync.readListClear = () => {};
+  readFinish.FbmSync.workStoreClear = () => 0;
   readFinish.FbmSync.staleRunCheck = () => null;
   readFinish.FbmSync.customerBaselineWrite = () => {};
   readFinish.FbmSync.activityStageNext = () => null;

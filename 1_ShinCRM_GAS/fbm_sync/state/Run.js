@@ -2,16 +2,6 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
- * Kho làm việc chỉ sống trong một lượt: bản ghi giữ trong sổ bận, tập "đã thấy", danh sách đọc, bản xem trước. Dọn khi mở lượt để lượt trước hỏng giữa chừng không để lại gì cho lượt này.
- */
-FbmSync.workStoreClear = function () {
-  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
-  ['customer', 'activity', 'activity_bulk'].forEach(function (scope) { FbmSync.seenStoreClear(scope); });
-  FbmSync.readListClear();
-  FbmSync.previewClear();
-};
-
-/**
  * Nhãn của lượt, chốt một lần lúc mở: ai chạy (Tay/Nền) và tiến trình nào. Dòng Log của lượt lấy nhãn này, không suy lại từ ô lượt lúc ghi (ô lượt có thể đã sang lượt khác).
  * `kindLabel` đặt thẳng tên tiến trình; bỏ trống thì lấy tên tiến trình nền (`process`) và thêm tên kiểu lượt theo bảng dãy chặng (mức quét lẫn gói quét) khi khác tên tiến trình (Quét nhanh do bước đếm gọi trong Giữ phiên).
  */
@@ -26,13 +16,16 @@ FbmSync.runLabelOf = function (state, kindLabel) {
 };
 
 /**
- * Nơi duy nhất mở lượt: dọn kho làm việc của lượt trước, dựng ô lượt mới từ ô hiện tại, ghi và trả về ô đã ghi.
+ * Nơi duy nhất mở lượt: dọn kho làm việc (`state/WorkStores.js`) và bản xem trước của lượt trước, dựng ô lượt mới từ ô hiện tại, ghi và trả về ô đã ghi.
  * `spec`: `origin`, `mode`, `scan`, `phase` (mặc định `checking_session`), `entity`, `total`, `cursor`, `message`, `scanPack` (gói của lượt quét `full`, chụp đầu lượt), `kindLabel` (xem `runLabelOf`), `process` và `pollAt` (tiến trình nền và giờ bắt đầu lần hỏi mở lượt, xem `Heartbeat.js`).
  * Ô cũ còn lượt chưa đóng (lượt treo bị thay) thì các bước của nó được đóng trước khi metadata bị bỏ. Mỗi lượt xác nhận phiên FBM lại từ đầu nên phiên cũ không được mang sang; số xung đột đang chờ quyết thì mang sang vì nó phản ánh Sheet.
  */
 FbmSync.runOpen = function (spec) {
   var opt = spec || {}, old = FbmSync.stateRead(), now = Date.now();
+  // Lượt trước đóng ở đường không qua `runClose` (hoặc treo) có thể còn bản ghi trong sổ bận và kho làm việc; bản xem trước sống tới lượt kế nên chỉ dọn ở đây.
+  recordGateReleaseOwner(FbmSync.RECORD_HOLDER);
   FbmSync.workStoreClear();
+  FbmSync.previewClear();
   FbmSync.businessFinishOpenSteps(old, 'paused', { error: 'Phiên mới đã bắt đầu thay phiên này.' });
   var state = Object.assign(FbmSync.stateDefault(), {
     runId: Number(now).toString(36), entity: String(opt.entity || ''), phase: opt.phase || 'checking_session', cursor: opt.cursor || {}, message: String(opt.message || ''),
@@ -63,6 +56,7 @@ FbmSync.RUN_VERDICTS = {
  * Đóng lượt trên state truyền vào và trả chính state đó; người điều phối ghi. Mọi đường kết thúc (xong, lỗi, dừng, bỏ lượt) đi qua đây nên:
  * - Dòng Log kết thúc các bước được ghi ngay lúc đóng, khi state còn là lượt đang chạy, nên mang đúng mã và nhãn của lượt đó.
  * - Request đang bay bị bỏ: `activeRequestId` rỗng thì response về muộn bị `requestAnswered` loại; mã của nó giữ ở `closedRequestId` để Log ghi đó là response của lượt đã đóng.
+ * - Kho làm việc của lượt bị xóa hẳn (`workStoreClear`), lượt nào đóng cũng không để lại khóa nào cho lượt sau.
  * - `runId` giữ lại để Sidebar còn vẽ kết quả lượt vừa xong; lượt coi là đã đóng nhờ phase cuối. Lượt lỗi giữ cursor.
  * `detail`: `message`, `code` (mã lỗi hoặc mã tạm dừng), `error` (chữ lỗi; lỗi thì mặc định là `message`), `retryable`, `keepRecords` (giữ bản ghi trong sổ bận khi lệnh ghi FBM chưa rõ kết quả), `cursor` (cursor giữ lại cho lần chạy sau, ví dụ lệnh ghi đang chờ xác nhận).
  */
@@ -74,7 +68,7 @@ FbmSync.runClose = function (state, verdict, detail) {
   var error = extra.error !== undefined ? String(extra.error || '') : failed ? message : '';
   FbmSync.businessFinishOpenSteps(state, spec.phase, { error: error || String(spec.reason || '') });
   if (extra.keepRecords !== true) { recordGateReleaseOwner(FbmSync.RECORD_HOLDER); }
-  FbmSync.readListClear();
+  FbmSync.workStoreClear();
   state.closedRequestId = String(state.activeRequestId || '');
   state.activeRequestId = ''; state.deadlineAt = 0; state.current = '';
   // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.

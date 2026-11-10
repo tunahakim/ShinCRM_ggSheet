@@ -43,7 +43,6 @@ FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded
 FbmSync.conflictCountShift = function (state, delta) {
   state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(delta || 0));
 };
-FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn MỘT giá trị DocumentProperties khoảng 9 KB (byte UTF-8): chặn trước setProperty để không ghi JSON dở. Ghi hỏng thì ném lỗi có mã kèm `detail`, không tự ghi Log, không trả kết quả cho bên gọi bỏ qua.
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;
 FbmSync.documentPropertyBytes = function (text) { return Utilities.newBlob(String(text)).getBytes().length; };
@@ -75,79 +74,6 @@ FbmSync.withOrchestrationLock = function (work, waitMs) {
   if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: FbmSync.statusView() }; }
   // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
-};
-
-/** Bitmap phân mảnh theo mã nội bộ ổn định; thứ tự dòng Sheet có đổi thì dấu vẫn đúng. */
-FbmSync.seenStorePrefix = function (scope) { return 'FBM_SYNC_SEEN_' + String(scope || '').toUpperCase().replace(/[^A-Z0-9_]/g, '_') + '_'; };
-FbmSync.seenStoreIndex = function (scope, record) {
-  var value = record && typeof record === 'object' ? record.id : record;
-  var text = String(value === null || value === undefined ? '' : value).trim();
-  var match = text.match(/^(CUS|ACT)-(\d{6})$/i);
-  if (!match) { return -1; }
-  var expected = String(scope || '').toLowerCase().indexOf('activity') === 0 ? 'ACT' : 'CUS';
-  if (String(match[1]).toUpperCase() !== expected) { return -1; }
-  var digits = match[2];
-  var index = Number(digits);
-  return isFinite(index) && index >= 0 ? index : -1;
-};
-FbmSync.seenStoreClear = function (scope) {
-  var props = FbmSync.props(), prefix = FbmSync.seenStorePrefix(scope), count = Number(props.getProperty(prefix + 'SHARDS') || 0);
-  for (var i = 0; i < count; i += 1) { props.deleteProperty(prefix + i); }
-  props.deleteProperty(prefix + 'TOTAL'); props.deleteProperty(prefix + 'HIGH_WATER'); props.deleteProperty(prefix + 'SHARDS');
-};
-FbmSync.seenStoreBegin = function (scope, recordsOrTotal) {
-  FbmSync.seenStoreClear(scope);
-  var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), records = Array.isArray(recordsOrTotal) ? recordsOrTotal : null, highWater = 0;
-  if (records) {
-    records.forEach(function (record) { highWater = Math.max(highWater, FbmSync.seenStoreIndex(scope, record)); });
-  }
-  props.setProperty(prefix + 'TOTAL', String(records ? records.length : Math.max(0, Number(recordsOrTotal || 0))));
-  props.setProperty(prefix + 'HIGH_WATER', String(Math.max(0, highWater)));
-  props.setProperty(prefix + 'SHARDS', '0');
-};
-/** Kho không có mốc "khách sinh sau đầu lượt coi như đã đánh dấu": bit nào chưa đặt là chưa, dùng cho tập khách cần đọc hoặc đã đọc giao dịch. */
-FbmSync.seenStoreBeginExact = function (scope) {
-  FbmSync.seenStoreBegin(scope, []);
-  FbmSync.props().setProperty(FbmSync.seenStorePrefix(scope) + 'HIGH_WATER', '');
-};
-FbmSync.seenStoreMark = function (scope, localRecords, incomingRecords) {
-  var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, local = localRecords || [], incoming = incomingRecords || [], positions = {}, shards = {}, maxShard = -1;
-  local.forEach(function (record) {
-    var id = String(record && record.fbmId || '').trim(), index = FbmSync.seenStoreIndex(scope, record);
-    if (id && index >= 0) { positions[id] = index; }
-  });
-  incoming.forEach(function (record) {
-    var id = String(record && (record.fbmId || record.id) || '').trim(), index = positions[id];
-    if (index === undefined) { return; }
-    var hexIndex = Math.floor(index / 4), shardIndex = Math.floor(hexIndex / shardLength), offset = hexIndex % shardLength;
-    if (!shards[shardIndex]) { shards[shardIndex] = String(props.getProperty(prefix + shardIndex) || '').split(''); }
-    while (shards[shardIndex].length <= offset) { shards[shardIndex].push('0'); }
-    var nibble = parseInt(shards[shardIndex][offset] || '0', 16) || 0;
-    shards[shardIndex][offset] = (nibble | (1 << (index % 4))).toString(16);
-    maxShard = Math.max(maxShard, shardIndex);
-  });
-  Object.keys(shards).forEach(function (key) { props.setProperty(prefix + key, shards[key].join('')); });
-  var previous = Number(props.getProperty(prefix + 'SHARDS') || 0);
-  props.setProperty(prefix + 'SHARDS', String(Math.max(previous, maxShard + 1)));
-};
-FbmSync.seenStoreHas = function (scope, record) {
-  var index = FbmSync.seenStoreIndex(scope, record), prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), highWaterRaw = props.getProperty(prefix + 'HIGH_WATER'), highWater = Number(highWaterRaw || 0), hasBoundary = highWaterRaw !== null && highWaterRaw !== undefined && String(highWaterRaw) !== '';
-  // ID cũ hoặc lạ không đủ an toàn để đánh dấu; coi như đã thấy để không suy ra vắng mặt nhầm.
-  if (index < 0 || (hasBoundary && index > highWater)) { return true; }
-  var hexIndex = Math.floor(index / 4), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, shardIndex = Math.floor(hexIndex / shardLength), offset = hexIndex % shardLength;
-  var value = String(props.getProperty(prefix + shardIndex) || ''), nibble = parseInt(value.charAt(offset) || '0', 16) || 0;
-  return (nibble & (1 << (index % 4))) !== 0;
-};
-FbmSync.seenStoreReader = function (scope) {
-  var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, cache = {}, highWaterRaw = props.getProperty(prefix + 'HIGH_WATER'), highWater = Number(highWaterRaw || 0), hasBoundary = highWaterRaw !== null && highWaterRaw !== undefined && String(highWaterRaw) !== '';
-  return function (record) {
-    var valueIndex = FbmSync.seenStoreIndex(scope, record);
-    if (valueIndex < 0 || (hasBoundary && valueIndex > highWater)) { return true; }
-    var hexIndex = Math.floor(valueIndex / 4), shardIndex = Math.floor(hexIndex / shardLength), offset = hexIndex % shardLength;
-    if (cache[shardIndex] === undefined) { cache[shardIndex] = String(props.getProperty(prefix + shardIndex) || ''); }
-    var nibble = parseInt(cache[shardIndex].charAt(offset) || '0', 16) || 0;
-    return (nibble & (1 << (valueIndex % 4))) !== 0;
-  };
 };
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
@@ -203,7 +129,6 @@ FbmSync.pushFailuresRemove = function (keys) {
  * Danh sách đẩy của chặng đẩy: các mã lần quét gần nhất thấy có việc, Khách trước Giao dịch. Chỉ là gợi ý chỗ cần nhìn, không quyết gì: mỗi mã được đọc lại và xét lại trước khi đẩy, và chặng đẩy chỉ sạch sau một lần quét không còn ứng viên, nên danh sách thiếu hay cũ không làm sót bản ghi.
  * Chỉ một khóa để kho không phình theo số bản ghi; phần không vừa để lần quét sau. Ghi một lần sau mỗi lần quét, không sửa từng bước.
  */
-FbmSync.PUSH_LIST_PREFIX = 'FBM_SYNC_PUSH_LIST_';
 FbmSync.PUSH_LIST_TAGS = { customer: 'c', activity: 'a' };
 /** Mỗi phần tử là `tag:mã|dấu vân lúc chọn`, để bước đẩy không đẩy nội dung khác tập đã qua cổng. Trả số mã đã ghi (đầu danh sách, vừa một khóa). */
 FbmSync.pushListWrite = function (candidates) {

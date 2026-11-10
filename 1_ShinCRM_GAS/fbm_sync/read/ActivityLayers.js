@@ -4,18 +4,8 @@
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-// Tên kho không bắt đầu bằng "activity": kho đánh theo số CUS của khách cha, không theo số ACT.
-FbmSync.READ_LIST_STORE = 'customer_read_list';
-FbmSync.READ_DONE_STORE = 'customer_read_done';
-FbmSync.ACTIVITY_READ_STORE = 'customer_activity_read';
-FbmSync.ACTIVITY_FRESH_STORE = 'customer_activity_fresh';
-// Khách chưa có trên Sheet chưa có số CUS: danh sách theo FBM giữ `stt_rec_kh`, một danh sách chờ đọc và một danh sách đã đọc.
-FbmSync.READ_NEW_PREFIX = 'FBM_SYNC_READ_NEW_';
-FbmSync.READ_NEW_DONE_PREFIX = 'FBM_SYNC_READ_NEW_DONE_';
-// Ghi chú "giao dịch chờ nối": khách B chưa đọc → các id giao dịch FBM báo B đang giữ.
-FbmSync.READ_WAIT_KEY = 'FBM_SYNC_READ_WAIT';
+// Tên các kho của tệp này khai ở `state/WorkStores.js` (kho làm việc của lượt).
 FbmSync.LAST_ACTIVITY_FIELDS = ['end_date', 'ma_cv'];
-FbmSync.TOP_ORDER_PREFIX = 'FBM_SYNC_TOP_ORDER_';
 
 /** Mở các kho của lớp 3; kho chính xác từng bit vì khách chưa đánh dấu nghĩa là chưa đọc, không được coi là đã đọc. */
 FbmSync.activityLayersBegin = function () {

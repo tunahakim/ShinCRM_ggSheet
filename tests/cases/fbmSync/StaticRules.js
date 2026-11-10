@@ -29,7 +29,7 @@ const PHASE_NAMES = ['idle', 'checking_session', 'waiting_session', 'pull_custom
 const PHASE_OWNER = '1_ShinCRM_GAS/fbm_sync/state/State.js';
 
 /** Tệp cổng kho DocumentProperties của luồng FBM: chỉ nó được `setProperty`/`deleteProperty` trực tiếp. */
-const PROPERTY_GATE_FILES = ['1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js'];
+const PROPERTY_GATE_FILES = ['1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js', '1_ShinCRM_GAS/fbm_sync/state/WorkStores.js'];
 
 /**
  * Tệp được nhắc tới bí mật phiên FBM (`cookie`, `customerAuthorized`, `activityAuthorized`): nơi đọc duy nhất (`scriptSettings`), các bộ dựng request đặt chúng vào body gửi FBM, các nơi ghi phiên và lớp gỡ cuối ở cửa ra.
@@ -187,7 +187,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 14,
     '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/state/State.js': 12,
+    '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
