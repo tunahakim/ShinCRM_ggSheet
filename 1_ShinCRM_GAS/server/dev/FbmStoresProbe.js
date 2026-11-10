@@ -45,7 +45,6 @@ function fbmProbeStoreCost() {
 function fbmProbeReadNewSize() {
   var records = FbmSync.withLocalSnapshot(function () { return FbmSync.readLocal('customer'); }), longest = 0;
   records.forEach(function (record) { longest = Math.max(longest, String(record.fbmId || '').length); });
-  var baseline = documentStoreReal().getProperty('FBM_SYNC_CUSTOMER_BASELINE_V1');
-  var fbmTotal = baseline ? Number(JSON.parse(baseline).total) : null;
+  var fbmTotal = FbmSync.customerBaselineRead();
   return { sheetCustomers: records.length, fbmBaseline: fbmTotal, longestFbmId: longest, worstCaseBytesEachList: (fbmTotal || records.length) * (longest + 1), shardBytes: FbmSync.SHARD_LIST_BYTES };
 }

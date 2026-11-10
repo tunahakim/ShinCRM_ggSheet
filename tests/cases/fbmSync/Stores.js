@@ -3,6 +3,7 @@
  */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { napServer } = require('../../lib/load-gas');
 
 function chay(so) {
   section('FBM sync - sổ tiến trình nền một khóa');
@@ -88,6 +89,67 @@ function chay(so) {
     let ma = '';
     try { F.pushFailuresWrite({ hashes, details: {} }); } catch (err) { ma = err.code; }
     check(so, 'sổ lỗi đẩy vượt trần pushFailuresMax thì cổng ghi ném PUSH_FAILURES_OVER_CAP, không cắt bớt im lặng và không ghi gì', [ma, F.pushFailuresRead().hashes], ['PUSH_FAILURES_OVER_CAP', {}]);
+  }
+  section('FBM sync - hàm chuyển kho một lần fbmStoresMigrate');
+  {
+    const logs = [], flow = workflowGas({ logEvent: (e) => { logs.push(e); } }), F = flow.hop.FbmSync, kho = flow.documentProperties;
+    napServer(flow.hop, 'fbm_sync/state/FbmStoresMigrate.js');
+    const lienKet = { spreadsheetId: 'sheet-workflow', userId: 'u1', username: 'A', accountName: 'Tai khoan A' };
+    const cu = {
+      FBM_SYNC_DONE_CUSTOMER_FULL_SCAN: '1794300044222', FBM_SYNC_DONE_HEARTBEAT: '1794300100000',
+      FBM_SYNC_RETRY_DETAIL_SCAN: JSON.stringify({ failures: 2, retryAt: 1794300900000 }),
+      FBM_SYNC_CUSTOMER_BASELINE_V1: JSON.stringify({ total: 7, at: 1794300797986 }), FBM_SYNC_DETAIL_CURSOR_V1: JSON.stringify({ cus: 20075, at: 1794302080247 }),
+      FBM_SYNC_BINDING_V1: JSON.stringify(lienKet), FBM_SYNC_PUSH_CLEAN_V1: '{}',
+      FBM_SYNC_SEEN_CUSTOMER_ACTIVITY_READ_0: 'ff', FBM_SYNC_SEEN_CUSTOMER_ACTIVITY_READ_SHARDS: '1', FBM_SYNC_PENDING_PUSHES_V1: JSON.stringify({ 'customer:CUS-1': { hSHIN: 'h', sentAt: 1, fbmId: '' } })
+    };
+    Object.keys(cu).forEach((key) => kho.setProperty(key, cu[key]));
+    const kq = flow.hop.fbmStoresMigrate(), so1 = F.processBookRead(), cuCon = Object.keys(kho.getProperties()).filter((key) => key in cu);
+    check(so, 'chuyển kho: giữ đúng nghĩa khóa cũ (giờ chạy xong, lần thử lại, mốc khách, con trỏ Vòng xoay, liên kết), xóa khóa cũ, khóa dấu đẩy sạch và kho làm việc còn sót, giữ sổ chờ xác nhận, ghi một dòng Log',
+      [so1.customerFull.doneAt, so1.heartbeat.doneAt, so1.detail.failures, so1.detail.retryAt, so1.customerFull.baseline, so1.detail.cursor, F.bindingRead().userId, cuCon, kq.written.sort(), logs.filter((l) => l.action === 'fbmStoresMigrate').length],
+      [1794300044222, 1794300100000, 2, 1794300900000, 7, 20075, 'u1', ['FBM_SYNC_PENDING_PUSHES_V1'], ['FBM_CONNECTION_V1', 'FBM_SYNC_PROCESS_BOOK_V1'], 1]);
+    const anh = JSON.stringify(kho.getProperties()), kq2 = flow.hop.fbmStoresMigrate();
+    check(so, 'chạy lại hàm chuyển không đổi gì trong kho', [JSON.stringify(kho.getProperties()) === anh, kq2.written, kq2.deleted, /không có gì/.test(kq2.report[0])], [true, [], [], true]);
+    kho.setProperty('FBM_SYNC_DONE_HEARTBEAT', '5');
+    flow.hop.fbmStoresMigrate();
+    check(so, 'sổ mới đã có thì khóa cũ còn sót chỉ bị xóa, không đè sổ', [F.processBookRead().heartbeat.doneAt, kho.getProperty('FBM_SYNC_DONE_HEARTBEAT')], [1794300100000, null]);
+  }
+  {
+    const flow = workflowGas(), F = flow.hop.FbmSync, kho = flow.documentProperties;
+    napServer(flow.hop, 'fbm_sync/state/FbmStoresMigrate.js');
+    kho.setProperty('FBM_SYNC_DONE_HEARTBEAT', '1');
+    kho.setProperty('FBM_SYNC_DETAIL_CURSOR_V1', '{hỏng');
+    let ma = '';
+    try { flow.hop.fbmStoresMigrate(); } catch (err) { ma = err.code; }
+    const conCu = [kho.getProperty('FBM_SYNC_DONE_HEARTBEAT'), kho.getProperty('FBM_SYNC_DETAIL_CURSOR_V1'), kho.getProperty('FBM_SYNC_PROCESS_BOOK_V1')];
+    kho.setProperty('FBM_SYNC_DETAIL_CURSOR_V1', '{}');
+    F.stateWrite(Object.assign(F.stateDefault(), { runId: 'r1', phase: 'pull_customer' }));
+    let maChay = '';
+    try { flow.hop.fbmStoresMigrate(); } catch (err) { maChay = err.code; }
+    check(so, 'khóa cũ hỏng hoặc đang có lượt chạy: hàm chuyển ném có mã, chưa ghi sổ mới và khóa cũ còn nguyên',
+      [ma, conCu, maChay, kho.getProperty('FBM_SYNC_DONE_HEARTBEAT'), kho.getProperty('FBM_SYNC_PROCESS_BOOK_V1')],
+      ['DOCUMENT_PROPERTY_CORRUPT', ['1', '{hỏng', null], 'FBM_STORES_MIGRATE_RUN_ACTIVE', '1', null]);
+  }
+  section('FBM sync - kho làm việc sống trong một lượt');
+  {
+    const flow = workflowGas(), F = flow.hop.FbmSync, kho = flow.documentProperties, bang = F.RUN_WORK_STORES;
+    const khoaLam = Object.keys(bang.bits).map((scope) => F.seenStorePrefix(scope) + '0').concat(bang.lists.map((prefix) => prefix + 'SHARDS'), bang.keys);
+    const gieo = () => { khoaLam.forEach((key) => kho.setProperty(key, '1')); kho.setProperty(F.PENDING_PUSHES_KEY, '{"customer:CUS-1":{"hSHIN":"h","sentAt":1}}'); kho.setProperty(F.PUSH_FAILURES_KEY, '{"hashes":{},"details":{}}'); };
+    const conLai = () => F.workStoreKeys(Object.keys(kho.getProperties()));
+    const giu = () => [F.PENDING_PUSHES_KEY, F.PUSH_FAILURES_KEY].filter((key) => kho.getProperty(key) !== null).length;
+    gieo();
+    F.withOrchestrationLock(() => { F.runOpen({ phase: 'pull_customer' }); });
+    const sauMo = [conLai(), giu()];
+    const ketLuan = Object.keys(F.RUN_VERDICTS).map((verdict) => {
+      F.withOrchestrationLock(() => { F.stateWrite(F.runOpen({ phase: 'pull_customer' })); });
+      gieo();
+      F.withOrchestrationLock(() => { const st = F.stateRead(); F.runClose(st, verdict, {}); F.stateWrite(st); });
+      return verdict + ':' + conLai().length + ':' + giu();
+    });
+    check(so, 'runOpen xóa kho làm việc sót của lượt trước, giữ sổ chờ xác nhận và sổ lỗi đẩy', sauMo, [[], 2]);
+    let maLa = '';
+    try { F.seenStoreKind('customer_khong_khai'); } catch (err) { maLa = err.code; }
+    check(so, 'kho bit không khai trong RUN_WORK_STORES thì ném, không đoán loại mã theo tên', maLa, 'SEEN_STORE_UNKNOWN');
+    check(so, 'mọi kết luận đóng lượt đều không để lại khóa kho làm việc nào, giữ sổ chờ xác nhận và sổ lỗi đẩy', ketLuan, Object.keys(F.RUN_VERDICTS).map((verdict) => verdict + ':0:2'));
   }
 }
 

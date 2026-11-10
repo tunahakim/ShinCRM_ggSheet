@@ -272,6 +272,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\Scope.js           Phạm vi khách của lượt (`scope`, `scopeResolve`) và khoảng nghỉ giữa hai request FBM (`requestGapMs`); mọi tham số khác đọc qua cổng cài đặt chung.
     ├── state\FbmSettings.js     Khai các phần cài đặt của đồng bộ FBM (công tắc tổng, tham số phiên, tài khoản, Extension, lịch nền, tự đăng nhập) cho cổng cài đặt chung và dựng lịch nền dạng theo tiến trình.
     ├── state\FbmSettingsMigrate.js Chuyển cài đặt FBM từ các khóa kho cũ sang khóa của cổng cài đặt chung, một lần.
+    ├── state\FbmStoresMigrate.js  Chuyển khóa lịch nền, mốc khách, con trỏ Vòng xoay và liên kết đời cũ sang sổ tiến trình và kho kết nối, một lần; xóa khóa cũ và kho làm việc còn sót.
     ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
     ├── state\Scheduler.js        Sổ tiến trình nền một khóa (lần xong, lần lỗi, số khách mốc, con trỏ Vòng xoay; một cổng đọc, một cổng ghi) và công cụ tính tiến trình nào đến hạn, không mở lượt.
     ├── state\BackgroundMachine.js Kho máy chạy nền (một máy được giao), kiểm máy hỏi có được chạy nền không, tự nhận thay máy im, bản xem máy cho Sidebar.
