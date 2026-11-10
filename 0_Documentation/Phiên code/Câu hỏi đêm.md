@@ -18,4 +18,4 @@ Tự quyết khi làm B6, chủ dự án xem lại: (1) tắt công tắc tổng
 
 ### Cổng chấp thuận đẩy (B9): các lựa chọn tạm
 
-Tự quyết khi làm B9, chủ dự án xem lại: (1) dòng chỉ ghi trạng thái chờ sửa (`hold`, ví dụ lệch người phụ trách) không tính vào ngưỡng và dấu tập, vì không phát lệnh ghi FBM; (2) nút "Kiểm lại ngay" mở màn đồng bộ và chạy một lượt tay chiều Đẩy; (3) giữa lượt đã chạy, phần còn lại dưới ngưỡng thì nhận cả dòng mới hoặc vừa sửa như một lượt mới (tập dưới ngưỡng vốn không cần duyệt), chạm ngưỡng thì chỉ đẩy phần đã qua cổng, phần mới để lượt sau hỏi; (4) khóa cũ `FBM_SYNC_PUSH_CLEAN_V1` bị bỏ qua, hàm chuyển một lần ở B10 xóa.
+Tự quyết khi làm B9, chủ dự án xem lại: (1) dòng chỉ ghi trạng thái chờ sửa (`hold`, ví dụ lệch người phụ trách) không tính vào ngưỡng và dấu tập, vì không phát lệnh ghi FBM; (2) giữa lượt đã chạy, phần còn lại dưới ngưỡng thì nhận cả dòng mới hoặc vừa sửa như một lượt mới (tập dưới ngưỡng vốn không cần duyệt), chạm ngưỡng thì chỉ đẩy phần đã qua cổng, phần mới để lượt sau hỏi; (3) khóa cũ `FBM_SYNC_PUSH_CLEAN_V1` bị bỏ qua, hàm chuyển một lần ở B10 xóa.
