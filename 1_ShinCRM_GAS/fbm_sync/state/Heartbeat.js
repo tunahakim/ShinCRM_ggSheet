@@ -34,14 +34,17 @@ FbmSync.backgroundSettle = function (state, now) {
   var outcome = FbmSync.processOutcome(state);
   if (!outcome) { return state; }
   var kind = String(state.process), schedule = FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background));
+  var book = FbmSync.processBookRead();
   if (outcome !== 'dropped') {
-    var mark = FbmSync.processBookMark(kind, outcome, now, FbmSync.processBookRead());
+    var mark = FbmSync.processBookMark(book, kind, outcome, now);
+    book = mark.book;
+    FbmSync.processBookWrite(book);
     if (outcome === 'failed') {
       logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: LOG_WARN, cycleId: String(state.runId || ''), reason: FbmSync.scheduleLabel(kind) + ' chạy nền không xong' + (state.lastFailureCode ? ' (mã ' + state.lastFailureCode + ')' : '') + ', lỗi liền ' + mark.failures + ' lần; thử lại sau ' + mark.minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: mark.failures, retryMinutes: mark.minutes } });
     }
   }
   state.process = '';
-  state.nextRunAt = FbmSync.scheduleNextAt(schedule, FbmSync.processBookRead());
+  state.nextRunAt = FbmSync.scheduleNextAt(schedule, book);
   return FbmSync.stateWrite(state);
 };
 

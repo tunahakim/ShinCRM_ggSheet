@@ -188,7 +188,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 14,
     '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
   popup: {

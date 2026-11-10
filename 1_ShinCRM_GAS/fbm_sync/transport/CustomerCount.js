@@ -4,17 +4,10 @@
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-FbmSync.CUSTOMER_BASELINE_KEY = 'FBM_SYNC_CUSTOMER_BASELINE_V1';
 FbmSync.RECOUNT_MESSAGE = 'Số khách FBM vừa đổi, quét thêm một lần...';
 
-/** Số khách mốc, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Nằm ngoài state vì `runOpen` xóa `session` mỗi lượt. */
-FbmSync.customerBaselineRead = function () {
-  var parsed = documentMemoRead(FbmSync.props(), FbmSync.CUSTOMER_BASELINE_KEY, 'số khách mốc FBM', 'object'), total = parsed ? Number(parsed.total) : NaN;
-  return isFinite(total) && total >= 0 ? total : null;
-};
-FbmSync.customerBaselineWrite = function (total) {
-  FbmSync.props().setProperty(FbmSync.CUSTOMER_BASELINE_KEY, JSON.stringify({ total: Number(total), at: Date.now() }));
-};
+/** Số khách mốc trong sổ tiến trình, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Chỉ `runMarksCommit` ghi khi lượt xong. */
+FbmSync.customerBaselineRead = function () { return FbmSync.processBookRead().customerFull.baseline; };
 
 /**
  * Request đếm: cùng điều kiện lọc với danh sách toàn bộ khách nên `TotalRowCount` hai bên khớp khi FBM không đổi; khác `count: 1` và không xin tiêu đề cột (chỉ cần tổng, tiêu đề nặng hơn cả response).

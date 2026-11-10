@@ -88,17 +88,15 @@ FbmSync.runClose = function (state, verdict, detail) {
  * - `customerTotal`: số khách mốc; ghi sớm thì lần đếm sau thấy khớp và bỏ quét.
  * - `rotationCursor`: vị trí Vòng xoay; ghi sớm thì khách của lô hỏng không bao giờ được đọc lại trong vòng này.
  */
-FbmSync.RUN_CLOSE_MARKS = {
-  customerTotal: function (value) { FbmSync.customerBaselineWrite(value); },
-  rotationCursor: function (value) { FbmSync.detailCursorWrite(value); }
-};
-/** Ghi các mốc khi `done`, rồi luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. */
+FbmSync.RUN_CLOSE_MARKS = ['customerTotal', 'rotationCursor'];
+/** Ghi các mốc vào sổ tiến trình khi `done` (một lần ghi sổ), rồi luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. */
 FbmSync.runMarksCommit = function (state, done) {
-  var metadata = state.metadata || {};
-  Object.keys(FbmSync.RUN_CLOSE_MARKS).forEach(function (key) {
-    if (done && typeof metadata[key] === 'number') { FbmSync.RUN_CLOSE_MARKS[key](metadata[key]); }
+  var metadata = state.metadata || {}, marks = {}, found = 0;
+  FbmSync.RUN_CLOSE_MARKS.forEach(function (key) {
+    if (done && typeof metadata[key] === 'number') { marks[key] = metadata[key]; found += 1; }
     delete metadata[key];
   });
+  if (found) { FbmSync.processBookWrite(FbmSync.processBookMarks(FbmSync.processBookRead(), marks)); }
 };
 
 /** Nơi duy nhất đưa lượt sang lỗi. `message` là chữ người dùng đọc, nên bên gọi tự nêu bước hỏng. */

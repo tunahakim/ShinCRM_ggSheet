@@ -64,6 +64,7 @@ const NHOM = [
   require("./fbmSync/Gate"),
   require("./fbmSync/Settings"),
   require("./fbmSync/StateStore"),
+  require("./fbmSync/Stores"),
   require("./fbmSync/EntryPointGate"),
   require("./fbmSync/RelayResend"),
   require("./fbmSync/PushGate"),

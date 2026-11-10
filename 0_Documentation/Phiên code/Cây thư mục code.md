@@ -272,7 +272,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\FbmSettings.js     Khai các phần cài đặt của đồng bộ FBM (công tắc tổng, tham số phiên, tài khoản, Extension, lịch nền, tự đăng nhập) cho cổng cài đặt chung và dựng lịch nền dạng theo tiến trình.
     ├── state\FbmSettingsMigrate.js Chuyển cài đặt FBM từ các khóa kho cũ sang khóa của cổng cài đặt chung, một lần.
     ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
-    ├── state\Scheduler.js        Lịch các tiến trình nền và sổ tiến trình (lần xong, lần lỗi): chỉ tính tiến trình nào đến hạn, không mở lượt.
+    ├── state\Scheduler.js        Sổ tiến trình nền một khóa (lần xong, lần lỗi, số khách mốc, con trỏ Vòng xoay; một cổng đọc, một cổng ghi) và công cụ tính tiến trình nào đến hạn, không mở lượt.
     ├── state\BackgroundMachine.js Kho máy chạy nền (một máy được giao), kiểm máy hỏi có được chạy nền không, tự nhận thay máy im, bản xem máy cho Sidebar.
     ├── state\Heartbeat.js        Người điều phối lần hỏi GAS của Extension (`heartbeatRun`): giao lượt tay đang chờ, kiểm máy nền, đóng lượt bỏ dở, mở tiến trình nền đến hạn, trả lệnh giữ/tắt chuông.
     ├── read\GridRead.js          Grid metadata, phân trang và category request.
@@ -543,6 +543,7 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
 
     tests/cases/fbmSync/Settings.js  Kiểm cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu, khóa hỏng, hàm chuyển một lần từ khóa đời cũ.
     tests/cases/fbmSync/StateStore.js  Kiểm kho trạng thái phiên đồng bộ khi DocumentProperties đầy hoặc hỏng.
+    tests/cases/fbmSync/Stores.js  Kiểm các kho bền đã gộp: sổ tiến trình nền, kho kết nối, kho làm việc của lượt, sổ chờ xác nhận, sổ lỗi đẩy, hàm chuyển khóa cũ.
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.

@@ -4,7 +4,7 @@
  */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
-const { datCongTac, datNen, datPhan, datLichNen } = require('../../lib/fbm/cai-dat-thu');
+const { datCongTac, datNen, datPhan, datLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 
 /** Bảng loại thông báo thật, để thông báo đồng bộ phát ra chắc chắn dùng loại đã khai. */
@@ -24,8 +24,7 @@ function hopNen(options) {
   const hop = flow.hop, F = hop.FbmSync;
   F.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   datLichNen(hop, LICH);
-  flow.documentProperties.setProperty(F.SCHEDULE_DONE_KEYS.customerFull, String(Date.now()));
-  flow.documentProperties.setProperty(F.SCHEDULE_DONE_KEYS.heartbeat, '1');
+  vaSoNen(F, { customerFull: { doneAt: Date.now() }, heartbeat: { doneAt: 1 } });
   if (opt.giao !== false) { F.backgroundMachineWrite(F.machineAssigned(MAY_A, 'Máy A', Date.now())); }
   const hoi = (machineId, trigger, extra) => F.controlDispatch('heartbeat', Object.assign({ trigger: trigger || 'alarm', machineId }, extra || {}), 'relay');
   return { flow, hop, F, logs, notices, hoi };
@@ -114,7 +113,7 @@ function chay(so) {
   }
   {
     const { flow, F, hoi } = hopNen();
-    flow.documentProperties.setProperty(F.SCHEDULE_DONE_KEYS.heartbeat, String(Date.now()));
+    vaSoNen(F, { heartbeat: { doneAt: Date.now() } });
     const idle = hoi(MAY_A);
     check(so, 'không có tiến trình đến hạn: NO_PROCESS_DUE, giữ chuông, không mở lượt',
       [idle.code, idle.request, idle.poll.minutes > 0, F.stateRead().runId || ''],

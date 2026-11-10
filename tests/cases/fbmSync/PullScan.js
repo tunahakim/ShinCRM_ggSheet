@@ -77,9 +77,10 @@ async function chay(so) {
     [['/Date(915148800000)/', '/Date(1751298801493)/', '000000010624', 'A000069569'], '1999010120250630000000010624A000069569']);
   // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn xét khách vắng thì mọi khách chưa quét tới bị coi là vắng (gặp thật: 1.262/1.312 khách).
   const marked = [];
-  const savedScanEnd = { absent: builders.FbmSync.customerAbsentMark, baseline: builders.FbmSync.customerBaselineWrite };
+  const savedScanEnd = { absent: builders.FbmSync.customerAbsentMark, read: builders.FbmSync.processBookRead, write: builders.FbmSync.processBookWrite };
   builders.FbmSync.customerAbsentMark = () => { marked.push('vắng'); };
-  builders.FbmSync.customerBaselineWrite = () => { marked.push('mốc'); };
+  builders.FbmSync.processBookRead = () => builders.FbmSync.processBookShape(null);
+  builders.FbmSync.processBookWrite = (book) => { marked.push(book.customerFull.baseline === 1312 ? 'mốc' : 'sổ khác'); };
   const scanOf = (pages, scopeNew) => pages.reduce((scan, grid, i) => builders.FbmSync.customerScanRecord(i === 0 ? null : scan, grid.rows, grid.total, i === 0 ? scopeNew : null), null);
   const finishOf = (scan) => { const st = { runId: 'scan-run', mode: 'read', metadata: {} }, patch = { metadata: {}, logs: [] }; marked.length = 0; let code = ''; try { builders.FbmSync.customerScanFinish(st, scan, patch); } catch (error) { code = error.code; } return [code, marked.slice(), patch.metadata.customerTotal === undefined ? null : patch.metadata.customerTotal, patch]; };
   const scanRun = (pages) => finishOf(scanOf(pages)).slice(0, 3);
@@ -95,7 +96,7 @@ async function chay(so) {
   check(so, 'Mã khách chỉ định chưa có trên Sheet mà danh sách khách FBM không trả về (gộp mọi trang, không phân biệt hoa thường) thành cảnh báo không chặn kèm dòng Log, chặng vẫn xét vắng và kết thúc',
     [(scopeFinish[3].metadata.preflightIssues || []).map((item) => [item.code, item.blocking, /ALT0010\b/.test(item.message), /00099/.test(item.message)]), scopeFinish[3].logs.map((line) => line.action), scopeFinish[1]],
     [[['FBM_SCOPE_CODE_NOT_ON_FBM', false, true, false]], ['scope_code_not_on_fbm'], ['vắng']]);
-  builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.customerBaselineWrite = savedScanEnd.baseline;
+  builders.FbmSync.customerAbsentMark = savedScanEnd.absent; builders.FbmSync.processBookRead = savedScanEnd.read; builders.FbmSync.processBookWrite = savedScanEnd.write;
 
   return so;
 }

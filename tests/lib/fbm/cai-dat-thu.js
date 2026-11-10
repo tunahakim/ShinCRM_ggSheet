@@ -50,4 +50,12 @@ function datLichNen(hop, lich) {
 /** Lịch nền hiệu lực dạng theo tiến trình, đúng bộ dựng mà Scheduler dùng. */
 function docLichNen(hop) { return hop.FbmSync.scheduleShape(docPhan(hop, 'background')); }
 
-module.exports = { datCaiDat, datPhan, datCongTac, datNen, docPhan, lichNenPatch, datLichNen, docLichNen };
+/** Vá sổ tiến trình nền qua đúng cổng đọc, ghi của GAS (`processBookRead`, `processBookWrite`): `patch` là `{ tiến trình: { doneAt, failures, retryAt, baseline, cursor } }`, mục không nêu giữ nguyên. Trả sổ đọc lại. */
+function vaSoNen(F, patch) {
+  const so = F.processBookRead();
+  Object.keys(patch).forEach((kind) => { Object.assign(so[kind], patch[kind]); });
+  F.processBookWrite(so);
+  return F.processBookRead();
+}
+
+module.exports = { datCaiDat, datPhan, datCongTac, datNen, docPhan, lichNenPatch, datLichNen, docLichNen, vaSoNen };

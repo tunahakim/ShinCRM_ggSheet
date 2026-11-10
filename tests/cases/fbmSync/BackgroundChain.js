@@ -2,7 +2,7 @@
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
-const { datLichNen } = require('../../lib/fbm/cai-dat-thu');
+const { datLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 
 const PHUT = 60000;
 
@@ -15,7 +15,7 @@ function chuoiHarness(lich, options) {
   h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   datLichNen(h.flow.hop, Object.assign({ enabled: true, direction: 'read' }, lich));
   const xong = [], ghiSo = h.F.processBookMark;
-  h.F.processBookMark = function (kind, outcome) { if (outcome === 'done') { xong.push(kind); } return ghiSo.apply(this, arguments); };
+  h.F.processBookMark = function (book, kind, outcome) { if (outcome === 'done') { xong.push(kind); } return ghiSo.apply(this, arguments); };
   /** Hỏi một lần sau `phut` phút; mỗi request FBM tốn `moiRequest` mili-giây. Trả các tiến trình chạy xong trong lần hỏi đó. */
   async function hoi(phut, moiRequest, hooks) {
     clock.now += phut * PHUT; xong.length = 0;
@@ -52,7 +52,7 @@ async function chay(so) {
   giuPhien.flow.hop.logTrace = (entry) => vetGiuPhien.push(entry);
   for (let i = 0; i < 3; i += 1) { giuPhienLan.push((await giuPhien.hoi(10)).xong); }
   check(so, 'Hỏi 10 phút một lần, Giữ phiên chu kỳ 1 phút: mỗi lần hỏi Giữ phiên chạy đúng một lần, giờ chạy xong ghi là chính lúc vừa chạy xong', [
-    giuPhienLan.map((list) => dem(list, 'heartbeat')), Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) <= giuPhien.clock.now, giuPhien.clock.now - Number(giuPhien.flow.documentProperties.getProperty('FBM_SYNC_DONE_HEARTBEAT')) < PHUT
+    giuPhienLan.map((list) => dem(list, 'heartbeat')), giuPhien.F.processBookRead().heartbeat.doneAt <= giuPhien.clock.now, giuPhien.clock.now - giuPhien.F.processBookRead().heartbeat.doneAt < PHUT
   ], [[1, 1, 1], true, true]);
   check(so, 'LOG_TRACE: mỗi lần Giữ phiên chạy xong ghi một dòng vết heartbeat_ok kèm số khách FBM báo, lệch số khách thì nói sẽ chạy Quét nhanh', vetGiuPhien.filter((v) => v.action === 'heartbeat_ok').map((v) => [v.source, v.reason]), [['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách; số khách lệch nên chạy Quét nhanh.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.'], ['fbm_sync', 'Giữ phiên FBM OK, FBM báo 12 khách.']]);
 
@@ -64,20 +64,20 @@ async function chay(so) {
 
   // Người dùng chọn dừng lượt nền: lượt nền dừng sau response đang chờ, không ghi giờ chạy xong, lần hỏi kế tiếp chạy lại.
   const chen = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  const mocTruoc = chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN');
+  const mocTruoc = chen.F.processBookRead().customerFull.doneAt;
   let daChen = false;
   const chenLan = await chen.hoi(60, 1000, { beforeSend: (request) => {
     chen.clock.now += 1000;
     if (!daChen && request.meta.kind === 'scan_job') { daChen = true; chen.F.controlDispatch('stop_background', {}); }
   } });
-  const mocSauChen = chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN');
+  const mocSauChen = chen.F.processBookRead().customerFull.doneAt;
   chen.F.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, metadata: {} });
   const chayLai = await chen.hoi(1);
-  check(so, 'Lượt nền bị lượt tay chen ngang: lượt nền dừng, không ghi giờ chạy xong của Quét nhanh; lần hỏi kế tiếp chạy lại Quét nhanh và ghi giờ chạy xong', [daChen, chenLan.xong, mocSauChen === mocTruoc, chayLai.xong, chen.flow.documentProperties.getProperty('FBM_SYNC_DONE_CUSTOMER_FULL_SCAN') !== mocTruoc], [true, [], true, ['customerFull'], true]);
+  check(so, 'Lượt nền bị lượt tay chen ngang: lượt nền dừng, không ghi giờ chạy xong của Quét nhanh; lần hỏi kế tiếp chạy lại Quét nhanh và ghi giờ chạy xong', [daChen, chenLan.xong, mocSauChen === mocTruoc, chayLai.xong, chen.F.processBookRead().customerFull.doneAt !== mocTruoc], [true, [], true, ['customerFull'], true]);
 
   // Công tắc từng tiến trình chỉ bật/tắt lịch hẹn: tắt Quét nhanh, số khách FBM đổi thì Giữ phiên vẫn gọi Quét nhanh.
   const tat = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });
-  tat.F.customerBaselineWrite(11);
+  vaSoNen(tat.F, { customerFull: { baseline: 11 } });
   const tatLan = await tat.hoi(10);
   check(so, 'Tắt Quét nhanh mà tổng khách FBM khác số khách mốc: Giữ phiên vẫn chạy Quét nhanh, nhận đủ 12 khách và ghi mốc mới', [tatLan.xong, dem(tat.trace.kinds, 'scan_job'), tat.local.customer.length, tat.F.customerBaselineRead()], [['heartbeat'], 1, 12, 12]);
 
@@ -105,7 +105,7 @@ async function chay(so) {
 
   // Quét nhanh lỗi liên tục (tab FBM không phản hồi) và đứng trước Giữ phiên trong chuỗi: trước đây mọi chuỗi gãy ở Quét nhanh nên Giữ phiên không bao giờ chạy.
   const loi = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 5 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  loi.F.customerBaselineWrite(12);
+  vaSoNen(loi.F, { customerFull: { baseline: 12 } });
   let hong = true;
   const hongTab = { fail: (request) => hong && request.meta.kind === 'scan_job' ? 'FBM_TAB_NOT_READY' : '' };
   const loiLan = [];
@@ -118,11 +118,11 @@ async function chay(so) {
   hong = false;
   const hoiPhuc = [];
   for (let i = 0; i < 6; i += 1) { hoiPhuc.push((await loi.hoi(5, 1000, hongTab)).xong); }
-  check(so, 'Tab FBM trở lại: Quét nhanh chạy khi tới giờ thử lại, chạy xong thì xóa lần thử lại và quay về chu kỳ thường', [hoiPhuc, loi.flow.documentProperties.getProperty('FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN') || null], [[['heartbeat'], ['heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat']], null]);
+  check(so, 'Tab FBM trở lại: Quét nhanh chạy khi tới giờ thử lại, chạy xong thì xóa lần thử lại và quay về chu kỳ thường', [hoiPhuc, loi.F.processBookRead().customerFull.retryAt], [[['heartbeat'], ['heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat']], 0]);
 
   // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
   const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  boDo.F.customerBaselineWrite(12);
+  vaSoNen(boDo.F, { customerFull: { baseline: 12 } });
   boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
   const sauBoDo = await boDo.hoi(1);
   check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);

@@ -39,7 +39,8 @@ function chay(so) {
   readFinish.FbmSync.readListClear = () => {};
   readFinish.FbmSync.workStoreClear = () => 0;
   readFinish.FbmSync.staleRunCheck = () => null;
-  readFinish.FbmSync.customerBaselineWrite = () => {};
+  readFinish.FbmSync.processBookRead = () => readFinish.FbmSync.processBookShape(null);
+  readFinish.FbmSync.processBookWrite = () => {};
   readFinish.FbmSync.activityStageNext = () => null;
   const readFinished = readFinish.FbmSync.continue({ job: { jobId: 'read-run:customer:0:0', chunkIndex: 0, chunkCount: 1, rowCount: 0, totalRowCount: 0, oversize: [] }, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'read-request' }] } });
   check(so, 'Lượt Lấy hết danh sách khách thì gắn khách vắng vào danh sách đọc một lần, không mở chiều đẩy',

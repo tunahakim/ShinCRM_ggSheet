@@ -1,6 +1,7 @@
 /** Bước đếm khách cuối lượt: FBM không đổi thì lượt kết thúc sau một request đếm; số khách đổi hoặc chưa có mốc thì chạy đúng một lượt Quét nhanh rồi dừng. */
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
+const { vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 
 const dem = (h, kind) => h.trace.kinds.filter((item) => item === kind).length;
 
@@ -23,7 +24,7 @@ async function chay(so) {
 
   const chuaMoc = scanHarness({ customers: 12 });
   await chuaMoc.run({ pack: 'quick' });
-  chuaMoc.F.props().deleteProperty(chuaMoc.F.CUSTOMER_BASELINE_KEY);
+  vaSoNen(chuaMoc.F, { customerFull: { baseline: null } });
   chuaMoc.trace.kinds.length = 0;
   const sauBulk = await chuaMoc.run({ startOptions: { scan: 'activity_bulk' } });
   const sauLop1 = chuaMoc.trace.kinds.slice(chuaMoc.trace.kinds.indexOf('scan_job:activity') + 1);
