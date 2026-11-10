@@ -7,7 +7,7 @@ function loi(fn) {
 }
 
 /** Hộp có khóa script giả bật/tắt được và Log gom theo thứ tự; lượt tay đọc đã mở sẵn (request đầu đang bay). */
-function hopCoLuot(origin) {
+function hopCoLuot(origin, them) {
   const khoa = { ban: false, tryLock() { return !this.ban; }, releaseLock() {} };
   const logs = [], ref = {};
   // Nhãn lượt lấy đúng lúc gọi logEvent như LogGate thật, để bắt dòng ghi sau khi lượt đã đóng.
@@ -17,7 +17,7 @@ function hopCoLuot(origin) {
   const F = hop.FbmSync;
   F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const started = F.start({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' });
+  const started = F.start(Object.assign({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' }, them || {}));
   return { hop, F, khoa, logs, data: documentProperties.data, started };
 }
 
@@ -46,6 +46,9 @@ async function chay(so) {
     ban.logs.slice(truocLog).some((line) => line.action === 'sync_session_finished')
   ], [false, 'SYNC_STOPPED', null, 'paused', true, '', true, true]);
   check(so, 'cờ của lượt đã đóng không chặn lượt mới: lượt sau vẫn phát request đầu', (() => { const lai = ban.F.start({ mode: 'read', origin: 'manual', manual: true }); return [!!lai.request, ban.F.statusView().running]; })(), [true, true]);
+
+  const dauDuyet = (origin) => hopCoLuot(origin, { approvedFingerprint: 'abcd1234-2' }).F.stateRead().approvedFingerprint;
+  check(so, 'K6: lượt tay do nút Chấp thuận mở giữ dấu tập trong ô lượt; lượt nền bỏ dấu dù được truyền, nên không lượt nền nào tự đẩy tập chạm ngưỡng; lệnh start loại sync chuyển dấu xuống', [dauDuyet(), dauDuyet('background'), /approvedFingerprint: input\.approvedFingerprint/.test(String(ban.F.START_KINDS.sync.run))], ['abcd1234-2', '', true]);
 
   // Lệnh Dừng ghi cờ giữa lúc lát đang chạy (bản chụp trong khóa không thấy): lát vẫn thấy trước khi phát request.
   const giua = hopCoLuot();

@@ -661,13 +661,21 @@ async function chay(so) {
   const gasSnapshot = { runId: 'run-017', running: true, phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
   hop.FBM_SYNC_CLIENT.lastStatus = gasSnapshot;
   hop.fbmSyncDrive = () => Promise.reject(new Error('Mất kết nối tới GAS'));
-  hop.callServer = (name) => (name === 'fbmApprovePush' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
-  await hop.fbmSyncApprovePush('abcd1234-2');
+  hop.callServer = (name) => (name === 'fbmGetSyncStatus' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
+  await hop.fbmSyncStatusOnce().catch(() => null);
   const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
   check(so, 'FBM-017: lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
     [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],
     ['error', 'Mất kết nối tới GAS', 'run-017', gasSnapshot.counts, 1]);
   hop.fbmSyncDrive = savedDrive; hop.callServer = savedCallServer;
+  const duyetChay = [], duyetDrive = [], realRunD = hop.fbmSyncRun, realDriveD = hop.fbmSyncDrive;
+  hop.fbmSyncRun = (mode, extra) => { duyetChay.push([mode, extra, hop.FBM_SYNC_CLIENT.mode]); return Promise.resolve(null); };
+  await hop.fbmSyncApprovePush('abcd1234-2');
+  hop.fbmSyncRun = realRunD;
+  hop.fbmSyncDrive = (command, payload) => { duyetDrive.push([command, payload.kind, payload.mode, payload.approvedFingerprint]); return Promise.resolve({ ok: true, status: { phase: 'done' } }); };
+  await hop.fbmSyncRunStart('push', { approvedFingerprint: 'abcd1234-2' });
+  hop.fbmSyncDrive = realDriveD;
+  check(so, 'K6: bấm Chấp thuận mở ngay lượt tay chiều Đẩy mang dấu tập đang hiện (không có lệnh duyệt riêng); lệnh start gửi dấu xuống GAS', [duyetChay, duyetDrive], [[['push', { approvedFingerprint: 'abcd1234-2' }, 'push']], [['start', 'sync', 'push', 'abcd1234-2']]]);
   hop.fbmSyncPaint = () => {};
   hop.FBM_SYNC_CLIENT.cancelRequested = true;
   const stoppingAction = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_customer', masterEnabled: true, enabled: true });

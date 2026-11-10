@@ -8,26 +8,26 @@ async function chay(so) {
   // Cổng của chặng đẩy (C1, K6): `FBM_SYNC_PUSH_GATE_V1` giữ trạng thái chặng đẩy gần nhất (sạch, chờ duyệt, đang mở) kèm dấu bốn phần đọc trước lần quét; lượt nền khớp dấu thì không đọc Sheet, không đẩy.
   const gateOf = (q) => q.F.pushGateRead();
   const syncedCustomer = (q, x) => { const row = editCustomer(x); row.fbmHash = q.F.hash(row, 'customer', q.F.stateCategoryGate(q.F.stateRead())); return row; };
-  const reopenPush = (q) => { const st = q.F.runOpen({ phase: 'push' }); st.mode = 'write'; st.phase = 'push'; st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; st.metadata.categoryCheck = { at: Date.now(), pushed: 0 }; q.F.stateWrite(st); };
+  const reopenPush = (q, approved, origin) => { const st = q.F.runOpen({ phase: 'push', origin: origin }); st.approvedFingerprint = approved || ''; st.mode = 'write'; st.phase = 'push'; st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; st.metadata.categoryCheck = { at: Date.now(), pushed: 0 }; q.F.stateWrite(st); };
   const approvalNotices = (q) => q.run.hop._notices.filter((row) => row[1] === 'fbm_push_approval').map((row) => row[0]);
   {
     const F = pushQueue([]).F, now = { rev: 7, failures: '', scope: '', account: 'Le Tuan Anh' };
     const bg = { origin: 'background', scan: 'detail' }, gate = (status, extra) => Object.assign({ status, mark: Object.assign({}, now) }, extra || {});
-    check(so, 'C1: phép quyết bỏ chặng đẩy: lượt tay và Quét nhanh luôn chạy; chưa có cổng, chặng trước dở dang hoặc đã có lời duyệt thì chạy; lệch phần dấu nào thì chạy kèm tên phần; cổng sạch hoặc chờ duyệt mà dấu khớp mới bỏ',
+    check(so, 'C1: phép quyết bỏ chặng đẩy: lượt tay và Quét nhanh luôn chạy; chưa có cổng hoặc chặng trước dở dang thì chạy; lệch phần dấu nào thì chạy kèm tên phần; cổng sạch hoặc chờ duyệt mà dấu khớp mới bỏ',
       [F.pushGateSkip({ origin: 'manual', scan: 'detail' }, gate('clean'), now), F.pushGateSkip({ origin: 'background', scan: 'full' }, gate('clean'), now), F.pushGateSkip(bg, null, now),
-        F.pushGateSkip(bg, gate('open'), now).reason, F.pushGateSkip(bg, gate('pending', { approvedFingerprint: 'abc-2' }), now).reason,
+        F.pushGateSkip(bg, gate('open'), now).reason,
         F.pushGateSkip(bg, gate('clean', { mark: Object.assign({}, now, { rev: 6 }) }), now).reason, F.pushGateSkip(bg, gate('clean', { mark: Object.assign({}, now, { failures: 'customer:CUS-A=h' }) }), now).reason,
         F.pushGateSkip(bg, gate('clean', { mark: Object.assign({}, now, { scope: 'limited:ALT00010', account: '' }) }), now).reason, F.pushGateSkip(bg, gate('clean'), now), F.pushGateSkip(bg, gate('pending'), now)],
-      [{ open: true, reason: 'manual' }, { open: true, reason: 'bypass_scan' }, { open: true, reason: 'no_gate' }, 'unfinished', 'approved', 'changed:rev', 'changed:failures', 'changed:scope,account', { open: false, reason: 'clean' }, { open: false, reason: 'pending' }]);
+      [{ open: true, reason: 'manual' }, { open: true, reason: 'bypass_scan' }, { open: true, reason: 'no_gate' }, 'unfinished', 'changed:rev', 'changed:failures', 'changed:scope,account', { open: false, reason: 'clean' }, { open: false, reason: 'pending' }]);
     const a = { entity: 'customer', id: 'CUS-A', hash: 'h1' }, b = { entity: 'customer', id: 'CUS-B', hash: 'h2' };
     const fp = F.candidateSetFingerprint([a, b]);
     check(so, 'C1: dấu tập không phụ thuộc thứ tự dòng, đổi khi một dòng đổi nội dung; dòng chỉ ghi trạng thái chờ sửa (hold) không tính vào ngưỡng',
-      [F.candidateSetFingerprint([b, a]) === fp, F.candidateSetFingerprint([a, Object.assign({}, b, { hash: 'h3' })]) === fp, F.pushGateDecide({ candidates: [a, Object.assign({ hold: true }, b)], threshold: 2, gate: null }).code],
+      [F.candidateSetFingerprint([b, a]) === fp, F.candidateSetFingerprint([a, Object.assign({}, b, { hash: 'h3' })]) === fp, F.pushGateDecide({ candidates: [a, Object.assign({ hold: true }, b)], threshold: 2, approved: '' }).code],
       [true, false, 'PUSH_RUN']);
-    check(so, 'C1: quyết đầu chặng: dưới ngưỡng thì đẩy; chạm ngưỡng chờ duyệt; lời duyệt khớp dấu tập thì đẩy; 0 là luôn hỏi; lời duyệt chỉ được xét khi cổng đang chờ',
-      [F.pushGateDecide({ candidates: [a], threshold: 2, gate: null }).code, F.pushGateDecide({ candidates: [a, b], threshold: 2, gate: null }).code, F.pushGateDecide({ candidates: [a, b], threshold: 2, gate: { approvedFingerprint: fp } }).code,
-        F.pushGateDecide({ candidates: [a], threshold: 0, gate: null }).code, F.approvalDecide(null, fp), F.approvalDecide({ status: 'clean', fingerprint: fp }, fp), F.approvalDecide({ status: 'pending', fingerprint: fp }, 'khac'), F.approvalDecide({ status: 'pending', fingerprint: fp }, fp)],
-      ['PUSH_RUN', 'PUSH_AWAITING_APPROVAL', 'PUSH_APPROVED_RUN', 'PUSH_AWAITING_APPROVAL', 'no_pending', 'no_pending', 'stale', 'approved']);
+    check(so, 'C1: quyết đầu chặng: dưới ngưỡng thì đẩy; chạm ngưỡng chờ duyệt; lượt mang dấu duyệt khớp tập thì đẩy, lệch thì chờ duyệt; 0 là luôn hỏi',
+      [F.pushGateDecide({ candidates: [a], threshold: 2, approved: '' }).code, F.pushGateDecide({ candidates: [a, b], threshold: 2, approved: '' }).code, F.pushGateDecide({ candidates: [a, b], threshold: 2, approved: fp }).code,
+        F.pushGateDecide({ candidates: [a, b], threshold: 2, approved: 'khac-2' }).code, F.pushGateDecide({ candidates: [a], threshold: 0, approved: '' }).code],
+      ['PUSH_RUN', 'PUSH_AWAITING_APPROVAL', 'PUSH_APPROVED_RUN', 'PUSH_AWAITING_APPROVAL', 'PUSH_AWAITING_APPROVAL']);
   }
   {
     const q = pushQueue([]);
@@ -76,29 +76,22 @@ async function chay(so) {
       [{ open: true, reason: 'no_gate' }, 1, 'warn', { open: true, reason: 'changed:rev' }]);
   }
 
-  // Chấp thuận theo dấu tập (K6): chạm ngưỡng thì không phát lệnh ghi nào, lượt kết thúc bình thường với cổng chờ duyệt và thông báo hai nút; lời duyệt chỉ đúng tập đã hiện.
+  // Chấp thuận theo dấu tập (K6, cách B): chạm ngưỡng thì không phát lệnh ghi nào, lượt kết thúc bình thường với cổng chờ duyệt và thông báo nút Chấp thuận; nút đó mở lượt tay mang dấu tập, chỉ lượt đó được đẩy và chỉ khi tập dựng lại khớp dấu.
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
     const first = q.F.pushStageResume(q.F.stateRead()), pending = gateOf(q);
-    check(so, 'K6: tập chạm ngưỡng thì không phát lệnh ghi FBM, lượt xong bình thường, cổng chờ duyệt giữ dấu tập và số bản ghi, thông báo chờ duyệt bật, Log ghi lý do',
-      [first, q.F.stateRead().phase, pending.status, pending.count, /^[0-9a-f]{8}-2$/.test(pending.fingerprint), pending.approvedFingerprint, approvalNotices(q), q.run.logs.filter((e) => e.action === 'push_awaiting_approval').length, q.run.writes.length],
-      [null, 'done', 'pending', 2, true, '', ['raise'], 1, 0]);
+    check(so, 'K6: tập chạm ngưỡng thì không phát lệnh ghi FBM, lượt xong bình thường, cổng chờ duyệt giữ dấu tập và số bản ghi (không có trường lời duyệt), thông báo chờ duyệt bật, Log ghi lý do',
+      [first, q.F.stateRead().phase, pending.status, pending.count, /^[0-9a-f]{8}-2$/.test(pending.fingerprint), 'approvedFingerprint' in pending, approvalNotices(q), q.run.logs.filter((e) => e.action === 'push_awaiting_approval').length, q.run.writes.length],
+      [null, 'done', 'pending', 2, true, false, ['raise'], 1, 0]);
     const raised = q.run.hop._notices.filter((row) => row[1] === 'fbm_push_approval')[0][2];
-    check(so, 'K6: thông báo chờ duyệt có nút Chấp thuận mang dấu tập và nút Kiểm lại ngay',
-      raised.actions, [{ label: 'Chấp thuận', action: 'fbmPushApprove', value: pending.fingerprint }, { label: 'Kiểm lại ngay', action: 'fbmPushRecheck' }]);
-    const stale = q.F.runPushApprovalCommand({ fingerprint: 'deadbeef-2' });
-    check(so, 'K6: lời duyệt mang dấu khác tập đang chờ thì từ chối PUSH_APPROVAL_STALE, cổng giữ nguyên chưa duyệt',
-      [stale.ok, stale.code, gateOf(q).approvedFingerprint], [false, 'PUSH_APPROVAL_STALE', '']);
-    const approved = q.F.runPushApprovalCommand({ fingerprint: pending.fingerprint });
-    check(so, 'K6: lời duyệt đúng dấu thì ghi dấu đã duyệt, gỡ thông báo, Log ghi lời duyệt, không phát request',
-      [approved.ok, approved.code, gateOf(q).approvedFingerprint, approvalNotices(q).slice(-1), q.run.logs.filter((e) => e.action === 'push_batch_approved').length, approved.request],
-      [true, 'PUSH_APPROVED', pending.fingerprint, ['resolve'], 1, undefined]);
-    reopenPush(q);
+    check(so, 'K6: thông báo chờ duyệt chỉ có một nút Chấp thuận mang dấu tập',
+      raised.actions, [{ label: 'Chấp thuận', action: 'fbmPushApprove', value: pending.fingerprint }]);
+    reopenPush(q, pending.fingerprint);
     const pushed = pushDrive(q);
-    check(so, 'K6: lượt kế dựng lại đúng tập đã duyệt thì đẩy cả tập; đẩy xong quét lại sạch thì cổng sạch, không còn gì để duyệt',
-      [pushed.tried, gateOf(q).status, q.F.runPushApprovalCommand({ fingerprint: pending.fingerprint }).code],
-      [['CUS-A', 'CUS-B'], 'clean', 'PUSH_APPROVAL_NOT_REQUIRED']);
+    check(so, 'K6: lượt tay mang đúng dấu tập thì đẩy cả tập ngay, Log ghi lời duyệt; đẩy xong quét lại sạch thì cổng sạch, thông báo gỡ',
+      [pushed.tried, q.run.logs.filter((e) => e.action === 'push_batch_approved').length, gateOf(q).status, approvalNotices(q).slice(-1)],
+      [['CUS-A', 'CUS-B'], 1, 'clean', ['resolve']]);
   }
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
@@ -106,18 +99,26 @@ async function chay(so) {
     q.F.pushStageResume(q.F.stateRead());
     const asked = gateOf(q).fingerprint;
     q.run.local.customer[1].companyName = 'Cty B sửa sau khi hiện thông báo';
-    q.F.runPushApprovalCommand({ fingerprint: asked });
-    reopenPush(q);
+    reopenPush(q, asked);
     const again = q.F.pushStageResume(q.F.stateRead());
-    check(so, 'K6: có người sửa dòng sau lúc hiện thông báo thì lời duyệt không phủ tập mới: lượt kế không đẩy, hỏi lại với dấu tập mới',
-      [again, gateOf(q).status, gateOf(q).fingerprint !== asked, gateOf(q).approvedFingerprint], [null, 'pending', true, '']);
+    check(so, 'K6: có người sửa dòng sau lúc hiện thông báo thì lượt mang dấu cũ không đẩy gì: phiếu mới thay phiếu cũ, thông báo hiện số mới',
+      [again, q.run.writes.length, gateOf(q).status, gateOf(q).fingerprint !== asked, q.run.logs.filter((e) => e.action === 'push_batch_approved').length, approvalNotices(q).slice(-1)], [null, 0, 'pending', true, 0, ['raise']]);
+  }
+  {
+    const q = pushQueue(['A', 'B'].map(editCustomer));
+    datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
+    q.F.pushStageResume(q.F.stateRead());
+    const asked = gateOf(q).fingerprint;
+    reopenPush(q, '', 'background');
+    const bg = q.F.pushStageResume(q.F.stateRead());
+    check(so, 'K6: lượt nền không mang lời duyệt nên không bao giờ tự đẩy tập chạm ngưỡng, kể cả khi tập không đổi',
+      [bg, q.run.writes.length, gateOf(q).status, gateOf(q).fingerprint], [null, 0, 'pending', asked]);
   }
   {
     const q = pushQueue(['A', 'B', 'C'].map(editCustomer));
     datPhan(q.run.hop, 'run', { approvalThreshold: 2 });
     q.F.pushStageResume(q.F.stateRead());
-    q.F.runPushApprovalCommand({ fingerprint: gateOf(q).fingerprint });
-    reopenPush(q);
+    reopenPush(q, gateOf(q).fingerprint);
     const pushed = pushDrive(q, (id) => { if (id === 'CUS-A') { q.run.local.customer[1].companyName = 'Cty B sửa giữa lượt'; q.run.local.customer[2].companyName = 'Cty C sửa giữa lượt'; } });
     check(so, 'K6: hai dòng sửa giữa lượt đã duyệt (phần còn lại chạm ngưỡng) thì không đẩy nội dung chưa ai duyệt: hoãn, lần quét lại không nhận phần mới, chặng dừng không sạch và Log ghi lý do',
       [pushed.tried, q.F.stateRead().phase, gateOf(q).status, q.run.logs.filter((e) => e.action === 'push_unfinished').length],
@@ -130,8 +131,8 @@ async function chay(so) {
     q.run.local.customer.splice(0, 2, syncedCustomer(q, 'A'), syncedCustomer(q, 'B'));
     reopenPush(q);
     const end = q.F.pushStageResume(q.F.stateRead());
-    check(so, 'K6: Sheet quay về khớp FBM trước khi duyệt thì lượt kế quét sạch: cổng sạch, thông báo chờ duyệt gỡ, lời duyệt cũ không còn gì để duyệt',
-      [end, gateOf(q).status, approvalNotices(q).slice(-1), q.F.runPushApprovalCommand({ fingerprint: 'x' }).code], [null, 'clean', ['resolve'], 'PUSH_APPROVAL_NOT_REQUIRED']);
+    check(so, 'K6: Sheet quay về khớp FBM trước khi duyệt thì lượt kế quét sạch: cổng sạch, thông báo chờ duyệt gỡ',
+      [end, gateOf(q).status, approvalNotices(q).slice(-1)], [null, 'clean', ['resolve']]);
   }
   {
     const q = pushQueue(['A', 'B'].map(editCustomer));
@@ -139,10 +140,8 @@ async function chay(so) {
     q.F.pushStageResume(q.F.stateRead());
     const options = { origin: 'background', scan: 'detail', mode: 'write' };
     const st = q.F.stateRead(); st.origin = 'background'; st.scan = 'detail'; q.F.stateWrite(st);
-    const waiting = q.F.pushGateCheck(q.F.stateRead(), options);
-    q.F.runPushApprovalCommand({ fingerprint: gateOf(q).fingerprint });
-    check(so, 'K6/K5: lượt nền gặp cổng chờ duyệt mà không gì đổi thì bỏ chặng đẩy (không quét lại, không hỏi lại); có lời duyệt thì chạy chặng đẩy',
-      [waiting, q.F.pushGateCheck(q.F.stateRead(), options)], [{ open: false, reason: 'pending' }, { open: true, reason: 'approved' }]);
+    check(so, 'K6/K5: lượt nền gặp cổng chờ duyệt mà không gì đổi thì bỏ chặng đẩy (không quét lại, không hỏi lại)',
+      q.F.pushGateCheck(q.F.stateRead(), options), { open: false, reason: 'pending' });
   }
 
   return so;

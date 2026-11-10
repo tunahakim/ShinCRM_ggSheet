@@ -181,7 +181,7 @@ async function chay(so) {
   check(so, 'nguoi dung chon bon loai dong bo thi Sidebar gui dung mode da chon', selectedModes, ['check', 'read', 'push', 'write']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  const awaiting = Object.assign(idle(), { pendingApproval: { count: 12, fingerprint: 'abcd1234-12', approved: false } });
+  const awaiting = Object.assign(idle(), { pendingApproval: { count: 12, fingerprint: 'abcd1234-12' } });
   const approved = [];
   hop.fbmSyncApprovePush = (fingerprint) => { approved.push(fingerprint); return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(awaiting);
