@@ -144,6 +144,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── FbmSyncBackgroundProbe.js Nghiệm thu dừng đồng bộ nền bằng đúng các cửa Sidebar gọi, đóng request không Extension nào gửi.
 │       ├── HashCompatProbe.js    Đếm dòng có dấu vân hiện tại khớp mốc fbmHash đã lưu, dùng sau mỗi lần đổi công thức dấu vân.
 │       ├── HardDeleteGuardProbe.js  Hỏi sổ người gác xóa hẳn trên khách thật (một có ID FBM, một chưa) mà không xóa gì.
+│       ├── FbmStoresProbe.js     Đo chi phí lệnh DocumentProperties thật và chụp khóa FBM để so trước và sau hàm chuyển kho.
 │       ├── FbmSyncStateProbe.js  Đo byte từng DocumentProperties và từng nhánh state FBM mà không trả giá trị nhạy cảm.
 │       ├── LogTraceSwitch.js     Bật/tắt LOG_TRACE qua settingsSave như màn Cài đặt: devLogTraceOn ghi "all", devLogTraceOff ghi "off".
 │       └── SeedFake.js           Sinh dữ liệu giả cho Customer, Activity, Category và ĐỂ LẠI trên sheet để mở ra xem được. Mọi cột @ lõi khai đều có giá trị. Xóa bằng wipeFakeData.
