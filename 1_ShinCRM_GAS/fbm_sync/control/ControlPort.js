@@ -18,7 +18,6 @@ FbmSync.COMMANDS = {
   release_background_machine: { lock: true, run: function () { return FbmSync.backgroundMachineReleaseCommand(); } },
   cancel: { run: function () { return FbmSync.runStopCommand('any'); } },
   stop_background: { run: function () { return FbmSync.runStopCommand('background'); } },
-  approve_push: { lock: true, run: function (input) { return FbmSync.runPushApprovalCommand(input); } },
   open_conflict: { lock: true, drives: true, run: function () { return FbmSync.runConflictOpenCommand(); } },
   confirm_conflict: { lock: true, run: function (input) { return FbmSync.runConflictConfirmCommand(input); } },
   save_settings: { lock: true, run: function (input) { return FbmSync.settingsSaveCommand(input); } },
@@ -158,7 +157,7 @@ FbmSync.publicStrip = function (value) {
  * `slice`: chạy trong ranh giới lát. Đăng nhập thử không chạy trong lát: khi lượt khác đang chạy nó từ chối mà không có request, ranh giới lát sẽ hiểu nhầm là lượt đang mở bị bỏ dở và đóng mất lượt của người khác.
  */
 FbmSync.START_KINDS = {
-  sync: { slice: true, run: function (input) { return FbmSync.start({ mode: input.mode, pack: input.pack, origin: 'manual', manual: true }); } },
+  sync: { slice: true, run: function (input) { return FbmSync.start({ mode: input.mode, pack: input.pack, origin: 'manual', manual: true, approvedFingerprint: input.approvedFingerprint }); } },
   identity_check: { slice: true, run: function (input) { return FbmSync.start({ mode: 'check', scan: 'identity_check', identity: input.identity || null, origin: 'manual', manual: true }); } },
   identity_probe: { slice: true, run: function () { return FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); } },
   login_test: { run: function (input) { return FbmSync.loginTestRequest(input.credentialRef, input.identity || null); } },

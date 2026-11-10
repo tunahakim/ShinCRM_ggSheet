@@ -95,14 +95,13 @@ FbmSync.pushCandidates = function (entity, scan, context) {
 
 /**
  * Có bỏ chặng đẩy trước khi đọc Sheet không, thuần: `options` là chiều và loại quét của lượt, `gate` là cổng đã lưu, `mark` là dấu hiện tại. Trả `{ open, reason }`.
- * Chỉ lượt nền mới được bỏ, và chỉ khi cổng `clean` hoặc `pending` mà dấu bốn phần còn khớp: cổng `pending` đã có lời duyệt thì chạy để đẩy tập vừa duyệt; cổng `open` là chặng trước chưa xong nên luôn chạy.
+ * Chỉ lượt nền mới được bỏ, và chỉ khi cổng `clean` hoặc `pending` mà dấu bốn phần còn khớp; cổng `open` là chặng trước chưa xong nên luôn chạy.
  */
 FbmSync.pushGateSkip = function (options, gate, mark) {
   var opt = options || {};
   if (opt.origin !== 'background') { return { open: true, reason: 'manual' }; }
   if (FbmSync.PUSH_GATE_BYPASS_SCANS.indexOf(String(opt.scan || '')) >= 0) { return { open: true, reason: 'bypass_scan' }; }
   if (!gate || !gate.mark) { return { open: true, reason: 'no_gate' }; }
-  if (gate.status === 'pending' && gate.approvedFingerprint) { return { open: true, reason: 'approved' }; }
   if (gate.status !== 'clean' && gate.status !== 'pending') { return { open: true, reason: 'unfinished' }; }
   var changed = ['rev', 'failures', 'scope', 'account'].filter(function (part) { return String(gate.mark[part]) !== String(mark[part]); });
   return changed.length ? { open: true, reason: 'changed:' + changed.join(',') } : { open: false, reason: gate.status };
@@ -127,7 +126,7 @@ FbmSync.pushWriteCandidates = function (candidates) {
 };
 
 /**
- * Quyết của đầu chặng đẩy trên tập vừa quét, thuần. `threshold` là ngưỡng chấp thuận (0 là luôn hỏi khi có ứng viên), `gate` là cổng đã lưu.
+ * Quyết của đầu chặng đẩy trên tập vừa quét, thuần. `threshold` là ngưỡng chấp thuận (0 là luôn hỏi khi có ứng viên), `approved` là dấu tập lượt mang theo (lượt tay do nút Chấp thuận mở), rỗng là không có lời duyệt.
  * Trả `{ code, fingerprint, count }`: `PUSH_CLEAN` khi không còn gì làm; `PUSH_AWAITING_APPROVAL` khi chạm ngưỡng mà lời duyệt không gắn đúng tập này; `PUSH_APPROVED_RUN` khi lời duyệt khớp dấu tập; `PUSH_RUN` khi dưới ngưỡng.
  */
 FbmSync.pushGateDecide = function (input) {
@@ -135,15 +134,9 @@ FbmSync.pushGateDecide = function (input) {
   var result = function (code) { return { code: code, fingerprint: fingerprint, count: count }; };
   if (!all.length) { return result('PUSH_CLEAN'); }
   if (count > 0 && count >= Number(input.threshold)) {
-    return input.gate && input.gate.approvedFingerprint === fingerprint ? result('PUSH_APPROVED_RUN') : result('PUSH_AWAITING_APPROVAL');
+    return input.approved && input.approved === fingerprint ? result('PUSH_APPROVED_RUN') : result('PUSH_AWAITING_APPROVAL');
   }
   return result('PUSH_RUN');
-};
-
-/** Lời duyệt người dùng gửi lên có gắn đúng tập đang chờ không, thuần. `fingerprint` là dấu tập Sidebar đang hiện. */
-FbmSync.approvalDecide = function (gate, fingerprint) {
-  if (!gate || gate.status !== 'pending' || !gate.fingerprint) { return 'no_pending'; }
-  return String(fingerprint || '') === String(gate.fingerprint) ? 'approved' : 'stale';
 };
 
 /** Quét cả hai thực thể, Khách trước Giao dịch: Giao dịch của khách mới chỉ đẩy được sau khi khách có mã FBM. */

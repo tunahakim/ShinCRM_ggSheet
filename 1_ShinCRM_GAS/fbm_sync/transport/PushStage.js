@@ -99,8 +99,9 @@ FbmSync.pushPassNext = function (state, settings, logs, threshold) {
   var admitted = found;
   // Danh sách mất hay hỏng giữa vòng (`at` chưa tới `size`) thì không còn biết tập đã qua cổng: xét lại cổng như đầu chặng, cổng đã chuyển sang mở nên tập chạm ngưỡng phải hỏi lại.
   if (cursor.pass === 0 || cursor.at < cursor.size) {
-    var decision = FbmSync.pushGateDecide({ candidates: found, threshold: threshold, gate: FbmSync.pushGateLoad(logs) });
+    var decision = FbmSync.pushGateDecide({ candidates: found, threshold: threshold, approved: String(state.approvedFingerprint || '') });
     if (decision.code === 'PUSH_AWAITING_APPROVAL') { return { end: FbmSync.pushApprovalAwait(decision, mark, logs) }; }
+    if (decision.code === 'PUSH_APPROVED_RUN') { logs.push({ action: 'push_batch_approved', outcome: LOG_OK, reason: 'Người dùng chấp thuận ' + decision.count + ' bản ghi; tập dựng lại khớp tập đã duyệt, đẩy ngay.', detail: { count: decision.count, fingerprint: decision.fingerprint } }); }
     FbmSync.pushGateWrite({ status: 'open', at: Date.now() });
     noticeResolve(FbmSync.PUSH_APPROVAL_TOPIC, '');
   } else {
@@ -108,7 +109,7 @@ FbmSync.pushPassNext = function (state, settings, logs, threshold) {
     FbmSync.pushListLoad(state, logs).forEach(function (item) { listed[FbmSync.pushCandidateKey(item)] = true; });
     var fresh = found.some(function (item) { return !listed[FbmSync.pushCandidateKey(item)]; });
     // Phần còn lại dưới ngưỡng thì như một lượt mới: không cần duyệt, nhận cả phần mới. Chạm ngưỡng mà có phần chưa qua cổng thì chỉ giữ phần đã qua.
-    if (fresh && FbmSync.pushGateDecide({ candidates: found, threshold: threshold, gate: null }).code !== 'PUSH_RUN') {
+    if (fresh && FbmSync.pushGateDecide({ candidates: found, threshold: threshold, approved: '' }).code !== 'PUSH_RUN') {
       admitted = found.filter(function (item) { return listed[FbmSync.pushCandidateKey(item)]; });
     }
   }
@@ -134,16 +135,16 @@ FbmSync.pushGateLoad = function (logs) {
 };
 
 /**
- * Tập ứng viên chạm ngưỡng mà chưa có lời duyệt gắn đúng dấu tập: không phát lệnh ghi nào, ghi cổng `pending` (dấu tập, số, dấu bốn phần đọc trước lần quét), phát thông báo hai nút và kết thúc lượt bình thường. Lời duyệt chỉ đi qua `runPushApprovalCommand`; lượt kế dựng lại tập, dấu còn khớp mới đẩy. Trả `end` của chặng.
+ * Tập ứng viên chạm ngưỡng mà chưa có lời duyệt gắn đúng dấu tập: không phát lệnh ghi nào, ghi cổng `pending` (dấu tập, số, dấu bốn phần đọc trước lần quét), phát thông báo nút Chấp thuận và kết thúc lượt bình thường. Nút đó mở lượt tay mang dấu tập (`approvedFingerprint` của ô lượt); lượt đó dựng lại tập, dấu còn khớp mới đẩy. Trả `end` của chặng.
  */
 FbmSync.pushApprovalAwait = function (decision, mark, logs) {
-  FbmSync.pushGateWrite({ status: 'pending', mark: mark, fingerprint: decision.fingerprint, count: decision.count, at: Date.now(), approvedFingerprint: '' });
+  FbmSync.pushGateWrite({ status: 'pending', mark: mark, fingerprint: decision.fingerprint, count: decision.count, at: Date.now() });
   noticeRaise({
     topic: FbmSync.PUSH_APPROVAL_TOPIC, scope: '', source: 'fbm_sync',
     title: decision.count + ' bản ghi ShinCRM chờ chấp thuận trước khi đẩy lên FBM',
     lines: ['Số bản ghi sắp đẩy chạm ngưỡng chấp thuận trong Cài đặt đồng bộ; chưa bản ghi nào được gửi lên FBM.'],
-    hint: 'Chấp thuận thì lượt đồng bộ kế đẩy đúng các bản ghi này. Có người sửa thêm trên Sheet trước lượt đó thì ShinCRM hỏi lại.',
-    actions: [{ label: 'Chấp thuận', action: 'fbmPushApprove', value: decision.fingerprint }, { label: 'Kiểm lại ngay', action: 'fbmPushRecheck' }]
+    hint: 'Chấp thuận thì ShinCRM mở ngay một lượt đồng bộ chiều Đẩy và đẩy đúng các bản ghi này. Có người sửa thêm trên Sheet từ lúc hiện thông báo thì lượt đó không đẩy gì và hỏi lại với số mới.',
+    actions: [{ label: 'Chấp thuận', action: 'fbmPushApprove', value: decision.fingerprint }]
   });
   logs.push({ action: 'push_awaiting_approval', outcome: LOG_WARN, reason: 'Có ' + decision.count + ' bản ghi sắp đẩy, chạm ngưỡng chấp thuận; chờ người dùng chấp thuận.', detail: { count: decision.count, fingerprint: decision.fingerprint } });
   return { kind: 'done', remaining: 0, note: ' Có ' + decision.count + ' bản ghi chờ chấp thuận; chưa đẩy lên FBM.' };

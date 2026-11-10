@@ -152,7 +152,7 @@ FbmSync.seenStoreReader = function (scope) {
 
 /** Tạo state rỗng với đủ field để các phiên cũ vẫn đọc được. */
 FbmSync.stateDefault = function () {
-  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', process: '', pollAt: 0, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', activeRequestReplay: false, closedRequestId: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
+  return { schemaVersion: FbmSync.STATE_SCHEMA_VERSION, runId: '', origin: 'manual', mode: 'read', scan: 'full', scanPack: '', process: '', pollAt: 0, requestGap: null, phase: 'idle', entity: '', cursor: {}, activeRequestId: '', activeRequestSig: '', activeRequestReplay: false, closedRequestId: '', resubmit: { answered: '', issued: '' }, loginForceOffered: false, identityTarget: null, approvedFingerprint: '', lastProgressAt: 0, deadlineAt: 0, session: { customerAuthorized: '', activityAuthorized: '', cookie: '', userId: '', accountUsername: '', accountName: '', lookups: {}, expired: false, identityVerified: false, identitySessionId: '', identityVerifiedAt: 0, sessionId: '', lastHeartbeatAt: 0 }, metadata: { categoryBlocks: [], preflightIssues: [], conflictCount: 0, manualPending: null, sessionGate: null }, counts: FbmSync.countsDefault(), progress: { done: 0, total: 0 }, current: '', message: '', startedAt: 0, updatedAt: 0, lastError: '', lastFailureCode: '', retryable: false };
 };
 
 /** Lấy kho state cấp tài liệu, dùng chung giữa các lần gọi GAS. */
@@ -222,7 +222,7 @@ FbmSync.pushListRead = function () {
 FbmSync.pushListClear = function () { FbmSync.shardListWrite(FbmSync.PUSH_LIST_PREFIX, []); };
 
 /**
- * Cổng chặng đẩy `{ status, mark, fingerprint, count, at, approvedFingerprint }`: `clean` là lần quét gần nhất không còn ứng viên, `pending` là tập vượt ngưỡng đang chờ duyệt, `open` là chặng đang chạy hoặc dừng giữa chừng. Chỉ là quyền bỏ qua một lần quét và nơi giữ lời duyệt, không phải nguồn sự thật: thiếu hay hỏng thì quét.
+ * Cổng chặng đẩy `{ status, mark, fingerprint, count, at }`: `clean` là lần quét gần nhất không còn ứng viên, `pending` là tập vượt ngưỡng đang chờ duyệt, `open` là chặng đang chạy hoặc dừng giữa chừng. Chỉ là quyền bỏ qua một lần quét và nơi giữ lời duyệt, không phải nguồn sự thật: thiếu hay hỏng thì quét.
  * `mark` là mọi thứ ngoài dòng Sheet mà phép xét đẩy dựa vào. Dòng Sheet đại diện bằng `rev` của sổ nạp lại (mọi cửa ghi và trigger sửa tay đều tăng nó, kể cả Category và Cài đặt); sổ lỗi đẩy, phạm vi trong cài đặt và tài khoản FBM đã liên kết đọc thẳng. Đọc từ bản chụp DocumentProperties của lần gọi nên không thêm lần gọi kho.
  */
 FbmSync.PUSH_GATE_KEY = 'FBM_SYNC_PUSH_GATE_V1';

@@ -61,6 +61,8 @@ FbmSync.startRun = function (options) {
   // Lượt Giữ phiên chạy mode `push` nhưng đếm khách và Quét nhanh bù theo chiều lịch nền; cổng đã quyết ở `pushGateDue`.
   state.scheduleMode = state.scan === 'keepalive' ? FbmSync.modeOf(opt.scheduleMode) : '';
   state.pushGate = opt.pushGate || null;
+  // Lời duyệt chỉ sống trong lượt tay do nút Chấp thuận mở; lượt nền không bao giờ mang nó nên không tự đẩy tập chạm ngưỡng.
+  state.approvedFingerprint = state.origin === 'manual' ? String(opt.approvedFingerprint || '') : '';
   FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(opt.detail && opt.detail.customersPerRun || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))) : 0; }
   // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).

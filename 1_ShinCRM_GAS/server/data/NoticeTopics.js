@@ -24,7 +24,7 @@ var NOTICE_TOPICS = {
   filter_reference: { level: 'info', clear: 'dismiss' },
   /** Máy khác vừa tự nhận chạy nền FBM thay máy được giao im quá ngưỡng. Không phạm vi: lần nhận thay sau ghi đè lần trước; còn tới khi người dùng bấm ✕ dù mở Sidebar lúc nào, vì máy được giao im là việc cần xem lại máy đó. */
   fbm_machine_takeover: { level: 'warning', clear: 'dismiss' },
-  /** Tập bản ghi sắp đẩy lên FBM chạm ngưỡng chấp thuận (cổng chặng đẩy `pending`). Không phạm vi: một tập chờ một lúc. Hai nút: Chấp thuận (mang dấu tập) và Kiểm lại ngay; tự hết khi người dùng chấp thuận hoặc lần quét sau sạch hay dưới ngưỡng. */
+  /** Tập bản ghi sắp đẩy lên FBM chạm ngưỡng chấp thuận (cổng chặng đẩy `pending`). Không phạm vi: một tập chờ một lúc. Một nút Chấp thuận mang dấu tập, mở lượt tay chiều Đẩy; tự hết khi lần quét sau sạch hay dưới ngưỡng, tập đổi thì thông báo thay bằng số mới. */
   fbm_push_approval: { level: 'warning', clear: 'on_success' }
 };
 

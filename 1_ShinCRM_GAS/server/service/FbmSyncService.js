@@ -10,7 +10,6 @@ function fbmCancelSync() { return fbmCommandRun('fbmCancelSync', 'cancel', {}); 
 function fbmStopBackground() { return fbmCommandRun('fbmStopBackground', 'stop_background', {}); }
 function fbmResetSyncState() { return fbmCommandRun('fbmResetSyncState', 'reset_state', {}); }
 /** Chấp thuận tập bản ghi chờ đẩy; `fingerprint` là dấu tập Sidebar đang hiện. Không mở lượt. */
-function fbmApprovePush(fingerprint) { return fbmCommandRun('fbmApprovePush', 'approve_push', { fingerprint: String(fingerprint || '') }); }
 function fbmRetryPushFailures() { return fbmCommandRun('fbmRetryPushFailures', 'retry_push_failures', {}); }
 function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, snapshot) { return fbmCommandRun('fbmConfirmConflict', 'confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, fbmValues: fbmValues, shinValues: shinValues, snapshot: snapshot }); }
 function fbmGetSyncStatus() { return fbmCommandRun('fbmGetSyncStatus', 'status', {}); }
