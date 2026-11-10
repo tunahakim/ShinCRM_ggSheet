@@ -102,7 +102,7 @@ FbmSync.pullBatchApply = function (state, entity, records, ctx) {
   state.counts.succeeded += Number(result.written || 0);
   // Ô Xung đột của phiên đếm cả dòng cũ vẫn còn xung đột; số chờ quyết trên Sidebar chỉ cộng xung đột mới và trừ dòng đã tự gỡ, vì dòng cũ đã nằm trong số đếm lúc preflight.
   state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
-  state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(result.conflicts || 0) - Number(result.conflictsCleared || 0));
+  FbmSync.conflictCountShift(state, Number(result.conflicts || 0) - Number(result.conflictsCleared || 0));
   state.counts.skipped += Number(result.skipped || 0);
   if (result.identityBlocks.length) { state.metadata.identityBlocks = (Array.isArray(state.metadata.identityBlocks) ? state.metadata.identityBlocks : []).concat(result.identityBlocks); }
   FbmSync.businessStepAdd(state, reconcileStep, { received: count, written: Number(result.written || 0), conflict: Number(result.conflicts || 0) + Number(result.conflictsKept || 0), skipped: Number(result.skipped || 0), sheetWriteBatches: Number(result.sheetWriteBatches || 0) });

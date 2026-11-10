@@ -36,6 +36,13 @@ FbmSync.runDoneMessage = function (state) {
     + (markerCleanFailed > 0 ? ' Có ' + markerCleanFailed + ' giao dịch chưa bỏ được dấu #SC trên FBM; xem Log.' : '');
 };
 FbmSync.countsDefault = function () { return { total: 0, completed: 0, succeeded: 0, pushed: 0, missingCustomer: 0, missingActivity: 0, transferredCustomer: 0, transferredActivity: 0, error: 0, conflict: 0, skipped: 0 }; };
+/**
+ * Dời số xung đột chờ quyết hiện trên Sidebar theo một lần ghi Sheet vừa đổi dòng sang hoặc ra khỏi `xung đột chờ quyết` (`delta` dương hoặc âm), không xuống dưới 0. Sửa trên ô lượt của lát; người gọi ghi.
+ * Số này chỉ để hiển thị, Sheet vẫn là nguồn của hàng đợi; sửa tay cột trạng thái làm số lệch tới lần đếm cả Sheet kế tiếp (preflight, lệnh xung đột). Dời dần thay vì đếm lại vì lượt Lấy không đọc cả Sheet ShinCRM.
+ */
+FbmSync.conflictCountShift = function (state, delta) {
+  state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) + Number(delta || 0));
+};
 FbmSync.SEEN_SHARD_HEX_LENGTH = 8000;
 // Apps Script giới hạn MỘT giá trị DocumentProperties khoảng 9 KB (byte UTF-8): chặn trước setProperty để không ghi JSON dở. Ghi hỏng thì ném lỗi có mã kèm `detail`, không tự ghi Log, không trả kết quả cho bên gọi bỏ qua.
 FbmSync.DOCUMENT_PROPERTY_VALUE_LIMIT = 9000;

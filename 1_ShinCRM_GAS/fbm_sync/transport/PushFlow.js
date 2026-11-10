@@ -163,7 +163,7 @@ FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValu
   if (outcome !== 'gone') { FbmSync.businessStepAdd(state, 'push_' + entity, { written: 1, sheetWriteBatches: 1 }); }
   if (outcome === 'conflict') {
     state.counts.conflict += 1;
-    state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
+    FbmSync.conflictCountShift(state, 1);
     FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_CONFLICT !== 'undefined' ? LOG_CONFLICT : 'conflict', 'FBM đã đổi sau lần đồng bộ trước và khác ShinCRM' + FbmSync.diffFieldText(entity, done.local, formValues, gate) + '; không ghi đè FBM, chờ quyết định xung đột.', { syncStatus: sync.conflict });
     message = 'Không đẩy ' + entity + ' ' + id + ': FBM đã đổi, chuyển xung đột chờ quyết.';
   } else if (outcome === 'settled') {
@@ -228,7 +228,7 @@ FbmSync.pushResultVerify = function (state, response, settings) {
   }
   // Xung đột không dừng phiên (`09/02` bước 3): dòng đã thành `xung đột chờ quyết` và được nhả, các bản ghi sau vẫn đẩy.
   FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_CONFLICT !== 'undefined' ? LOG_CONFLICT : 'conflict', 'Đọc xác nhận khác dữ liệu vừa ghi' + differing + '; chờ quyết định xung đột.', { syncStatus: sync.conflict });
-  state.metadata.conflictCount = Number(state.metadata.conflictCount || 0) + 1;
+  FbmSync.conflictCountShift(state, 1);
   state.counts.conflict += 1;
   state.cursor = FbmSync.pushCursorNext(cursor, true); state.current = ''; state.message = 'Đọc xác nhận ' + entity + ' ' + id + ' khác dữ liệu vừa ghi; chuyển xung đột chờ quyết.';
   return {};

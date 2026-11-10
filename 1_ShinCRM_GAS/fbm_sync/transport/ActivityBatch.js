@@ -142,7 +142,7 @@ FbmSync.gateFlagDecide = function (gate, state, entity, flags) {
     var patch = Object.assign({ id: id }, flag.patch || {}), key = flag.status === sync.missing ? 'missing' : flag.status === sync.transferred ? 'transferred' : '';
     if (key) { state.counts[counted[key]] = Number(state.counts[counted[key]] || 0) + 1; }
     if (flag.status && String(record.syncStatus || '') !== flag.status) { patch.syncStatus = flag.status; }
-    if (patch.syncStatus && FbmSync.isConflictPending(record)) { state.metadata = state.metadata || {}; state.metadata.conflictCount = Math.max(0, Number(state.metadata.conflictCount || 0) - 1); }
+    if (patch.syncStatus && FbmSync.isConflictPending(record)) { FbmSync.conflictCountShift(state, -1); }
     if (Object.keys(patch).length === 1) { return; }
     writes.push(patch);
     if (flag.status) { FbmSync.logPullRecord(entity, { fbmId: record.fbmId }, record, flag.status, flag.reason); }
