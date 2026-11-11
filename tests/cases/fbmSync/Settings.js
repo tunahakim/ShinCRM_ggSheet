@@ -8,7 +8,7 @@ const { dungHop, TEP_NEN } = require('../../lib/dung-hop');
 const { trongLanGoi } = require('../../lib/gas/lan-goi');
 const { docLog } = require('../../lib/gas/doc-log');
 
-const TEP_LENH_CAI_DAT = ['fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
+const TEP_LENH_CAI_DAT = ['fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
 const KHACH_SHEET = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
 
 /** Hộp có cổng cài đặt và phần cài đặt FBM thật; các việc đi kèm (dừng lượt, trạng thái) được thay bằng bản ghi lại thứ tự gọi. */

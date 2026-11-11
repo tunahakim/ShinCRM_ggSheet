@@ -482,7 +482,7 @@ async function chay(so) {
   // FBM-025/026/028: DocumentProperties đọc lỗi hoặc JSON hỏng phải ném lỗi có mã lên lát, không coi như "chưa có" rồi ghi đè.
   const thrownCode = (work) => { try { work(); return 'không ném'; } catch (error) { return String(error && error.code || ''); } };
   const dp = makeSync(), DP = dp.hop.FbmSync, dpData = dp.documentProperties.data;
-  napServer(dp.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js');
+  napServer(dp.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js');
   const dpStart = DP.runOpen({ phase: 'pull_customer' }); dpStart.cursor = { pageIndex: 7 }; DP.stateWrite(dpStart);
   dpData.FBM_SYNC_STATE_V1 = '{"runId":"r1","cursor":{"pageIndex":7'; // JSON đứt giữa chừng
   const corruptStateRaw = dpData.FBM_SYNC_STATE_V1;
@@ -503,7 +503,7 @@ async function chay(so) {
     ['DOCUMENT_PROPERTY_CORRUPT', '["không phải object"]', 'error', 'DOCUMENT_PROPERTY_CORRUPT', true]);
 
   const dpDown = makeSync(), DD = dpDown.hop.FbmSync, ddProps = dpDown.documentProperties, ddGet = ddProps.getProperty;
-  napServer(dpDown.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js');
+  napServer(dpDown.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js');
   ddProps.getProperty = () => { throw new Error('Service invoked too many times: properties'); };
   check(so, 'FBM-025/026/028: dịch vụ DocumentProperties lỗi thì state, hash chờ xác nhận, cấu hình đăng nhập và công tắc tổng đều ném DOCUMENT_PROPERTIES_READ_FAILED, công tắc không mở theo mặc định',
     [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pendingPushesRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))],

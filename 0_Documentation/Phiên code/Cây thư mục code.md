@@ -244,6 +244,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
     ├── auth\AutoLogin.js       Điều phối cấu hình envelope đăng nhập và phục hồi phiên hết hạn.
     ├── auth\LoginStores.js     Hai kho đăng nhập tách theo người ghi: credential `FBM_CREDENTIAL_V1` (bản mã, phần công khai) và dấu lần thử `FBM_LOGIN_ATTEMPT_V1`; cổng đọc, cổng ghi và công cụ tính dấu lần thử.
+    ├── auth\LoginTools.js      Công cụ thuần của lượt đăng nhập: mô tả request từng bước trang Login (ô cần mật khẩu để trống cho Extension điền), đọc salt, chọn database/đơn vị, quyết định lệnh khóa trang, khớp danh tính, cổng tự đăng nhập
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
@@ -552,6 +553,7 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
     tests/cases/fbmSync/StateStore.js  Kiểm kho trạng thái phiên đồng bộ khi DocumentProperties đầy hoặc hỏng.
     tests/cases/fbmSync/Stores.js  Kiểm các kho bền đã gộp: sổ tiến trình nền, kho kết nối, kho làm việc của lượt, sổ chờ xác nhận, sổ lỗi đẩy, hàm chuyển khóa cũ.
     tests/cases/fbmSync/LoginStores.js  Kiểm hai kho đăng nhập và hàm chuyển `fbmLoginMigrate`: tách đúng, chạy lại không đổi, lỗi giữa chừng giữ khóa cũ, ghi dấu lần thử không khôi phục credential đã xóa.
+    tests/cases/fbmSync/LoginTools.js   Kiểm công cụ thuần của lượt đăng nhập: request từng bước, salt, lựa chọn, khóa trang, khớp danh tính, bảng cổng tự đăng nhập
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.

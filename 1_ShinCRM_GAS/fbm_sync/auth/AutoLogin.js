@@ -59,18 +59,7 @@ FbmSync.autoLoginAttemptOptions = function (state, cursor) {
 };
 
 FbmSync.autoLoginCanAttempt = function (now, options) {
-  var at = Number(now || Date.now()), value = FbmSync.loginConfigRead(), policy = settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy);
-  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED' }; }
-  if (!policy.enabled || !value.configured) { return { ok: false, code: 'AUTO_LOGIN_NOT_CONFIGURED' }; }
-  // Chặn cả lượt người dùng bấm: mỗi lần bấm Đồng bộ là một lần gửi lại mật khẩu FBM đã báo sai, đủ nhiều lần là khóa tài khoản.
-  if (value.loginHalted) { return { ok: false, code: 'AUTO_LOGIN_HALTED' }; }
-  // Chu kỳ chờ chỉ áp sau lần thử chưa thành công (tài liệu 06); phiên xác minh được thì khóa đã gỡ.
-  if (options && options.manual === true) { return { ok: true, credentialRef: value.credentialRef }; }
-  var last = Number(value.lastAttemptAt || 0), lastFailed = last > 0 && Number(value.lastLoginAt || 0) < last;
-  if (!policy.retryEnabled && lastFailed) { return { ok: false, code: 'AUTO_LOGIN_RETRY_DISABLED' }; }
-  var retryMs = policy.retryMinutes * 60 * 1000;
-  if (lastFailed && at - last < retryMs) { return { ok: false, code: 'AUTO_LOGIN_THROTTLED', retryAt: last + retryMs }; }
-  return { ok: true, credentialRef: value.credentialRef };
+  return FbmSync.autoLoginGate({ masterEnabled: settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled'), policy: settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy), credential: FbmSync.credentialRead(), attempt: FbmSync.loginAttemptRead(), now: Number(now || Date.now()), manual: !!(options && options.manual === true) });
 };
 
 /** Lý do cổng không được tự đăng nhập, theo đúng kết quả autoLoginCanAttempt trả về.
@@ -277,21 +266,16 @@ FbmSync.loginIdentityContinue = function (state, cursor, response) {
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
   var runtime = { spreadsheetId: FbmSync.currentSpreadsheetId(), userId: identity.userId, username: identity.username, accountName: identity.accountName };
-  var expected = cursor.testOnly && cursor.expectedIdentity ? FbmSync.identityNormalize(cursor.expectedIdentity) : null;
-  var expectedHasValue = expected && (expected.spreadsheetId || expected.userId || expected.username || expected.accountName);
-  var match = expectedHasValue
-    ? { status: FbmSync.identityMismatches(expected, FbmSync.identityFilledFields(expected, runtime)).length ? 'REBIND_REQUIRED' : 'BOUND' }
-    : FbmSync.identityStatus(runtime);
   // Liên kết (hoặc bản nháp đăng nhập thử) phải khớp cả grid User lẫn trang FBM vừa mở sau đăng nhập.
-  var pageCheck = match.status === 'BOUND' ? FbmSync.pageIdentityCheck(expectedHasValue ? expected : match.binding, FbmSync.pageIdentity(response), cursor.pageReloaded === true) : { status: 'ok' };
-  if (pageCheck.status === 'reload') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
-  if (pageCheck.status === 'missing') {
+  var expected = cursor.testOnly ? cursor.expectedIdentity : null;
+  var match = FbmSync.identityMatchDecide({ expected: expected, bound: FbmSync.identityDraftFilled(expected) ? null : FbmSync.identityStatus(runtime), runtime: runtime, page: FbmSync.pageIdentity(response), pageReloaded: cursor.pageReloaded === true });
+  if (match.status === 'PAGE_RELOAD') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
+  if (match.status === 'PAGE_MISSING') {
     FbmSync.sessionIdentityClear(state);
     state.phase = 'paused'; state.cursor = {}; state.lastFailureCode = 'FBM_PAGE_IDENTITY_MISSING'; state.lastError = 'Đăng nhập xong nhưng đã tải lại trang FBM vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản.'; state.message = state.lastError; FbmSync.stateWrite(state);
     FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_identity_page_missing');
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError, message: state.lastError };
   }
-  if (pageCheck.status === 'mismatch') { match = { status: 'REBIND_REQUIRED' }; }
   if (match.status !== 'BOUND') {
     FbmSync.sessionIdentityClear(state);
     if (!cursor.testOnly) { FbmSync.autoLoginTurnOff(); }

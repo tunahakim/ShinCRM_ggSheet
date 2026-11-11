@@ -96,7 +96,7 @@ function capSauTep(hopCat, duongDan) {
 /** Sau cả lần nạp: hộp có chặng đẩy thì cấp phần dấu lần đẩy sạch cần; hộp có bước kiểm tra phiên thì nạp bước đánh dấu phiên đã xác minh (`AutoLogin.js`), hộp có `Report.js` thì nạp cổng ghi lỗi Sidebar (`ClientError.js`), như bản thật luôn có. */
 function capSauNap(hopCat, duongDans) {
   if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
-  if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0 && !(hopCat.FbmSync && hopCat.FbmSync.sessionVerifiedApply)) { ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js'].forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep })); }
+  if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0 && !(hopCat.FbmSync && hopCat.FbmSync.sessionVerifiedApply)) { ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js'].forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep })); }
   if (duongDans.indexOf('fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }
 

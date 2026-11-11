@@ -77,7 +77,7 @@ const NGOAI_LE = [
   ['tests/cases/actions.js', 289, 15986, 'giữ', 'một module'],
   ['tests/cases/domUi.js', 257, 13792, 'giữ', 'một module'],
   ['tests/cases/extensionBridge.js', 1016, 106939, 'B4', 'kiểm bridge, scout, service worker, executor + quét chữ GAS/Sidebar'],
-  ['tests/cases/fbmSync/AutoLogin.js', 493, 74891, 'B11/B4', 'gần một module; dài vì check dài (TB 155 ký tự/dòng); thêm dòng dựng chính sách qua cổng cài đặt'],
+  ['tests/cases/fbmSync/AutoLogin.js', 493, 74952, 'B11/B4', 'gần một module; dài vì check dài (TB 155 ký tự/dòng); thêm dòng dựng chính sách qua cổng cài đặt'],
   ['tests/cases/fbmSync/Components.js', 243, 15773, 'B12', 'quét component Sidebar đồng bộ'],
   ['tests/cases/fbmSync/Orchestration.js', 234, 22566, 'B8', 'nâng trần khi bỏ recordHoldsPeekOwner (đọc sổ bận qua kho thử); đã tách liên kết, cổng Web App, bộ đệm kho; phần còn lại kiểm khung lượt qua chặng đọc/đẩy cũ (thử lại lát, trace, giữ bản ghi), tách khi viết lại chặng ở B8, B9; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight; nạp tệp chặng quét khách; ô lượt tiếp tục mang tên cột gốc của lượt; B9: hàm dựng request nhận cfg qua tham số, lô tra mã nhận phần mã đã đọc'],
   ['tests/cases/fbmSync/Preflight.js', 234, 22489, 'B9', 'một module; chỉ dài vì check dài, đã xuống dòng check theo nhãn, giá trị nhận, giá trị mong đợi; B9: hàm dựng request nhận cfg qua tham số, lô tra mã nhận phần mã đã đọc'],
