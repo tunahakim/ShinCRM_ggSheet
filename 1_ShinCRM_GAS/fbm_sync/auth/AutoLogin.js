@@ -1,20 +1,10 @@
 /** Điều phối cấu hình và request auto-login; không giữ mật khẩu bản rõ. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-FbmSync.LOGIN_CONFIG_KEY = 'FBM_LOGIN_CONFIG_V1';
-FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY = 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1';
-
-FbmSync.loginConfigDefault = function () {
-  return { configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: 0, lastLoginAt: 0, nextRetryAt: 0, lastError: '', loginHalted: false };
-};
-
-/** Chỉ đọc cấu hình đã mã hóa và loại envelope trước khi trả ra Sidebar. */
+/** Bản đọc gộp hai kho đăng nhập (`LoginStores.js`) cho các chỗ đọc cũ; `envelope` là bản mã. */
 FbmSync.loginConfigRead = function () {
-  var fallback = FbmSync.loginConfigDefault();
-  var parsed = FbmSync.documentPropertyJson(FbmSync.LOGIN_CONFIG_KEY, 'cấu hình đăng nhập FBM');
-  if (!parsed) { return fallback; }
-  fallback = Object.assign(fallback, parsed, { public: parsed.public && typeof parsed.public === 'object' ? parsed.public : {}, envelope: parsed.envelope && typeof parsed.envelope === 'object' ? parsed.envelope : null, configured: !!parsed.credentialRef && !!parsed.envelope, loginHalted: parsed.loginHalted === true });
-  return fallback;
+  var credential = FbmSync.credentialRead(), attempt = FbmSync.loginAttemptRead();
+  return Object.assign({ configured: credential.configured, credentialRef: credential.credentialRef, envelope: credential.ciphertext, public: credential.public }, attempt);
 };
 
 /** Nhận duy nhất envelope đã mã hóa từ Extension; không nhận credential bản rõ. */
@@ -32,9 +22,9 @@ FbmSync.loginConfigSave = function (input) {
     unit: String(publicMeta.unit || '').slice(0, 40),
     language: String(publicMeta.language || 'v').slice(0, 8)
   };
-  var current = FbmSync.loginConfigRead();
-  var saved = { credentialRef: ref, envelope: { version: Number(envelope.version || 1), alg: String(envelope.alg || 'AES-GCM'), iv: String(envelope.iv), ciphertext: String(envelope.ciphertext) }, public: safePublic, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: Number(current.nextRetryAt || 0), lastError: '' };
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(saved));
+  var attempt = FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'saved' }, Date.now(), 0);
+  FbmSync.credentialWrite({ credentialRef: ref, ciphertext: envelope, public: safePublic });
+  FbmSync.loginAttemptWrite(attempt);
   return { ok: true, configured: true, credentialRef: ref, public: safePublic };
 };
 
@@ -43,17 +33,15 @@ FbmSync.loginConfigRepairUsername = function (input) {
   var value = input || {}, current = FbmSync.loginConfigRead(), ref = String(value.credentialRef || '').trim(), username = String(value.username || '').trim();
   if (!current.configured || !ref || ref !== String(current.credentialRef || '')) { return { ok: false, code: 'LOGIN_CREDENTIAL_NOT_FOUND', message: 'Không tìm thấy credential cần cập nhật username.' }; }
   if (!username || username.indexOf('*') >= 0 || username.length > 80) { return { ok: false, code: 'LOGIN_USERNAME_INVALID', message: 'Username FBM không hợp lệ.' }; }
-  current.public = Object.assign({}, current.public || {}, { usernameHint: username });
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(current));
+  FbmSync.credentialWrite({ credentialRef: current.credentialRef, ciphertext: current.envelope, public: Object.assign({}, current.public, { usernameHint: username }) });
   return FbmSync.loginConfigPublic();
 };
 
 /* Xóa credential cũ; đổi identity không được dùng lại mật khẩu A. Chính sách tự đăng nhập nằm ở cổng cài đặt nên không bị đụng tới. */
 FbmSync.loginConfigClearCredential = function () {
-  var current = FbmSync.loginConfigRead(), saved = {
-    configured: false, credentialRef: '', envelope: null, public: {}, lastAttemptAt: Number(current.lastAttemptAt || 0), lastLoginAt: Number(current.lastLoginAt || 0), nextRetryAt: 0, lastError: ''
-  };
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(saved));
+  var attempt = FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'cleared' }, Date.now(), 0);
+  FbmSync.credentialWrite(null);
+  FbmSync.loginAttemptWrite(attempt);
   return FbmSync.loginConfigPublic();
 };
 
@@ -104,18 +92,14 @@ FbmSync.autoLoginBlockMessage = function (code, blocked) {
 
 /** Lý do đường truyền ghi sẵn lúc thử: lượt hỏng giữa đường không về tới bước ghi lý do mà khóa chờ đã đặt. FBM trả lời thì ghi đè. */
 FbmSync.autoLoginMarkAttempt = function (now) {
-  var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
-  value.lastAttemptAt = at; value.lastError = FbmSync.LOGIN_REPLIES.transport.text;
-  value.nextRetryAt = at + settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes') * 60 * 1000;
-  FbmSync.props().setProperty(FbmSync.AUTO_LOGIN_LAST_ATTEMPT_KEY, String(at));
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
+  var at = Number(now || Date.now());
+  FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'attempt', transportText: FbmSync.LOGIN_REPLIES.transport.text }, at, settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes')));
   return at;
 };
 
 FbmSync.autoLoginMarkSuccess = function (now) {
-  var at = Number(now || Date.now()), value = FbmSync.loginConfigRead();
-  value.lastLoginAt = at; value.nextRetryAt = 0; value.lastError = ''; value.loginHalted = false;
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
+  var at = Number(now || Date.now());
+  FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'success' }, at, 0));
   return at;
 };
 
@@ -129,11 +113,7 @@ FbmSync.sessionVerifiedApply = function (state, identity) {
 
 /** `halt`: FBM đã trả lời từ chối mà thử lại cũng không khá hơn (sai mật khẩu, câu trả lời chưa gặp), nên ngừng tự đăng nhập tới khi lưu lại thông tin hoặc đăng nhập thử được (09/01 "Ba kết quả của một lượt đăng nhập"). */
 FbmSync.autoLoginMarkFailure = function (message, halt) {
-  var value = FbmSync.loginConfigRead();
-  value.lastError = String(message || 'Tự đăng nhập FBM thất bại.').slice(0, 240);
-  if (halt === true) { value.loginHalted = true; }
-  value.nextRetryAt = Number(value.lastAttemptAt || Date.now()) + settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes') * 60 * 1000;
-  FbmSync.props().setProperty(FbmSync.LOGIN_CONFIG_KEY, JSON.stringify(value));
+  FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'failure', message: message, halt: halt === true }, Date.now(), settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes')));
   return FbmSync.loginConfigPublic();
 };
 

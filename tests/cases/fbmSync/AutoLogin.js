@@ -19,12 +19,12 @@ async function chay(so) {
   const data = {};
   const props = taoKhoThuocTinh(data);
   const hop = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => props }, logEvent() {}, LOG_OK: 'ok', LOG_ERROR: 'error' });
-  napServer(hop, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/write/SheetSave.js');
+  napServer(hop, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/write/SheetSave.js');
   check(so, 'auto-login mặc định bật nhưng chưa cấu hình', [docPhan(hop, 'loginPolicy').enabled, hop.FbmSync.loginConfigPublic().configured], [true, false]);
   const invalid = hop.FbmSync.loginConfigSave({ credentialRef: 'cred-invalid', envelope: { iv: 'short', ciphertext: 'short' } });
   check(so, 'envelope thiếu độ dài bị từ chối', invalid.code, 'LOGIN_ENVELOPE_INVALID');
   const saved = hop.FbmSync.loginConfigSave({ credentialRef: 'cred-test-1234', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'anhlt', database: 'FHN_CRM_App', unit: 'CTY' } });
-  check(so, 'lưu envelope chỉ trả metadata công khai và username đầy đủ', [saved.ok, saved.public.usernameHint, saved.envelope, JSON.stringify(data.FBM_LOGIN_CONFIG_V1).includes('password')], [true, 'anhlt', undefined, false]);
+  check(so, 'lưu envelope chỉ trả metadata công khai và username đầy đủ', [saved.ok, saved.public.usernameHint, saved.envelope, JSON.stringify(data.FBM_CREDENTIAL_V1).includes('password')], [true, 'anhlt', undefined, false]);
   check(so, 'đọc cấu hình không trả ciphertext ra Sidebar', [hop.FbmSync.loginConfigPublic().configured, hop.FbmSync.loginConfigPublic().envelope], [true, undefined]);
   const state = hop.FbmSync.runOpen({ phase: 'pull_customer', total: 1 });
   state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'], count: 2000 }; hop.FbmSync.stateWrite(state);
@@ -54,7 +54,7 @@ async function chay(so) {
   const heartbeatData = { FBM_SYNC_PROCESS_BOOK_V1: JSON.stringify({ customerFull: { doneAt: Date.now() }, activityFull: { doneAt: Date.now() }, detail: { doneAt: Date.now() } }) };
   const heartbeatProps = taoKhoThuocTinh(heartbeatData);
   const heartbeat = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => heartbeatProps, getScriptProperties: () => heartbeatProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-test' }) });
-  napServer(heartbeat, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(heartbeat, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   heartbeat.FbmSync.configValue = () => '';
   heartbeat.FbmSync.readLocal = () => [];
   heartbeat.FbmSync.bindingWrite({ spreadsheetId: 'sheet-test', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
@@ -95,9 +95,9 @@ async function chay(so) {
   // Phiên chết lần nữa ở lần hỏi nền sau (gặp thật 2026-10-16: đăng nhập 00:17, 00:32 phiên lại chết): cờ "đã thử đăng nhập" của lượt trước không được chặn lần đăng nhập mới.
   heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const loginLeftover = heartbeat.FbmSync.stateRead().metadata.sessionGate.loginAttempted;
-  const againConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const againConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   againConfig.lastAttemptAt = 0; againConfig.nextRetryAt = 0;
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(againConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(againConfig);
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const againCount = hoiNen(heartbeat);
   // Quét đầy đủ vừa mở đã xóa phiên nên Giữ phiên mở bằng probe; probe nhận Authorized:false là phiên chết, đi thẳng cổng đăng nhập.
@@ -116,10 +116,10 @@ async function chay(so) {
   const secondStart = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
   check(so, 'moi luot moi probe lai User du khong con cookie cu', [secondStart.request.meta.kind, identityUserRequests, heartbeat.FbmSync.stateRead().session.identityVerified], ['session_probe', 2, false]);
   check(so, 'probe User khong co payload cookie van duoc cap fallback transport tuy chon', [secondStart.request.body.cookie, secondStart.request.meta.transport.replacements[0].required, secondStart.request.meta.transport.replacements[0].fallback], ['{{FBM_PAYLOAD_COOKIE}}', false, '']);
-  const unauthenticatedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const unauthenticatedConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   unauthenticatedConfig.lastAttemptAt = 0;
   unauthenticatedConfig.nextRetryAt = 0;
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(unauthenticatedConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(unauthenticatedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, identityVerified: false, identitySessionId: '', sessionId: '' } });
   const unauthenticatedProbe = heartbeat.FbmSync.start({ mode: 'read', origin: 'manual' });
   const unauthenticatedResult = heartbeat.FbmSync.continue({ ok: true, status: 200, body: JSON.stringify({ d: { TotalRowCount: 0, Rows: null, Repetition: null, Aggregation: null, ViewPage: null, Authorized: false } }), transport: { contract: MA_HOP_DONG, trace: [{ requestId: unauthenticatedProbe.request.id }] } });
@@ -178,9 +178,9 @@ async function chay(so) {
     const probe = noiNen(heartbeat, { ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: sent.request.id }] } });
     return probe.request && probe.request.meta.kind === 'session_probe' ? noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: probe.request.id }] } }) : probe;
   };
-  const savedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const savedConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   savedConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(savedConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(savedConfig);
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const failedLoginProbe = hoiNen(heartbeat);
@@ -196,10 +196,10 @@ async function chay(so) {
   const throttledDue = phienChet(throttledDueProbe);
   check(so, 'login that bai bi throttle toi da mot lan moi 30 phut khi den lich', [throttledDueProbe.request && throttledDueProbe.request.meta.kind, throttledDue.ok, throttledDue.code, throttledDue.request], ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
 
-  const expiredConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const expiredConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   expiredConfig.lastAttemptAt = Date.now() - 31 * 60 * 1000;
   expiredConfig.nextRetryAt = 0;
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(expiredConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(expiredConfig);
   heartbeat.FbmSync.statePatch({ runId: 'expired-401', phase: 'pull_customer', mode: 'read', entity: 'customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] }, activeRequestId: 'expired-401-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const suspected401 = heartbeat.FbmSync.continue({ ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'expired-401-request' }] } });
   const expired401 = heartbeat.FbmSync.continue({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd', transport: { contract: MA_HOP_DONG, trace: [{ requestId: suspected401.request.id }] } });
@@ -310,16 +310,16 @@ async function chay(so) {
   // Lần hỏi nền sau là lượt mới: response báo chưa xác thực thì probe; chưa hết chu kỳ thử lại thì lượt kết thúc, không gửi lệnh đăng nhập.
   const unauthBody = '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}';
   // Lần đăng nhập vừa bị chặn được ghi là lần thử gần nhất (thực tế do beginAutoLogin ghi trước khi gửi lệnh).
-  const justTried = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const justTried = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   justTried.lastAttemptAt = Date.now();
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(justTried);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(justTried);
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const withinCycle = hoiNen(heartbeat);
   const withinCycleEnd = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: withinCycle.request.id }] } });
   check(so, 'Chưa hết chu kỳ thử lại: lượt nền mới thấy phiên chết thì kết thúc AUTO_LOGIN_THROTTLED, không gửi lệnh đăng nhập', [withinCycle.request.meta.kind, withinCycleEnd.code, withinCycleEnd.request, heartbeat.FbmSync.runInProgress(heartbeat.FbmSync.stateRead())], ['session_probe', 'AUTO_LOGIN_THROTTLED', null, false]);
-  const blockedConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const blockedConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   blockedConfig.lastAttemptAt = Date.now() - 10 * 1000; blockedConfig.loginHalted = true; blockedConfig.lastError = 'Lý do cũ';
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(blockedConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(blockedConfig);
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const afterCycle = hoiNen(heartbeat);
   const afterCycleIdentity = noiNen(heartbeat, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: afterCycle.request.id }] } });
@@ -343,9 +343,9 @@ async function chay(so) {
     loginPageWrong.code, loginPageEmpty.ok, loginPageEmpty.request && loginPageEmpty.request.meta.kind, loginPageEmpty.request && loginPageEmpty.request.meta.reloadFbmPage, loginPageEmptyCursor.pageReloaded, loginPageStillEmpty.code
   ], ['LOGIN_IDENTITY_MISMATCH', true, 'identity_user_grid', 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', true, 'FBM_PAGE_IDENTITY_MISSING']);
   // Lần tự đăng nhập vừa hỏng đặt khóa chờ; người dùng bấm "Đăng nhập thử" thành công thì nền phải tự đăng nhập lại được ngay (lời báo khóa chờ hướng dẫn đúng việc này; gặp thật 2026-10-31).
-  const throttledConfig = JSON.parse(heartbeatData.FBM_LOGIN_CONFIG_V1);
+  const throttledConfig = JSON.parse(heartbeatData.FBM_LOGIN_ATTEMPT_V1);
   throttledConfig.lastAttemptAt = Date.now() - 10 * 1000; throttledConfig.lastLoginAt = throttledConfig.lastAttemptAt - 60 * 1000;
-  heartbeatData.FBM_LOGIN_CONFIG_V1 = JSON.stringify(throttledConfig);
+  heartbeatData.FBM_LOGIN_ATTEMPT_V1 = JSON.stringify(throttledConfig);
   const throttledBefore = heartbeat.FbmSync.autoLoginCanAttempt().code;
   heartbeat.FbmSync.statePatch({ runId: 'login-test-run', phase: 'checking_session', cursor: loginPageCursor, activeRequestId: '', deadlineAt: 0 });
   heartbeat.FbmSync.loginIdentityContinue(heartbeat.FbmSync.stateRead(), loginPageCursor, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2037', pageAccountName: 'Nguoi khac' } } });
@@ -368,9 +368,9 @@ async function chay(so) {
   const connectionData = {};
   let failLoginWrite = false;
   const connectionProps = taoKhoThuocTinh(connectionData), connectionSet = connectionProps.setProperty;
-  connectionProps.setProperty = (key, value) => { if (failLoginWrite && key === 'FBM_LOGIN_CONFIG_V1') { throw new Error('LOGIN_WRITE_FAILED'); } return connectionSet(key, value); };
+  connectionProps.setProperty = (key, value) => { if (failLoginWrite && key === 'FBM_CREDENTIAL_V1') { throw new Error('LOGIN_WRITE_FAILED'); } return connectionSet(key, value); }; const connectionDelete = connectionProps.deleteProperty; connectionProps.deleteProperty = (key) => { if (failLoginWrite && key === 'FBM_CREDENTIAL_V1') { throw new Error('LOGIN_WRITE_FAILED'); } return connectionDelete(key); };
   const connection = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => connectionProps }, shinOpenBook: () => ({ getId: () => 'sheet-connection' }) });
-  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(connection, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   connection.FbmSync.configValue = () => '';
   connection.FbmSync.readLocal = () => [];
   const incompleteBinding = connection.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-connection', userId: 'user-a', username: '' }, credential: { mode: 'preserve' } });
@@ -446,7 +446,7 @@ async function chay(so) {
   const afterWipeData = { FBM_SYNC_PROCESS_BOOK_V1: JSON.stringify({ customerFull: { doneAt: Date.now() }, activityFull: { doneAt: Date.now() }, detail: { doneAt: Date.now() } }) };
   const afterWipeProps = taoKhoThuocTinh(afterWipeData);
   const afterWipe = taoHopCat({ FbmSync: {}, PropertiesService: { getDocumentProperties: () => afterWipeProps, getScriptProperties: () => afterWipeProps }, LockService: { getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }, shinOpenBook: () => ({ getId: () => 'sheet-wipe' }) });
-  napServer(afterWipe, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
+  napServer(afterWipe, 'fbm_sync/control/ControlPort.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
   afterWipe.FbmSync.configValue = () => '';
   afterWipe.FbmSync.readLocal = () => [];
   afterWipe.FbmSync.bindingWrite({ spreadsheetId: 'sheet-wipe', userId: '7777', username: 'WIPE', accountName: 'Tai khoan wipe' });

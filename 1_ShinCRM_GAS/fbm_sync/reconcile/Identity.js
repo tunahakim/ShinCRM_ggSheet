@@ -67,7 +67,7 @@ FbmSync.bindingWrite = function (binding) {
 /* Lưu cả nhận diện và credential dưới cùng lock; không để hệ thống rơi vào trạng thái nửa A nửa B. */
 FbmSync.connectionSave = function (input) {
   var value = input || {}, binding = value.binding || {}, credential = value.credential || {}, props = FbmSync.props();
-  var loginKey = FbmSync.LOGIN_CONFIG_KEY || 'FBM_LOGIN_CONFIG_V1', oldConnectionRaw = props.getProperty(FbmSync.CONNECTION_KEY), oldLoginRaw = props.getProperty(loginKey);
+  var rollbackKeys = [FbmSync.CONNECTION_KEY, FbmSync.CREDENTIAL_KEY, FbmSync.LOGIN_ATTEMPT_KEY], oldRaw = rollbackKeys.map(function (key) { return props.getProperty(key); });
   var identity = { spreadsheetId: String(binding.spreadsheetId || '').trim(), userId: String(binding.userId || '').trim(), username: String(binding.username || '').trim(), accountName: String(binding.accountName || '').trim() };
   var allEmpty = !identity.spreadsheetId && !identity.userId && !identity.username && !identity.accountName;
   if (!allEmpty && (!identity.spreadsheetId || !identity.userId || !identity.username || !identity.accountName)) {
@@ -95,8 +95,8 @@ FbmSync.connectionSave = function (input) {
   } catch (error) {
     var rollbackFailure = '';
     try {
-      [[FbmSync.CONNECTION_KEY, oldConnectionRaw], [loginKey, oldLoginRaw]].forEach(function (pair) {
-        if (pair[1] === null || pair[1] === '') { props.deleteProperty(pair[0]); } else { props.setProperty(pair[0], pair[1]); }
+      rollbackKeys.forEach(function (key, index) {
+        if (oldRaw[index] === null || oldRaw[index] === '') { props.deleteProperty(key); } else { props.setProperty(key, oldRaw[index]); }
       });
     } catch (rollbackError) { rollbackFailure = String(rollbackError && rollbackError.message || rollbackError); }
     // Khôi phục cũng hỏng thì liên kết và credential có thể nửa cũ nửa mới: phải nói rõ để người dùng lưu lại, không báo như đã khôi phục.

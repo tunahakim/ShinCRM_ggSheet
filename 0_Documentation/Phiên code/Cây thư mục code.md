@@ -243,6 +243,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
     ├── auth\AutoLogin.js       Điều phối cấu hình envelope đăng nhập và phục hồi phiên hết hạn.
+    ├── auth\LoginStores.js     Hai kho đăng nhập tách theo người ghi: credential `FBM_CREDENTIAL_V1` (bản mã, phần công khai) và dấu lần thử `FBM_LOGIN_ATTEMPT_V1`; cổng đọc, cổng ghi và công cụ tính dấu lần thử.
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
@@ -273,6 +274,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\FbmSettings.js     Khai các phần cài đặt của đồng bộ FBM (công tắc tổng, tham số phiên, tài khoản, Extension, lịch nền, tự đăng nhập) cho cổng cài đặt chung và dựng lịch nền dạng theo tiến trình.
     ├── state\FbmSettingsMigrate.js Chuyển cài đặt FBM từ các khóa kho cũ sang khóa của cổng cài đặt chung, một lần.
     ├── state\FbmStoresMigrate.js  Chuyển khóa lịch nền, mốc khách, con trỏ Vòng xoay và liên kết đời cũ sang sổ tiến trình và kho kết nối, một lần; xóa khóa cũ và kho làm việc còn sót.
+    ├── state\FbmLoginMigrate.js  Chuyển một lần khóa đăng nhập gộp đời cũ sang hai kho đăng nhập, đọc lại so khớp rồi xóa khóa cũ; công cụ một lần, xóa cùng `server/dev/`.
     ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
     ├── state\Scheduler.js        Sổ tiến trình nền một khóa (lần xong, lần lỗi, số khách mốc, con trỏ Vòng xoay; một cổng đọc, một cổng ghi) và công cụ tính tiến trình nào đến hạn, không mở lượt.
     ├── state\BackgroundMachine.js Kho máy chạy nền (một máy được giao), kiểm máy hỏi có được chạy nền không, tự nhận thay máy im, bản xem máy cho Sidebar.
@@ -549,6 +551,7 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
     tests/cases/fbmSync/Settings.js  Kiểm cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu, khóa hỏng, hàm chuyển một lần từ khóa đời cũ.
     tests/cases/fbmSync/StateStore.js  Kiểm kho trạng thái phiên đồng bộ khi DocumentProperties đầy hoặc hỏng.
     tests/cases/fbmSync/Stores.js  Kiểm các kho bền đã gộp: sổ tiến trình nền, kho kết nối, kho làm việc của lượt, sổ chờ xác nhận, sổ lỗi đẩy, hàm chuyển khóa cũ.
+    tests/cases/fbmSync/LoginStores.js  Kiểm hai kho đăng nhập và hàm chuyển `fbmLoginMigrate`: tách đúng, chạy lại không đổi, lỗi giữa chừng giữ khóa cũ, ghi dấu lần thử không khôi phục credential đã xóa.
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.

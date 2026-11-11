@@ -482,7 +482,7 @@ async function chay(so) {
   // FBM-025/026/028: DocumentProperties đọc lỗi hoặc JSON hỏng phải ném lỗi có mã lên lát, không coi như "chưa có" rồi ghi đè.
   const thrownCode = (work) => { try { work(); return 'không ném'; } catch (error) { return String(error && error.code || ''); } };
   const dp = makeSync(), DP = dp.hop.FbmSync, dpData = dp.documentProperties.data;
-  napServer(dp.hop, 'fbm_sync/auth/AutoLogin.js');
+  napServer(dp.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js');
   const dpStart = DP.runOpen({ phase: 'pull_customer' }); dpStart.cursor = { pageIndex: 7 }; DP.stateWrite(dpStart);
   dpData.FBM_SYNC_STATE_V1 = '{"runId":"r1","cursor":{"pageIndex":7'; // JSON đứt giữa chừng
   const corruptStateRaw = dpData.FBM_SYNC_STATE_V1;
@@ -503,7 +503,7 @@ async function chay(so) {
     ['DOCUMENT_PROPERTY_CORRUPT', '["không phải object"]', 'error', 'DOCUMENT_PROPERTY_CORRUPT', true]);
 
   const dpDown = makeSync(), DD = dpDown.hop.FbmSync, ddProps = dpDown.documentProperties, ddGet = ddProps.getProperty;
-  napServer(dpDown.hop, 'fbm_sync/auth/AutoLogin.js');
+  napServer(dpDown.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/AutoLogin.js');
   ddProps.getProperty = () => { throw new Error('Service invoked too many times: properties'); };
   check(so, 'FBM-025/026/028: dịch vụ DocumentProperties lỗi thì state, hash chờ xác nhận, cấu hình đăng nhập và công tắc tổng đều ném DOCUMENT_PROPERTIES_READ_FAILED, công tắc không mở theo mặc định',
     [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pendingPushesRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))],
@@ -512,11 +512,11 @@ async function chay(so) {
   check(so, 'FBM-028: Spreadsheet chưa có công tắc tổng vẫn coi là bật; chỉ "false" rõ ràng mới khóa', [dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'), (datCongTac(dpDown.hop, false), dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))], [true, false]);
 
   const secretEnvelope = '{"ciphertext":"BI-MAT-ENVELOPE","password":"mat-khau-that"';
-  dpData.FBM_LOGIN_CONFIG_V1 = secretEnvelope;
+  dpData.FBM_CREDENTIAL_V1 = secretEnvelope;
   let loginError = null;
   try { DP.loginConfigRead(); } catch (error) { loginError = error; }
   check(so, 'FBM-028: cấu hình đăng nhập JSON hỏng thì ném lỗi có mã, thông báo không chứa envelope hay mật khẩu, không ghi đè cấu hình',
-    [loginError && loginError.code, /BI-MAT|mat-khau/.test(String(loginError && loginError.message)), dpData.FBM_LOGIN_CONFIG_V1 === secretEnvelope],
+    [loginError && loginError.code, /BI-MAT|mat-khau/.test(String(loginError && loginError.message)), dpData.FBM_CREDENTIAL_V1 === secretEnvelope],
     ['DOCUMENT_PROPERTY_CORRUPT', false, true]);
 
   // G9.3: PA3 cho Activity đi đúng đường lệnh chốt xung đột; trường FBM `details`/`end_date` ghi về `content`/`workDate` của ShinCRM.

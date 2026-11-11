@@ -64,12 +64,13 @@ FbmSync.documentPropertySet = function (key, value, context) {
 FbmSync.documentPropertyJson = function (key, context) {
   return documentPropertyJson(FbmSync.props(), key, context, 'object');
 };
-/** Đọc khóa gộp từ nhiều khóa cũ: khóa gộp chưa có mà còn khóa cũ thì ném `FBM_STORES_MIGRATION_PENDING`, không đọc thành rỗng (rỗng thì lần ghi kế tiếp đè mất dữ liệu cũ). Hàm chuyển `fbmStoresMigrate` xóa khóa cũ. */
-FbmSync.mergedStoreRead = function (key, context, oldKeys) {
+/** Đọc khóa gộp từ nhiều khóa cũ: khóa gộp chưa có mà còn khóa cũ thì ném mã chờ chuyển của hàm chuyển (`migrator`, mặc định `fbmStoresMigrate` với `FBM_STORES_MIGRATION_PENDING`), không đọc thành rỗng (rỗng thì lần ghi kế tiếp đè mất dữ liệu cũ). Hàm chuyển xóa khóa cũ. */
+FbmSync.mergedStoreRead = function (key, context, oldKeys, migrator) {
   var stored = FbmSync.documentPropertyJson(key, context);
   if (stored) { return stored; }
   var props = FbmSync.props(), left = oldKeys.filter(function (old) { return props.getProperty(old) !== null; });
-  if (left.length) { var pending = new Error(context + ' chưa được chuyển từ ' + left.length + ' khóa cũ; chạy hàm chuyển fbmStoresMigrate trước.'); pending.code = 'FBM_STORES_MIGRATION_PENDING'; pending.detail = { keys: left }; throw pending; }
+  var by = migrator || { name: 'fbmStoresMigrate', code: 'FBM_STORES_MIGRATION_PENDING' };
+  if (left.length) { var pending = new Error(context + ' chưa được chuyển từ ' + left.length + ' khóa cũ; chạy hàm chuyển ' + by.name + ' trước.'); pending.code = by.code; pending.detail = { keys: left }; throw pending; }
   return null;
 };
 
