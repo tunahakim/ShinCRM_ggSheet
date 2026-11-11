@@ -8,6 +8,7 @@ const { datCongTac, datNen, datPhan, docPhan, datLichNen, docLichNen, vaSoNen } 
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const { workflowGas, khoDongBo } = require('../../lib/fbm/hop-dong-bo');
+const { quaTrangLogin } = require('../../lib/fbm/trang-login');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
@@ -292,10 +293,7 @@ async function chay(so) {
   loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
   loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
   const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
-  const afterLogin = noiDangNhap(loginFlow.hop, {
-    ok: true, status: 200, body: JSON.stringify({ d: true }),
-    transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: loginStarted.request.id }] }
-  });
+  const afterLogin = quaTrangLogin((response) => noiDangNhap(loginFlow.hop, response), loginStarted.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = noiDangNhap(loginFlow.hop, executorRaw(loginAuthorize.reply, afterLogin.request.id));
   const loginUser = await sendThroughExecutor(afterAuthorize.request, userResponse);
@@ -303,12 +301,13 @@ async function chay(so) {
   check(so, 'dang nhap thu: Login thanh cong phai qua authorize va User grid khop binding moi duoc bao thanh cong', [
     loginStarted.request.meta.kind, afterLogin.request.meta.kind, afterAuthorize.request.meta.kind,
     loginDone.ok, loginDone.code, loginDone.status.phase, loginDone.status.message
-  ], ['login', 'authorize', 'identity_user_grid', true, 'LOGIN_OK', 'done', 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.']);
+  ], ['login_step', 'authorize', 'identity_user_grid', true, 'LOGIN_OK', 'done', 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.']);
 
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest('workflow-credential-ref');
-  const wrongAfterLogin = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: true }), transport: { contract: MA_HOP_DONG, captures: { payloadCookie: '461020379855cFHN_CRM_App' }, trace: [{ stage: 'executor_response_sent', requestId: wrongStart.request.id }] } });
+  wrongLogin.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest();
+  const wrongAfterLogin = quaTrangLogin((response) => noiDangNhap(wrongLogin.hop, response), wrongStart.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const wrongAuthorize = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = noiDangNhap(wrongLogin.hop, {
     ok: true, status: 200,
@@ -317,7 +316,7 @@ async function chay(so) {
   });
   check(so, 'dang nhap thu sai identity: khong coi la thanh cong va khong thay binding', [
     wrongDone.ok, wrongDone.code, wrongDone.status.phase, wrongLogin.hop.FbmSync.bindingRead().userId
-  ], [false, 'LOGIN_IDENTITY_MISMATCH', 'paused', '2037']);
+  ], [false, 'LOGIN_IDENTITY_MISMATCH', 'error', '2037']);
 
   const binding = workflowGas();
   const bindingSaved = binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });

@@ -775,11 +775,11 @@ async function chay(so) {
   render(hop, content, hop.fbmSyncRenderAccount, idle);
   loginPassword.value = '****';
   let viewLoginArgs = null;
-  hop.fbmSyncDrive = (command, payload) => { viewLoginArgs = [payload.credentialRef, payload.identity]; return Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } }); };
+  hop.fbmSyncDrive = (command, payload) => { viewLoginArgs = [payload.credentialDraft, payload.identity]; return Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } }); };
   hop.callServer = () => Promise.resolve({});
   const viewLoginButton = dom.document.getElementById('fbm-sync-login-test');
   await hop.fbmSyncTestLogin(viewLoginButton);
-  check(so, 'Đăng nhập thử chế độ xem dùng credential đã lưu, không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [['saved-ref', { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'success']);
+  check(so, 'Đăng nhập thử chế độ xem không gửi bản nháp (GAS dùng credential đã lưu), không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [[null, { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'success']);
 
   hop.FBM_SYNC_CLIENT.running = false;
   hop.sheetLinkExtensionAlive = () => true;

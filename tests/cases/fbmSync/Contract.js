@@ -23,13 +23,13 @@ async function chay(so) {
   ], [[], [], [], [], ['0:lo-1:0', '1:lo-1:1']]);
   const nganSach = napServer(taoHopCat({ FbmSync: {} }), 'fbm_sync/transport/Budget.js').FbmSync;
   const B = nganSach.BUDGET;
-  check(so, 'ngân sách: hạn Extension = chờ tab + mỗi request một fetch (đăng nhập nhiều fetch, mở lại trang) + khoảng nghỉ dài nhất trước mỗi request gọi FBM; hạn GAS thu hồi cộng đường về Sidebar và lên GAS; Sidebar chờ GAS bằng trần nền tảng', [
+  check(so, 'ngân sách: hạn Extension = chờ tab + mỗi request một fetch (bước đăng nhập mở trang chờ thêm một lần tab) + khoảng nghỉ dài nhất trước mỗi request gọi FBM; hạn GAS thu hồi cộng đường về Sidebar và lên GAS; Sidebar chờ GAS bằng trần nền tảng', [
     nganSach.budgetTimeoutMs({ meta: { kind: 'grid' } }),
     nganSach.budgetTimeoutMs({ items: [{ meta: {} }, { meta: {} }, { meta: {} }] }, { minMs: 100, maxMs: 350 }),
-    nganSach.budgetTimeoutMs({ meta: { kind: 'login', afterLoginUrl: 'x' } }),
+    nganSach.budgetTimeoutMs({ meta: { kind: 'login_step', command: 'navigate' } }),
     nganSach.budgetDeadlineAt(1000, 25000),
     nganSach.budgetGasReplyMs()
-  ], [B.tabReadyMs + B.fetchMs, B.tabReadyMs + 3 * B.fetchMs + 3 * 350, 2 * B.tabReadyMs + B.loginFetches * B.fetchMs, 1000 + 25000 + B.bridgeMs + B.gasTransitMs, B.gasHardMs + B.gasTransitMs]);
+  ], [B.tabReadyMs + B.fetchMs, B.tabReadyMs + 3 * B.fetchMs + 3 * 350, 2 * B.tabReadyMs + B.fetchMs, 1000 + 25000 + B.bridgeMs + B.gasTransitMs, B.gasHardMs + B.gasTransitMs]);
   nganSach.budgetCallBegin(1000);
   check(so, 'trần mềm lời gọi GAS tính từ lúc lời gọi bắt đầu; chưa mở lời gọi (test gọi thẳng) thì không bao giờ chạm', [nganSach.budgetCallExhausted(1000 + B.gasSoftMs - 1), nganSach.budgetCallExhausted(1000 + B.gasSoftMs), napServer(taoHopCat({ FbmSync: {} }), 'fbm_sync/transport/Budget.js').FbmSync.budgetCallExhausted(Date.now())], [false, true, false]);
   check(so, 'GAS coi response không mang mã hoặc mang mã khác là lệch, đúng mã thì cho qua', [

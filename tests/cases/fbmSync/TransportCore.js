@@ -45,7 +45,7 @@ async function chay(so) {
   const duyet = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((muc) => (muc.isDirectory() ? duyet(path.join(dir, muc.name)) : /\.js$/.test(muc.name) && tep.push(path.join(dir, muc.name))));
   duyet(goc);
   const loai = new Set();
-  tep.forEach((file) => { const text = fs.readFileSync(file, 'utf8'); [/meta\s*:\s*(?:Object\.assign\(\s*)?\{[^{}]*?\bkind\s*:\s*'([a-z_]+)'/g, /meta\.kind\s*=\s*'([a-z_]+)'/g].forEach((re) => { let m; while ((m = re.exec(text))) { loai.add(m[1]); } }); });
+  tep.forEach((file) => { const text = fs.readFileSync(file, 'utf8'); [/meta\s*:\s*(?:Object\.assign\(\s*)?\{[^{}]*?\bkind\s*:\s*'([a-z_]+)'/g, /meta\.kind\s*=\s*'([a-z_]+)'/g, /\bmeta\s*=\s*function\s*\([^)]*\)\s*\{\s*return\s+Object\.assign\(\s*\{\s*kind\s*:\s*'([a-z_]+)'/g].forEach((re) => { let m; while ((m = re.exec(text))) { loai.add(m[1]); } }); });
   const chuaKhai = [...loai].filter((kind) => !Object.prototype.hasOwnProperty.call(F.REQUEST_REPLAY, kind)), thua = Object.keys(F.REQUEST_REPLAY).filter((kind) => !loai.has(kind));
   check(so, 'REQUEST_REPLAY phủ mọi loại request mã GAS dựng (quét tĩnh tìm thấy đủ cỡ bảng), không thừa loại không ai dựng, mọi giá trị đúng kiểu true/false', [
     loai.size >= 15, chuaKhai, thua, Object.values(F.REQUEST_REPLAY).every((value) => value === true || value === false)

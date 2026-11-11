@@ -30,7 +30,7 @@ async function chay(so) {
   const running = FbmSync.runOpen({ phase: 'pull_customer', total: 1 });
   running.phase = 'pull_customer'; running.cursor = { kind: 'customer_grid' };
   FbmSync.stateWrite(running);
-  FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
+  FbmSync.credentialRead = () => ({ configured: true, credentialRef: 'cred-test-1234', ciphertext: { ciphertext: 'ban-ma-gia' }, public: {} });
   const busyState = JSON.stringify(FbmSync.stateRead());
   const loginBusy = FbmSync.controlDispatch('start', { kind: 'login_test', machineId: 'may-A' });
   check(so, 'Đăng nhập thử khi lượt khác đang chạy thì trả SYNC_BUSY, không cấp request và không đổi ô lượt', [loginBusy.code, loginBusy.request || null, JSON.stringify(FbmSync.stateRead()) === busyState], ['SYNC_BUSY', null, true]);

@@ -106,9 +106,9 @@ async function tabVaMien(so) {
   const sai = workerNap({ gas() { return { ok: true, request: null }; } }).ctx;
   const req = (extra) => phongBi(sai, 'x', extra);
   const ma = (request) => { const error = sai.envelopeSiteCheck(request); return error ? error.code : ''; };
-  check(so, 'Một phép kiểm miền chặn mọi URL trong phong bì: request, phần tử lô, trang mở tab, trang tải lại, trang sau đăng nhập; chặn cả tên miền giả dạng tiền tố', [
-    ma(req()), ma(req({ items: [{ id: '0', url: 'https://fbo.com.vn:8888/a' }, { id: '1', url: 'https://evil.test/' }] })), ma(req({ meta: { openFbmContext: { url: 'https://evil.test/' } } })), ma(req({ meta: { reloadFbmPage: 'http://fbo.com.vn:8888/Main/' } })), ma(req({ meta: { afterLoginUrl: 'https://evil.test/' } })),
-    ma(req({ url: 'https://fbo.com.vn:8888.evil.test/' })), ma(req({ url: 'https://fbo.com.vn:8888@evil.test/' })), ma(req({ meta: { reloadFbmPage: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', afterLoginUrl: 'https://fbo.com.vn:8888/Default.aspx' } }))
+  check(so, 'Một phép kiểm miền chặn mọi URL trong phong bì: request, phần tử lô, trang mở tab, trang tải lại, trang lệnh mở trang của bước đăng nhập; chặn cả tên miền giả dạng tiền tố', [
+    ma(req()), ma(req({ items: [{ id: '0', url: 'https://fbo.com.vn:8888/a' }, { id: '1', url: 'https://evil.test/' }] })), ma(req({ meta: { openFbmContext: { url: 'https://evil.test/' } } })), ma(req({ meta: { reloadFbmPage: 'http://fbo.com.vn:8888/Main/' } })), ma(req({ url: 'https://evil.test/', method: 'COMMAND', meta: { command: 'navigate' } })),
+    ma(req({ url: 'https://fbo.com.vn:8888.evil.test/' })), ma(req({ url: 'https://fbo.com.vn:8888@evil.test/' })), ma(req({ url: 'https://fbo.com.vn:8888/Default.aspx', method: 'COMMAND', meta: { command: 'navigate', reloadFbmPage: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx' } }))
   ], ['', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', 'FBM_URL_OUTSIDE_SITE', '']);
 
   const lechBan = voiPhongBi({}, { contract: 'ban-cu' });

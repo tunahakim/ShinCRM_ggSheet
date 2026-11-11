@@ -13,10 +13,14 @@ function hopDangNhap() {
   return { F, logs };
 }
 
-/** Lượt đang chờ trả lời Login rồi nộp body; `manual` là lượt người dùng bấm. */
+/** Nộp body cho bước Login của lượt đăng nhập qua chặng chung (`CURSOR_TABLE.login`). `cursor` là các trường ô lượt (mục đích, bản nháp...). */
+function nopLogin(F, body, cursor, origin) {
+  F.statePatch({ runId: 'login-' + Math.random().toString(36).slice(2), origin: origin, phase: 'checking_session', cursor: F.loginCursorOpen(Object.assign({ step: 'login', facts: { salt: 'ab12cd34', database: 'FHN_CRM_App', unit: 'CTY' } }, cursor)), activeRequestId: '', deadlineAt: 0, session: { expired: true } });
+  return F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: body });
+}
+/** Lượt tự đăng nhập đang chờ trả lời Login; `manual` là lượt người dùng bấm. */
 function traLoi(F, body, manual) {
-  F.statePatch({ runId: 'login-' + Math.random().toString(36).slice(2), origin: manual ? 'manual' : 'background', phase: 'checking_session', cursor: { kind: 'login', purpose: 'auto', manual: !!manual, testOnly: false, credentialRef: MA_THONG_TIN, resumeCursor: { kind: 'customer_grid' } }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  return F.loginAdapterContinue(F.stateRead(), F.stateRead().cursor, { ok: true, status: 200, body: body });
+  return nopLogin(F, body, { purpose: 'auto', manual: !!manual, resumeCursor: { kind: 'customer_grid' } }, manual ? 'manual' : 'background');
 }
 
 async function chay(so) {
@@ -61,8 +65,7 @@ async function chay(so) {
 
   // Đăng nhập thử bằng bản nháp chưa lưu không chứng minh thông tin đã lưu sai.
   const nhap = hopDangNhap();
-  nhap.F.statePatch({ runId: 'login-draft', origin: 'manual', phase: 'checking_session', cursor: { kind: 'login', purpose: 'test', testOnly: true, credentialRef: 'cred-draft-other' }, activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  nhap.F.loginAdapterContinue(nhap.F.stateRead(), nhap.F.stateRead().cursor, { ok: true, status: 200, body: '{"d":false}' });
+  nopLogin(nhap.F, '{"d":false}', { purpose: 'test', draft: { credentialRef: 'cred-draft-other', ciphertext: { iv: '123456789012', ciphertext: 'ciphertext-long-enough' } } }, 'manual');
   check(so, 'đăng nhập thử bằng bản nháp bị báo sai mật khẩu: báo cho người dùng nhưng không ngừng tự đăng nhập bằng thông tin đã lưu', [nhap.F.stateRead().message.indexOf('Đăng nhập thử không thành công: FBM báo sai') === 0, nhap.F.loginConfigRead().loginHalted], [true, false]);
 }
 

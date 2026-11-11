@@ -38,7 +38,7 @@ async function chay(so) {
     ['write chi sang ghi FBM sau khi cap nhat Sheet', { mode: 'write', scan: 'full', phase: 'push', cursor: { kind: 'push_wait', operation: 'activity_verify' } }, 'write', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'current', 'pending']],
     ['identity probe dang doc User hoan tat session truoc nhan dien', { mode: 'check', scan: 'identity_probe', phase: 'checking_session', cursor: { kind: 'identity_user_grid' } }, 'identity_probe', ['done', 'current']],
     ['identity check chi quet Customer va doi soat lien ket', { mode: 'check', scan: 'identity_check', phase: 'pull_customer', cursor: { kind: 'customer_grid' } }, 'identity_check', ['done', 'current', 'pending']],
-    ['login test sau login chuyen sang kiem tra phien', { mode: 'read', scan: 'full', phase: 'checking_session', cursor: { kind: 'login_identity_authorize' } }, 'login_test', ['done', 'current', 'pending']],
+    ['login test sau login chuyen sang kiem tra phien', { mode: 'read', scan: 'full', phase: 'checking_session', cursor: { kind: 'login', step: 'authorize' } }, 'login_test', ['done', 'current', 'pending']],
     ['preflight loi khong tu nhan bat ky buoc FBM nao da xong', { mode: 'read', scan: 'full', phase: 'error', cursor: {} }, 'read', ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']],
     ['tam dung o Activity giu dung cac buoc da xong', { mode: 'read', scan: 'full', phase: 'paused', cursor: { kind: 'activity_grid' } }, 'read', ['done', 'done', 'done', 'paused', 'pending', 'pending']],
     ['xung dot dung tai doi soat va khong hoan tat Sheet', { mode: 'read', scan: 'full', phase: 'conflict', cursor: {} }, 'read', ['done', 'done', 'done', 'done', 'error', 'pending']]

@@ -120,18 +120,20 @@ async function chay(so) {
 
   check(so, 'phong bì mang URL ngoài miền FBM bị GAS từ chối trước khi phát', loi(() => FbmSync.nextEnvelope({ url: 'https://evil.test/Main/x', body: {}, meta: { kind: 'session_probe' } })) !== null, true);
 
-  // Request mở lượt phải dựng lại được từ cursor: đăng nhập thử giữ testOnly/force, xung đột giữ fbmId.
-  check(so, 'cursor đăng nhập thử và hủy phiên cũ dựng lại đúng request login', [
-    FbmSync.requestForCursor({ cursor: { kind: 'login', credentialRef: 'cred-1', testOnly: true, purpose: 'test' } }).meta,
-    FbmSync.requestForCursor({ cursor: { kind: 'login', credentialRef: 'cred-1', testOnly: true, purpose: 'force' } }).meta.force
-  ].map((meta) => typeof meta === 'object' ? [meta.kind, meta.testOnly, meta.force] : meta), [['login', true, false], true]);
+  // Request mở lượt phải dựng lại được từ cursor: bước đăng nhập giữ bước và cờ hủy phiên cũ, xung đột giữ fbmId.
+  const banNhap = { credentialRef: 'cred-1', ciphertext: { iv: '123456789012', ciphertext: 'ciphertext-long-enough' } };
+  const dungLai = (purpose, step) => FbmSync.requestForCursor({ cursor: FbmSync.loginCursorOpen({ purpose, draft: banNhap, step, facts: { salt: 'ab12', database: 'FHN_CRM_App', unit: 'CTY' } }) });
+  check(so, 'cursor đăng nhập thử và hủy phiên cũ dựng lại đúng request bước đăng nhập; chỉ hủy phiên cũ gửi cờ force', [
+    [dungLai('test', 'page').meta.kind, dungLai('test', 'page').meta.step], dungLai('test', 'login').body.force, dungLai('force', 'login').body.force, dungLai('force', 'login').meta.fill.credentialRef
+  ], [['login_step', 'page'], false, true, 'cred-1']);
   check(so, 'cursor đọc lại xung đột dựng lại đúng request đọc theo ID FBM', FbmSync.requestForCursor({ cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' } }).meta.kind, 'conflict_refresh_grid');
 
   FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
+  FbmSync.credentialRead = () => FbmSync.credentialShape({ credentialRef: 'cred-test-1234', ciphertext: banNhap.ciphertext });
   documentProperties.deleteProperty(FbmSync.STATE_KEY);
   const login = FbmSync.controlDispatch('start', { kind: 'login_test', machineId: 'may-A' });
   const loginPicked = hoi('may-A');
-  check(so, 'Đăng nhập thử trên Sheet chưa từng chạy lượt vẫn có runId; nhận lượt ra request login thử', [typeof login.runId, !!login.runId, loginPicked.request && loginPicked.request.meta.kind, loginPicked.request && loginPicked.request.meta.testOnly], ['string', true, 'login', true]);
+  check(so, 'Đăng nhập thử trên Sheet chưa từng chạy lượt vẫn có runId; nhận lượt ra request bước trang Login', [typeof login.runId, !!login.runId, loginPicked.request && loginPicked.request.meta.kind, loginPicked.request && loginPicked.request.meta.step], ['string', true, 'login_step', 'page']);
 }
 
 module.exports = { chay };

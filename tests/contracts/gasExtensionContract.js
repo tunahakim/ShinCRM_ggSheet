@@ -12,7 +12,8 @@ const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
   request: {
     fields: ['protocol', 'version', 'contract', 'id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta', 'items'],
-    meta: ['kind', 'trace', 'transport', 'requestGap', 'force', 'credentialRef', 'openFbmContext', 'afterLoginUrl', 'reloadFbmPage', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job', 'keep'],
+    // Bước đăng nhập (`kind` = `login_step`, `step`): `fill` là ô Extension điền sau khi giải mã (`slots`, `credentialRef`, `ciphertext`, `salt`); `command` là lệnh cho Extension thay vì gọi FBM (`navigate` mở trang, `pageKeyStore` ghi khóa trang khi khớp giá trị kiểm `pageKey`).
+    meta: ['kind', 'step', 'trace', 'transport', 'requestGap', 'fill', 'command', 'pageKey', 'openFbmContext', 'reloadFbmPage', 'timeoutMs', 'fetchMs', 'gasReplyMs', 'batch', 'job', 'keep'],
     // Lệnh cắt response lưới do GAS tính: `fields` (tên cột theo `AliasName`, đúng thứ tự; trang có tiêu đề) hoặc `positions` với `width` (vị trí cột và số cột gốc; trang không tiêu đề). Extension cắt ngay trong tab; response không phải lưới đi nguyên.
     keep: ['fields', 'positions', 'width'],
     // Mọi URL trong envelope phải thuộc miền này; Extension từ chối envelope có địa chỉ khác trước khi tìm tab.
@@ -31,7 +32,7 @@ const CONTRACT = {
   // Extension → GAS: response FBM thô. `transport.contract` là mã phiên bản Extension đang chạy.
   response: {
     fields: ['ok', 'status', 'headers', 'body', 'transport', 'items', 'job'],
-    transport: ['contract', 'trace', 'captures', 'loginStage', 'loginBlocked'],
+    transport: ['contract', 'trace', 'captures'],
     // Response lô chỉ gồm phần tử đã chạy, đúng thứ tự gửi.
     item: ['id', 'ok', 'status', 'headers', 'body'],
     // Lưới đã cắt theo `keep` (cả gói của việc quét): dòng chỉ còn cột GAS cần, đúng thứ tự GAS gửi; `SourceFields` là tên cột gốc khi trang có tiêu đề (gói quét: chỉ gói 0); thiếu cột theo tên thì `MissingFields`, dòng lệch số cột gốc thì `ShapeMismatch`, cả hai không kèm dòng. `Authorized` và `Bugs` của FBM giữ nguyên.
@@ -41,7 +42,8 @@ const CONTRACT = {
     // Tab không còn giữ việc quét (tải lại, Extension khởi động lại): GAS chạy lại cả việc. Quá trần cỡ, không đọc được dạng bảng hoặc hết hạn fetch: GAS chia giao dịch theo khoảng ngày.
     codes: ['FBM_SCAN_JOB_GONE', 'FBM_SCAN_TOO_LARGE', 'FBM_SCAN_UNPARSEABLE', 'FBM_FETCH_TIMEOUT'],
     // Lỗi Extension không gửi được envelope tới tab, trả nguyên mã để GAS quyết: không có tab (GAS cho mở thì phát lại kèm `openFbmContext`), tab không sẵn sàng (Extension không tự tải lại; GAS phát lại một lần kèm `reloadFbmPage`), Chrome chặn quyền site (không thử lại, người dùng phải mở quyền), địa chỉ ngoài miền FBM.
-    transportCodes: ['FBM_TAB_NOT_FOUND', 'FBM_TAB_NOT_READY', 'FBM_SITE_ACCESS_BLOCKED', 'FBM_URL_OUTSIDE_SITE']
+    // Máy này không giữ khóa giải mã bản mã GAS gửi (lưu kết nối ở máy khác): không gửi gì tới FBM.
+    transportCodes: ['FBM_TAB_NOT_FOUND', 'FBM_TAB_NOT_READY', 'FBM_SITE_ACCESS_BLOCKED', 'FBM_URL_OUTSIDE_SITE', 'LOGIN_KEY_MISSING', 'LOGIN_FILL_SLOT_UNKNOWN']
   },
   // Extension → Web App GAS: cửa duy nhất phong bì ra khỏi GAS, cho cả lượt nền lẫn lượt tay. `heartbeat` hỏi việc (GAS trả request của lượt tay đang chờ máy hỏi, hoặc việc nền đến hạn); `continue` nộp `response` / `error` (`requestId`, `code`, `message`). Mọi thân mang `machineId`; GAS chỉ nhận `continue` từ đúng máy đang lái lượt.
   relay: {
@@ -52,7 +54,8 @@ const CONTRACT = {
     triggers: ['alarm', 'startup', 'run_now', 'config', 'install'],
     // Ô lỗi gọi relay trong hộp đen, gửi kèm `trail` ở lần hỏi sau; GAS ghi Log rồi trả `trailAck` = `at` để Extension xóa ô.
     relayFailure: ['at', 'command', 'code', 'httpStatus', 'attempts'],
-    reply: ['ok', 'code', 'error', 'httpStatus', 'request', 'status', 'conflict', 'trailAck', 'retryMs', 'poll'],
+    // `credentialRefs`: mã tham chiếu GAS đang giữ bản mã; Extension bỏ bản mã đời cũ còn nằm cạnh khóa của các mã này.
+    reply: ['ok', 'code', 'error', 'httpStatus', 'request', 'status', 'conflict', 'trailAck', 'retryMs', 'poll', 'credentialRefs'],
     // Lệnh chuông trong trả lời `heartbeat`: `minutes` giữ chuông theo nhịp, `stop` tắt chuông tới lần mở trình duyệt, tải lại Extension, Sidebar đánh thức hoặc cấu hình mới.
     poll: ['minutes', 'stop', 'code'],
     driverCodes: ['RELAY_MACHINE_ID_REQUIRED', 'RUN_DRIVER_MISMATCH', 'CONTINUE_EMPTY'],
@@ -63,8 +66,8 @@ const CONTRACT = {
   },
   // Sidebar ↔ Extension qua postMessage.
   bridge: {
-    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_METADATA', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL', 'CRM_FBM_MACHINE_ID', 'CRM_FBM_RUN_NOW'],
-    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_METADATA_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_CANCEL_RESULT', 'CRM_FBM_MACHINE_ID_RESULT', 'CRM_FBM_RUN_NOW_RESULT', 'CRM_FBM_STATUS'],
+    toExtension: ['CRM_HANDSHAKE', 'CRM_FBM_CONFIG', 'CRM_FBM_CREDENTIALS', 'CRM_FBM_CREDENTIAL_CLEAR', 'CRM_FBM_CANCEL', 'CRM_FBM_MACHINE_ID', 'CRM_FBM_RUN_NOW'],
+    toSidebar: ['CRM_HANDSHAKE_ACK', 'CRM_FBM_CONFIG_ACK', 'CRM_FBM_CREDENTIALS_RESULT', 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', 'CRM_FBM_CANCEL_RESULT', 'CRM_FBM_MACHINE_ID_RESULT', 'CRM_FBM_RUN_NOW_RESULT', 'CRM_FBM_STATUS'],
     // Mọi trả lời lệnh cùng một dạng; `CRM_FBM_STATUS` mang trạng thái lượt GAS trả qua relay hoặc lỗi Extension (`failure`).
     reply: ['id', 'ok', 'result', 'code', 'error', 'currentSpreadsheetId'],
     status: ['status', 'conflict', 'code', 'error', 'failure', 'done'],

@@ -18,7 +18,8 @@ const BUILDERS = {
   'fbm_sync/reconcile/CategoryLookup.js': ['lookupBatchRequest'],
   'fbm_sync/transport/ActivityBatch.js': ['activityBatchRequest', 'gateOpen'],
   'fbm_sync/transport/TransportCore.js': ['sessionSystemRequest', 'sessionSystemEnvelope'],
-  'fbm_sync/auth/AutoLogin.js': ['loginRequest'],
+  'fbm_sync/auth/LoginTools.js': ['loginRequestPlan'],
+  'fbm_sync/auth/LoginRun.js': ['loginStepRequest'],
   'fbm_sync/transport/PushFlow.js': ['pushConfigErrors', 'validateAutoCustomerCode']
 };
 // Đọc cài đặt hay phạm vi từ kho: chỉ người điều phối được làm, hàm dựng nhận qua tham số.

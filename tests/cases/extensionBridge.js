@@ -96,9 +96,10 @@ function scanFbmRequestArchitecture(rootDir, virtualFiles) {
     if (normalized.endsWith('.js') && !normalized.endsWith(executorName) && /fetch\s*\([^;]*(?:fbo\.com\.vn|FBM_EXECUTE|req\.url|request\.url)/is.test(source)) {
       violations.fbmFetch.push(relative);
     }
-    if (!normalized.endsWith('fbm_sync/auth/AutoLogin.js') && !normalized.endsWith(transportName)) {
-      const executable = source.split('\n').filter((line) => !/FbmSync\.(loginRequest|beginAutoLogin)\s*=\s*function/.test(line)).join('\n');
-      if (/(?:FbmSync|sync)\.(?:loginRequest|beginAutoLogin)\s*\(/.test(executable)) {
+    // Request bước đăng nhập chỉ do lượt đăng nhập dựng (mở lượt, chặng, phát lại theo ô lượt).
+    if (!['fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js', 'fbm_sync/auth/LoginTools.js'].some((tep) => normalized.endsWith(tep)) && !normalized.endsWith(transportName)) {
+      const executable = source.split('\n').filter((line) => !/FbmSync\.(loginStepRequest|loginRequestPlan|beginAutoLogin)\s*=\s*function/.test(line)).join('\n');
+      if (/(?:FbmSync|sync)\.(?:loginStepRequest|loginRequestPlan|beginAutoLogin)\s*\(/.test(executable)) {
         violations.loginCaller.push(relative);
       }
     }
@@ -248,7 +249,7 @@ async function chay(so) {
   const fixtureRoot = path.join(architectureRoot, '1_ShinCRM_GAS', 'server', 'dev');
   const fixtureScan = scanFbmRequestArchitecture(architectureRoot, [{
     file: path.join(fixtureRoot, 'ScannerFixture.js'),
-    source: 'function scannerFixture() { return sync.loginRequest("fixture"); }'
+    source: 'function scannerFixture() { return sync.loginStepRequest({ step: "page" }); }'
   }]);
   const sessionLayerCustomerCalls = [];
   const sessionLayerSources = [
@@ -313,10 +314,7 @@ async function chay(so) {
   check(so, 'Extension ma hoa credential bang AES-GCM truoc khi luu', workerSource.indexOf('crypto.subtle.generateKey') >= 0 && workerSource.indexOf('CREDENTIAL_VAULT_PREFIX') >= 0 && workerSource.indexOf('FBM_ENCRYPT_CREDENTIALS') >= 0, true);
   check(so, 'metadata username hien day du thay vi che an***', workerSource.indexOf('usernameHint: username') >= 0 && workerSource.indexOf("username.slice(0, 2) + '***'") < 0, true);
   check(so, 'bridge credential chi tra envelope va khong tra password ve Sidebar', fs.readFileSync(BRIDGE_FILE, 'utf8').indexOf('CRM_FBM_CREDENTIALS_RESULT') >= 0 && syncSource.indexOf('fbmSyncEncryptCredentials') >= 0 && syncSource.indexOf('fbm-login-password') >= 0, true);
-  check(so, 'executor login dung force false va khong logout phien hop le', executorSource.indexOf("force: forceOldSession") >= 0 && executorSource.indexOf("var forceOldSession = request.meta.force === true;") >= 0 && executorSource.indexOf("credentials: 'include'") >= 0 && executorSource.indexOf("meta.kind === 'login'") >= 0, true);
-  check(so, 'executor login tai Login.aspx de lay salt truoc khi goi Login', executorSource.indexOf("fetch(base.slice(0, -1)") >= 0 && executorSource.indexOf('login_page_loaded') >= 0 && executorSource.indexOf('Không đọc được mã phiên đăng nhập từ trang FBM.') >= 0, true);
-  check(so, 'executor login nhan du lieu database va don vi theo cac shape FBM', executorSource.indexOf('function loginListValue') >= 0 && executorSource.indexOf("'FHN_CRM_App'") >= 0 && executorSource.indexOf("'CTY'") >= 0, true);
-  check(so, 'executor login doc lai trang tai khoan de lay payload cookie', executorSource.indexOf("/Main/zccrAccount.aspx") >= 0 && executorSource.indexOf('payload_cookie_page_read') >= 0, true);
+  check(so, 'executor không còn đường đăng nhập riêng: không đọc mật khẩu, không băm, không tự gọi trang Login; mọi bước đăng nhập là request GAS dựng, worker điền ô', [/loginCredentials|function md5|meta\.kind === 'login'|Login\.aspx/.test(executorSource), /function md5/.test(workerSource), /function credentialFill/.test(workerSource)], [false, true, true]);
   check(so, 'Sidebar kết thúc chỗ chờ lượt bằng lỗi Extension rõ ràng (tin failure), không gửi lại request FBM', syncSource.indexOf('if (data.retryable)') < 0 && syncSource.indexOf('retryCount: 0') < 0 && syncSource.indexOf('fbmSyncRunWaitEnd(null, error)') >= 0 && syncSource.indexOf("'extension_failure'") >= 0, true);
   check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && /callServer\('fbmGetSyncStatus'\)\.then\(function \(bundle\) \{\s*if \(!bundle \|\| !bundle\.status\)/.test(syncSource), true);
   check(so, 'kiem tra lien ket dung chung guard Extension; loi phia trinh duyet khong tu goi Dung (luot thuoc GAS)', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf('fbmSyncCancelAfterError') < 0 && (syncSource.match(/'fbmCancelSync'/g) || []).length === 1, true);
@@ -423,7 +421,7 @@ async function chay(so) {
   let workerMessageListener = null;
   const relayStorage = {};
   const workerContext = {
-    console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, crypto: globalThis.crypto, btoa, atob, Uint8Array,
+    console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, crypto: globalThis.crypto, btoa, atob, Uint8Array, TextEncoder, TextDecoder, unescape, encodeURIComponent,
     chrome: {
       tabs: { query: () => Promise.resolve([]), sendMessage() {} },
       scripting: { executeScript: () => Promise.resolve() }, permissions: { contains: () => Promise.resolve(true) },
@@ -618,18 +616,14 @@ async function chay(so) {
   let homeUrl = '', homeListener = null;
   workerContext.chrome.tabs.update = (tabId, options, callback) => { homeUrl = options.url; setImmediate(() => callback({ id: tabId, status: 'loading' })); };
   workerContext.chrome.tabs.onUpdated = { addListener(fn) { homeListener = fn; }, removeListener() {} };
-  const loginRequest = { id: 'login-1', meta: { kind: 'login', timeoutMs: 30000, afterLoginUrl: 'https://fbo.com.vn:8888/Default.aspx' } };
+  const navigateRequest = { id: 'login-home', url: 'https://fbo.com.vn:8888/Default.aspx', meta: { kind: 'login_step', step: 'home', command: 'navigate', timeoutMs: 30000 } };
   let homeReply = null;
-  const pendingHome = workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: true, transport: {} } }).then((reply) => { homeReply = reply; });
+  const pendingHome = workerContext.navigateFbmTab(80, navigateRequest).then((reply) => { homeReply = reply; });
   await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'đăng nhập thành công mở màn hình làm việc GAS cấp và chưa trả kết quả khi tab đang tải', [homeUrl, homeReply, typeof homeListener], ['https://fbo.com.vn:8888/Default.aspx', null, 'function']);
+  check(so, 'bước mở trang của lượt đăng nhập mở đúng URL GAS cấp và chưa trả kết quả khi tab đang tải', [homeUrl, homeReply, typeof homeListener], ['https://fbo.com.vn:8888/Default.aspx', null, 'function']);
   homeListener(80, { status: 'complete' }, { id: 80, status: 'complete' });
   await pendingHome;
-  check(so, 'màn hình làm việc tải xong mới trả kết quả đăng nhập kèm vết', homeReply.result.transport.trace.map((item) => item.stage), ['fbm_home_opened']);
-  homeUrl = '';
-  await workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: true, transport: { loginBlocked: true } } });
-  await workerContext.showFbmHomeAfterLogin(80, loginRequest, { result: { ok: false } });
-  check(so, 'đăng nhập bị chặn hoặc thất bại thì không đổi trang tab FBM', homeUrl, '');
+  check(so, 'tab tải xong mới trả kết quả mở trang, vết mang mã request để GAS nhận đúng bước; tab không mở được trả mã thất bại để GAS quyết định', [JSON.parse(homeReply.result.body).code, homeReply.result.transport.trace[0].requestId, await (async () => { workerContext.chrome.tabs.update = undefined; return JSON.parse((await workerContext.navigateFbmTab(80, navigateRequest)).result.body).code; })()], ['FBM_PAGE_OPENED', 'login-home', 'FBM_HOME_OPEN_FAILED']);
   // Tab FBM treo hoặc bị Chrome dỡ: worker dựng mới, đồng hồ thật, hạn envelope ngắn để chạy nhanh.
   const tabWorker = (tab, behaviour) => {
     const state = { updates: [], reloads: 0, pings: 0, executes: 0, injects: 0, bodies: [], trails: [], listeners: [] };
@@ -843,173 +837,65 @@ async function chay(so) {
     });
   });
 
-  await new Promise((resolve) => {
-    let listener = null;
-    const calls = [];
-    function response(text) {
-      return {
-        ok: true,
-        status: 200,
-        headers: { get() { return 'application/json'; } },
-        arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); }
-      };
-    }
-    const context = {
-      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
-      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: '' } },
-      fetch(url, options) {
-        calls.push({ url: String(url), method: options && options.method || 'GET', body: options && options.body });
-        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval(\u0027\\\u0027a2838e\\\u0027+\\\u00276f471b\\\u0027\u0027)"}</script>`)); }
-        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
-        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Công ty","Company"]]}')); }
-        if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":true}')); }
-        if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('<script>var payload={"cookie":"461020379855cFHN_CRM_App"};</script>')); }
-        return Promise.resolve(response('{}'));
-      },
-      chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
-    };
-    vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
-    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', loginCredentials: { username: 'anhlt', password: 'mat-khau', language: 'v' } } } }, null, (reply) => {
-      setTimeout(() => {
-        const loginBody = calls[3] && JSON.parse(calls[3].body);
-        check(so, 'executor login chay du trang salt, database, don vi, Login va trang tai khoan', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.ok], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login|zccrAccount.aspx', true]);
-        check(so, 'executor login doc salt ChallengeScript HTML live, force false va khong dua mat khau goc len FBM', [loginBody.value, loginBody.force, loginBody.password === 'mat-khau', loginBody.database, loginBody.unit], ['a2838e6f471b', false, false, 'FHN_CRM_App', 'CTY']);
-        resolve();
-      }, 20);
-    });
-  });
-
-  // FBM từ chối đăng nhập (d khác true) thì dừng ở response Login, không mở trang tài khoản (chưa đăng nhập mà mở thì FBM sang Error.htm); cờ hủy phiên cũ theo meta.force.
-  await new Promise((resolve) => {
-    let listener = null;
-    const calls = [];
-    const response = (text) => ({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); } });
-    const context = {
-      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: '' } },
-      fetch(url, options) {
-        calls.push({ url: String(url), body: options && options.body });
-        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval('\'a2838e\'+\'6f471b\'')"}</script>`)); }
-        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
-        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Công ty","Company"]]}')); }
-        if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":"x"}')); }
-        return Promise.resolve(response('<html>Error</html>'));
-      },
-      chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
-    };
-    vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
-    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', force: true, loginCredentials: { username: 'anhlt', password: 'mat-khau', language: 'v' } } } }, null, (reply) => {
-      setTimeout(() => {
-        const loginBody = calls[3] && JSON.parse(calls[3].body);
-        check(so, 'executor: FBM từ chối đăng nhập thì trả nguyên response Login, không mở trang tài khoản; GAS gắn cờ thì Login gửi force true', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.body, loginBody && loginBody.force], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login', '{"d":"x"}', true]);
-        resolve();
-      }, 20);
-    });
-  });
-
-  // Đăng nhập: mã phiên phải bắt bằng mẫu GAS cấp trong request, không bằng mẫu viết cứng trong Extension. Mẫu cũ của Extension không nhận dạng \"...\" mà
-  // FBM dùng trong script trang, nên Login thành công nhưng không có cookie và request xác minh kế tiếp bị chặn FBM_TRANSPORT_CAPTURE_MISSING.
-  const runLoginWithAccountPage = (accountHtml, storage) => new Promise((resolve) => {
-    let listener = null;
-    const response = (text) => ({ ok: true, status: 200, url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', headers: { get() { return 'text/html'; } }, arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); } });
-    const context = {
-      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: '' } },
-      localStorage: storage && storage.local || { setItem() {}, removeItem() {} }, sessionStorage: storage && storage.session || { clear() {} },
-      fetch(url) {
-        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval('\'a2838e\'+\'6f471b\'')"}</script>`)); }
-        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
-        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Công ty","Company"]]}')); }
-        if (String(url).endsWith('/Login')) { return Promise.resolve(response('{"d":true}')); }
-        if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response(accountHtml)); }
-        return Promise.resolve(response('{}'));
-      },
-      chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
-    };
-    vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
-    const transport = { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: payloadCookieCapturePattern(), flags: 'i', group: 1 }] };
-    listener({ type: 'FBM_EXECUTE_V2', request: { id: 'login-capture', meta: { kind: 'login', transport, loginCredentials: { username: 'anhlt', password: 'mat-khau', language: 'v' } } } }, null, (reply) => resolve(reply && reply.result || {}));
-  });
-  const escapedLogin = await runLoginWithAccountPage(String.raw`<script>var state = "{\"cookie\":\"461020379855cFHN_CRM_App\",\"user\":\"anhlt\"}";</script>`);
-  const escapedRead = (escapedLogin.transport && escapedLogin.transport.trace || []).filter((item) => item.stage === 'payload_cookie_page_read')[0] || {};
-  check(so, 'executor login bắt mã phiên dạng \\"cookie\\":\\"...\\" trên trang tài khoản bằng mẫu GAS cấp và ghi trace đã bắt được, không kèm nội dung trang',
-    [escapedLogin.transport && escapedLogin.transport.captures && escapedLogin.transport.captures.payloadCookie, escapedRead.code, escapedRead.endpoint, JSON.stringify(escapedLogin.transport.trace).indexOf('461020379855c') < 0],
-    ['461020379855cFHN_CRM_App', 'PAYLOAD_COOKIE_CAPTURED', '/Main/zccrAccount.aspx', true]);
-  // Màn hình FBM trắng sau khi ShinCRM đăng nhập: trang Login của FBM lưu khóa MD5(MD5(salt)+MD5(mật khẩu)) vào localStorage "k\0" (bảng dữ liệu trang chính kiểm khóa này),
-  // xóa sessionStorage và menu cũ. Đăng nhập ngầm phải làm y hệt; trace chỉ mang mã kết quả, không mang khóa.
+  // Đăng nhập do GAS chạy từng bước; Extension chỉ giải mã và điền ô. Mật khẩu và hash không bao giờ về GAS hay vào vết.
   const md5hex = (text) => require('crypto').createHash('md5').update(text).digest('hex');
-  const expectedKey = md5hex(md5hex('a2838e6f471b') + md5hex('mat-khau'));
-  // Trang tài khoản thật mang mã kiểm của bảng dạng "salt":"<md5(khóa + cookie)>\t<tên khóa>" cùng "cookie" của đúng lần tải đó.
-  const accountWithGridCheck = (key) => '<script>$create(FastBusiness.ReportExtender, {"cookie":"abcd2037efghiFHN_CRM_App","salt":"' + md5hex(key + 'abcd2037efghiFHN_CRM_App') + '\\tk\\u0000"});</script>';
+  const SALT = 'a2838e6f471b';
+  const daLuu = await workerContext.saveCredentialEnvelope({ username: 'anhlt', password: 'mat-khau-gia', database: 'FHN_CRM_App', unit: 'CTY' });
+  const fillOf = (slots, extra) => Object.assign({ slots, credentialRef: daLuu.credentialRef, ciphertext: daLuu.envelope, salt: SALT }, extra || {});
+  check(so, 'kho Extension chỉ giữ mã tham chiếu và khóa giải mã, không giữ bản mã hay mật khẩu; bản mã trả cho Sidebar để GAS giữ',
+    [Object.keys(relayStorage['fbmCredentialVault:' + daLuu.credentialRef]).sort().join(','), JSON.stringify(relayStorage).indexOf('mat-khau-gia') < 0, !!daLuu.envelope.ciphertext], ['key,ref', true, true]);
+  const loginFilled = await workerContext.credentialFill({ url: 'https://fbo.com.vn:8888/Main/Login.aspx/Login', method: 'POST', body: { user: '', password: '', database: 'FHN_CRM_App', value: SALT, force: false }, meta: { kind: 'login_step', step: 'login', fill: fillOf({ user: 'username', password: 'loginHash' }) } });
+  check(so, 'worker điền tên đăng nhập và hash md5(salt + md5(mật khẩu)) vào đúng ô GAS chỉ, bodyText khớp body, bỏ ô fill (bản mã không đi tiếp tới tab)',
+    [loginFilled.body.user, loginFilled.body.password, loginFilled.body.password === 'mat-khau-gia', JSON.parse(loginFilled.bodyText).password === loginFilled.body.password, 'fill' in loginFilled.meta, loginFilled.body.database],
+    ['anhlt', md5hex(SALT + md5hex('mat-khau-gia')), false, true, false, 'FHN_CRM_App']);
+  const pageKey = md5hex(md5hex(SALT) + md5hex('mat-khau-gia'));
+  const pageKeyReq = (check) => ({ url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', method: 'COMMAND', meta: { kind: 'login_step', step: 'pageKey', command: 'pageKeyStore', pageKey: { check, pageCookie: 'abcd2037efghiFHN_CRM_App' }, fill: fillOf({}) } });
+  const khop = await workerContext.credentialFill(pageKeyReq(md5hex(pageKey + 'abcd2037efghiFHN_CRM_App')));
+  const lech = await workerContext.credentialFill(pageKeyReq(md5hex('khoa-phien-dang-song' + 'abcd2037efghiFHN_CRM_App')));
+  check(so, 'lệnh ghi khóa trang: worker chỉ đưa khóa md5(md5(salt) + md5(mật khẩu)) cho tab khi khớp giá trị kiểm của trang tài khoản; máy chủ giữ khóa khác (phiên đang sống) thì đưa khóa rỗng',
+    [khop.meta.pageKeyWrite, lech.meta.pageKeyWrite, 'pageKey' in khop.meta, 'fill' in khop.meta], [pageKey, '', false, false]);
+  const loiCode = (promise) => promise.then(() => 'NO_ERROR', (error) => error.code);
+  check(so, 'máy không giữ khóa của mã tham chiếu thì không gửi gì (LOGIN_KEY_MISSING); GAS đòi điền ô lạ thì cũng không gửi (LOGIN_FILL_SLOT_UNKNOWN); request không có fill đi nguyên',
+    [await loiCode(workerContext.credentialFill({ body: {}, meta: { fill: fillOf({ user: 'username' }, { credentialRef: 'cred-may-khac' }) } })),
+      await loiCode(workerContext.credentialFill({ body: {}, meta: { fill: fillOf({ user: 'password' }) } })),
+      (await workerContext.credentialFill({ url: 'x', meta: { kind: 'grid' } })).url], ['LOGIN_KEY_MISSING', 'LOGIN_FILL_SLOT_UNKNOWN', 'x']);
+  relayStorage['fbmCredentialVault:cred-doi-cu'] = { ref: 'cred-doi-cu', key: { k: 'khoa' }, envelope: { ciphertext: 'ban-ma-cu' } };
+  relayStorage['fbmCredentialVault:cred-chua-giu'] = { ref: 'cred-chua-giu', key: { k: 'khoa' }, envelope: { ciphertext: 'ban-ma-cu' } };
+  await workerContext.credentialVaultSlim(['cred-doi-cu']);
+  await workerContext.credentialVaultSlim(['cred-doi-cu']);
+  check(so, 'kho đời cũ: GAS báo đang giữ bản mã của mã nào thì Extension bỏ bản mã cạnh khóa của mã đó, chạy lại không đổi; mã GAS không giữ thì để nguyên',
+    [Object.keys(relayStorage['fbmCredentialVault:cred-doi-cu']).sort().join(','), relayStorage['fbmCredentialVault:cred-doi-cu'].key.k, 'envelope' in relayStorage['fbmCredentialVault:cred-chua-giu']], ['key,ref', 'khoa', true]);
+
+  // Tab FBM ghi khóa trang như trang Login của FBM: xóa sessionStorage và menu cũ rồi lưu localStorage "k\0"; vết chỉ mang mã kết quả, không mang khóa.
+  const runPageKeyStore = (pageKeyWrite, storage) => new Promise((resolve) => {
+    let listener = null;
+    const context = {
+      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout, Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
+      document: { documentElement: { innerHTML: '', textContent: '' } },
+      localStorage: storage.local, sessionStorage: storage.session,
+      fetch() { storage.fetches += 1; return Promise.reject(new Error('lệnh ghi khóa trang không được gọi FBM')); },
+      chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
+    };
+    vm.createContext(context);
+    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    listener({ type: 'FBM_EXECUTE_V2', request: { id: 'login-key', url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', method: 'COMMAND', meta: { kind: 'login_step', step: 'pageKey', command: 'pageKeyStore', pageKeyWrite } } }, null, (reply) => resolve(reply && reply.result || {}));
+  });
   const makeBrowserStore = (items) => {
-    const store = { items: Object.assign({}, items), sessionCleared: false };
+    const store = { items: Object.assign({}, items), sessionCleared: false, fetches: 0 };
     store.local = { getItem(key) { return key in store.items ? store.items[key] : null; }, setItem(key, value) { store.items[key] = value; }, removeItem(key) { delete store.items[key]; } };
     store.session = { clear() { store.sessionCleared = true; } };
     return store;
   };
-  const storageCode = (login) => ((login.transport && login.transport.trace || []).filter((item) => item.stage === 'login_page_storage')[0] || {}).code;
   const browserStore = makeBrowserStore({ menuItems: 'menu-cu' });
-  const storedLogin = await runLoginWithAccountPage(accountWithGridCheck(expectedKey), browserStore);
-  check(so, 'đăng nhập ngầm tạo phiên mới thì lưu khóa trang FBM vào localStorage "k\\0" như trang Login, xóa menu và sessionStorage cũ, trace không chứa khóa',
-    [browserStore.items['k\u0000'], 'menuItems' in browserStore.items, browserStore.sessionCleared, storageCode(storedLogin), JSON.stringify(storedLogin.transport.trace).indexOf(expectedKey) < 0],
-    [expectedKey, false, true, 'LOGIN_PAGE_KEY_STORED', true]);
+  const stored = await runPageKeyStore(pageKey, browserStore);
+  check(so, 'tab nhận khóa khớp thì lưu localStorage "k\\0", xóa menu và sessionStorage cũ, không gọi FBM, vết không chứa khóa',
+    [browserStore.items['k\u0000'], 'menuItems' in browserStore.items, browserStore.sessionCleared, JSON.parse(stored.body).code, browserStore.fetches, JSON.stringify(stored.transport.trace).indexOf(pageKey) < 0],
+    [pageKey, false, true, 'LOGIN_PAGE_KEY_STORED', 0, true]);
   // Đo thật 2026-10-06: đăng nhập thử khi phiên trình duyệt đang sống, Login vẫn trả d:true nhưng máy chủ giữ khóa cũ; ghi khóa mới làm bảng FBM trắng.
   const liveStore = makeBrowserStore({ 'k\u0000': 'khoa-phien-dang-song', menuItems: 'menu-dang-dung' });
-  const liveLogin = await runLoginWithAccountPage(accountWithGridCheck('khoa-phien-dang-song'), liveStore);
-  check(so, 'đăng nhập khi phiên trình duyệt đang sống mà máy chủ giữ khóa cũ thì không ghi đè khóa, không xóa menu, bảng FBM vẫn hiện',
-    [liveStore.items['k\u0000'], liveStore.items.menuItems, liveStore.sessionCleared, storageCode(liveLogin)],
-    ['khoa-phien-dang-song', 'menu-dang-dung', false, 'LOGIN_PAGE_KEY_KEPT_EXISTING']);
-  const blindStore = makeBrowserStore({});
-  const blindLogin = await runLoginWithAccountPage('<html></html>', blindStore);
-  check(so, 'trang tài khoản không có mã kiểm bảng thì không ghi khóa mù và trace báo không kiểm được', ['k\u0000' in blindStore.items, storageCode(blindLogin)], [false, 'LOGIN_PAGE_KEY_UNVERIFIABLE']);
-  const noCookieLogin = await runLoginWithAccountPage('<html><body>Đăng nhập</body></html>');
-  const noCookieRead = (noCookieLogin.transport && noCookieLogin.transport.trace || []).filter((item) => item.stage === 'payload_cookie_page_read')[0] || {};
-  check(so, 'executor login không thấy mã phiên thì trả captures rỗng và trace PAYLOAD_COOKIE_MISSING để GAS dừng có lý do', [noCookieLogin.transport && noCookieLogin.transport.captures, noCookieRead.code], [{}, 'PAYLOAD_COOKIE_MISSING']);
-  const noCookieTab = (noCookieLogin.transport && noCookieLogin.transport.trace || []).filter((item) => item.stage === 'payload_cookie_tab_read')[0] || {};
-  // Chẩn đoán "lúc được lúc không": phải phân biệt trang không có mã phiên với mẫu bắt lệch, mà trace vẫn không được mang nội dung trang hay mã phiên.
-  check(so, 'trace bắt mã phiên ghi có/không dấu hiệu database FBM ở trang tài khoản và tab, không kèm giá trị',
-    [escapedRead.error, noCookieRead.error, noCookieRead.responseLength > 0, noCookieTab.error, JSON.stringify(noCookieLogin.transport.trace).indexOf('Đăng nhập') < 0],
-    ['payload_marker_present', 'payload_marker_absent', true, 'payload_marker_absent', true]);
-
-  await new Promise((resolve) => {
-    let listener = null;
-    const calls = [];
-    function response(text) {
-      return {
-        ok: true,
-        status: 200,
-        headers: { get() { return 'text/html; charset=UTF-8'; } },
-        arrayBuffer() { return Promise.resolve(new TextEncoder().encode(text).buffer); }
-      };
-    }
-    const context = {
-      console: { log() {}, warn() {} }, Date, URL, Promise, Error, AbortController, setTimeout, clearTimeout,
-      Blob, Response, TextDecoder, TextEncoder, DecompressionStream: undefined,
-      document: { documentElement: { innerHTML: '', textContent: '' } },
-      fetch(url, options) {
-        calls.push({ url: String(url), method: options && options.method || 'GET' });
-        if (String(url).endsWith('/Main/Login.aspx')) { return Promise.resolve(response(String.raw`<script>{"ChallengeScript":"eval(\u0027\\\u0027a2838e\\\u0027+\\\u00276f471b\\\u0027\u0027)"}</script>`)); }
-        if (String(url).endsWith('/GetEntityData')) { return Promise.resolve(response('{"d":[["01","Fast FBM Online","FHN_CRM_App"]]}')); }
-        if (String(url).endsWith('/GetUnitData')) { return Promise.resolve(response('{"d":[["CTY","Company","Company"]]}')); }
-        if (String(url).endsWith('/Login')) { return Promise.resolve(response('Đã đăng nhập. Hủy phiên làm việc trước')); }
-        if (String(url).endsWith('/zccrAccount.aspx')) { return Promise.resolve(response('unexpected-account-page')); }
-        return Promise.resolve(response('{}'));
-      },
-      chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
-    };
-    vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
-    listener({ type: 'FBM_EXECUTE_V2', request: { meta: { kind: 'login', loginCredentials: { username: 'anhlt' } } } }, null, (reply) => {
-      setTimeout(() => {
-        check(so, 'executor dung tai Login khi FBM bao dang co phien khac, khong tu huy va khong mo trang tai khoan', [calls.map((item) => item.url.replace('https://fbo.com.vn:8888/Main/', '')).join('|'), reply && reply.result && reply.result.transport && reply.result.transport.loginBlocked, reply && reply.result && reply.result.body], ['Login.aspx|Login.aspx/GetEntityData|Login.aspx/GetUnitData|Login.aspx/Login', true, 'Đã đăng nhập. Hủy phiên làm việc trước']);
-        resolve();
-      }, 20);
-    });
-  });
+  const kept = await runPageKeyStore('', liveStore);
+  check(so, 'khóa rỗng (máy chủ giữ khóa của phiên đang sống) thì tab không ghi đè khóa, không xóa menu, bảng FBM vẫn hiện',
+    [liveStore.items['k\u0000'], liveStore.items.menuItems, liveStore.sessionCleared, JSON.parse(kept.body).code], ['khoa-phien-dang-song', 'menu-dang-dung', false, 'LOGIN_PAGE_KEY_KEPT_EXISTING']);
 }
 
 module.exports = { chay };

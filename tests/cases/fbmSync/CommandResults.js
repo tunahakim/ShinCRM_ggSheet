@@ -54,7 +54,6 @@ const CA = [
   { lenh: 'set_background', ten: 'set_background', payload: { enabled: false } },
   { lenh: 'save_identity_binding', ten: 'save_identity_binding', payload: { binding: {} } },
   { lenh: 'save_credential', ten: 'save_credential thiếu dữ liệu', payload: {} },
-  { lenh: 'repair_login_username', ten: 'repair_login_username', payload: { credentialRef: 'cred-test-1234', username: 'nguoi-thu' }, chuan: dangNhapDaLuu },
   { lenh: 'reset_state', ten: 'reset_state' },
   { lenh: 'retry_push_failures', ten: 'retry_push_failures không có lỗi đẩy' },
   { lenh: 'retry_push_failures', ten: 'retry_push_failures mở lại nhóm lỗi', chuan: (F) => { F.pushFailuresWrite({ hashes: { 'customer:CUS-1': 'h1' }, details: {} }); F.recordChange = (plan) => plan({ read: (entity) => entity === 'customer' ? [{ id: 'CUS-1' }] : [], busy: () => ({}) }); } },
