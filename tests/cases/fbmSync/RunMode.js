@@ -19,7 +19,7 @@ function chay(so) {
   const realPullWrite = builders.FbmSync.pullPageApply;
   builders.FbmSync.stateRead = () => readModeState;
   builders.FbmSync.stateWrite = (next) => { readModeState = next; return next; };
-  builders.FbmSync.pullPageApply = (entity, records) => { readModeSheetWrites += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }; };
+  builders.FbmSync.pullPageApply = (entity, records) => { readModeSheetWrites += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
   const readModeResult = keoLo(builders.FbmSync, 'customer', [{ id: 'CUS-000001' }], 'read');
   check(so, 'mode read ghi ket qua pull vao ShinCRM nhung khong co quyen ghi FBM',
     [readModeResult.written, readModeSheetWrites, readModeState.counts.succeeded, builders.FbmSync.canWriteFbm('read')],

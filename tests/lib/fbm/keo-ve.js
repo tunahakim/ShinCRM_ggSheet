@@ -11,12 +11,10 @@ function coDauVan(F, entity, records, ctx) {
   return (records || []).map((record) => (record && record.fbmHash || typeof F.hash !== 'function' ? record : Object.assign({}, record, { fbmHash: String(F.hash(record, entity, ctx.categoryGate)) })));
 }
 
-/** Như `pullPageApply` cộng phần người điều phối xóa mục chờ xác nhận. */
+/** Như `pullPageApply` với ngữ cảnh người điều phối truyền. */
 function keoVe(F, entity, records) {
   const ctx = ngCanhKeo(F);
-  const result = F.pullPageApply(entity, coDauVan(F, entity, records, ctx), Object.assign({ pending: typeof F.pendingPushesRead === 'function' ? F.pendingPushesRead() : {} }, ctx));
-  if (typeof F.pendingPushClear === 'function') { result.pendingClears.forEach((item) => F.pendingPushClear(item.entity, item.id)); }
-  return result;
+  return F.pullPageApply(entity, coDauVan(F, entity, records, ctx), ctx);
 }
 
 /** Như lớp xả đọc áp một lô trên ô lượt trong kho: đọc, áp với `mode` của lần gọi, ghi lại. */

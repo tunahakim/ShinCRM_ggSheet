@@ -55,34 +55,7 @@ function chay(so) {
     F.connectionWrite({ binding: {}, clearedFrom: {} });
     check(so, 'kho kết nối rỗng cả hai phần thì xóa hẳn khóa', khoaFbm(), []);
   }
-  section('FBM sync - sổ chờ xác nhận và sổ lỗi đẩy');
-  {
-    const notices = [], resolved = [];
-    const flow = workflowGas({ LOG_WARN: 'warn', noticeRaise: (notice) => { const moi = !notices.some((n) => n.title === notice.title); notices.push(notice); return moi; }, noticeResolve: (topic) => { resolved.push(topic); } }), F = flow.hop.FbmSync;
-    const T = Date.UTC(2026, 10, 10, 8, 0), PHUT = 60000, tuoi = F.BUDGET.pendingPushStaleMinutes * PHUT;
-    const pending = {
-      'customer:CUS-1': { hSHIN: 'h1', sentAt: T, fbmId: '' },
-      'customer:CUS-2': { hSHIN: 'h2', sentAt: T, fbmId: 'F2' },
-      'customer:CUS-3': { hSHIN: 'h3', sentAt: T - tuoi - PHUT, fbmId: '' },
-      'activity:ACT-9': { hSHIN: 'h9', sentAt: T, fbmId: 'A9' },
-      'customer:CUS-4': { hSHIN: 'h4', sentAt: T - tuoi - PHUT, fbmId: 'F4' }
-    };
-    const local = { customer: [{ id: 'CUS-1', fbmHash: '' }, { id: 'CUS-2', fbmHash: 'h2' }, { id: 'CUS-3', fbmHash: '' }, { id: 'CUS-4', fbmHash: 'cu' }], activity: [] };
-    const sweep = F.pendingSweep(pending, local, T, tuoi);
-    check(so, 'pendingSweep: mồ côi là bản ghi đã xóa khỏi Sheet hoặc FBM đã giữ đúng bản gửi; bản ghi tạo khách mất phản hồi (chưa có dấu vân) không bao giờ mồ côi dù quá tuổi; quá tuổi chỉ để báo',
-      [sweep.orphans.sort(), sweep.stale.sort()], [['activity:ACT-9', 'customer:CUS-2'], ['customer:CUS-3', 'customer:CUS-4']]);
-    F.pendingPushesWrite(pending);
-    const scan = { records: (entity) => local[entity] }, logs = [];
-    F.pendingSweepApply(scan, logs, T);
-    const sauLan1 = Object.keys(F.pendingPushesRead()).sort(), log1 = logs.map((l) => l.action);
-    logs.length = 0;
-    F.pendingSweepApply(scan, logs, T + PHUT);
-    check(so, 'pendingSweepApply: xóa mồ côi trong một lần ghi, giữ mục quá tuổi và mục tạo khách mất phản hồi; thông báo quá tuổi chỉ ghi Log khi mới bật',
-      [sauLan1, log1, logs.map((l) => l.action), notices.length, notices[0].topic], [['customer:CUS-1', 'customer:CUS-3', 'customer:CUS-4'], ['pending_push_orphans', 'pending_push_stale'], [], 2, 'fbm_pending_stale']);
-    F.pendingPushesWrite({});
-    F.pendingSweepApply(scan, logs, T);
-    check(so, 'sổ chờ rỗng thì xóa hẳn khóa và gỡ thông báo quá tuổi', [flow.documentProperties.getProperty(F.PENDING_PUSHES_KEY), resolved.indexOf('fbm_pending_stale') >= 0], [null, true]);
-  }
+  section('FBM sync - sổ lỗi đẩy');
   {
     const F = workflowGas().hop.FbmSync, max = F.BUDGET.pushFailuresMax, hashes = {};
     for (let i = 0; i <= max; i += 1) { hashes['customer:CUS-' + i] = 'h' + i; }
@@ -104,9 +77,9 @@ function chay(so) {
     };
     Object.keys(cu).forEach((key) => kho.setProperty(key, cu[key]));
     const kq = flow.hop.fbmStoresMigrate(), so1 = F.processBookRead(), cuCon = Object.keys(kho.getProperties()).filter((key) => key in cu);
-    check(so, 'chuyển kho: giữ đúng nghĩa khóa cũ (giờ chạy xong, lần thử lại, mốc khách, con trỏ Vòng xoay, liên kết), xóa khóa cũ, khóa dấu đẩy sạch và kho làm việc còn sót, giữ sổ chờ xác nhận, ghi một dòng Log',
+    check(so, 'chuyển kho: giữ đúng nghĩa khóa cũ (giờ chạy xong, lần thử lại, mốc khách, con trỏ Vòng xoay, liên kết), xóa khóa cũ, khóa dấu đẩy sạch, sổ chờ xác nhận đã bỏ và kho làm việc còn sót, ghi một dòng Log',
       [so1.customerFull.doneAt, so1.heartbeat.doneAt, so1.detail.failures, so1.detail.retryAt, so1.customerFull.baseline, so1.detail.cursor, F.bindingRead().userId, cuCon, kq.written.sort(), logs.filter((l) => l.action === 'fbmStoresMigrate').length],
-      [1794300044222, 1794300100000, 2, 1794300900000, 7, 20075, 'u1', ['FBM_SYNC_PENDING_PUSHES_V1'], ['FBM_CONNECTION_V1', 'FBM_SYNC_PROCESS_BOOK_V1'], 1]);
+      [1794300044222, 1794300100000, 2, 1794300900000, 7, 20075, 'u1', [], ['FBM_CONNECTION_V1', 'FBM_SYNC_PROCESS_BOOK_V1'], 1]);
     const anh = JSON.stringify(kho.getProperties()), kq2 = flow.hop.fbmStoresMigrate();
     check(so, 'chạy lại hàm chuyển không đổi gì trong kho', [JSON.stringify(kho.getProperties()) === anh, kq2.written, kq2.deleted, /không có gì/.test(kq2.report[0])], [true, [], [], true]);
     kho.setProperty('FBM_SYNC_DONE_HEARTBEAT', '5');
@@ -133,9 +106,9 @@ function chay(so) {
   {
     const flow = workflowGas(), F = flow.hop.FbmSync, kho = flow.documentProperties, bang = F.RUN_WORK_STORES;
     const khoaLam = Object.keys(bang.bits).map((scope) => F.seenStorePrefix(scope) + '0').concat(bang.lists.map((prefix) => prefix + 'SHARDS'), bang.keys);
-    const gieo = () => { khoaLam.forEach((key) => kho.setProperty(key, '1')); kho.setProperty(F.PENDING_PUSHES_KEY, '{"customer:CUS-1":{"hSHIN":"h","sentAt":1}}'); kho.setProperty(F.PUSH_FAILURES_KEY, '{"hashes":{},"details":{}}'); };
+    const gieo = () => { khoaLam.forEach((key) => kho.setProperty(key, '1')); kho.setProperty(F.PUSH_FAILURES_KEY, '{"hashes":{},"details":{}}'); };
     const conLai = () => F.workStoreKeys(Object.keys(kho.getProperties()));
-    const giu = () => [F.PENDING_PUSHES_KEY, F.PUSH_FAILURES_KEY].filter((key) => kho.getProperty(key) !== null).length;
+    const giu = () => [F.PUSH_FAILURES_KEY].filter((key) => kho.getProperty(key) !== null).length;
     gieo();
     F.withOrchestrationLock(() => { F.runOpen({ phase: 'pull_customer' }); });
     const sauMo = [conLai(), giu()];
@@ -145,11 +118,11 @@ function chay(so) {
       F.withOrchestrationLock(() => { const st = F.stateRead(); F.runClose(st, verdict, {}); F.stateWrite(st); });
       return verdict + ':' + conLai().length + ':' + giu();
     });
-    check(so, 'runOpen xóa kho làm việc sót của lượt trước, giữ sổ chờ xác nhận và sổ lỗi đẩy', sauMo, [[], 2]);
+    check(so, 'runOpen xóa kho làm việc sót của lượt trước, giữ sổ lỗi đẩy', sauMo, [[], 1]);
     let maLa = '';
     try { F.seenStoreKind('customer_khong_khai'); } catch (err) { maLa = err.code; }
     check(so, 'kho bit không khai trong RUN_WORK_STORES thì ném, không đoán loại mã theo tên', maLa, 'SEEN_STORE_UNKNOWN');
-    check(so, 'mọi kết luận đóng lượt đều không để lại khóa kho làm việc nào, giữ sổ chờ xác nhận và sổ lỗi đẩy', ketLuan, Object.keys(F.RUN_VERDICTS).map((verdict) => verdict + ':0:2'));
+    check(so, 'mọi kết luận đóng lượt đều không để lại khóa kho làm việc nào, giữ sổ lỗi đẩy', ketLuan, Object.keys(F.RUN_VERDICTS).map((verdict) => verdict + ':0:1'));
   }
 }
 

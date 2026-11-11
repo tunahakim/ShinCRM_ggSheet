@@ -12,7 +12,7 @@ async function chay(so) {
   const pushProps = { data: {} };
   const pushPropertyApi = taoKhoThuocTinh(pushProps.data);
   const push = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {}, PropertiesService: { getDocumentProperties: () => pushPropertyApi, getScriptProperties: () => pushPropertyApi }, writeGateSave: () => ({ ok: true }) });
-  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
+  napServer(push, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const pushCandidatesImpl = push.FbmSync.pushCandidates;
   // Hộp này kiểm hàng đợi đẩy; lịch kiểm lại danh mục có test riêng.
@@ -65,13 +65,9 @@ async function chay(so) {
   push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save', { map: {} });
   check(so, 'push thanh cong giu baseline cu cho ky xac nhan va dung source push', [pushPatch.fbmHash, pushWriteRequest.source], ['BASE', 'push']);
   check(so, 'push thành công không ghi Log từng record', pushLogs.length, 0);
-  let pendingSet;
-  const realPendingSet = push.FbmSync.pendingPushSet;
-  push.FbmSync.pendingPushSet = (entity, id, value) => { pendingSet = value; };
   const createdActivity = { id: 'ACT-NEW', fbmId: '', content: 'Tạo từ ShinCRM', taskType: 'CV1', workDate: '2026-10-07' };
-  push.FbmSync.pushResultSent({ entity: 'activity', record: createdActivity }, { d: { InternalValues: [{ Name: 'id', Value: 174900 }] } }, 'activity_new_save', { map: {} });
-  check(so, 'FBM-050: tạo Activity lưu hash đã gửi kèm ID FBM vừa cấp, khớp bản đọc xác nhận', pendingSet.hSHIN, push.FbmSync.hash(Object.assign({}, createdActivity, { fbmId: '174900' }), 'activity', { map: {} }));
-  push.FbmSync.pendingPushSet = realPendingSet;
+  const createdSent = push.FbmSync.pushResultSent({ entity: 'activity', record: createdActivity }, { d: { InternalValues: [{ Name: 'id', Value: 174900 }] } }, 'activity_new_save', { map: {} });
+  check(so, 'FBM-050: tạo Activity trả hash đã gửi kèm ID FBM vừa cấp, khớp bản đọc xác nhận', createdSent.sentHash, push.FbmSync.hash(Object.assign({}, createdActivity, { fbmId: '174900' }), 'activity', { map: {} }));
   const errorState = { counts: { error: 0 }, metadata: { pushFailures: {} } };
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
   check(so, 'push loi luu hash local de chan lap lai', push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'], push.FbmSync.hash({ id: 'C-ERR', companyName: 'Lỗi' }, 'customer', { map: {} }));
@@ -172,7 +168,7 @@ async function chay(so) {
   check(so, 'Xung đột phát hiện giữa lượt không còn công tắc dừng cả chiều đẩy: chỉ dòng xung đột bị pushCandidates loại', typeof push.FbmSync.stopPushOnConflicts, 'undefined');
   {
     // Log của chặng đẩy qua bộ gom của lát: mỗi nhóm đúng một dòng.
-    const savedLogEvent = push.logEvent, savedRead = push.FbmSync.readLocal, savedGate = push.writeGateSave, savedPendingSet = push.FbmSync.pendingPushSet, issueLogs = [];
+    const savedLogEvent = push.logEvent, savedRead = push.FbmSync.readLocal, savedGate = push.writeGateSave, issueLogs = [];
     const flush = () => { issueLogs.length = 0; push.logEvent = (event) => issueLogs.push(event); push.FbmSync.recordIssuesFlush(); return issueLogs.slice(); };
     push.logEvent = () => {}; push.FbmSync.recordIssuesFlush();
     const errorCandidate = (id, raw) => ({ entity: 'customer', kind: 'edit', id, raw, record: { id, fbmId: 'F-' + id } });
@@ -197,22 +193,14 @@ async function chay(so) {
     const skipLogs = flush();
     check(so, 'FBM-021: lát có nhiều bản ghi bị giữ thì Log đúng một dòng loại đó, kèm số lượng và danh sách mã; câu trên Sidebar vẫn nêu mã bản ghi', [skipState.counts.skipped, skipLogs.length, skipLogs[0] && skipLogs[0].detail.count, skipLogs[0] && skipLogs[0].detail.ids, skipLogs[0] && skipLogs[0].reason.indexOf('ACT-1, ACT-2, ACT-3') >= 0, messages[0].indexOf('ACT-3') >= 0], [3, 1, 3, ['ACT-1', 'ACT-2', 'ACT-3'], true, true]);
 
-    // Sổ chờ xác nhận ghi trước Sheet: ghi Sheet hỏng thì mục chờ vẫn còn, lượt sau không mất dấu lệnh đã tới FBM (FBM-027).
-    const order = [];
+    // Pha 1 không ghi kho nào ngoài dòng: hash đã gửi trả về cho dấu trang; ghi Sheet hỏng sau khi FBM đã lưu thì lỗi nổi lên, không nuốt.
     push.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'C-THU-TU', fbmId: '', fbmHash: '' }] : [];
-    push.FbmSync.pendingPushSet = (entity, id, value) => { order.push('so-cho'); return savedPendingSet(entity, id, value); };
-    push.writeGateSave = () => { order.push('sheet'); return { ok: true }; };
     const orderResponse = { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-THU-TU' }, { Name: 'ma_kh', Value: 'ALT00077' }] } };
-    push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save', { map: {} });
-    check(so, 'FBM-027: áp kết quả đẩy ghi sổ chờ xác nhận trước, ghi Sheet sau', order, ['so-cho', 'sheet']);
-    push.FbmSync.pendingPushClear('customer', 'C-THU-TU');
     push.writeGateSave = () => { throw new Error('Sheet hỏng'); };
     let sheetFailure = '';
     try { push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save', { map: {} }); } catch (error) { sheetFailure = String(error && error.message || error); }
-    const keptPending = push.FbmSync.pendingPushGet('customer', 'C-THU-TU');
-    check(so, 'FBM-027: ghi Sheet ném lỗi sau khi FBM đã lưu thì lỗi nổi lên và mục chờ xác nhận vẫn còn đủ hash, mã FBM', [sheetFailure !== '', keptPending && typeof keptPending.hSHIN, keptPending && keptPending.fbmId], [true, 'string', 'A-THU-TU']);
-    push.FbmSync.pendingPushClear('customer', 'C-THU-TU');
-    push.FbmSync.pendingPushSet = savedPendingSet; push.writeGateSave = savedGate; push.FbmSync.readLocal = savedRead; push.logEvent = savedLogEvent;
+    check(so, 'Pha 1: ghi Sheet ném lỗi sau khi FBM đã lưu thì lỗi nổi lên', sheetFailure !== '', true);
+    push.writeGateSave = savedGate; push.FbmSync.readLocal = savedRead; push.logEvent = savedLogEvent;
   }
   {
     // FBM-021: ba bản ghi bị giữ rồi một bản ghi đẩy được thì ba bản ghi giữ chỉ tốn một lần ghi Sheet, lần ghi kế là "đang đẩy" của bản ghi đẩy được.
@@ -292,17 +280,16 @@ async function chay(so) {
   const activityResponse = buocDay(push.FbmSync, { d: { InternalValues: [{ Name: 'id', Value: 42 }] } });
   check(so, 'Activity New nhan ID FBM va tao request doc xac nhan', [activityResponse.meta.kind, activityResponse.meta.id, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], ['activity_edit_open', '42', 0, 'push']);
   const verifyRecord = { id: 'ACT-VERIFY', fbmId: '42', customerFbmCode: 'ALT00010', taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09', owner: 'Owner', fbmHash: 'base', syncStatus: push.FbmSync.SYNC_STATUS.pushed };
-  push.FbmSync.pendingPushSet('activity', verifyRecord.id, { hSHIN: push.FbmSync.hash(verifyRecord, 'activity', { map: {} }), fbmId: '42' });
   push.FbmSync.readLocal = () => [verifyRecord];
   push.writeGateSave = () => ({ ok: true });
   const verifyState = push.FbmSync.runOpen({ phase: 'push' });
-  verifyState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', candidate: { entity: 'activity', kind: 'create', id: verifyRecord.id, record: verifyRecord } };
+  verifyState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', sentHash: push.FbmSync.hash(verifyRecord, 'activity', { map: {} }), candidate: { entity: 'activity', kind: 'create', id: verifyRecord.id, record: verifyRecord } };
   push.FbmSync.stateWrite(verifyState);
   const verifyRow = []; verifyRow[0] = 42; verifyRow[3] = 'Goi'; verifyRow[10] = new Date('2026-09-09T00:00:00Z'); verifyRow[15] = 'Noi dung #SC-ACT-VERIFY';
   const markerClean = buocDay(push.FbmSync, { d: { Controller: 'zccrAccountTask', Row: verifyRow } });
   const markerCleanDetails = markerClean && markerClean.body.memvars.filter((item) => item.Name === 'details')[0];
   check(so, 'G12: lệnh tạo Activity xác nhận xong mà FBM còn dấu #SC thì gửi ngay lệnh sửa Edit theo ID FBM với nội dung sạch', [markerClean && markerClean.body.action, markerClean && markerClean.body.values[0], markerCleanDetails && markerCleanDetails.OldValue, markerCleanDetails && markerCleanDetails.NewValue, push.FbmSync.stateRead().cursor.operation], ['Edit', '42', 'Noi dung #SC-ACT-VERIFY', 'Noi dung', 'activity_marker_clean']);
-  check(so, 'Activity chỉ tính đã đẩy sau khi đọc xác nhận khớp hash', [push.FbmSync.stateRead().counts.pushed, push.FbmSync.pendingPushGet('activity', verifyRecord.id), pushLogs.some((event) => event.action === 'push_record')], [1, null, false]);
+  check(so, 'Activity chỉ tính đã đẩy sau khi đọc xác nhận khớp hash', [push.FbmSync.stateRead().counts.pushed, pushLogs.some((event) => event.action === 'push_record')], [1, false]);
   const cleanWrites = [];
   push.writeGateSave = (request) => { cleanWrites.push(request); return { ok: true }; };
   push.FbmSync.recordIssues = {};
@@ -317,10 +304,9 @@ async function chay(so) {
   const cleanIssue = pushLogs.slice(truocBoDau).filter((event) => /_record_issue$/.test(event.action))[0] || {};
   check(so, 'G12: lệnh bỏ dấu hỏng chỉ cảnh báo ở Log và câu chốt Sidebar, không đánh lỗi giao dịch', [cleanIssue.outcome, /Chưa bỏ được dấu nhận diện #SC/.test(cleanIssue.reason || ''), cleanWrites.length, push.FbmSync.stateRead().counts.error, /chưa bỏ được dấu #SC/.test(push.FbmSync.stateRead().message)], ['warn', true, 0, 0, true]);
   const keptRecord = Object.assign({}, verifyRecord, { id: 'ACT-KEPT', syncStatus: push.FbmSync.SYNC_STATUS.pushed });
-  push.FbmSync.pendingPushSet('activity', keptRecord.id, { hSHIN: push.FbmSync.hash(keptRecord, 'activity', { map: {} }), fbmId: '42' });
   push.FbmSync.readLocal = () => [keptRecord];
   const keptState = push.FbmSync.runOpen({ phase: 'push' });
-  keptState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', candidate: { entity: 'activity', kind: 'edit', id: keptRecord.id, record: keptRecord } };
+  keptState.cursor = { kind: 'push_wait', entity: 'activity', index: 0, operation: 'activity_verify', sentHash: push.FbmSync.hash(keptRecord, 'activity', { map: {} }), candidate: { entity: 'activity', kind: 'edit', id: keptRecord.id, record: keptRecord } };
   push.FbmSync.stateWrite(keptState);
   const keptRow = verifyRow.slice(); keptRow[15] = 'Noi dung #SC-ACT-KEPT';
   buocDay(push.FbmSync, { d: { Controller: 'zccrAccountTask', Row: keptRow } });

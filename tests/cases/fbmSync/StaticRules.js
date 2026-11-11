@@ -225,8 +225,9 @@ const EXCEPTIONS = {
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js': 8,
-    '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 5
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 3,
+    '1_ShinCRM_GAS/fbm_sync/transport/PushRecover.js': 2
   }
 };
 

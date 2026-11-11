@@ -69,7 +69,7 @@ function capDauDaySach(hopCat) {
 }
 
 /** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. Nhãn lượt ở `Run.js` đọc tên tiến trình nền của `Scheduler.js` nên sổ tiến trình nạp cùng khung. */
-const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/WorkStores.js', 'fbm_sync/state/PendingPushes.js', 'fbm_sync/state/RequestWatch.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
+const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/WorkStores.js', 'fbm_sync/state/RequestWatch.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
 
 /** Trước khi chạy một tệp: tệp đồng bộ cần bảng quyền; `Identity.js` đọc liên kết qua cửa JSON của kho trong `State.js` (bản thật luôn có). */
 function capTruocTep(hopCat, duongDan, duongDans) {
@@ -95,7 +95,7 @@ function capSauTep(hopCat, duongDan) {
 
 /** Sau cả lần nạp: hộp có chặng đẩy thì cấp phần dấu lần đẩy sạch cần; hộp có bước kiểm tra phiên thì nạp bước đánh dấu phiên đã xác minh (`AutoLogin.js`), hộp có `Report.js` thì nạp cổng ghi lỗi Sidebar (`ClientError.js`), như bản thật luôn có. */
 function capSauNap(hopCat, duongDans) {
-  if (duongDans.indexOf('fbm_sync/transport/PushFlow.js') >= 0) { capDauDaySach(hopCat); }
+  if (duongDans.indexOf('fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js') >= 0) { capDauDaySach(hopCat); }
   if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0 && !(hopCat.FbmSync && hopCat.FbmSync.sessionVerifiedApply)) { ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js'].forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep })); }
   if (duongDans.indexOf('fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }

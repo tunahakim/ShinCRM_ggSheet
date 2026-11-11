@@ -25,7 +25,7 @@ function chay(so) {
       protocol: { parse: (value) => value, assertSuccess: () => ({ ok: true }), contractMismatch: () => null }, replyCheck: () => ({ ok: true }), scope: () => null,
       traceImport: () => {}, traceEvent: () => {}, traceResponse: () => ({}), applyTransportSession: () => false, sessionGateResponseStarted: () => {},
       rowsToRecords: () => ({ rows: [], fields: [], total: 0 }), isTemporaryRecord: () => false, customerPageItem: () => '', customerPageValue: () => [], seenStoreReader: () => () => true, seenStoreMark: () => {}, readLocal: () => [],
-      pullPageApply: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [], pendingClears: [] }), previewRecords: () => {}, customerNext: () => false,
+      pullPageApply: () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [] }), previewRecords: () => {}, customerNext: () => false,
       canWriteSheet: (mode) => mode === 'read' || mode === 'write', canWriteFbm: (mode) => mode === 'push' || mode === 'write',
       pushStageOpen: () => { readFinishPushRequests += 1; return {}; },
       runInProgress: (state) => !!state.runId && ['idle', 'done', 'error', 'paused', 'conflict'].indexOf(state.phase) < 0, businessFinishOpenSteps: () => {}, RECORD_HOLDER: 'fbm',
