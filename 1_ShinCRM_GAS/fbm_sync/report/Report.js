@@ -50,7 +50,7 @@ FbmSync.pipelineDefinition = function (state) {
   var value = state || {}, scan = String(value.scan || 'full'), mode = String(value.mode || 'read'), cursor = value.cursor || {};
   if (scan === 'identity_probe') { return { kind: 'identity_probe', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'identity', label: 'Đọc nhận diện tài khoản' }] }; }
   if (scan === 'identity_check') { return { kind: 'identity_check', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'customer', label: 'Quét Customer' }, { id: 'reconcile', label: 'Đối chiếu liên kết' }] }; }
-  if (String(cursor.kind || '') === 'login' || /^login_identity_/.test(String(cursor.kind || ''))) {
+  if (String(cursor.kind || '') === 'login') {
     return { kind: 'login_test', steps: [{ id: 'login', label: 'Đăng nhập FBM' }, { id: 'session', label: 'Kiểm tra phiên' }, { id: 'identity', label: 'Xác minh tài khoản' }] };
   }
   if (scan === 'activity_bulk') { return { kind: 'activity_bulk', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }, { id: 'sheet', label: 'Cập nhật Sheet' }] }; }
@@ -69,8 +69,8 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
   (definition.steps || []).forEach(function (step) { available[step.id] = true; });
   if (phase === 'done' || phase === 'idle') { return ''; }
   if (kind === 'lookup') { return available.category ? 'category' : ''; }
-  if (kind === 'login_identity_authorize') { return available.session ? 'session' : 'login'; }
-  if (kind === 'identity_user_grid' || kind === 'login_identity_user') { return available.identity ? 'identity' : 'session'; }
+  if (kind === 'login' && cursor.step === 'authorize') { return available.session ? 'session' : 'login'; }
+  if (kind === 'identity_user_grid' || (kind === 'login' && cursor.step === 'identity')) { return available.identity ? 'identity' : 'session'; }
   if (kind === 'customer_grid') { return available.customer ? 'customer' : ''; }
   if (kind === 'activity_grid' || (kind === 'scan_job' && cursor.entity === 'activity')) { return available.activity ? 'activity' : ''; }
   if (kind === 'push_scan') { return available.record ? 'record' : ''; }
@@ -83,7 +83,7 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
   if (phase === 'pull_activity') { return available.activity ? 'activity' : ''; }
   if (phase === 'reconcile' || phase === 'conflict') { return available.reconcile ? 'reconcile' : ''; }
   if (phase === 'push') { return available.record ? 'record' : ''; }
-  if (phase === 'checking_session') { return available.login && (kind === 'login' || /^login_/.test(kind)) ? 'login' : 'session'; }
+  if (phase === 'checking_session') { return available.login && kind === 'login' ? 'login' : 'session'; }
   return '';
 };
 /** DTO tiến độ chỉ dùng để vẽ; marker hoàn tất luôn xuất phát từ state GAS cùng lượt. */

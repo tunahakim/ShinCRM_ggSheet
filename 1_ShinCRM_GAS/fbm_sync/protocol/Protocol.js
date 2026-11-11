@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.protocol = {
   version: 1,
   // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Mọi lời gọi giữa GAS và Extension mang mã này: GAS gửi trong phong bì, Extension gửi trong response và thân lời gọi relay; lệch mã thì bên nhận dừng với `EXTENSION_PROTOCOL_MISMATCH`.
-  contract: 'f939312ceea2',
+  contract: '72bc9995058e',
   /** Chặn request bị ghép thiếu endpoint trước khi nó tới Extension/FBM. */
   validateEndpoint: function (url) {
     var value = String(url === null || url === undefined ? '' : url).trim();
@@ -13,9 +13,14 @@ FbmSync.protocol = {
     if (!allowed.test(value)) { return { ok: false, code: 'FBM_ENDPOINT_UNALLOWED', message: 'Endpoint FBM không nằm trong danh sách cho phép; đã dừng trước khi gửi.' }; }
     return { ok: true };
   },
-  /** Tạo envelope có id để ghép đúng response với request. */
-  request: function (id, url, body, meta) {
-    return { protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), url: url, method: 'POST', headers: { 'content-type': 'application/json; charset=UTF-8' }, body: body, bodyText: FbmSync.protocol.json(body), meta: meta || {} };
+  /**
+   * Tạo envelope có id để ghép đúng response với request. `method` mặc định `POST`; `GET` (đọc trang) và `COMMAND` (lệnh cho Extension, không gọi FBM) không mang thân, vì fetch GET có thân thì trình duyệt ném.
+   * Thân là chuỗi thì gửi nguyên văn (bước `GetEntityData` của trang Login gửi thân rỗng, không phải `""`).
+   */
+  request: function (id, url, body, meta, method) {
+    var verb = String(method || 'POST'), envelope = { protocol: 'shincrm-fbm', version: 1, contract: FbmSync.protocol.contract, id: String(id), url: url, method: verb, headers: { 'content-type': 'application/json; charset=UTF-8' }, meta: meta || {} };
+    if (verb === 'POST') { envelope.body = body; envelope.bodyText = typeof body === 'string' ? body : FbmSync.protocol.json(body); }
+    return envelope;
   },
   /**
    * Lô request đọc độc lập (09/01 "Lô request đọc độc lập"). Id phần tử là thứ tự trong lô: Extension chạy lần lượt và chỉ được dừng sớm, nên response hợp lệ luôn là `0..k-1`.

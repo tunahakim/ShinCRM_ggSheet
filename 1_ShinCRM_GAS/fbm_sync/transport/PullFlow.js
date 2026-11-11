@@ -304,10 +304,6 @@ FbmSync.continueStep = function (rawResponse) {
   FbmSync.replyIntake(state, rawResponse);
   FbmSync.stateWrite(state);
   response = FbmSync.protocol.parse(rawResponse);
-  if (typeof FbmSync.continueSessionGate === 'function') {
-    var gateResponse = FbmSync.continueSessionGate(state, cursor, rawResponse);
-    if (gateResponse) { return gateResponse; }
-  }
   if (cursor.kind === 'session_probe' && !FbmSync.protocol.isLiveSessionResponse(rawResponse)) {
     return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
   }
@@ -347,11 +343,6 @@ FbmSync.continueStep = function (rawResponse) {
   state.retryable = false;
   state.lastFailureCode = '';
   FbmSync.stateWrite(state);
-
-  if (typeof FbmSync.continueSessionGate === 'function') {
-    var completedGate = FbmSync.continueSessionGate(state, cursor, rawResponse);
-    if (completedGate) { return completedGate; }
-  }
 
   // Probe User là bước hệ thống của cổng: đối chiếu đủ bốn định danh rồi
   // mới trả lại cursor nghiệp vụ ban đầu. Không gọi logic Customer tại đây.

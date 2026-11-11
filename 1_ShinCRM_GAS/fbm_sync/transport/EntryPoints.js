@@ -51,7 +51,7 @@ FbmSync.relaySwitchDecisionLog = function (decision, fromSpreadsheetId) {
 };
 /**
  * Thân trả cho Extension sau khi đã qua `publicResult`. `status` là statusView đầy đủ vì Extension chuyển nguyên cho Sidebar đang mở vẽ (lượt tay giờ do Extension chở); `conflict` là bản xung đột vừa đọc lại để Sidebar mở hộp quyết.
- * `httpStatus` là mã HTTP của response FBM (chỉ có ở kết quả lỗi đọc FBM), không phải `status`. `trailAck` là mốc ô lỗi Extension GAS vừa ghi Log, Extension xóa ô khi mốc chưa đổi. `retryMs` là giãn cách Extension thử lại lần gọi relay hỏng kế tiếp. `poll` là lệnh chuông của lần hỏi nền (`{ minutes }` giữ nhịp, `{ stop, code }` tắt chuông); lệnh khác không có.
+ * `httpStatus` là mã HTTP của response FBM (chỉ có ở kết quả lỗi đọc FBM), không phải `status`. `trailAck` là mốc ô lỗi Extension GAS vừa ghi Log, Extension xóa ô khi mốc chưa đổi. `retryMs` là giãn cách Extension thử lại lần gọi relay hỏng kế tiếp. `poll` là lệnh chuông của lần hỏi nền (`{ minutes }` giữ nhịp, `{ stop, code }` tắt chuông); lệnh khác không có. `credentialRefs` chỉ có ở lần hỏi.
  */
 FbmSync.relayCompact = function (result, trailAck) {
   var value = result || {};
@@ -65,6 +65,7 @@ FbmSync.relayCompact = function (result, trailAck) {
     conflict: value.conflict || null,
     trailAck: Number(trailAck || 0),
     poll: value.poll || null,
+    credentialRefs: Array.isArray(value.credentialRefs) ? value.credentialRefs : [],
     retryMs: FbmSync.BUDGET.relayRetryMs.slice()
   };
 };

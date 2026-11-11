@@ -121,6 +121,12 @@ FbmSync.pollStop = function (code) { return { stop: true, code: String(code) }; 
  * Lượt tay giữ chỗ quá hạn được đóng ở lần hỏi của bất kỳ máy nào (không thì Sidebar thấy lượt "đang chạy" mãi); các việc khác chỉ máy chạy nền được làm.
  */
 FbmSync.heartbeatRun = function (input) {
+  // Câu trả lời kèm mã tham chiếu GAS đang giữ bản mã: Extension bỏ bản mã đời cũ nằm cạnh khóa của mã đó (kho Extension chỉ còn khóa).
+  var credential = FbmSync.credentialRead();
+  return Object.assign({}, FbmSync.heartbeatDecide(input), { credentialRefs: credential.configured ? [credential.credentialRef] : [] });
+};
+/** Quyết định của lần hỏi: máy nào được chạy, lượt nào nhận tiếp, tiến trình nào đến hạn, lệnh chuông. */
+FbmSync.heartbeatDecide = function (input) {
   var ask = input || {}, machineId = String(ask.machineId || '');
   // Hộp đen nạp trước mọi lần ghi ô lượt: request quá hạn bị bỏ ở lần ghi nào thì dòng Log của nó cũng mang hộp đen.
   FbmSync.requestWatchTrail(ask.trail);

@@ -15,13 +15,13 @@ FbmSync.loginRequestPlan = function (step, facts, credential, options) {
   var base = FbmSync.FBM_BASE_URL, page = base + '/Main/Login.aspx', f = facts || {}, c = credential || {}, pub = c.public || {};
   var fill = function (slots) { return { slots: slots, credentialRef: String(c.credentialRef || ''), ciphertext: c.ciphertext || null, salt: String(f.salt || '') }; };
   var meta = function (extra) { return Object.assign({ kind: 'login_step', step: step }, extra || {}); };
-  if (step === 'page') { return { url: page, method: 'GET', body: null, meta: meta({ responseType: 'text' }) }; }
+  if (step === 'page') { return { url: page, method: 'GET', body: null, meta: meta() }; }
   if (step === 'entity') { return { url: page + '/GetEntityData', method: 'POST', body: '', meta: meta() }; }
   if (step === 'unit') { return { url: page + '/GetUnitData', method: 'POST', body: { u: '', d: String(f.database || '') }, meta: meta({ fill: fill({ u: 'username' }) }) }; }
   if (step === 'login') {
     return { url: page + '/Login', method: 'POST', body: { user: '', password: '', database: String(f.database || ''), unit: String(f.unit || ''), language: String(pub.language || 'v'), value: String(f.salt || ''), force: !!(options && options.force === true), storage: true }, meta: meta({ fill: fill({ user: 'username', password: 'loginHash' }) }) };
   }
-  if (step === 'account') { return { url: base + '/Main/zccrAccount.aspx', method: 'GET', body: null, meta: meta({ responseType: 'text' }) }; }
+  if (step === 'account') { return { url: base + '/Main/zccrAccount.aspx', method: 'GET', body: null, meta: meta() }; }
   if (step === 'pageKey') { return { url: base + '/Main/zccrAccount.aspx', method: 'COMMAND', body: null, meta: meta({ command: 'pageKeyStore', pageKey: { check: String(f.pageKey && f.pageKey.check || ''), pageCookie: String(f.pageKey && f.pageKey.pageCookie || '') }, fill: fill({}) }) }; }
   if (step === 'home') { return { url: base + '/Default.aspx', method: 'COMMAND', body: null, meta: meta({ command: 'navigate' }) }; }
   var unknown = new Error('Bước đăng nhập lạ: ' + step); unknown.code = 'LOGIN_STEP_UNKNOWN'; throw unknown;

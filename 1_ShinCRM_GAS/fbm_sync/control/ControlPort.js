@@ -26,7 +26,6 @@ FbmSync.COMMANDS = {
   set_background: { lock: true, run: function (input) { return FbmSync.backgroundSwitchCommand(input.enabled === true); } },
   save_identity_binding: { lock: true, run: function (input) { return FbmSync.bindingWrite(input.binding || {}); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
-  repair_login_username: { lock: true, run: function (input) { return FbmSync.loginConfigRepairUsername(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
   retry_push_failures: { lock: true, run: function () { return FbmSync.pushFailuresClearCommand(); } },
   client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace); return { ok: true, status: FbmSync.logTransportError(input.message, input.action, input.runId) }; } },
@@ -160,7 +159,7 @@ FbmSync.START_KINDS = {
   sync: { slice: true, run: function (input) { return FbmSync.start({ mode: input.mode, pack: input.pack, origin: 'manual', manual: true, approvedFingerprint: input.approvedFingerprint }); } },
   identity_check: { slice: true, run: function (input) { return FbmSync.start({ mode: 'check', scan: 'identity_check', identity: input.identity || null, origin: 'manual', manual: true }); } },
   identity_probe: { slice: true, run: function () { return FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); } },
-  login_test: { run: function (input) { return FbmSync.loginTestRequest(input.credentialRef, input.identity || null); } },
+  login_test: { run: function (input) { return FbmSync.loginTestRequest(input.credentialDraft || null, input.identity || null); } },
   login_force: { run: function () { return FbmSync.loginForceRequest(); } }
 };
 FbmSync.commandStart = function (input) {

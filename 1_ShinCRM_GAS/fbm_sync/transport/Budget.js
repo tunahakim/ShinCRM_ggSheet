@@ -14,8 +14,6 @@ FbmSync.BUDGET = {
   gasTransitMs: 30000,
   // Giãn cách Extension thử lại một lần gọi relay hỏng (404, HTML, quá giờ); hết danh sách thì dừng và để nhịp nền sau hỏi lại.
   relayRetryMs: [5000, 15000, 45000],
-  // Đăng nhập là chuỗi fetch nối tiếp trong executor (trang gốc, salt, đơn vị, Login, trang tài khoản) rồi mở lại trang làm việc.
-  loginFetches: 6,
   activityBatchCustomers: 50,
   // Giao dịch của một khách đọc trong một trang; khách nhiều hơn thì lô sau xin trang kế của riêng khách đó tới khi hết.
   activityCustomerRows: 1000,
@@ -61,10 +59,9 @@ FbmSync.budgetFetchMs = function (meta) { return String(meta && meta.kind || '')
 FbmSync.budgetTimeoutMs = function (request, requestGap) {
   var budget = FbmSync.BUDGET, items = request && request.items ? request.items : [request || {}], total = budget.tabReadyMs, gapMs = Math.max(0, Number(requestGap && requestGap.maxMs || 0));
   items.forEach(function (item) {
-    var meta = item && item.meta || {}, fetches = String(meta.kind || '') === 'login' ? budget.loginFetches : 1;
-    total += gapMs + FbmSync.budgetFetchMs(meta) * fetches;
+    total += gapMs + FbmSync.budgetFetchMs(item && item.meta || {});
   });
-  if (request && request.meta && request.meta.afterLoginUrl) { total += budget.tabReadyMs; }
+  if (request && request.meta && request.meta.command === 'navigate') { total += budget.tabReadyMs; }
   if (request && request.meta && request.meta.reloadFbmPage) { total += budget.tabReadyMs; }
   return total;
 };

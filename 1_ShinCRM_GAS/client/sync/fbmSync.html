@@ -120,26 +120,13 @@ function fbmSyncSetAccountNotice(scope, kind, message) {
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, fbmSyncAccountNoticeBlocks(name)); }
   return notice;
 }
-/** Nạp cấu hình đăng nhập GAS trả; username bị che thì hỏi Extension tên thật và sửa lại kho GAS. */
+/** Nạp cấu hình đăng nhập GAS trả. Extension chỉ giữ khóa giải mã, không giữ tên đăng nhập: tên đã lưu bị che hoặc trống thì đánh dấu để màn Tài khoản đòi nhập lại trước khi lưu hay xóa. */
 function fbmSyncApplyLoginStatus(login) {
   return Promise.resolve(login).then(function (login) {
     FBM_SYNC_CLIENT.loginStatus = login || {};
     FBM_SYNC_CLIENT.loginPasswordMode = FBM_SYNC_CLIENT.loginStatus.configured === true ? 'saved' : 'draft';
-    if (FBM_SYNC_CLIENT.loginStatus.configured === true && FBM_SYNC_CLIENT.loginStatus.credentialRef && (!fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus) || /\*/.test(fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus)))) {
-      return fbmSyncLoadCredentialMetadata(FBM_SYNC_CLIENT.loginStatus.credentialRef).then(function (metadata) {
-        var username = String(metadata && metadata.username || '').trim();
-        if (username && username.indexOf('*') < 0) {
-          FBM_SYNC_CLIENT.loginStatus.public = Object.assign({}, FBM_SYNC_CLIENT.loginStatus.public || {}, { usernameHint: username });
-          return callServer('fbmRepairLoginUsername', [{ credentialRef: FBM_SYNC_CLIENT.loginStatus.credentialRef, username: username }]).then(function (repaired) {
-            if (repaired && repaired.ok !== false) { FBM_SYNC_CLIENT.loginStatus = repaired; }
-            else { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; }
-            return FBM_SYNC_CLIENT.loginStatus;
-          }).catch(function () { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; return FBM_SYNC_CLIENT.loginStatus; });
-        }
-        FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true;
-        return FBM_SYNC_CLIENT.loginStatus;
-      }).catch(function () { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; return FBM_SYNC_CLIENT.loginStatus; });
-    }
+    var username = fbmSyncLoginUsernameValue(FBM_SYNC_CLIENT.loginStatus);
+    if (FBM_SYNC_CLIENT.loginStatus.configured === true && (!username || /\*/.test(username))) { FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true; }
     if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
     return FBM_SYNC_CLIENT.loginStatus;
   }).then(function (result) { if (FBM_SYNC_CLIENT.lastStatus && FBM_SYNC_CLIENT.statusReady) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); } return result; });
@@ -689,7 +676,7 @@ function syncScreenClose() {
  * Cổng duy nhất Sidebar gọi Extension qua cầu nối: chờ kênh sẵn sàng, gửi lệnh, chờ trả lời cùng `id`. Bridge trả mọi lệnh một dạng `{ ok, result, code, error }`; lỗi giữ mã của Extension để nơi gọi báo đúng việc.
  * `purpose` là việc người dùng đang làm, đi vào chữ lỗi khi Extension vắng hoặc không trả lời.
  */
-var FBM_SYNC_EXTENSION_REPLY = { CRM_FBM_CONFIG: 'CRM_FBM_CONFIG_ACK', CRM_FBM_CREDENTIALS: 'CRM_FBM_CREDENTIALS_RESULT', CRM_FBM_CREDENTIAL_METADATA: 'CRM_FBM_CREDENTIAL_METADATA_RESULT', CRM_FBM_CREDENTIAL_CLEAR: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', CRM_FBM_CANCEL: 'CRM_FBM_CANCEL_RESULT', CRM_FBM_MACHINE_ID: 'CRM_FBM_MACHINE_ID_RESULT', CRM_FBM_RUN_NOW: 'CRM_FBM_RUN_NOW_RESULT' };
+var FBM_SYNC_EXTENSION_REPLY = { CRM_FBM_CONFIG: 'CRM_FBM_CONFIG_ACK', CRM_FBM_CREDENTIALS: 'CRM_FBM_CREDENTIALS_RESULT', CRM_FBM_CREDENTIAL_CLEAR: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', CRM_FBM_CANCEL: 'CRM_FBM_CANCEL_RESULT', CRM_FBM_MACHINE_ID: 'CRM_FBM_MACHINE_ID_RESULT', CRM_FBM_RUN_NOW: 'CRM_FBM_RUN_NOW_RESULT' };
 function fbmSyncExtensionRpc(action, fields, purpose) {
   if (window.top === window) { return Promise.reject(Object.assign(new Error('Không tìm thấy Extension để ' + purpose + '.'), { code: 'EXTENSION_NOT_FOUND' })); }
   return fbmSyncWaitForBridge().then(function (ready) {
@@ -1372,7 +1359,6 @@ function fbmSyncLoginCredentialsFromForm() {
   return { username: username ? String(username.value || '').trim() : '', password: passwordValue, userId: String(identity.userId || ''), spreadsheetId: String(identity.spreadsheetId || ''), database: '', unit: '', language: 'v' };
 }
 function fbmSyncEncryptCredentials(credentials) { return fbmSyncExtensionRpc('CRM_FBM_CREDENTIALS', { credentials: credentials }, 'mã hóa thông tin đăng nhập'); }
-function fbmSyncLoadCredentialMetadata(credentialRef) { return fbmSyncExtensionRpc('CRM_FBM_CREDENTIAL_METADATA', { credentialRef: String(credentialRef || '') }, 'đọc username đã lưu'); }
 function fbmSyncClearCredentialInExtension(credentialRef) { return fbmSyncExtensionRpc('CRM_FBM_CREDENTIAL_CLEAR', { credentialRef: String(credentialRef || '') }, 'xóa thông tin đăng nhập'); }
 function fbmSyncConfirmCredentialDelete() {
   var message = 'Username và mật khẩu đã lưu sẽ bị xóa. Liên kết tài khoản FBM vẫn được giữ nguyên.';
@@ -1484,9 +1470,10 @@ function fbmSyncTestLogin(button) {
     return Promise.resolve(null);
   }
   fbmSyncSetAccountNotice('login', 'pending', 'Đang đăng nhập thử và xác minh tài khoản FBM...');
-  var credentialRef = editing ? fbmSyncEncryptCredentials(credentials).then(function (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; return encrypted.credentialRef; }) : Promise.resolve(login.credentialRef);
-  return credentialRef.then(function (ref) {
-    return fbmSyncDrive('start', { kind: 'login_test', credentialRef: ref, identity: expectedIdentity }, 'login');
+  // Đang sửa: mã hóa bản nháp và gửi bản mã kèm lượt thử (GAS không lưu); không sửa thì GAS dùng credential đã lưu.
+  var draft = editing ? fbmSyncEncryptCredentials(credentials).then(function (encrypted) { FBM_SYNC_CLIENT.pendingLoginEnvelope = { username: credentials.username, encrypted: encrypted }; return { credentialRef: encrypted.credentialRef, ciphertext: encrypted.envelope, public: encrypted.public || {} }; }) : Promise.resolve(null);
+  return draft.then(function (credentialDraft) {
+    return fbmSyncDrive('start', { kind: 'login_test', credentialDraft: credentialDraft, identity: expectedIdentity }, 'login');
   }).then(function (result) {
     if (result && result.code === 'SYNC_BACKGROUND_SKIPPED') { return result; }
     var snapshot = result && result.status || {};

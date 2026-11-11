@@ -47,7 +47,8 @@ FbmSync.sessionGateToken = function () {
 };
 FbmSync.sessionGatePolicy = function () {
   var policy = settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy);
-  return { autoLogin: policy.enabled && FbmSync.loginConfigRead().configured === true, autoOpenTab: policy.autoOpenTab };
+  // Tự mở tab là mục con của Tự đăng nhập: mục cha tắt thì không còn hiệu lực.
+  return { autoLogin: policy.enabled && FbmSync.loginConfigRead().configured === true, autoOpenTab: policy.enabled && policy.autoOpenTab };
 };
 FbmSync.sessionGateMeta = function (state) {
   state.metadata = state.metadata || {};
@@ -55,9 +56,9 @@ FbmSync.sessionGateMeta = function (state) {
   return state.metadata.sessionGate;
 };
 /** Nhóm request hệ thống chỉ cổng phiên được quyền dựng và phát. */
-FbmSync.SESSION_SYSTEM_KINDS = ['login', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
+FbmSync.SESSION_SYSTEM_KINDS = ['login_step', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
 /** Request hệ thống được đi khi phiên chưa xác minh: chính các bước xác minh. Giữ phiên đọc dữ liệu khách (request đếm mang điều kiện quyền) nên không thuộc nhóm này. */
-FbmSync.SESSION_PROBE_EXEMPT_KINDS = ['login', 'identity_user_grid', 'session_probe'];
+FbmSync.SESSION_PROBE_EXEMPT_KINDS = ['login_step', 'identity_user_grid', 'session_probe'];
 FbmSync.isSessionSystemRequest = function (request) {
   var kind = String(request && request.meta && request.meta.kind || '');
   return FbmSync.SESSION_SYSTEM_KINDS.indexOf(kind) >= 0;
@@ -103,11 +104,10 @@ FbmSync.sessionIdentityClear = function (state) {
   if (state) { state.session = session; }
   return state;
 };
-/** Request hệ thống của cổng phiên. `cfg` là `scriptSettings(state)` của ô lượt bên gọi; request đăng nhập không cần cookie hay token nên không dùng nó. */
+/** Request hệ thống của cổng phiên. `cfg` là `scriptSettings(state)` của ô lượt bên gọi. Request các bước đăng nhập do lượt đăng nhập dựng (`loginStepRequest`). */
 FbmSync.sessionSystemRequest = function (kind, value, cfg) {
   var request, options = value && typeof value === 'object' ? value : {};
-  if (kind === 'login') { request = FbmSync.loginRequest(value && value.credentialRef, value && value.testOnly === true, value && value.force === true); }
-  else if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer', cfg); }
+  if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer', cfg); }
   else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(cfg); request.meta.kind = 'session_probe'; }
   else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(cfg); }
   else { return null; }
@@ -119,25 +119,16 @@ FbmSync.sessionSystemEnvelope = function (kind, value, cfg) {
   var request = FbmSync.sessionSystemRequest(kind, value, cfg);
   return request ? FbmSync.nextEnvelope(request) : null;
 };
+/** Ô lượt đang là lượt đăng nhập: request của nó (bước trang Login, authorize, grid User) đi qua cổng mà không bị đổi thành hỏi thử hay mở đăng nhập lồng. Chỉ người mở lượt đăng nhập đặt được ô lượt này. */
 FbmSync.sessionGateCursorIsInternal = function (state) {
-  var cursor = state && state.cursor || {};
-  return cursor.kind === 'login' || cursor.kind === 'login_identity_authorize' || cursor.kind === 'login_identity_user';
+  return String(state && state.cursor && state.cursor.kind || '') === 'login';
 };
 FbmSync.sessionGateRequestCode = function (request, state) {
   if (!request && state && state.lastFailureCode) { return String(state.lastFailureCode); }
   return FbmSync.sessionGateOwnsRequest(request, state) ? 'AUTO_' + 'LOGIN_REQUEST_READY' : 'HEARTBEAT_REQUEST_READY';
 };
-FbmSync.sessionGateAttachLoginToken = function (request, state) {
-  var value = request || {}, meta = value.meta || {}, gate = FbmSync.sessionGateMeta(state), token = String(gate.loginToken || '');
-  if (String(meta.kind || '') === 'login' && token) {
-    value.meta = Object.assign({}, meta, { sessionGateToken: token });
-  }
-  return value;
-};
 FbmSync.sessionGateOwnsRequest = function (request, state) {
-  var value = request || {}, meta = value.meta || {}, cursor = state && state.cursor || {}, gate = state && state.metadata && state.metadata.sessionGate || {};
-  if (String(meta.kind || '') !== 'login' || cursor.kind !== 'login') { return false; }
-  return !!gate.loginToken && String(meta.sessionGateToken || '') === String(gate.loginToken);
+  return String(request && request.meta && request.meta.kind || '') === 'login_step' && FbmSync.sessionGateCursorIsInternal(state);
 };
 /**
  * Mọi sự kiện cổng phiên, kể cả sự kiện không kết thúc phiên (hết hạn đang đăng nhập lại, thử lại tìm tab), đều có một dòng Log riêng (FBM-029).
@@ -207,12 +198,9 @@ FbmSync.sessionGateStart = function (state, failedCursor) {
     return null;
   }
   gate = FbmSync.sessionGateMeta(current);
-  gate.loginToken = FbmSync.sessionGateToken();
   gate.loginStartedAt = Date.now();
-  current.metadata.sessionGate = gate;
   FbmSync.stateWrite(current);
-  request = FbmSync.sessionGateAttachLoginToken(allowed, current);
-  return request;
+  return allowed;
 };
 /** Phản ứng tập trung khi response xác nhận phiên đã hết hạn. */
 FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
@@ -354,7 +342,6 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   FbmSync.stateWrite(state);
   request = FbmSync.requestForCursor(state);
   if (!request) { return null; }
-  request = FbmSync.sessionGateAttachLoginToken(request, state);
   if (reload) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
   envelope = FbmSync.nextEnvelope(request);
   if (!envelope) { return null; }
@@ -395,15 +382,6 @@ FbmSync.nextEnvelope = function (request) { return FbmSync.sliceIssue(request); 
  */
 FbmSync.sessionGateGuard = function (pendingState, request) {
   var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
-  // Login test cũng phải nhận token do cổng cấp; không dùng cờ trong request
-  // để caller tự né cổng. Mục đích test chỉ được đọc từ cursor owner đã lưu.
-  if (String(request.meta && request.meta.kind || '') === 'login' && !internalLogin && pendingState.cursor && pendingState.cursor.kind === 'login' && pendingState.cursor.purpose === 'test' && String(pendingState.cursor.credentialRef || '') === String(request.meta && request.meta.credentialRef || '')) {
-    var testGate = FbmSync.sessionGateMeta(pendingState);
-    testGate.loginToken = FbmSync.sessionGateToken();
-    FbmSync.stateWrite(pendingState);
-    request = FbmSync.sessionGateAttachLoginToken(request, pendingState);
-    internalLogin = true;
-  }
   // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
   // Probe là request hệ thống nên không quay lại nhánh này.
   var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid','lookup', 'push_lookup', 'push_scan', 'push_wait'];
@@ -477,7 +455,7 @@ FbmSync.requestIssue = function (state, request, now) {
   FbmSync.stateWrite(state);
   FbmSync.traceEvent(state, 'response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
-  return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta));
+  return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta), request.method);
 };
 /**
  * Giữ chỗ nhận lượt cho máy đang mở lượt từ Sidebar; lần hỏi kế tiếp của Extension máy đó (Sidebar đánh thức hoặc chuông) nhận lượt. Lúc Extension đến nhận, GAS dựng lại request từ cursor, nên request định phát phải dựng lại được từ cursor: lệch là lỗi lập trình, ném ngay chứ không để Extension nhận nhầm bước.
@@ -502,7 +480,7 @@ FbmSync.envelopeHold = function (request) {
  * `true` chỉ cho request đọc thuần: FBM có nhận rồi cũng không đổi gì. Request mở form, lưu, đăng nhập và cấp quyền form là `false` vì lần gửi đầu có thể đã tới FBM (mở form tạo khách sinh mã khách mới).
  */
 FbmSync.REQUEST_REPLAY = {
-  login: false, authorize: false,
+  login_step: false, authorize: false,
   session_probe: true, grid: true, owner_lookup: true, customer_batch: true, identity_user_grid: true, conflict_refresh_grid: true, completion: true, customer_count: true, scan_job: true, scan_chunk: true,
   // Lô chỉ là vỏ; lô gửi lại được khi mọi phần tử gửi lại được.
   batch: true,
@@ -559,9 +537,7 @@ FbmSync.responseRequestId = function (rawResponse) {
  */
 FbmSync.requestForCursor = function (state) {
   var cursor = state.cursor || {}, cfg = FbmSync.scriptSettings(state);
-  if (cursor.kind === 'login') { return FbmSync.sessionSystemRequest('login', { credentialRef: cursor.credentialRef, testOnly: cursor.testOnly === true, force: cursor.purpose === 'force' }, cfg); }
-  if (cursor.kind === 'login_identity_authorize') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }, cfg); }
-  if (cursor.kind === 'login_identity_user') { return FbmSync.sessionSystemRequest('identity_user_grid', null, cfg); }
+  if (cursor.kind === 'login') { return FbmSync.loginStepRequest(cursor, FbmSync.loginCredential(cursor), cfg); }
   if (cursor.kind === 'session_probe') { return FbmSync.sessionSystemRequest('session_probe', null, cfg); }
   if (cursor.kind === 'authorize_customer') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }, cfg); }
   if (cursor.kind === 'authorize_activity') { return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }, cfg); }
