@@ -242,9 +242,10 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       └── textNormalize.html    Bản sinh đôi client của server\util\TextNormalize.js. [RÀNG BUỘC CỨNG] hai bản phải giống nhau.
 │
 └── fbm_sync\                     Module đồng bộ FBM. Đọc được DATA_SCHEMA; phần lõi TUYỆT ĐỐI không đọc ngược vào đây.
-    ├── auth\AutoLogin.js       Điều phối cấu hình envelope đăng nhập và phục hồi phiên hết hạn.
+    ├── auth\AutoLogin.js       Cấu hình đăng nhập, chính sách tự đăng nhập và mở lượt đăng nhập (thử, hủy phiên cũ, tự đăng nhập khi phiên hết).
     ├── auth\LoginStores.js     Hai kho đăng nhập tách theo người ghi: credential `FBM_CREDENTIAL_V1` (bản mã, phần công khai) và dấu lần thử `FBM_LOGIN_ATTEMPT_V1`; cổng đọc, cổng ghi và công cụ tính dấu lần thử.
     ├── auth\LoginTools.js      Công cụ thuần của lượt đăng nhập: mô tả request từng bước trang Login (ô cần mật khẩu để trống cho Extension điền), đọc salt, chọn database/đơn vị, quyết định lệnh khóa trang, khớp danh tính, cổng tự đăng nhập
+    ├── auth\LoginRun.js        Chặng đăng nhập theo hợp đồng chặng chung (`CURSOR_TABLE.login`): đọc response từng bước trang Login, authorize, grid User; bước kết ghi dấu lần thử và đóng hoặc tiếp tục lượt.
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
@@ -347,6 +348,7 @@ tests\
 │   │   ├── tab-fbm-gia.js        Tab FBM giả chạy executor thật của Extension (`tabGia`), cùng hàm dựng response lưới và trả lời giả cho phần tử cửa ghi.
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── chuoi-dang-nhap.js    Chuỗi đăng nhập thật ba phía cho test K8: GAS hộp cát ↔ worker thật ↔ executor thật trong tab FBM giả ghi lại mọi request nhận được.
+│   │   ├── trang-login.js        Câu trả lời mặc định của FBM giả cho từng bước trang Login và cách nộp lần lượt các bước đó (`quaTrangLogin`).
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   │   ├── buoc-day.js           Lối gọi chặng đẩy cho ca kiểm đúng như khung lát gọi (bản sao ô lượt, patch, chốt lượt).
