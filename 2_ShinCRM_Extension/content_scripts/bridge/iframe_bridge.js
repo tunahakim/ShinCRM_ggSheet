@@ -132,7 +132,6 @@ function bridgeErrorMessage(error) {
 var BRIDGE_COMMANDS = {
   CRM_FBM_CONFIG: { worker: 'FBM_CONFIGURE_RELAY', reply: 'CRM_FBM_CONFIG_ACK', fields: function (data) { return { config: data.config || {} }; } },
   CRM_FBM_CREDENTIALS: { worker: 'FBM_ENCRYPT_CREDENTIALS', reply: 'CRM_FBM_CREDENTIALS_RESULT', fields: function (data) { return { credentials: data.credentials || {} }; } },
-  CRM_FBM_CREDENTIAL_METADATA: { worker: 'FBM_GET_CREDENTIAL_METADATA', reply: 'CRM_FBM_CREDENTIAL_METADATA_RESULT', fields: function (data) { return { credentialRef: String(data.credentialRef || '') }; } },
   CRM_FBM_CREDENTIAL_CLEAR: { worker: 'FBM_CLEAR_CREDENTIALS', reply: 'CRM_FBM_CREDENTIAL_CLEAR_RESULT', fields: function (data) { return { credentialRef: String(data.credentialRef || '') }; } },
   CRM_FBM_CANCEL: { worker: 'FBM_CANCEL_BATCH', reply: 'CRM_FBM_CANCEL_RESULT', fields: function () { return {}; } },
   CRM_FBM_MACHINE_ID: { worker: 'FBM_MACHINE_ID', reply: 'CRM_FBM_MACHINE_ID_RESULT', fields: function () { return {}; } },

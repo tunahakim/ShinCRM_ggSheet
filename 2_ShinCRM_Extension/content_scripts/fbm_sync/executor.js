@@ -54,153 +54,19 @@
     });
     return output;
   }
-  function jsonValue(text) { try { var value = JSON.parse(String(text || '')); return value && value.d !== undefined ? value.d : value; } catch (ignore) { return null; } }
-  /** Salt chỉ có trên Login.aspx. Không suy diễn từ tab đang mở vì tab đó thường là zccrAccount.aspx. */
-  function loginValueFromPage(html) {
-    var source = String(html || document.documentElement && document.documentElement.innerHTML || ''), challenge = source.match(/"ChallengeScript"\s*:\s*"([^"]+)"/i), pieces, patterns = [
-      /\\u0027([a-f0-9]{4,})\\u0027\s*\+\s*\\u0027([a-f0-9]{4,})\\u0027/i,
-      /u0027([a-f0-9]{4,})u0027\s*\+\s*u0027([a-f0-9]{4,})u0027/i,
-      /'([a-f0-9]{4,})'\s*\+\s*'([a-f0-9]{4,})'/i,
-      /(?:loginValue|encryptSalt|encrypt_salt|passwordSalt|loginSalt)\s*[=:]\s*["']([^"']+)["']/i,
-      /["']value["']\s*:\s*["']([^"']+)["']/i
-    ];
-    // HTML FBM thực tế escape dấu nháy nhiều lớp: eval(\u0027\\\u0027a2838e...). Chỉ ghép hai đoạn hex trong ChallengeScript.
-    if (challenge) {
-      pieces = (challenge[1].replace(/\\+u0027/gi, '|').match(/[a-f0-9]{4,}/gi) || []);
-      if (pieces.length >= 2) { return String(pieces[0]) + String(pieces[1]); }
+  /**
+   * Lệnh `pageKeyStore`: phần phía trình duyệt của trang Login FBM (_onLoginComplete). Bảng dữ liệu trên trang chính kiểm khóa `localStorage["k\0"]`; thiếu hoặc lệch thì tab FBM trắng.
+   * Worker đã tính khóa và so với giá trị kiểm của trang tài khoản; khóa rỗng nghĩa là không khớp: máy chủ giữ khóa của phiên trình duyệt đang sống, tab giữ nguyên khóa đó (`LOGIN_PAGE_KEY_KEPT_EXISTING`), vì ghi khóa sai làm bảng trắng. Thân trả về chỉ mang mã, không mang khóa.
+   */
+  function storePageKey(request, trace) {
+    var key = String(request.meta && request.meta.pageKeyWrite || ''), code;
+    if (!key) { code = 'LOGIN_PAGE_KEY_KEPT_EXISTING'; }
+    else {
+      try { sessionStorage.clear(); localStorage.removeItem('menuItems'); localStorage.setItem('k' + String.fromCharCode(0), key); code = 'LOGIN_PAGE_KEY_STORED'; }
+      catch (storageError) { code = 'LOGIN_PAGE_KEY_STORAGE_FAILED'; }
     }
-    for (var i = 0; i < patterns.length; i += 1) {
-      var match = source.match(patterns[i]);
-      if (match) { return match[2] ? String(match[1]) + String(match[2]) : match[1]; }
-    }
-    return '';
-  }
-  function loginListValue(value, keys, fallback) {
-    var data = value && value.d !== undefined ? value.d : value, found = '';
-    function walk(item) {
-      if (found || item === undefined || item === null) { return; }
-      if (typeof item === 'string') {
-        if (item && (item.indexOf('_') >= 0 || !fallback)) { found = item; }
-        return;
-      }
-      if (Array.isArray(item)) {
-        for (var i = item.length - 1; i >= 0 && !found; i -= 1) { walk(item[i]); }
-        return;
-      }
-      if (typeof item === 'object') {
-        for (var j = 0; j < keys.length && !found; j += 1) {
-          if (item[keys[j]] !== undefined) { found = String(item[keys[j]] || ''); }
-        }
-        Object.keys(item).some(function (key) { if (!found) { walk(item[key]); } return !!found; });
-      }
-    }
-    walk(data);
-    return found || String(fallback || '');
-  }
-  function md5(value) {
-    function rotate(x, n) { return (x << n) | (x >>> (32 - n)); }
-    function add(x, y) { return (x + y) | 0; }
-    function ff(a, b, c, d, x, s, t) { return add(rotate(add(add(a, (b & c) | (~b & d)), add(x, t)), s), b); }
-    function gg(a, b, c, d, x, s, t) { return add(rotate(add(add(a, (b & d) | (c & ~d)), add(x, t)), s), b); }
-    function hh(a, b, c, d, x, s, t) { return add(rotate(add(add(a, b ^ c ^ d), add(x, t)), s), b); }
-    function ii(a, b, c, d, x, s, t) { return add(rotate(add(add(a, c ^ (b | ~d)), add(x, t)), s), b); }
-    var input = unescape(encodeURIComponent(String(value))), bytes = [], i, j, a, b, c, d, olda, oldb, oldc, oldd, x = [];
-    for (i = 0; i < input.length; i += 1) { bytes[i >> 2] = (bytes[i >> 2] || 0) | input.charCodeAt(i) << ((i % 4) * 8); }
-    bytes[input.length >> 2] = (bytes[input.length >> 2] || 0) | 0x80 << ((input.length % 4) * 8);
-    bytes[(((input.length + 8) >> 6) + 1) * 16 - 2] = input.length * 8;
-    bytes[(((input.length + 8) >> 6) + 1) * 16 - 1] = 0;
-    a = 0x67452301; b = 0xefcdab89; c = 0x98badcfe; d = 0x10325476;
-    for (i = 0; i < bytes.length; i += 16) {
-      for (j = 0; j < 16; j += 1) { x[j] = bytes[i + j] || 0; }
-      olda = a; oldb = b; oldc = c; oldd = d;
-      a = ff(a,b,c,d,x[0],7,-680876936); d = ff(d,a,b,c,x[1],12,-389564586); c = ff(c,d,a,b,x[2],17,606105819); b = ff(b,c,d,a,x[3],22,-1044525330);
-      a = ff(a,b,c,d,x[4],7,-176418897); d = ff(d,a,b,c,x[5],12,1200080426); c = ff(c,d,a,b,x[6],17,-1473231341); b = ff(b,c,d,a,x[7],22,-45705983);
-      a = ff(a,b,c,d,x[8],7,1770035416); d = ff(d,a,b,c,x[9],12,-1958414417); c = ff(c,d,a,b,x[10],17,-42063); b = ff(b,c,d,a,x[11],22,-1990404162);
-      a = ff(a,b,c,d,x[12],7,1804603682); d = ff(d,a,b,c,x[13],12,-40341101); c = ff(c,d,a,b,x[14],17,-1502002290); b = ff(b,c,d,a,x[15],22,1236535329);
-      a = gg(a,b,c,d,x[1],5,-165796510); d = gg(d,a,b,c,x[6],9,-1069501632); c = gg(c,d,a,b,x[11],14,643717713); b = gg(b,c,d,a,x[0],20,-373897302);
-      a = gg(a,b,c,d,x[5],5,-701558691); d = gg(d,a,b,c,x[10],9,38016083); c = gg(c,d,a,b,x[15],14,-660478335); b = gg(b,c,d,a,x[4],20,-405537848);
-      a = gg(a,b,c,d,x[9],5,568446438); d = gg(d,a,b,c,x[14],9,-1019803690); c = gg(c,d,a,b,x[3],14,-187363961); b = gg(b,c,d,a,x[8],20,1163531501);
-      a = gg(a,b,c,d,x[13],5,-1444681467); d = gg(d,a,b,c,x[2],9,-51403784); c = gg(c,d,a,b,x[7],14,1735328473); b = gg(b,c,d,a,x[12],20,-1926607734);
-      a = hh(a,b,c,d,x[5],4,-378558); d = hh(d,a,b,c,x[8],11,-2022574463); c = hh(c,d,a,b,x[11],16,1839030562); b = hh(b,c,d,a,x[14],23,-35309556);
-      a = hh(a,b,c,d,x[1],4,-1530992060); d = hh(d,a,b,c,x[4],11,1272893353); c = hh(c,d,a,b,x[7],16,-155497632); b = hh(b,c,d,a,x[10],23,-1094730640);
-      a = hh(a,b,c,d,x[13],4,681279174); d = hh(d,a,b,c,x[0],11,-358537222); c = hh(c,d,a,b,x[3],16,-722521979); b = hh(b,c,d,a,x[6],23,76029189);
-      a = hh(a,b,c,d,x[9],4,-640364487); d = hh(d,a,b,c,x[12],11,-421815835); c = hh(c,d,a,b,x[15],16,530742520); b = hh(b,c,d,a,x[2],23,-995338651);
-      a = ii(a,b,c,d,x[0],6,-198630844); d = ii(d,a,b,c,x[7],10,1126891415); c = ii(c,d,a,b,x[14],15,-1416354905); b = ii(b,c,d,a,x[5],21,-57434055);
-      a = ii(a,b,c,d,x[12],6,1700485571); d = ii(d,a,b,c,x[3],10,-1894986606); c = ii(c,d,a,b,x[10],15,-1051523); b = ii(b,c,d,a,x[1],21,-2054922799);
-      a = ii(a,b,c,d,x[8],6,1873313359); d = ii(d,a,b,c,x[15],10,-30611744); c = ii(c,d,a,b,x[6],15,-1560198380); b = ii(b,c,d,a,x[13],21,1309151649);
-      a = ii(a,b,c,d,x[4],6,-145523070); d = ii(d,a,b,c,x[11],10,-1120210379); c = ii(c,d,a,b,x[2],15,718787259); b = ii(b,c,d,a,x[9],21,-343485551);
-      a = add(a, olda); b = add(b, oldb); c = add(c, oldc); d = add(d, oldd);
-    }
-    function hex(n) { var out = '', k; for (k = 0; k < 4; k += 1) { out += ('0' + ((n >> (k * 8)) & 255).toString(16)).slice(-2); } return out; }
-    return hex(a) + hex(b) + hex(c) + hex(d);
-  }
-  /** Mô phỏng phần phía trình duyệt của trang Login FBM (_onLoginComplete); trả mã kết quả cho trace, không trả khóa. Không ghi mù như trang Login: khi phiên trên trình duyệt đang sống, Login vẫn trả d:true nhưng máy chủ giữ khóa cũ (đo 2026-10-06), ghi khóa mới sẽ làm bảng FBM trắng. Nên chỉ ghi khi khóa khớp mã kiểm "salt" + "cookie" của bảng trên trang tài khoản vừa tải sau Login. */
-  function storeLoginPageKey(credentials, salt, accountHtml) {
-    var password = String(credentials && credentials.password || ''), keyName = 'k' + String.fromCharCode(0);
-    if (!password || /^[a-f0-9]{32}$/i.test(password)) { return 'LOGIN_PAGE_KEY_SKIPPED_HASHED_CREDENTIAL'; }
-    var html = String(accountHtml || ''), check = html.match(/"salt"\s*:\s*"([a-f0-9]{32})\\t/i), pageCookie = html.match(/"cookie"\s*:\s*"([^"]+)"/i);
-    if (!check || !pageCookie) { return 'LOGIN_PAGE_KEY_UNVERIFIABLE'; }
-    var candidate = md5(md5(String(salt || '')) + md5(password)), expected = check[1].toLowerCase();
-    try {
-      if (md5(candidate + pageCookie[1]) === expected) {
-        sessionStorage.clear();
-        localStorage.removeItem('menuItems');
-        localStorage.setItem(keyName, candidate);
-        return 'LOGIN_PAGE_KEY_STORED';
-      }
-      return md5(String(localStorage.getItem(keyName) || '') + pageCookie[1]) === expected ? 'LOGIN_PAGE_KEY_KEPT_EXISTING' : 'LOGIN_PAGE_KEY_MISMATCH';
-    } catch (storageError) {
-      return 'LOGIN_PAGE_KEY_STORAGE_FAILED';
-    }
-  }
-  function executeLogin(request, trace) {
-    var credentials = request && request.meta && request.meta.loginCredentials || {}, base = 'https://fbo.com.vn:8888/Main/Login.aspx/', headers = { accept: '*/*', 'content-type': 'application/json; charset=UTF-8' };
-    function post(url, body) { return fetch(base + url, { method: 'POST', headers: headers, body: body, credentials: 'include', cache: 'no-store' }).then(function (response) { return readResponseText(response).then(function (text) { return { response: response, text: text }; }); }); }
-    // FBM đổi salt theo lần tải Login.aspx. Đây là bước bắt buộc trước ba POST đăng nhập.
-    return fetch(base.slice(0, -1), { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (response) {
-      return readResponseText(response).then(function (html) {
-        if (!response.ok) { throw new Error('FBM không cho mở trang đăng nhập để lấy mã phiên.'); }
-        var salt = loginValueFromPage(html);
-        if (!salt) { throw new Error('Không đọc được mã phiên đăng nhập từ trang FBM.'); }
-        traceEvent(trace, 'login_page_loaded', request, { httpStatus: response.status });
-        return salt;
-      });
-    }).then(function (salt) { return post('GetEntityData', '').then(function (entity) { return { salt: salt, entity: entity }; }); }).then(function (prepared) {
-      var entity = prepared.entity;
-      if (!entity.response.ok) { throw new Error('FBM không cho đọc danh sách database.'); }
-      var data = jsonValue(entity.text), database = String(credentials.database || loginListValue(data, ['Ma_DL', 'ma_dl', 'database', 'Database'], 'FHN_CRM_App'));
-      return post('GetUnitData', JSON.stringify({ u: String(credentials.username || ''), d: database })).then(function (unit) {
-        if (!unit.response.ok) { throw new Error('FBM không cho đọc danh sách đơn vị.'); }
-        var units = jsonValue(unit.text), selectedUnit = String(credentials.unit || loginListValue(units, ['Ma_Dvcs', 'ma_dvcs', 'unit', 'Unit'], 'CTY')), salt = String(credentials.value || prepared.salt || '');
-        if (!database || !selectedUnit || !salt) { throw new Error('Không lấy đủ database, đơn vị hoặc mã phiên để đăng nhập FBM.'); }
-        var firstHash = /^[a-f0-9]{32}$/i.test(String(credentials.password || '')) ? String(credentials.password) : md5(salt + md5(String(credentials.password || '')));
-        // force:true hủy phiên cũ; chỉ bật khi GAS gửi cờ từ nút người dùng đã xác nhận, mặc định luôn login mềm.
-        var forceOldSession = request.meta.force === true;
-        var body = JSON.stringify({ user: String(credentials.username || ''), password: firstHash, database: database, unit: selectedUnit, language: String(credentials.language || 'v'), value: salt, force: forceOldSession, storage: true });
-        traceEvent(trace, 'login_request_built', request, { database: database, unit: selectedUnit });
-        return post('Login', body).then(function (login) {
-          if (!login.response.ok) { return { ok: false, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { trace: trace } }; }
-          // FBM chỉ báo đăng nhập được bằng {"d":true}; khác đi thì trả nguyên response Login cho GAS phân loại (GAS giữ bảng nghĩa của `d`), không mở trang tài khoản (mở khi chưa đăng nhập thì FBM chuyển sang Error.htm, gặp thật 2026-10-07) và không tự bấm nút hủy phiên cũ.
-          var accepted = /^\s*\{\s*"d"\s*:\s*true\s*\}\s*$/.test(String(login.text || ''));
-          if (!accepted) {
-            traceEvent(trace, 'login_rejected', request, { httpStatus: login.response.status });
-            return { ok: true, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { loginStage: 'login', loginBlocked: true, trace: trace } };
-          }
-          traceEvent(trace, 'login_successful', request, { httpStatus: login.response.status });
-          return fetch('https://fbo.com.vn:8888/Main/zccrAccount.aspx', { method: 'GET', credentials: 'include', cache: 'no-store' }).then(function (account) {
-            return readResponseText(account).then(function (accountHtml) {
-              // Mẫu bắt cookie do GAS cấp trong request (một chỗ định nghĩa); ưu tiên trang tài khoản vừa đọc, rồi response Login, cuối cùng mới tới trang đang mở.
-              var captures = Object.assign({}, captureTransportValues(request, '', 'page_html'), captureTransportValues(request, login.text, 'response'), captureTransportValues(request, accountHtml, 'response'));
-              traceEvent(trace, 'payload_cookie_page_read', request, Object.assign(payloadCookieDiagnostic(accountHtml, account.url), { httpStatus: account.status, code: captures.payloadCookie ? 'PAYLOAD_COOKIE_CAPTURED' : 'PAYLOAD_COOKIE_MISSING' }));
-              // Bảng dữ liệu trên trang chính kiểm khóa localStorage "k\0" mà trang Login lưu; thiếu/lệch thì tab FBM trắng trơn (ch02 2.5.1).
-              traceEvent(trace, 'login_page_storage', request, { code: storeLoginPageKey(credentials, salt, accountHtml) });
-              traceEvent(trace, 'payload_cookie_tab_read', request, Object.assign(payloadCookieDiagnostic(document.documentElement ? document.documentElement.innerHTML : ''), { code: document.readyState }));
-              return { ok: login.response.ok, status: login.response.status, headers: { contentType: login.response.headers.get('content-type') || '' }, body: login.text, transport: { captures: captures, trace: trace } };
-            });
-          });
-        });
-      });
-    });
+    traceEvent(trace, 'login_page_storage', request, { code: code });
+    return { ok: true, status: 200, headers: { contentType: 'application/json' }, body: JSON.stringify({ code: code }), transport: { trace: trace } };
   }
   /** Việc quét vượt trần cỡ response: không gửi gì về GAS ngoài mã lỗi, GAS tự chia nhỏ theo khoảng ngày. */
   function responseTooLarge(maxBytes) {
@@ -331,7 +197,7 @@
     }
     var req = request, trace = [];
     traceEvent(trace, 'executor_started', req);
-    if (req.meta && req.meta.kind === 'login') { return executeLogin(req, trace); }
+    if (req.meta && req.meta.command === 'pageKeyStore') { return Promise.resolve(storePageKey(req, trace)); }
     if (req.meta && req.meta.kind === 'scan_chunk') { return Promise.resolve().then(function () { return scanChunkResult(req.meta.job && req.meta.job.chunkIndex, trace, req); }); }
     if (req.meta && req.meta.kind === 'scan_job') { scanJob = null; }
     var sent = applyTransportReplacements(req, requestBody(req));
