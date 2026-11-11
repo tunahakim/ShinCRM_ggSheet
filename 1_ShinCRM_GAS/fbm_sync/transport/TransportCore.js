@@ -388,57 +388,42 @@ FbmSync.pauseForRuntimeLimit = function (state) {
  * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay. `logs` gom dòng Log thường của công cụ, cửa lệnh ghi ở cuối lời gọi.
  */
 FbmSync.issueContext = null;
-/** Cổng phát request: kênh Sidebar giữ chỗ nhận lượt; công tắc tổng tắt, hết ngân sách lời gọi hay phiên chưa xác minh thì không phát request này (cổng phiên có thể thay bằng probe hoặc đăng nhập); qua cổng thì `requestIssue`. */
-FbmSync.nextEnvelope = function (request) {
-  if (!request) { return null; }
-  if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
-  // Đang tắt thì không cấp request kế tiếp; lượt đang mở đóng qua cùng cổng với lệnh Dừng.
-  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
-    FbmSync.stopPendingApply(true);
-    return null;
+/** Tên cũ của bước phát request của lát; chặng cũ còn gọi tên này tới khi chuyển sang hợp đồng chặng. */
+FbmSync.nextEnvelope = function (request) { return FbmSync.sliceIssue(request); };
+/**
+ * Phần cổng phiên của bước phát request: request đăng nhập thử nhận thẻ của cổng; request nghiệp vụ khi danh tính phiên chưa xác minh thì đổi thành hỏi thử; phiên đã hết hạn thì cổng mở đăng nhập. Trả request thật sẽ gửi, hoặc `null` khi cổng đã đóng lượt.
+ */
+FbmSync.sessionGateGuard = function (pendingState, request) {
+  var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
+  // Login test cũng phải nhận token do cổng cấp; không dùng cờ trong request
+  // để caller tự né cổng. Mục đích test chỉ được đọc từ cursor owner đã lưu.
+  if (String(request.meta && request.meta.kind || '') === 'login' && !internalLogin && pendingState.cursor && pendingState.cursor.kind === 'login' && pendingState.cursor.purpose === 'test' && String(pendingState.cursor.credentialRef || '') === String(request.meta && request.meta.credentialRef || '')) {
+    var testGate = FbmSync.sessionGateMeta(pendingState);
+    testGate.loginToken = FbmSync.sessionGateToken();
+    FbmSync.stateWrite(pendingState);
+    request = FbmSync.sessionGateAttachLoginToken(request, pendingState);
+    internalLogin = true;
   }
-  var pendingState = FbmSync.stateRead();
-  if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(pendingState); }
-  try {
-    var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
-    // Login test cũng phải nhận token do cổng cấp; không dùng cờ trong request
-    // để caller tự né cổng. Mục đích test chỉ được đọc từ cursor owner đã lưu.
-    if (String(request.meta && request.meta.kind || '') === 'login' && !internalLogin && pendingState.cursor && pendingState.cursor.kind === 'login' && pendingState.cursor.purpose === 'test' && String(pendingState.cursor.credentialRef || '') === String(request.meta && request.meta.credentialRef || '')) {
-      var testGate = FbmSync.sessionGateMeta(pendingState);
-      testGate.loginToken = FbmSync.sessionGateToken();
+  // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
+  // Probe là request hệ thống nên không quay lại nhánh này.
+  var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid','lookup', 'push_lookup', 'push_scan', 'push_wait'];
+  var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
+  // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
+  // caller né cổng bằng cách đặt một tên meta.kind lạ.
+  var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
+  var loginFlowOwnsSystemRequest = FbmSync.sessionGateCursorIsInternal(pendingState);
+  if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
+    var originalCursor = Object.assign({}, pendingState.cursor || {});
+    if (originalCursor.kind !== 'session_probe') {
+      FbmSync.sessionGateEnterProbe(pendingState, originalCursor, 'Đang kiểm tra tab và tài khoản FBM...');
       FbmSync.stateWrite(pendingState);
-      request = FbmSync.sessionGateAttachLoginToken(request, pendingState);
-      internalLogin = true;
+      request = FbmSync.sessionSystemRequest('session_probe', null, FbmSync.scriptSettings(pendingState));
     }
-    // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
-    // Probe là request hệ thống nên không quay lại nhánh này.
-    var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid','lookup', 'push_lookup', 'push_scan', 'push_wait'];
-    var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
-    // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
-    // caller né cổng bằng cách đặt một tên meta.kind lạ.
-    var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
-    var loginFlowOwnsSystemRequest = FbmSync.sessionGateCursorIsInternal(pendingState);
-    if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
-      var gate = FbmSync.sessionGateMeta(pendingState), originalCursor = Object.assign({}, pendingState.cursor || {});
-      if (originalCursor.kind !== 'session_probe') {
-        FbmSync.sessionGateEnterProbe(pendingState, originalCursor, 'Đang kiểm tra tab và tài khoản FBM...');
-        FbmSync.stateWrite(pendingState);
-        request = FbmSync.sessionSystemRequest('session_probe', null, FbmSync.scriptSettings(pendingState));
-      }
-    }
-    if (pendingState.session && pendingState.session.expired === true && !internalLogin && (!FbmSync.isSessionSystemRequest(request) || String(request.meta && request.meta.kind || '') === 'heartbeat')) {
-      var gateRequest = FbmSync.sessionGateStart(pendingState, pendingState.cursor || {});
-      if (!gateRequest) { return null; }
-      request = gateRequest;
-      pendingState = FbmSync.stateRead();
-    }
-    // Cổng có thể thay request authorize/nghiệp vụ bằng probe; transport phải
-    // được chọn theo request thực tế sẽ gửi, không theo request caller ban đầu.
-    requestKind = String(request.meta && request.meta.kind || requestKind);
-  } catch (gateError) {
-    return FbmSync.sessionGateFailClosed(pendingState, gateError);
   }
-  return FbmSync.requestIssue(FbmSync.stateRead(), request, Date.now());
+  if (pendingState.session && pendingState.session.expired === true && !internalLogin && (!FbmSync.isSessionSystemRequest(request) || String(request.meta && request.meta.kind || '') === 'heartbeat')) {
+    return FbmSync.sessionGateStart(pendingState, pendingState.cursor || {});
+  }
+  return request;
 };
 /**
  * Bước phát request của lát, sau khi cổng phiên đã chọn request thật sẽ gửi: kiểm miền FBM của từng request, cấp `requestId`, đặt hạn chờ, ghi request đang chờ vào ô lượt và bọc phong bì cho Extension.

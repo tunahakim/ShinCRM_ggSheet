@@ -432,6 +432,7 @@ tests\
     │   ├── Builders.js            Kiểm builder/parser request Customer và Activity.
     │   ├── RunMode.js             Kiểm quyền ghi theo mode của lượt, đếm lượt kéo ở mode đọc và kiểm, câu thông báo kết thúc lượt.
     │   ├── ReadFinish.js          Kiểm chặng chính của lượt Lấy khi hết danh sách khách: gắn khách vắng một lần, không mở chiều đẩy.
+    │   ├── PushIssue.js           Kiểm chiều đẩy phát request qua bước phát của lát: phong bì có mã request và hạn chờ, phiên chưa xác minh thì đổi thành hỏi thử.
     │   ├── PullActivity.js        Kiểm kéo Activity qua cửa ghi: dấu #SC, xung đột định danh, người tạo, nối lại khách cha, thứ tự mã FBM.
     │   ├── PullRequests.js        Kiểm dựng request FBM của chặng kéo và sửa: lệnh sửa Customer, grid theo phạm vi, grid giao dịch, bộ lọc ngày.
     │   ├── PullScan.js            Kiểm mở việc quét và trang kéo: cursor và state gọn, mô tả trang FBM, tiến trình, xét khách vắng, mốc số khách.

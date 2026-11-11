@@ -133,7 +133,7 @@ FbmSync.replyIntake = function (state, rawResponse) {
 
 /**
  * Người điều phối một chặng theo hợp đồng chung: đọc đầu vào chặng cần qua cổng chủ của chúng (`inputs`), chạy chặng trên bản sao ô lượt (chặng không sửa được ô lượt thật), gộp patch rồi:
- * `next` thì phát request qua `nextEnvelope`; `session.suspected` thì nhường cổng phiên probe lại; `end` thì giao kết quả cho bước kết của chặng (`end`). Chặng ném lỗi thì `runSlice` đóng lượt lỗi.
+ * `next` thì phát request qua `sliceIssue`; `session.suspected` thì nhường cổng phiên probe lại; `end` thì giao kết quả cho bước kết của chặng (`end`). Chặng ném lỗi thì `runSlice` đóng lượt lỗi.
  */
 FbmSync.stageRun = function (entry, state, rawResponse) {
   FbmSync.replyIntake(state, rawResponse);
@@ -143,9 +143,26 @@ FbmSync.stageRun = function (entry, state, rawResponse) {
     var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);
     return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
   }
-  if (out.next) { return { ok: true, request: FbmSync.nextEnvelope(out.next), status: FbmSync.statusView() }; }
+  if (out.next) { return { ok: true, request: FbmSync.sliceIssue(out.next), status: FbmSync.statusView() }; }
   if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
   return entry.end(state, out.end);
+};
+/**
+ * Bước phát request của lát: kênh Sidebar giữ chỗ nhận lượt; công tắc tổng tắt thì đóng lượt như lệnh Dừng; hết ngân sách lời gọi thì tạm dừng; cổng phiên chọn request thật sẽ gửi (hỏi thử, đăng nhập); rồi `requestIssue` cấp mã, hạn và bọc phong bì. Trả phong bì, chỗ giữ, hoặc `null` khi không phát.
+ */
+FbmSync.sliceIssue = function (request) {
+  if (!request) { return null; }
+  if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
+  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
+    FbmSync.stopPendingApply(true);
+    return null;
+  }
+  var state = FbmSync.stateRead();
+  if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(state); }
+  var sent;
+  try { sent = FbmSync.sessionGateGuard(state, request); }
+  catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
+  return sent ? FbmSync.requestIssue(FbmSync.stateRead(), sent, Date.now()) : null;
 };
 /**
  * Chạy một công cụ theo hợp đồng chung trên bản sao ô lượt (công cụ không sửa được ô lượt thật) rồi gộp patch nó trả. Công cụ ném lỗi có thể kèm `logs` đã gom (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.

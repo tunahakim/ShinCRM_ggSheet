@@ -80,7 +80,7 @@ function pushQueue(customers, activities) {
   run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
   F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
   F.categoryGateCheck = () => [];
-  F.nextEnvelope = (request) => request;
+  F.sliceIssue = (request) => request;
   const st = F.runOpen({ phase: 'push' });
   st.mode = 'write'; st.phase = 'push'; 
   st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };

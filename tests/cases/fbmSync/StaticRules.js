@@ -150,7 +150,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 34,
     '1_ShinCRM_GAS/fbm_sync/transport/PushStage.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 30,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 27,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {

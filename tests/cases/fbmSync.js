@@ -23,6 +23,7 @@ const NHOM = [
   require("./fbmSync/PullApplyInput"),
   require("./fbmSync/RunMode"),
   require("./fbmSync/ReadFinish"),
+  require("./fbmSync/PushIssue"),
   require("./fbmSync/PullActivity"),
   require("./fbmSync/PullRequests"),
   require("./fbmSync/PullScan"),

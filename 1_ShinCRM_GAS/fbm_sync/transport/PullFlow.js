@@ -271,7 +271,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
     if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
-    result.request = FbmSync.nextEnvelope(FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
+    result.request = FbmSync.sliceIssue(FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
     return result;
   }
   FbmSync.finishPullRun(state);
