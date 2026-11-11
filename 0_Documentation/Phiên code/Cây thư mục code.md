@@ -343,6 +343,7 @@ tests\
 │   │   ├── hop-keo.js            Hộp cát cho chặng kéo về (`hopKeoVe` đủ chặng quét, `hopKeoBien` chỉ cửa ghi kéo về) và bảng danh mục thử `congDanhMucThu`.
 │   │   ├── tab-fbm-gia.js        Tab FBM giả chạy executor thật của Extension (`tabGia`), cùng hàm dựng response lưới và trả lời giả cho phần tử cửa ghi.
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
+│   │   ├── chuoi-dang-nhap.js    Chuỗi đăng nhập thật ba phía cho test K8: GAS hộp cát ↔ worker thật ↔ executor thật trong tab FBM giả ghi lại mọi request nhận được.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   │   ├── buoc-day.js           Lối gọi chặng đẩy cho ca kiểm đúng như khung lát gọi (bản sao ô lượt, patch, chốt lượt).
@@ -433,6 +434,7 @@ tests\
     │   ├── RunMode.js             Kiểm quyền ghi theo mode của lượt, đếm lượt kéo ở mode đọc và kiểm, câu thông báo kết thúc lượt.
     │   ├── ReadFinish.js          Kiểm chặng chính của lượt Lấy khi hết danh sách khách: gắn khách vắng một lần, không mở chiều đẩy.
     │   ├── PushIssue.js           Kiểm chiều đẩy phát request qua bước phát của lát: phong bì có mã request và hạn chờ, phiên chưa xác minh thì đổi thành hỏi thử.
+    │   ├── K8.js                  Test chốt K8: mật khẩu và mọi bản băm chỉ có trong request gửi FBM, qua lượt Đăng nhập thử, tự đăng nhập khi hết phiên và sai mật khẩu.
     │   ├── PullActivity.js        Kiểm kéo Activity qua cửa ghi: dấu #SC, xung đột định danh, người tạo, nối lại khách cha, thứ tự mã FBM.
     │   ├── PullRequests.js        Kiểm dựng request FBM của chặng kéo và sửa: lệnh sửa Customer, grid theo phạm vi, grid giao dịch, bộ lọc ngày.
     │   ├── PullScan.js            Kiểm mở việc quét và trang kéo: cursor và state gọn, mô tả trang FBM, tiến trình, xét khách vắng, mốc số khách.

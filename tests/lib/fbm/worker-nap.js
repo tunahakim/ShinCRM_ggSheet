@@ -13,7 +13,7 @@ const SHEET = 'sheet-test';
 const nghi = (ms) => new Promise((resolve) => setTimeout(resolve, ms || 0));
 
 /**
- * Service worker thật với Chrome giả. `opt.gas(body, lan)` là GAS: trả object JSON, hoặc ném lỗi để giả mạng hỏng. `opt.tab` mô tả tab FBM: `ping` (trả lời ping hay không), `pingAfterReload`, `reloadCompletes`, `inject` (hàm thay `executeScript`), `result(request)` (kết quả executor).
+ * Service worker thật với Chrome giả. `opt.gas(body, lan)` là GAS: trả object JSON, hoặc ném lỗi để giả mạng hỏng. `opt.tab` mô tả tab FBM: `ping` (trả lời ping hay không), `pingAfterReload`, `reloadCompletes`, `inject` (hàm thay `executeScript`), `result(request)` (kết quả executor), hoặc `execute(message)` trả Promise câu trả lời của executor thật trong tab.
  */
 function workerNap(opt) {
   const st = { bodies: [], executes: [], statuses: [], fbmQueries: 0, reloads: 0, injects: 0, worker: null, storage: Object.assign({ fbmWebAppUrl: RELAY_URL, fbmSyncKey: 'relay-key', fbmSpreadsheetId: SHEET }, opt.storage || {}), listeners: [], trails: [], permissionAsks: [] };
@@ -22,7 +22,7 @@ function workerNap(opt) {
   const pingAnswers = () => tabOpt.ping !== false && (tabOpt.ping === true || tabOpt.ping === undefined) ? true : (tabOpt.pingAfterReload && st.reloads > 0);
   const context = {
     console: { log() {}, warn() {}, info() {} }, Date, URL, Promise, Error, AbortController, WeakMap, Uint8Array, setTimeout, clearTimeout,
-    crypto: globalThis.crypto || nodeCrypto.webcrypto, btoa, atob,
+    crypto: globalThis.crypto || nodeCrypto.webcrypto, btoa, atob, TextEncoder, TextDecoder,
     chrome: {
       tabs: {
         query(info) {
@@ -40,7 +40,7 @@ function workerNap(opt) {
           if (message.type === 'CRM_BRIDGE_PING') { done({ ready: true }); return; }
           if (message.type === 'CRM_FBM_STATUS') { st.statuses.push(message); done({ delivered: true }); return; }
           if (message.type === 'FBM_PING_V2') { if (pingAnswers()) { done({ ready: true, version: MANIFEST.version }); } else if (tabOpt.pingRefused) { done({ error: 'Could not establish connection. Receiving end does not exist.' }); } return; }
-          if (message.type === 'FBM_EXECUTE_V2') { st.executes.push(message.request); done({ result: tabOpt.result ? tabOpt.result(message.request) : { ok: true, status: 200, headers: { contentType: 'application/json' }, body: '{"d":{}}', transport: { trace: [] } } }); }
+          if (message.type === 'FBM_EXECUTE_V2') { st.executes.push(message.request); if (tabOpt.execute) { tabOpt.execute(message).then(done); return; } done({ result: tabOpt.result ? tabOpt.result(message.request) : { ok: true, status: 200, headers: { contentType: 'application/json' }, body: '{"d":{}}', transport: { trace: [] } } }); }
         }
       },
       scripting: { executeScript() { st.injects += 1; return tabOpt.inject ? tabOpt.inject() : Promise.resolve(); } },
