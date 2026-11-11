@@ -1,5 +1,5 @@
 /**
- * Các bước của một ứng viên trong chặng đẩy (`pushCandidateRun`, thiết kế 5.8) và các công cụ chúng dùng: mở form, so ba bản, lưu, áp kết quả hai pha (`pushResultSent`, `pushResultVerify`), tra lại lệnh tạo khách mất phản hồi, dọn dấu `#SC`, quyết khi một bước lỗi (`pushErrorDecide`).
+ * Các bước của một ứng viên trong chặng đẩy (`pushCandidateRun`, thiết kế 5.8) và các công cụ chúng dùng: mở form, so ba bản, lưu, áp kết quả hai pha (`pushResultSent`, `pushResultVerify`), dọn dấu `#SC`, quyết khi một bước lỗi (`pushErrorDecide`). Tra lại lệnh tạo mất phản hồi ở `PushRecover.js`.
  * Mọi hàm ở đây sửa trên ô lượt của chặng (bản sao do khung lát cấp), không đọc hay ghi ô lượt, không dựng phong bì, không ghi Log thẳng (lỗi và bỏ qua vào bộ gom Log của lát). Người điều phối chặng ở `PushStage.js`.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
@@ -43,8 +43,9 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
   return FbmSync.recordIssueAdd('push', String(candidate && candidate.entity || ''), String(detail && detail.syncStatus || ''), String(candidate && candidate.id || ''), reason, outcome);
 };
 /**
- * Pha 1 của áp kết quả đẩy (`pushResultApply`): lệnh lưu đã trả thành công. Lấy ID FBM (thiếu thì ném `FBM_PUSH_RESPONSE_INCOMPLETE`), băm bản đã gửi, ghi sổ chờ xác nhận rồi mới ghi dòng `đã đẩy chờ xác nhận`. Baseline chỉ đổi ở pha 2, sau bước đọc lại.
- * `gate` là cổng danh mục của chặng. Trả patch đã ghi lên dòng (có `fbmId` để mở form đọc lại).
+ * Pha 1 của áp kết quả đẩy (`pushResultApply`): lệnh lưu đã trả thành công. Lấy ID FBM (thiếu thì ném `FBM_PUSH_RESPONSE_INCOMPLETE`), băm bản đã gửi rồi ghi dòng `đã đẩy chờ xác nhận`. Baseline chỉ đổi ở pha 2, sau bước đọc lại.
+ * Hash đã gửi không ghi kho nào: bên gọi giữ trong dấu trang của chặng cho pha 2. Lượt chết trước pha 2 thì dòng `đã đẩy chờ xác nhận` đã có ID FBM, lần kéo về sau so ba chiều như mọi dòng; lệnh tạo không bao giờ bị phát lại vì dòng đã có ID.
+ * `gate` là cổng danh mục của chặng. Trả `{ patch, sentHash }`: patch đã ghi lên dòng (có `fbmId` để mở form đọc lại).
  */
 FbmSync.pushResultSent = function (candidate, response, operation, gate) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
@@ -59,62 +60,16 @@ FbmSync.pushResultSent = function (candidate, response, operation, gate) {
     patch.fbmId = String(activityId).trim();
     if (!patch.fbmId) { throw FbmSync.pushResponseIncomplete('FBM không trả id sau khi ghi Activity.'); }
   }
-  // Giữ baseline cũ; hash payload gửi được lưu riêng để kỳ đọc nhận ra chính lần ghi này.
   // Fingerprint Activity có `id` FBM nên phải tính sau khi gắn ID vừa nhận; tính trên bản ghi lúc tạo (chưa có ID) thì mọi lệnh tạo đọc xác nhận lệch thành xung đột giả (FBM-050).
   var sentHash = FbmSync.hash(Object.assign({}, record, { fbmId: patch.fbmId }), candidate.entity, gate);
-  // Sổ chờ ghi TRƯỚC, Sheet sau: lệnh ghi đã tới FBM nên mục chờ phải còn kể cả khi ghi Sheet hỏng, không thì lượt sau mất dấu và có thể tạo trùng (FBM-027). Mục chờ không bao giờ xóa theo tuổi. Hash chờ xác nhận chỉ lưu trong state server, không ghi vào Sheet.
-  try {
-    FbmSync.pendingPushSet(candidate.entity, record.id, { hSHIN: sentHash, sentAt: Date.now(), fbmId: patch.fbmId });
-  } catch (pendingError) {
-    throw new Error('Không ghi được hash đang chờ xác nhận sau push: ' + String(pendingError && pendingError.message || pendingError));
-  }
   FbmSync.pushRowChange(candidate.entity, record.id, { build: function () { return { patch: patch }; } });
-  return patch;
+  return { patch: patch, sentHash: sentHash };
 };
 /** FBM báo lưu thành công mà không trả ID: không biết bản ghi nằm đâu trên FBM nên không đọc xác nhận được. */
 FbmSync.pushResponseIncomplete = function (message) {
   var error = new Error(message);
   error.code = 'FBM_PUSH_RESPONSE_INCOMPLETE';
   return error;
-};
-
-/** Khi New Customer mất response, chỉ đọc lại theo mã tự sinh để xác định có ghi thành công hay chưa. */
-FbmSync.customerCreateRecoveryRequest = function (state, cursor, settings) {
-  var candidate = FbmSync.hydratePushCandidate(cursor && cursor.candidate || {}), record = candidate.record || {}, taxNumber = String(record.taxNumber || '').trim();
-  if (!taxNumber) { return null; }
-  state.cursor = FbmSync.pushCursor(cursor, { kind: 'push_wait', operation: 'customer_create_recover', entity: 'customer', candidate: FbmSync.pushCandidateForState(candidate) });
-  state.message = 'Đang kiểm tra Customer vừa tạo sau khi mất phản hồi; không gửi lại lệnh ghi.';
-  return FbmSync.customerGridRequest({ type: 0, count: 20, gridPageIndex: -2, gridRefresh: false, scope: null, filter: ['ma_so_thue:**' + taxNumber] }, settings);
-};
-/**
- * Đối chiếu đúng một dòng Customer sau create mất response rồi vá ID/baseline.
- * Cùng phiên thì còn mã tự sinh để khớp kèm MST và so dữ liệu đã gửi. Phiên sau (`recover`) mã tự sinh đã mất và người dùng có thể đã sửa bản ghi, nên chỉ khớp MST rồi vá hai mã FBM, baseline để rỗng như `09/04` bước 5: lần quét lại của chặng đẩy chọn lại dòng và bước mở form so hai bên (chưa có mốc thì không bao giờ lưu đè), ghi baseline hoặc báo xung đột.
- */
-FbmSync.finishCustomerCreateRecovery = function (state, response) {
-  var cursor = state.cursor || {}, candidate = FbmSync.hydratePushCandidate(cursor.candidate || {}), record = candidate.record || {}, grid = FbmSync.rowsToRecords('customer', response), taxNumber = String(record.taxNumber || '').trim(), autoCode = String(candidate.autoCode || '').trim(), laterRun = candidate.kind === 'recover', rows = grid.rows.filter(function (row) { return String(row.ma_so_thue || '').trim() === taxNumber && (laterRun || String(row.ma_kh || '').trim() === autoCode); }), gate = FbmSync.stateCategoryGate(state), id = String(candidate.id || '');
-  // Đọc dòng, so và vá trong cùng một lần qua cửa; mọi lỗi ném ra từ hàm quyết thì cửa không ghi gì.
-  var done = FbmSync.pushRowChange('customer', id, { allowGone: true, release: true, build: function (local) {
-    if (laterRun && rows.length === 0) { throw new Error('Customer đang đẩy từ lần trước nhưng FBM không có khách cùng Mã số thuế; lần tạo trước có thể chưa thành công. Không tự tạo lại; kiểm tra trên FBM rồi bấm Mở lại bản ghi lỗi nếu cần tạo lại.'); }
-    if (rows.length !== 1) { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
-    if (laterRun) {
-      var found = FbmSync.customerRecord(rows[0], gate);
-      return { patch: { id: local.id, fbmId: found.fbmId, fbmCustomerCode: found.fbmCustomerCode, fbmHash: '', syncStatus: FbmSync.SYNC_STATUS.pending } };
-    }
-    var incoming = FbmSync.customerRecord(rows[0], gate), localHash = FbmSync.hash(local, 'customer', gate), incomingHash = FbmSync.hash(incoming, 'customer', gate), sentHash = FbmSync.hash(candidate.record || {}, 'customer', gate);
-    if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
-    return { patch: { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() } };
-  } });
-  if (done.status === 'gone') { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
-  if (done.status === 'busy') { throw new Error('Customer ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa vá mã FBM.'); }
-  var local = done.local;
-  if (laterRun) {
-    FbmSync.businessStepAdd(state, 'push_customer', { written: 1, sheetWriteBatches: 1 });
-    state.cursor = FbmSync.pushCursorNext(cursor, true); state.current = ''; state.message = 'Đã tìm thấy trên FBM Customer ' + local.id + ' tạo ở lần trước; đã vá mã FBM, sẽ so hai bên trước khi ghi.';
-    return;
-  }
-  state.counts.pushed += 1;
-  FbmSync.businessStepAdd(state, 'push_customer', { verified: 1, pushed: 1, written: 1, sheetWriteBatches: 1 });
-  state.cursor = FbmSync.pushCursorNext(cursor, true); state.current = ''; state.message = 'Đã xác nhận Customer tạo thành công sau khi mất phản hồi.';
 };
 
 /** Kiểm tra response mở form có đủ trường fingerprint trước khi xác nhận. */
@@ -179,13 +134,13 @@ FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValu
 };
 
 /**
- * Pha 2 của áp kết quả đẩy (`pushResultApply`): đọc lại đúng bản ghi và so hash với payload đã gửi. Dòng cục bộ đọc trong cửa cùng lần ghi kết quả; bản ghi được nhả trong cùng lần ghi đó, trừ khi còn bước dọn dấu #SC.
+ * Pha 2 của áp kết quả đẩy (`pushResultApply`): đọc lại đúng bản ghi và so hash với payload đã gửi (`cursor.sentHash`, pha 1 để lại). Dòng cục bộ đọc trong cửa cùng lần ghi kết quả; bản ghi được nhả trong cùng lần ghi đó, trừ khi còn bước dọn dấu #SC.
  * Trả `{ next }` khi còn bước dọn dấu, ngược lại `{}` (dấu trang đã sang ứng viên kế).
  */
 FbmSync.pushResultVerify = function (state, response, settings) {
-  var cursor = state.cursor || {}, candidate = cursor.candidate || {}, entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), pending = FbmSync.pendingPushGet(entity, id), pendingHash = String(pending && (pending.hSHIN || pending.hash) || '').trim(), gate = FbmSync.stateCategoryGate(state);
-  if (!pendingHash) { throw new Error('FBM_VERIFY_STATE_MISSING: không còn hash của lần ghi cần xác nhận.'); }
-  var values = FbmSync.verifyFormValues(response, entity), incomingHash = FbmSync.hash(values, entity, gate), sentHash = pendingHash;
+  var cursor = state.cursor || {}, candidate = cursor.candidate || {}, entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sentHash = String(cursor.sentHash || '').trim(), gate = FbmSync.stateCategoryGate(state);
+  if (!sentHash) { throw new Error('FBM_VERIFY_STATE_MISSING: dấu trang không còn hash của lần ghi cần xác nhận.'); }
+  var values = FbmSync.verifyFormValues(response, entity), incomingHash = FbmSync.hash(values, entity, gate);
   // Lệnh sửa không mang dấu mà FBM vẫn còn dấu: coi là đẩy không ăn để không xếp dọn lại mỗi lượt (G12).
   var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(values.details);
   if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }
@@ -202,10 +157,9 @@ FbmSync.pushResultVerify = function (state, response, settings) {
     // Sheet là nguồn của hàng đợi xung đột nên ghi trạng thái cùng lần nhả: dòng `xung đột chờ quyết` đã bị khóa đồng bộ.
     return { patch: { id: local.id, syncStatus: sync.conflict }, release: true, value: { outcome: 'conflict' } };
   } });
-  if (done.status === 'gone') { FbmSync.pendingPushClear(entity, id); throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
+  if (done.status === 'gone') { throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
   if (done.status === 'busy') { throw new Error('Bản ghi ' + entity + ' ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa ghi kết quả xác nhận.'); }
   var local = done.local, outcome = done.value;
-  FbmSync.pendingPushClear(entity, id);
   if (outcome.outcome === 'confirmed') {
     FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', outcome.status === sync.synced ? 'FBM đã xác nhận đúng dữ liệu vừa ghi.' : 'FBM đã xác nhận; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.', { hPUSH: sentHash, hFBM: incomingHash, syncStatus: outcome.status });
     state.counts.pushed += 1;
@@ -252,7 +206,7 @@ FbmSync.finishMarkerClean = function (state, cursor, candidate, failure) {
 };
 
 /**
- * Bước đọc xác nhận lỗi (FBM báo lỗi, form thiếu trường): lệnh ghi đã tới FBM nên không bao giờ gửi lại; mục chờ xác nhận giữ nguyên để kỳ đọc sau nhận ra lần ghi này. Lượt dừng lỗi, bản ghi giữ trong sổ bận. Trả `end` của chặng.
+ * Bước đọc xác nhận lỗi (FBM báo lỗi, form thiếu trường): lệnh ghi đã tới FBM nên không bao giờ gửi lại; dòng giữ `đã đẩy chờ xác nhận` (đã có ID FBM) để lần kéo về sau so ba chiều. Lượt dừng lỗi, bản ghi giữ trong sổ bận. Trả `end` của chặng.
  */
 FbmSync.pushVerifyFailed = function (state, cursor, failure) {
   var candidate = FbmSync.hydratePushCandidate(cursor.candidate || {}), entity = String(cursor.entity || ''), id = String(candidate.id || '');
@@ -297,8 +251,8 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   state.message = 'Lỗi đẩy ' + String(candidate && candidate.entity || '') + ':' + String(candidate && candidate.id || '') + ': ' + detail.reason;
   var gate = FbmSync.stateCategoryGate(state), localHash = FbmSync.hash(candidate.record || {}, candidate.entity, gate);
   FbmSync.pushFailureAdd(candidate.entity + ':' + String(candidate.id || ''), localHash, Object.assign({}, detail, { requestKind: String(operation || candidate.kind || '') }));
-  // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để không bị tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát nên an toàn để đẩy lại.
-  var waitingForMarker = candidate.kind === 'recover' || candidate.kind === 'stuck' || (candidate.kind === 'create' && operation !== 'customer_create_open');
+  // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để lượt sau tra theo khóa trước khi tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát, còn FBM từ chối rõ ràng mà tra không thấy thì chưa tạo gì, nên hai trường hợp này là lỗi thường.
+  var waitingForMarker = detail.code !== FbmSync.PUSH_CREATE_REJECTED && (candidate.kind === 'recover' || (candidate.kind === 'create' && operation !== 'customer_create_open'));
   var failedStatus = detail.code === FbmSync.PUSH_RECORD_NOT_FOUND ? FbmSync.SYNC_STATUS.missing : FbmSync.SYNC_STATUS.error;
   var done = FbmSync.pushRowChange(candidate.entity, String(candidate.id || ''), { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, releaseGone: true, build: function () {
     return { patch: { id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : failedStatus }, release: !waitingForMarker };
@@ -337,14 +291,15 @@ FbmSync.markPushSkippedBatch = function (state, candidates) {
 
 /**
  * Một bước của ứng viên lỗi (`fromReply`: FBM trả lỗi; ngược lại bước xử lý response ném): không bao giờ phát lại lệnh đã gửi.
- * Đọc xác nhận lỗi thì dừng lượt (`pushVerifyFailed`); lệnh tạo khách FBM báo lỗi thì có thể đã tạo nên tra theo MST trước (FBM-027); dọn dấu `#SC` lỗi chỉ cảnh báo; còn lại ghi lỗi lên dòng (`markPushError`) rồi sang ứng viên kế. Trả `{ next }`, `{ end }` hoặc `{}` (dấu trang đã sang ứng viên kế).
+ * Đọc xác nhận lỗi thì dừng lượt (`pushVerifyFailed`); lệnh tạo khách báo lỗi thì có thể đã tạo nên tra theo MST ngay (FBM-027); lệnh tạo giao dịch FBM từ chối rõ ràng (lỗi nghiệp vụ, không còn xử lý trễ) thì tra theo dấu `#SC` ngay, lỗi khác để lượt sau tra sau khoảng chờ; dọn dấu `#SC` lỗi chỉ cảnh báo; còn lại ghi lỗi lên dòng (`markPushError`) rồi sang ứng viên kế. Trả `{ next }`, `{ end }` hoặc `{}` (dấu trang đã sang ứng viên kế).
  */
 FbmSync.pushErrorDecide = function (state, failure, fromReply, settings) {
   var cursor = state.cursor || {};
   if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') { return { end: FbmSync.pushVerifyFailed(state, cursor, failure) }; }
   if (cursor.operation === 'activity_marker_clean') { FbmSync.finishMarkerClean(state, cursor, FbmSync.hydratePushCandidate(cursor.candidate || {}), failure || 'Lỗi không rõ.'); return {}; }
-  if (fromReply && cursor.operation === 'customer_create_save' && cursor.candidate && cursor.candidate.kind === 'create') {
-    var recovery = FbmSync.customerCreateRecoveryRequest(state, cursor, settings);
+  var rejected = failure && failure.code === 'FBM_BUSINESS_ERROR' ? FbmSync.pushFailureDetail(failure).reason : '';
+  if (fromReply && cursor.candidate && cursor.candidate.kind === 'create' && (cursor.operation === 'customer_create_save' || (cursor.operation === 'activity_create' && rejected))) {
+    var recovery = FbmSync.createRecoveryRequest(state, cursor, settings, rejected);
     if (recovery) { return { next: recovery }; }
   }
   var candidate = FbmSync.hydratePushCandidate(cursor.candidate || {});
@@ -417,6 +372,7 @@ FbmSync.pushCandidateRun = function (state, ctx, logs) {
 FbmSync.pushOperationStep = function (state, response, cfg) {
   var cursor = state.cursor, candidate = FbmSync.hydratePushCandidate(cursor.candidate), gate = FbmSync.stateCategoryGate(state);
   if (cursor.operation === 'customer_create_recover') { FbmSync.finishCustomerCreateRecovery(state, response); return {}; }
+  if (cursor.operation === 'activity_create_recover') { return FbmSync.finishActivityCreateRecovery(state, response, cfg); }
   if (cursor.operation === 'customer_verify' || cursor.operation === 'activity_verify') { return FbmSync.pushResultVerify(state, response, cfg); }
   if (cursor.operation === 'activity_marker_clean') { FbmSync.finishMarkerClean(state, cursor, candidate, null); return {}; }
   if (cursor.operation === 'customer_create_open') {
@@ -451,12 +407,12 @@ FbmSync.pushOperationStep = function (state, response, cfg) {
     return { next: activitySaveRequest };
   }
   if (cursor.operation === 'activity_create' || cursor.operation === 'customer_create_save' || cursor.operation === 'customer_edit_save' || cursor.operation === 'activity_edit_save') {
-    var pushed = FbmSync.pushResultSent(candidate, response, cursor.operation, gate);
+    var sent = FbmSync.pushResultSent(candidate, response, cursor.operation, gate);
   } else {
     throw new Error('Không nhận diện được bước push: ' + cursor.operation);
   }
   FbmSync.pushFailuresRemove([cursor.entity + ':' + String(candidate.id || '')]);
-  cursor.operation = cursor.entity === 'customer' ? 'customer_verify' : 'activity_verify';
+  cursor.operation = cursor.entity === 'customer' ? 'customer_verify' : 'activity_verify'; cursor.sentHash = sent.sentHash;
   state.cursor = cursor; state.message = 'Đã ghi ' + cursor.entity + ' ' + candidate.id + '; đang đọc xác nhận FBM...';
-  return { next: cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(pushed.fbmId, cfg) : FbmSync.activityEditOpenRequest(pushed.fbmId, cfg) };
+  return { next: cursor.entity === 'customer' ? FbmSync.customerEditOpenRequest(sent.patch.fbmId, cfg) : FbmSync.activityEditOpenRequest(sent.patch.fbmId, cfg) };
 };

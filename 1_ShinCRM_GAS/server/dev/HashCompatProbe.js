@@ -16,7 +16,6 @@ function fbmProbeHashCompat() {
     });
     report[entity] = item;
   });
-  report.pendingPushes = Object.keys(FbmSync.pendingPushesRead()).length;
   report.pushFailures = Object.keys(FbmSync.pushFailuresRead().hashes).length;
   return report;
 }

@@ -11,6 +11,7 @@ FbmSync.pushReviewContext = function (state, scan, settings) {
     categoryGate: categoryGate,
     pushFailures: FbmSync.pushFailuresRead().hashes,
     scope: FbmSync.scope(),
+    now: Date.now(),
     hash: function (record, entity) { return scan ? scan.hash(record, entity, categoryGate) : FbmSync.hash(record, entity, categoryGate); },
     settings: function () { if (!cached) { cached = FbmSync.scriptSettings(state); } return cached; }
   };
@@ -18,8 +19,8 @@ FbmSync.pushReviewContext = function (state, scan, settings) {
 
 /**
  * Dòng có được đẩy không, và vì sao: phép xét duy nhất của chiều đẩy, dùng cho lần quét cả sheet, cho từng bước đẩy trên dòng đọc lại theo mã và cho số liệu của preflight, nên ba nơi không thể quyết khác nhau. `customer` là khách cha của Giao dịch. Chỉ xét, không ghi gì.
- * Trả `{ eligible, kind, reason }`: `reason` là mã lý do không đẩy (theo thứ tự xét: `temporary`, `deleted`, `conflict`, `outOfScope`, `parentNotReady`, `permissionInvalid`, `noPermission`, `frozen`, `pushFailed`, `awaitingConfirmation`, `unchanged`); được đẩy thì kèm `hash` (dấu vân dòng đã tính) và `kind` là `edit`, `create`, `recover` hoặc `stuck`.
- * Bản ghi `đang đẩy` chưa có ID FBM là lệnh tạo đã phát mà không biết kết quả; tạo lại có thể sinh bản ghi trùng (`09/04`, FBM-027). Customer đi đường tra theo MST (`recover`), Activity không có đường tra nên chỉ báo người dùng (`stuck`).
+ * Trả `{ eligible, kind, reason }`: `reason` là mã lý do không đẩy (theo thứ tự xét: `temporary`, `deleted`, `conflict`, `outOfScope`, `parentNotReady`, `permissionInvalid`, `noPermission`, `frozen`, `recoverWait`, `pushFailed`, `awaitingConfirmation`, `unchanged`); được đẩy thì kèm `hash` (dấu vân dòng đã tính) và `kind` là `edit`, `create` hoặc `recover`.
+ * Bản ghi `đang đẩy` chưa có ID FBM là lệnh tạo đã phát mà không biết kết quả; tạo lại khi chưa tra có thể sinh bản ghi trùng (FBM-027). Nó là `recover`: tra theo khóa của mình (Customer theo MST, Activity theo dấu `#SC` trong giao dịch của khách cha) rồi mới nối hoặc tạo lại, sau khoảng chờ `recoverWaitMinutes`. Sổ lỗi đẩy không chặn nó: dòng tự gỡ ở lượt sau, khoảng chờ giữ cho lỗi tra không lặp trong cùng lượt.
  */
 FbmSync.pushEligible = function (entity, record, customer, context) {
   var no = function (reason) { return { eligible: false, kind: '', reason: reason }; };
@@ -31,14 +32,14 @@ FbmSync.pushEligible = function (entity, record, customer, context) {
   var permission = FbmSync.syncPermission(record, entity, customer);
   if (!permission.push) { return no(permission.invalid ? 'permissionInvalid' : 'noPermission'); }
   if (FbmSync.isPushFrozen(record, customer)) { return no('frozen'); }
-  var status = String(record.syncStatus || ''), unconfirmed = FbmSync.isUnconfirmedCreate(record), currentHash = context.hash(record, entity);
-  // Sổ lỗi đẩy áp cả cho lệnh tạo chưa xác nhận: đã báo lỗi thì chờ người xử lý, lần quét lại trong chặng không chọn lại để báo lỗi lần nữa.
-  if (String(context.pushFailures[entity + ':' + String(record.id || '')] || '') === currentHash) { return no('pushFailed'); }
-  if (!unconfirmed) {
-    if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return no('awaitingConfirmation'); }
-    if (String(record.fbmId || '').trim() && !FbmSync.pushChanged(record, currentHash)) { return no('unchanged'); }
+  var status = String(record.syncStatus || ''), currentHash = context.hash(record, entity);
+  if (FbmSync.isUnconfirmedCreate(record)) {
+    return FbmSync.recoverDue(record, context.now) ? { eligible: true, kind: 'recover', reason: '', hash: currentHash } : no('recoverWait');
   }
-  return { eligible: true, kind: unconfirmed ? (entity === 'customer' ? 'recover' : 'stuck') : String(record.fbmId || '').trim() ? 'edit' : 'create', reason: '', hash: currentHash };
+  if (String(context.pushFailures[entity + ':' + String(record.id || '')] || '') === currentHash) { return no('pushFailed'); }
+  if (status === FbmSync.SYNC_STATUS.pushed || status === FbmSync.SYNC_STATUS.notApplied) { return no('awaitingConfirmation'); }
+  if (String(record.fbmId || '').trim() && !FbmSync.pushChanged(record, currentHash)) { return no('unchanged'); }
+  return { eligible: true, kind: String(record.fbmId || '').trim() ? 'edit' : 'create', reason: '', hash: currentHash };
 };
 
 /** Dòng có nội dung ShinCRM chưa lên FBM: chưa có mốc, dấu vân khác mốc, hoặc đang chờ đối soát. `currentHash` là dấu vân bên gọi đã tính. */
@@ -61,7 +62,7 @@ FbmSync.pushCandidateBuild = function (entity, record, customer, verdict, contex
   // `raw` là dòng Sheet lúc chọn, chỉ sống trong bộ nhớ: bước ghi so nó với dòng đọc lại trong cửa để không đẩy dòng vừa có người sửa.
   var candidate = { kind: verdict.kind, entity: entity, id: String(record.id || ''), hash: String(verdict.hash || ''), record: record, raw: record };
   if (customer && entity === 'activity') { candidate.record = Object.assign({}, record, { customerFbmCode: customer.fbmCustomerCode || '', stt_rec: customer.fbmId || '' }); }
-  if (verdict.kind === 'recover' || verdict.kind === 'stuck') { return candidate; }
+  if (verdict.kind === 'recover') { return candidate; }
   var hold = FbmSync.pushHold(candidate, context);
   if (!hold) { return candidate; }
   if (String(record.syncStatus || '') === hold.status) { return null; }
@@ -158,6 +159,12 @@ FbmSync.inScope = function (customer, scope) {
 /** Lệnh tạo đã phát nhưng chưa biết FBM có lưu hay không; bản ghi sửa (đã có ID FBM) gửi lại không sinh trùng nên không thuộc nhóm này. */
 FbmSync.isUnconfirmedCreate = function (record) {
   return String(record && record.syncStatus || '') === FbmSync.SYNC_STATUS.pushing && !String(record && record.fbmId || '').trim();
+};
+
+/** Đã qua khoảng chờ `recoverWaitMinutes` tính từ lúc đặt `đang đẩy` (cột Đồng bộ lúc). Dòng không có mốc đọc được (đặt trước khi có mốc) thì coi như đã qua. */
+FbmSync.recoverDue = function (record, now) {
+  var at = record && record.syncedAt ? new Date(record.syncedAt).getTime() : NaN;
+  return !isFinite(at) || Number(now) >= at + FbmSync.BUDGET.recoverWaitMinutes * 60000;
 };
 
 /** Chỉ lưu khóa cần để dựng lại candidate; payload đầy đủ phải đọc lại từ Sheet. */

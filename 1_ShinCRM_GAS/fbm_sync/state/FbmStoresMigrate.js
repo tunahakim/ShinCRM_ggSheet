@@ -11,8 +11,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /** Khóa cũ của sổ tiến trình theo tiến trình; DONE là số mili giây chạy xong, RETRY là `{ failures, retryAt }`. */
 var FBM_STORES_OLD_DONE = { customerFull: 'FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_DONE_DETAIL_SCAN', heartbeat: 'FBM_SYNC_DONE_HEARTBEAT' };
 var FBM_STORES_OLD_RETRY = { customerFull: 'FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN', activityFull: 'FBM_SYNC_RETRY_ACTIVITY_FULL_SCAN', detail: 'FBM_SYNC_RETRY_DETAIL_SCAN', heartbeat: 'FBM_SYNC_RETRY_HEARTBEAT' };
-/** Khóa không còn code nào đọc: dấu lần đẩy sạch đời cũ, thay bằng `FBM_SYNC_PUSH_GATE_V1`. */
-var FBM_STORES_RETIRED_KEYS = ['FBM_SYNC_PUSH_CLEAN_V1'];
+/** Khóa không còn code nào đọc: dấu lần đẩy sạch đời cũ (thay bằng `FBM_SYNC_PUSH_GATE_V1`); sổ chờ xác nhận (trạng thái `đang đẩy`/`đã đẩy chờ xác nhận` trên dòng thay sổ, hash đã gửi nằm trong dấu trang của chặng). */
+var FBM_STORES_RETIRED_KEYS = ['FBM_SYNC_PUSH_CLEAN_V1', 'FBM_SYNC_PENDING_PUSHES_V1'];
 
 /** Công cụ tính (thuần): `stored` là khóa cũ → giá trị đã đọc (DONE là chuỗi số, khóa JSON đã parse). Trả `{ book, connection }`; phần không còn khóa cũ nào thì `null`. */
 function fbmStoresMigratePlan(stored) {

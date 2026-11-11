@@ -178,11 +178,6 @@ function fbmProbeStuckState() {
   return out;
 }
 
-/** Dò hash chờ xác nhận và khóa ghi (không chứa cookie hay mật khẩu) để điều tra lệch dữ liệu sau lệnh ghi FBM. */
-function fbmProbePendingPushes() {
-  var state = FbmSync.stateRead();
-  return { pending: FbmSync.pendingPushesRead(), cursor: state.cursor };
-}
 
 /** Tạm thu phạm vi live (đọc và đẩy) về khách CUS-020061 đã tạo thật, để lượt hai chiều đọc được Activity của khách này (G12.5). Trả về ALT00010 bằng `fbmScopeDefaultCustomer`. */
 function fbmScopeCreatedCustomer() {

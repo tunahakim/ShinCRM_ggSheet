@@ -251,7 +251,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── protocol\Protocol.js     Envelope và parse response.
     ├── transport\Budget.js       Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
     ├── transport\TransportCore.js Hợp đồng request, retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại).
-    ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, tra lại MST, đọc xác nhận, dọn dấu), hai pha áp kết quả và quyết lỗi đẩy.
+    ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, đọc xác nhận, dọn dấu), hai pha áp kết quả và quyết lỗi đẩy.
+    ├── transport\PushRecover.js    Tra lại lệnh tạo mất phản hồi theo khóa (khách theo MST, giao dịch theo dấu `#SC`) rồi nối id FBM hoặc cho tạo lại.
     ├── transport\PushStage.js   Người điều phối chặng đẩy theo hợp đồng chung: nhận response, quét lại và cổng chấp thuận, xét từng mã, chốt lượt.
     ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
     ├── transport\RequestSettings.js Cài đặt dựng request: hằng địa chỉ FBM, `scriptSettings(state)` của một lát, phép kiểm `requestCfg` đầu mọi hàm dựng (thiếu cfg thì ném `FBM_REQUEST_SETTINGS_MISSING`).
@@ -265,7 +266,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── control\SettingsCommands.js Lệnh cài đặt của cửa lệnh (`save_settings`, `set_master`, `set_background`, `reset_settings`) và gói cài đặt cho màn đồng bộ, đều đi qua cổng cài đặt chung.
     ├── state\State.js            DocumentProperties, cursor và progress.
     ├── state\WorkStores.js       Kho làm việc của một lượt: bảng `RUN_WORK_STORES` khai mọi tên kho (kho bit, danh sách nhiều khóa, khóa đơn), kho bit "đã thấy", `workStoreClear` xóa hẳn ở mở và đóng lượt.
-    ├── state\PendingPushes.js    Sổ chờ xác nhận (hash đã gửi FBM chưa đọc lại, chống tạo trùng): cổng đọc ghi, dọn mồ côi ở lần quét đầu chặng đẩy, mục quá tuổi chỉ báo.
     ├── state\RequestWatch.js     Canh request GAS phát cho Extension trong một lời gọi: request đang chờ, đã trả lời, nộp lặp; request quá hạn bị bỏ thì ghi phát hiện, bước đóng lời gọi của phạm vi `fbm_sync` ghi Log.
     ├── state\Run.js              Mở và đóng Lượt (`runOpen` và nhãn lượt, `runClose`, `runFail`, bảng kết luận `RUN_VERDICTS`, thu hồi lượt quá hạn).
     ├── state\RunStop.js          Lệnh Dừng: cờ dừng ở khóa riêng ghi không cần khóa điều phối, lát áp cờ trước khi phát request.

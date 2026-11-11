@@ -89,7 +89,7 @@ FbmSync.pushPassNext = function (state, settings, logs, threshold) {
   var cursor = FbmSync.pushCursor(state.cursor), stalled = cursor.pass > 0 && cursor.at >= cursor.size && !cursor.progress;
   // Đọc trước khi đọc Sheet: lần quét này sạch thì dấu là đúng bản này, mọi sửa sau lúc đọc đều làm dấu lệch.
   var mark = FbmSync.pushGateMark();
-  var found = FbmSync.withLocalSnapshot(function () { var scan = FbmSync.localScan(); if (cursor.pass === 0) { FbmSync.pendingSweepApply(scan, logs, Date.now()); } return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(state, scan, settings)); });
+  var found = FbmSync.withLocalSnapshot(function () { var scan = FbmSync.localScan(); return FbmSync.pushCandidatesAll(scan, FbmSync.pushReviewContext(state, scan, settings)); });
   ['customer', 'activity'].forEach(function (entity) {
     var step = 'push_' + entity;
     FbmSync.businessStepStart(state, step, { mode: state.mode, scan: state.scan, entity: entity });
@@ -203,20 +203,15 @@ FbmSync.pushNext = function (state, settings, logs, threshold) {
     if (!candidate) { state.cursor = FbmSync.pushCursorNext(cursor, true); continue; }
     // Dòng đã đổi nội dung từ lúc qua cổng chấp thuận: không đẩy nội dung chưa ai duyệt, để lần quét lại hoặc lượt sau xét.
     if (candidate.hash !== item.hash) { flush(); FbmSync.pushDefer(state, cursor, entity, candidate.id, { status: 'changed' }); continue; }
-    if (candidate.kind === 'stuck') {
-      flush();
-      var stuck = FbmSync.markPushError(state, candidate, { code: 'PUSH_CREATE_UNCONFIRMED', reason: 'Hoạt động đang đẩy từ lần trước mà mất phản hồi; FBM không có đường tra lại nên không tự gửi lại để tránh tạo trùng. Kiểm tra trên FBM: chưa có thì bấm Mở lại bản ghi lỗi để tạo lại.' }, 'activity_create');
-      state.cursor = FbmSync.pushCursorNext(cursor, stuck === 'ok'); continue;
-    }
     var configError = FbmSync.pushConfigErrors(candidate, settings);
     if (configError) { flush(); return { end: { kind: 'pause', message: configError } }; }
     if (candidate.kind === 'recover') {
       flush();
-      // Tra là request đọc nên không qua kiểm danh mục/điều kiện đẩy; không có MST thì không tra được và không được tạo lại.
+      // Lệnh tạo không biết kết quả: tra theo khóa trước khi tạo lại (FBM-027). Tra là request đọc nên không qua kiểm danh mục; tra không thấy thì dòng về lệnh tạo thường, lần quét lại xét đủ.
       state.current = candidate.id;
-      var recovery = FbmSync.customerCreateRecoveryRequest(state, Object.assign({}, cursor, { candidate: candidate }), settings);
+      var recovery = FbmSync.createRecoveryRequest(state, Object.assign({}, cursor, { candidate: candidate }), settings, '');
       if (recovery) { return { next: recovery }; }
-      var lost = FbmSync.markPushError(state, candidate, { code: 'PUSH_CREATE_UNCONFIRMED', reason: 'Customer đang đẩy từ lần trước nhưng không còn Mã số thuế để tra trên FBM; không tự tạo lại. Kiểm tra trên FBM rồi bấm Mở lại bản ghi lỗi nếu cần tạo lại.' }, 'customer_create_recover');
+      var lost = FbmSync.markPushError(state, candidate, { code: 'PUSH_CREATE_UNCONFIRMED', reason: entity === 'customer' ? 'Customer đang đẩy từ lần trước nhưng không còn Mã số thuế để tra trên FBM; không tạo lại khi chưa tra. Điền lại Mã số thuế, lượt sau tự tra rồi nối hoặc tạo lại.' : 'Giao dịch đang đẩy từ lần trước nhưng khách cha chưa có ID FBM để tra; không tạo lại khi chưa tra.' }, entity + '_create_recover');
       state.cursor = FbmSync.pushCursorNext(cursor, lost === 'ok'); continue;
     }
     // Phép xét danh mục cần danh mục FBM còn mới; lệch người phụ trách thì không cần.
@@ -236,7 +231,8 @@ FbmSync.pushNext = function (state, settings, logs, threshold) {
     }
     // `09/04` bước 1: ghi `đang đẩy` và giữ bản ghi trong sổ bận trong cùng một lần qua cửa, chỉ khi dòng còn đúng như lúc chọn, rồi mới phát lệnh; ghi Sheet không được thì ném lỗi và lệnh ghi FBM không được phát (FBM-002). Ô lượt mang cursor chờ ghi được khung lát ghi cùng lần phát.
     var started = FbmSync.pushRowChange(entity, candidate.id, { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, build: function () {
-      return { patch: { id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }, hold: FbmSync.PUSH_HOLD_REASON };
+      // Lệnh tạo ghi thêm mốc giờ vào cột Đồng bộ lúc: mất phản hồi thì lượt sau chỉ tra lại sau `recoverWaitMinutes` tính từ mốc này.
+      return { patch: Object.assign({ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }, candidate.kind === 'create' ? { syncedAt: new Date() } : {}), hold: FbmSync.PUSH_HOLD_REASON };
     } });
     if (started.status !== 'ok') {
       // Dòng vừa đổi, đã vắng hoặc đang bận: chưa phát gì, sang mã kế và để lần quét lại xét lại.

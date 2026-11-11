@@ -86,8 +86,8 @@ FbmSync.startRun = function (options) {
   return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
 };
 /**
- * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi rồi xóa các mục chờ xác nhận đã khớp; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
- * `ctx`: `{ categoryGate, now, accountName }`; hàm đọc sổ chờ đẩy một lần rồi truyền cho `pullPageApply` qua `ctx.pending`.
+ * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
+ * `ctx`: `{ categoryGate, now, accountName }`.
  */
 FbmSync.pullBatchApply = function (state, entity, records, ctx) {
   var count = (records || []).length, pullStep = 'pull_' + String(entity || ''), reconcileStep = 'reconcile_' + String(entity || '');
@@ -99,8 +99,7 @@ FbmSync.pullBatchApply = function (state, entity, records, ctx) {
     FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count });
     return { ok: true, preview: true, written: 0, skipped: count };
   }
-  var result = FbmSync.pullPageApply(entity, records || [], Object.assign({}, ctx, { pending: FbmSync.pendingPushesRead() }));
-  result.pendingClears.forEach(function (item) { FbmSync.pendingPushClear(item.entity, item.id); });
+  var result = FbmSync.pullPageApply(entity, records || [], ctx);
   state.counts.succeeded += Number(result.written || 0);
   // Ô Xung đột của phiên đếm cả dòng cũ vẫn còn xung đột; số chờ quyết trên Sidebar chỉ cộng xung đột mới và trừ dòng đã tự gỡ, vì dòng cũ đã nằm trong số đếm lúc preflight.
   state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
