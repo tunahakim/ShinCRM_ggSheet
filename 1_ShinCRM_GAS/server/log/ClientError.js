@@ -1,7 +1,7 @@
 /**
  * Cổng chung ghi một lỗi do Sidebar tự gặp vào sheet `Log`, nguồn `sidebar`.
  *
- * Vì sao cần cổng riêng: lỗi sinh ở trình duyệt (hết hạn chờ một lời gọi, Extension vắng, thao tác hỏng phía client) thì máy chủ không ném gì, nên `runEntryPoint` không có gì để ghi. Không có cổng này thì loại lỗi đó im lặng. Mọi module cần ghi lỗi phía Sidebar (lượt nạp, đồng bộ FBM...) đi qua đây, không tự dựng dòng `logEvent` nguồn `sidebar`.
+ * Vì sao cần cổng riêng: lỗi sinh ở trình duyệt (hết hạn chờ một lời gọi, Extension vắng, thao tác hỏng phía client) hoặc lời gọi bị Google chặn trước khi code chạy (chưa cấp quyền, trình duyệt nhiều tài khoản) thì máy chủ không ném gì, nên `runEntryPoint` không có gì để ghi. Không có cổng này thì loại lỗi đó im lặng. Mọi module cần ghi lỗi phía Sidebar (lượt nạp, đồng bộ FBM...) đi qua đây, không tự dựng dòng `logEvent` nguồn `sidebar`.
  *
  * **Không tin chuỗi client gửi.** Lý do và chi tiết bị cắt độ dài, chỉ giữ các khóa đã khai, để một chuỗi rác không làm phồng ô Log.
  */

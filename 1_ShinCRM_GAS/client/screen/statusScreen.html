@@ -45,9 +45,9 @@ function statusBudgetBlocked(budget) {
   }]);
 }
 
-/** Câu nói về sheet Log theo việc đã thật sự xảy ra. `server`: máy chủ ném lỗi nên `runEntryPoint` đã ghi; ba trạng thái còn lại là lỗi sinh ở trình duyệt, Sidebar tự ghi qua `callServerLogError`. */
+/** Câu nói về sheet Log theo việc đã thật sự xảy ra. `server`: lỗi mang dấu `runEntryPoint` đã ghi; ba trạng thái còn lại là lỗi không có dấu đó (lỗi trình duyệt, lời gọi bị Google chặn trước khi code chạy), Sidebar tự ghi qua `callServerErrorLog`. */
 var STATUS_LOAD_ERROR_LOG_TEXT = {
-  server: 'Lượt chạy này đã ghi một dòng vào sheet Log kèm vết gọi.',
+  server: 'Lỗi này đã có trong sheet Log kèm vết gọi.',
   pending: 'Đang ghi lỗi này vào sheet Log…',
   logged: 'Đã ghi một dòng vào sheet Log nêu tên hàm và thời gian đã chờ.',
   not_logged: 'Chưa ghi được lỗi này vào sheet Log vì máy chủ cũng không nhận lời gọi ghi Log; hãy chụp lại màn hình này.'

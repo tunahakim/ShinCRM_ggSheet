@@ -109,15 +109,15 @@ async function sidebarBoot(options) {
     return { ok: true, core: core, summary: BOOT_LAST_SUMMARY };
   } catch (err) {
     var message = err && err.message ? err.message : String(err);
-    if (!(err && err.logged)) {
+    if (err && err.inLog === true) {
       statusLoadError(message, 'server');
       return { ok: false, error: message };
     }
     statusLoadError(message, 'pending');
-    var logged = await err.logged;
-    // Người dùng đã bấm Thử lại trong lúc chờ ghi Log thì màn hình thuộc lượt mới, không vẽ đè.
-    if (luot === BOOT_RUN_SEQ) { statusLoadError(message, logged ? 'logged' : 'not_logged'); }
-    return { ok: false, error: message, logged: logged };
+    var state = await callServerErrorLog(err, 'boot_failed');
+    // Đã bấm Thử lại trong lúc chờ ghi Log thì màn thuộc lượt mới, không vẽ đè.
+    if (luot === BOOT_RUN_SEQ) { statusLoadError(message, state); }
+    return { ok: false, error: message, logged: state === 'logged' };
   } finally {
     if (finishBusy) { finishBusy(); }
   }

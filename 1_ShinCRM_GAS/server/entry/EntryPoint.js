@@ -25,6 +25,21 @@ function entryFail(name, source, err) {
   logEvent({ source: source, action: name, outcome: LOG_ERROR, reason: errorMessage(err), detail: Object.assign({ code: err && err.code ? String(err.code) : '' }, err && err.detail && typeof err.detail === 'object' ? err.detail : {}, { stack: err && err.stack ? String(err.stack) : '(không có stack)' }) });
 }
 
+/**
+ * Đuôi `runEntryPoint` gắn vào thông báo lỗi khi lỗi đã nằm trong sheet `Log` (vừa nhả ra Sheet, hoặc là lỗi lặp của cửa vào tự gọi đã ghi từ lần trước).
+ * Vì sao cần: `withFailureHandler` của Sidebar nhận cả lỗi Google chặn trước khi code chạy (chưa cấp quyền, trình duyệt nhiều tài khoản), và lúc đó chưa có dòng Log nào. Chỉ thông báo lỗi đi được tới Sidebar, nên dấu phải nằm trong chữ. Sidebar đọc dấu qua `SIDEBAR_SERVER_DATA.entry`, không chép lại chuỗi.
+ */
+var ENTRY_LOGGED_MARK = ' [đã ghi vào sheet Log]';
+var SIDEBAR_SERVER_DATA_PROVIDERS = typeof SIDEBAR_SERVER_DATA_PROVIDERS !== 'undefined' ? SIDEBAR_SERVER_DATA_PROVIDERS : {};
+SIDEBAR_SERVER_DATA_PROVIDERS.entry = function () { return { loggedMark: ENTRY_LOGGED_MARK }; };
+
+/** Gắn dấu đã ghi Log; cửa vào lồng nhau không gắn hai lần. */
+function entryMarkLogged(err) {
+  var message = String(err.message || '');
+  if (message.slice(-ENTRY_LOGGED_MARK.length) !== ENTRY_LOGGED_MARK) { err.message = message + ENTRY_LOGGED_MARK; }
+  return err;
+}
+
 /** Cửa vào chạy thành công: gỡ thông báo lỗi của nó; có gỡ thì ghi một dòng hết lỗi. Kho đã nằm trong bản đọc của lần gọi nên lượt không có lỗi cũ không tốn lệnh ghi nào. */
 function entryRecover(name, source) {
   var previous = noticeResolve('entry_failure', name);
@@ -48,7 +63,7 @@ function runEntryPoint(name, source, fn) {
   var scope = Object.prototype.hasOwnProperty.call(ENTRY_POINT_SCOPES, source) ? ENTRY_POINT_SCOPES[source] : null;
   // Mốc đo DEV (server/dev/FbmPerfProbe.js); gỡ thư mục dev thì hàm không tồn tại và dòng này không làm gì. Tham số thứ tư là đối số gốc của cửa vào.
   var perf = typeof devPerfBegin === 'function' ? devPerfBegin(name, arguments[3]) : null;
-  var failed = false, result;
+  var failed = false, thrown = null, result;
   // Bản đọc DocumentProperties sống đúng một lần gọi (server/state/DocumentStore.js): mở đầu tiên, đóng cuối cùng (sau `flushLog`). Phạm vi riêng của nhánh mở trước mốc đầu tiên để mốc đó cũng được gom.
   documentStoreBegin();
   pendingChangesBegin();
@@ -58,8 +73,11 @@ function runEntryPoint(name, source, fn) {
     // Kết quả `ok: false` là cửa vào báo lại lỗi cũ chứ chưa hết lỗi.
     if (!(result && result.ok === false)) { entryRecover(name, source); }
     return result;
-  } catch (err) {
+  } catch (caught) {
+    // Giá trị ném không phải đối tượng thì không gắn được dấu vào thông báo; bọc lại để mọi lỗi đi cùng một hợp đồng. Không dùng `instanceof Error`: lỗi từ ngữ cảnh khác (dịch vụ Google, hộp test) vẫn là lỗi.
+    var err = caught && typeof caught === 'object' ? caught : new Error(String(caught));
     failed = true;
+    thrown = err;
     if (scope) { scope.boundary('gas_failed', name, err); }
     entryFail(name, source, err);
     throw err;
@@ -84,6 +102,9 @@ function runEntryPoint(name, source, fn) {
         try { scope.end(); } catch (endErr) { entryFail(name, source, endErr); }
       }
       flushLog();
+      // Log đã ra Sheet mới gắn dấu; `flushLog` ném thì lỗi của nó thay lỗi gốc và không mang dấu, nên Sidebar sẽ tự ghi.
+      if (thrown) { entryMarkLogged(thrown); }
+      if (closeErr) { entryMarkLogged(closeErr); }
     } finally {
       documentStoreEnd();
       if (perf) { devPerfEnd(perf, failed); }
