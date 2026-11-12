@@ -7,6 +7,10 @@
 const { dungHop } = require('../lib/dung-hop');
 const { napServer } = require('../lib/load-gas');
 const { dungClient } = require('../lib/dung-client');
+const { duLieuServer } = require('../lib/sidebar/nap-sidebar');
+
+/** Dấu `runEntryPoint` gắn khi lỗi đã vào Log, đọc từ dữ liệu GAS thật in vào Sidebar. */
+const DAU_LOG = duLieuServer().entry.loggedMark;
 const { section, check, ghiLoiNap } = require('../lib/assert');
 
 /** Hộp cát `callServer` với `google.script.run` giả: lưu lại từng lời gọi và hẹn giờ để ca kiểm tự quyết lời gọi nào trả, lời gọi nào hết hạn. */
@@ -14,7 +18,7 @@ function dungCallServer() {
   const goi = [];
   const hen = [];
   const hop = dungClient({ tep: ['client/util/serverCall.html'], stubs: {
-    Promise, Date,
+    Promise, Date, SIDEBAR_SERVER_DATA: duLieuServer(),
     setTimeout(fn, ms) { hen.push({ fn, ms }); return hen.length; },
     clearTimeout() {},
     progressBegin() {}, progressEnd() {}, callTimingRecord() {},
@@ -81,16 +85,26 @@ async function chay(so) {
 
   goi.length = 0; hen.length = 0; loi = null;
   const p3 = hop.callServer('loadCore').catch((err) => { loi = err; });
-  goi[0].fail(new Error('Máy chủ ném lỗi'));
+  goi[0].fail(new Error('Máy chủ ném lỗi' + DAU_LOG));
   await p3;
-  check(so, 'lỗi máy chủ ném (runEntryPoint đã ghi) thì không ghi Log lần nữa và không có err.logged',
-    [loi.message, loi.logged, goi.length], ['Máy chủ ném lỗi', undefined, 1]);
+  check(so, 'lỗi mang dấu runEntryPoint đã ghi: bỏ dấu khỏi chữ, đánh dấu inLog, không ghi Log lần nữa, không có err.logged',
+    [loi.message, loi.inLog, loi.logged, goi.length], ['Máy chủ ném lỗi', true, undefined, 1]);
+
+  goi.length = 0; hen.length = 0; loi = null;
+  const p4 = hop.callServer('loadCore').catch((err) => { loi = err; });
+  goi[0].fail(new Error('Cần được cho phép để thực hiện hành động đó.'));
+  await p4;
+  const trangThai = hop.callServerErrorLog(loi, 'boot_failed');
+  goi[1].fail(new Error('Cần được cho phép để thực hiện hành động đó.'));
+  check(so, 'lỗi không mang dấu (Google chặn trước khi code chạy) thì không được coi là đã vào Log: gọi ghi Log, bị chặn nốt thì báo chưa ghi',
+    [loi.message, loi.inLog, goi.map((g) => g.name), await trangThai],
+    ['Cần được cho phép để thực hiện hành động đó.', undefined, ['loadCore', 'logClientError'], 'not_logged']);
 
   section('clientError — màn lỗi lượt nạp nói đúng việc đã ghi Log hay chưa');
 
   let boot;
   try {
-    boot = dungClient({ tep: ['client/ram/bootstrap.html'], stubs: { Promise, Date } });
+    boot = dungClient({ tep: ['client/util/serverCall.html', 'client/ram/bootstrap.html'], stubs: { Promise, Date, SIDEBAR_SERVER_DATA: duLieuServer() } });
   } catch (err) {
     return ghiLoiNap(so, 'nạp bootstrap', err);
   }
@@ -116,15 +130,26 @@ async function chay(so) {
   check(so, 'hết hạn chờ, không ghi được Log: màn lỗi nói rõ là chưa ghi, không nói đã ghi', man, ['pending', 'not_logged']);
 
   man.length = 0;
-  boot.callServer = () => Promise.reject(new Error('Máy chủ ném lỗi'));
+  boot.callServer = () => Promise.reject(Object.assign(new Error('Máy chủ ném lỗi'), { inLog: true }));
   await boot.sidebarBoot();
-  check(so, 'lỗi máy chủ ném: màn lỗi giữ câu máy chủ đã ghi Log', man, ['server']);
+  check(so, 'lỗi runEntryPoint đã ghi: màn lỗi nói lỗi đã có trong Log', man, ['server']);
+
+  man.length = 0;
+  const goiNap = [];
+  boot.callServer = (name, args) => { goiNap.push([name, args && args[0]]); return name === 'logClientError' ? Promise.resolve({ ok: true }) : Promise.reject(new Error('Cần được cho phép để thực hiện hành động đó.')); };
+  await boot.sidebarBoot();
+  check(so, 'lời gọi bị Google chặn (không có dấu đã ghi): màn lỗi không nói đã ghi, Sidebar tự ghi Log rồi mới nói đã ghi', [man, goiNap.map((g) => g.join(':'))], [['pending', 'logged'], ['loadCore:', 'logClientError:boot_failed']]);
+
+  man.length = 0;
+  boot.callServer = (name) => Promise.reject(new Error(name === 'logClientError' ? 'vẫn bị chặn' : 'Cần được cho phép để thực hiện hành động đó.'));
+  await boot.sidebarBoot();
+  check(so, 'lời ghi Log cũng bị chặn: màn lỗi nói rõ chưa ghi được', man, ['pending', 'not_logged']);
 
   man.length = 0;
   boot.callServer = () => { const e = new Error('hết hạn'); e.logged = new Promise((r) => { ghi = r; }); return Promise.reject(e); };
   const cu = boot.sidebarBoot();
   await new Promise((r) => setImmediate(r));
-  boot.callServer = () => Promise.reject(new Error('lượt mới'));
+  boot.callServer = () => Promise.reject(Object.assign(new Error('lượt mới'), { inLog: true }));
   await boot.sidebarBoot();
   ghi(true);
   await cu;

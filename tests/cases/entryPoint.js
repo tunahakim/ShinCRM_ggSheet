@@ -41,6 +41,18 @@ function chay(so) {
   checkThrows(so, 'cửa vào ngoài danh sách lần 2', () => goi('saveRecord', hong('lỗi C')), 'lỗi C');
   check(so, 'cửa vào ngoài danh sách (người bấm, FBM) vẫn ghi mọi lần lỗi', dem('lỗi C'), 2);
 
+  section('EntryPoint — dấu "đã ghi Log" trên lỗi ném ra');
+  const bat = (fn) => { try { fn(); return null; } catch (e) { return e; } };
+  const dau = hop.ENTRY_LOGGED_MARK;
+  const e1 = bat(() => goi('saveRecord', hong('lỗi E')));
+  check(so, 'lỗi đã nhả Log thì mang dấu ở cuối, chữ gốc giữ nguyên phía trước', [typeof e1, e1.message], ['object', 'lỗi E' + dau]);
+  const e2 = bat(() => goi('saveRecord', () => goi('loadCore', hong('lỗi F'))));
+  check(so, 'cửa vào lồng nhau không gắn dấu hai lần', e2.message, 'lỗi F' + dau);
+  const e3 = bat(() => goi('saveRecord', () => { throw 'chuỗi G'; }));
+  check(so, 'giá trị ném không phải Error được bọc thành Error mang dấu', [typeof e3, e3.message], ['object', 'chuỗi G' + dau]);
+  const e4 = bat(() => goi('renderViewIfDirty', hong('lỗi A')));
+  check(so, 'lỗi lặp của cửa vào tự gọi (đã có trong Log từ lần trước) vẫn mang dấu', e4.message, 'lỗi A' + dau);
+
   section('EntryPoint — thay đổi chờ ghi nhận: một lần chạy một tín hiệu, ghi nhận cả khi lỗi');
   const rev = () => hop.reloadStateRead().revision;
   const mark = (id) => hop.dirtyStateMarkSignal({ customer: [id] });

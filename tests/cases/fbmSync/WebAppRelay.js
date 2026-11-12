@@ -74,8 +74,8 @@ async function chay(so) {
   relay.FbmSync.controlDispatch = () => { throw new Error('Lỗi đọc state thử nghiệm'); };
   const relayBoom = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { machineId: 'may-A' } });
   const boomLine = relayLog.lines.filter((line) => line.action === 'fbmRelay')[0] || {};
-  check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension',
-    [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm', 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'entry_failure']]]);
+  check(so, 'FBM-034: exception trong nhịp nền có dòng Log lỗi action fbmRelay, được xả ra Sheet, đẩy tin chờ cho Sidebar và vẫn trả JSON lỗi cho Extension, lỗi mang dấu đã ghi Log',
+    [relayBoom.ok, relayBoom.error, boomLine.outcome, boomLine.reason, relayLog.flushes, relayLog.reports], [false, 'Lỗi đọc state thử nghiệm' + relay.ENTRY_LOGGED_MARK, 'error', 'Lỗi đọc state thử nghiệm', 2, [['Lỗi đọc state thử nghiệm', 'entry_failure']]]);
   const mismatch = relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-khac', command: 'heartbeat', payload: {} });
   check(so, 'FBM-034: Extension gửi nhịp nền cho bảng tính khác thì có dòng Log lỗi và tin chờ, không xử lý nhịp',
     [mismatch.ok, mismatch.code, relayLog.lines.length, relayLog.reports.length, relayLog.lines[1] && relayLog.lines[1].reason.indexOf('bảng tính khác') >= 0],

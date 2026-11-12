@@ -11,7 +11,7 @@ const SIDEBAR = 'client/Sidebar.html';
 /** Thẻ chèn dữ liệu GAS trong Sidebar.html, đứng trước mọi tệp client. */
 const THE_DU_LIEU_SERVER = '<?!= sidebarServerData() ?>';
 /** Tệp GAS mà `sidebarServerData()` cần: bảng dãy chặng, bảng tiến trình nền và tên của chúng, cùng chính hàm chèn. */
-const TEP_DU_LIEU_SERVER = ['fbm_sync/state/RunPlan.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/FbmSettings.js', 'server/entry/Menu.js'];
+const TEP_DU_LIEU_SERVER = ['fbm_sync/state/RunPlan.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/FbmSettings.js', 'server/entry/EntryPoint.js', 'server/entry/Menu.js'];
 let banDuLieuServer = null;
 
 /** Chuỗi `<script>` mà GAS thật in vào chỗ thẻ chèn dữ liệu: chạy đúng hàm `sidebarServerData()` trên các tệp GAS thật, không chép lại dữ liệu. */

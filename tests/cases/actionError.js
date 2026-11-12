@@ -32,7 +32,7 @@ async function chay(so) {
   ], ['Lỗi: Hành động hỏng', { label: 'Đóng ✕', action: 'noticeDismiss', value: 'actionError' }, [['logClientError', 'sidebar_action', 'Hành động hỏng']], a.hop.ACTION_ERROR_LOG_TEXT.pending, a.hop.ACTION_ERROR_LOG_TEXT.logged, []]);
 
   const b = taoCanh({ ok: true });
-  await b.hop.actionErrorReport(Object.assign(new Error('Máy chủ ném'), { fromServer: true }));
+  await b.hop.actionErrorReport(Object.assign(new Error('Máy chủ ném'), { inLog: true }));
   await b.hop.actionErrorReport(Object.assign(new Error('Hết hạn chờ'), { logged: Promise.resolve(false) }));
   check(so, 'Lỗi máy chủ ném thì không ghi Log lần nữa và nói máy chủ đã ghi; hết hạn chờ dùng kết quả ghi sẵn, ghi hỏng thì bảo chụp màn hình', [
     b.calls.length, goiY(b.hop)
