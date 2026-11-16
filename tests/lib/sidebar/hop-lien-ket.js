@@ -80,7 +80,10 @@ function dungHopLienKet() {
     hop._options.push(options || {});
     return syncValue({ ok: true, spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '', reload: { revision: 0 } });
   };
-  napTheoSidebar(['client/ram/refresh.html', 'client/ui/notices.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html'], hop);
+  // Ghi Log lỗi nền: ghi lại lời gọi; `callServerErrorLog` thật được kiểm ở `tests/cases/clientError.js`.
+  hop._errorLogs = [];
+  hop.callServerErrorLog = (err, action) => { hop._errorLogs.push([action, err && err.message]); return syncValue(err && err.inLog ? 'server' : 'logged'); };
+  napTheoSidebar(['client/ram/refresh.html', 'client/ui/notices.html', 'client/ui/actionError.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html'], hop);
   // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
   hop.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;

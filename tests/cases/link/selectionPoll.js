@@ -21,7 +21,7 @@ async function chay(so) {
 
   const chong = dungHopLienKet(); batDauLienKet(chong); chong._clock.now = 4000; chong.selectionPollClearTimer();
   let resolveProbe = null;
-  chong.callServer = (name, args, options) => { chong._calls.push({ name, args, options }); return { then: (ok) => { resolveProbe = ok; return { then: () => null }; } }; };
+  chong.callServer = (name, args, options) => { chong._calls.push({ name, args, options }); return { then(ok) { resolveProbe = resolveProbe || ok; return this; } }; };
   chong.selectionPollTick(); chong.selectionPollTick();
   check(so, 'request selection đang bay thì nhịp sau không tạo request chồng',
     [chong._calls.length, chong.SELECTION_POLL.inFlight, typeof resolveProbe],
@@ -196,7 +196,7 @@ async function chay(so) {
   const pickedResend = [];
   readerResend.ACTIONS.setCurrentCustomer = (input) => { pickedResend.push(input.pick); };
   let finishProbe = null;
-  readerResend.callServer = (name, args, options) => { readerResend._calls.push({ name, args, options }); return { then: (ok) => { finishProbe = ok; return { then: () => null }; } }; };
+  readerResend.callServer = (name, args, options) => { readerResend._calls.push({ name, args, options }); return { then(ok) { finishProbe = finishProbe || ok; return this; } }; };
   readerResend.sheetLinkOnMessage({ origin: readerResend.SHEET_LINK_ORIGIN, data: Object.assign({}, downContext, { nonce: readerResend.SHEET_LINK_NONCE }) });
   chayHenGio(readerResend, 1000);
   readerResend.sheetLinkOnMessage({ origin: readerResend.SHEET_LINK_ORIGIN, data: Object.assign({}, downContext, { nonce: readerResend.SHEET_LINK_NONCE, seq: 2, hint: '' }) });
