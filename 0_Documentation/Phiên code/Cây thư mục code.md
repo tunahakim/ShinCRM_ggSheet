@@ -247,15 +247,17 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── auth\LoginStores.js     Hai kho đăng nhập tách theo người ghi: credential `FBM_CREDENTIAL_V1` (bản mã, phần công khai) và dấu lần thử `FBM_LOGIN_ATTEMPT_V1`; cổng đọc, cổng ghi và công cụ tính dấu lần thử.
     ├── auth\LoginTools.js      Công cụ thuần của lượt đăng nhập: mô tả request từng bước trang Login (ô cần mật khẩu để trống cho Extension điền), đọc salt, chọn database/đơn vị, quyết định lệnh khóa trang, khớp danh tính, cổng tự đăng nhập
     ├── auth\LoginRun.js        Chặng đăng nhập theo hợp đồng chặng chung (`CURSOR_TABLE.login`): đọc response từng bước trang Login, authorize, grid User; bước kết ghi dấu lần thử và đóng hoặc tiếp tục lượt.
+    ├── auth\SessionStage.js   Chặng phiên (`CURSOR_TABLE.session`): mở bằng một công cụ `sessionGateOpen` từ hai chỗ (bước phát request gặp cursor có cổng khi phiên chưa xác minh, hoặc phản hồi đáng ngờ); kết luận phiên sống/hết hạn/đáng ngờ, xác minh danh tính, gửi lại request đọc một lần, mở lượt tự đăng nhập qua cổng `autoLoginGate`.
     ├── schema\FbmFields.js      Field map, controller và trạng thái FBM.
     ├── SyncSchema.js             Khai 8 cột thuần đồng bộ. Tám cột này không được xuất hiện trong DATA_SCHEMA.
     ├── protocol\Protocol.js     Envelope và parse response.
     ├── transport\Budget.js       Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
-    ├── transport\TransportCore.js Hợp đồng request, retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại).
+    ├── transport\TransportCore.js Hợp đồng request (`requestIssue` cấp mã, deadline, chữ ký), retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại); cổng phiên không còn ở đây mà ở bước phát request của lát và chặng phiên.
     ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, đọc xác nhận, dọn dấu), hai pha áp kết quả và quyết lỗi đẩy.
     ├── transport\PushRecover.js    Tra lại lệnh tạo mất phản hồi theo khóa (khách theo MST, giao dịch theo dấu `#SC`) rồi nối id FBM hoặc cho tạo lại.
     ├── transport\PushStage.js   Người điều phối chặng đẩy theo hợp đồng chung: nhận response, quét lại và cổng chấp thuận, xét từng mã, chốt lượt.
-    ├── transport\PullFlow.js    Điều phối preflight, đọc Customer và đọc Activity.
+    ├── transport\PullFlow.js    Mở lượt đọc (`startRun`: nối lượt dở theo cột `resumable` của bảng cursor, luôn kiểm lại phiên trước), preflight, đọc Customer và đọc Activity.
+    ├── transport\OpenStages.js  Các chặng đầu lượt theo hợp đồng chặng chung: xác thực Customer/Activity (`authorize_*`), grid User của lượt đọc danh tính, nạp danh mục (`lookup`, cả lô lỗi thì dừng), grid Customer của lượt kiểm liên kết; bước kết chọn chặng kế.
     ├── transport\RequestSettings.js Cài đặt dựng request: hằng địa chỉ FBM, `scriptSettings(state)` của một lát, phép kiểm `requestCfg` đầu mọi hàm dựng (thiếu cfg thì ném `FBM_REQUEST_SETTINGS_MISSING`).
     ├── transport\ScanJob.js     Việc quét: cấp scan_job/scan_chunk, đối chiếu gói với cursor, chạy lại khi tab mất việc.
     ├── transport\CustomerCount.js Bước đếm khách cuối lượt và thân Giữ phiên: số khách mốc, request đếm cùng bộ lọc với lượt lấy danh sách, lệch mốc thì chạy Quét nhanh.
@@ -482,6 +484,7 @@ tests\
     │   ├── CommandResults.js       Chạy mọi lệnh của bảng lệnh qua controlDispatch như Sidebar và relay gọi thật; bảng ca phải phủ đủ lệnh, loại lượt và mục cài đặt, trường bị cửa ra bỏ là đỏ.
     │   ├── Run.js                  Kiểm `state/Run.js` và `state/RunStop.js`: nhãn lượt, Dừng khi khóa bận vẫn ghi cờ, lát kế và lát đang chạy không phát request, dừng nền rồi chạy tay, cờ hỏng, cửa `runClose`/`runFail`.
     │   ├── Slice.js                Kiểm `state/Slice.js`: hai công cụ sửa hai trường trong một lát đều còn, ghi kho một lần, bản khác bị chặn `SLICE_FOREIGN_STATE`, lỗi giữa lát, ghi kho hỏng, lát lồng.
+    │   ├── SessionGate.js          Kiểm cổng phiên và chặng phiên: hết ngân sách giữ cursor nghiệp vụ, phiên sống nối lại request mang danh tính vừa xác minh, lệnh ghi nghi phiên dừng, phiên chết khi chờ ghi thì tạm dừng, nối lượt dở.
     │   ├── RunPickup.js            Kiểm mở lượt tay bằng runId: chỉ Extension của đúng máy nhận lượt, nhận một lần, response muộn và lỗi chặn quyền site không chạm lượt sai.
     │   ├── Heartbeat.js            Kiểm lần hỏi GAS của Extension theo bảng quyết nhịp nền: công tắc tắt, máy không được giao tắt chuông, chỉ kiểm, lượt bận, lượt bỏ dở kèm hộp đen, tự nhận máy nền, sổ tiến trình khi lượt nền đóng.
     │   ├── RunGuards.js            Kiểm rào ô lượt dùng chung: câu hộp đen Extension, nhãn lượt trong Log theo tiến trình nền, RUN_LEFT_OPEN, dừng lượt nền và response đến muộn, pha "đang chạy".
