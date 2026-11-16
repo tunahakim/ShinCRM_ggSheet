@@ -474,8 +474,9 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
       return drawn && typeof drawn.then === 'function' ? drawn.then(function () { return result; }) : result;
     };
     return applied && typeof applied.then === 'function' ? applied.then(applyView) : applyView();
-  }, function (error) {
-    if (typeof console !== 'undefined' && console.warn) { console.warn('Không kiểm tra được selection/reload; sẽ thử lại ở nhịp sau.', error); }
+  }).then(function (result) { backgroundErrorClear('selectionProbe'); return result; }, function (error) {
+    // Cổng chung của mọi chỗ gọi: báo ở đây thì không chỗ nào quên báo, kể cả lỗi khi xử lý lời trả. Trả `null` để nhịp gọi tự thử lại; vì vậy `settled` không bao giờ từ chối.
+    backgroundErrorReport('selectionProbe', error);
     return null;
   });
   var completion = settled.then(function (result) {
@@ -489,14 +490,6 @@ function sheetLinkProbeSelectionAndReload(reason, options) {
     }
     if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
     return result;
-  }, function (error) {
-    SHEET_LINK_SELECTION_PENDING = null;
-    if (SHEET_LINK_SELECTION_WAKE_QUEUED) {
-      SHEET_LINK_SELECTION_WAKE_QUEUED = false;
-      sheetLinkProbeSelectionAndReload('queued-wake', sheetLinkTakeQueuedWake());
-    }
-    if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }
-    throw error;
   });
   SHEET_LINK_SELECTION_PENDING = completion;
   return SHEET_LINK_SELECTION_PENDING;
@@ -522,7 +515,8 @@ function sheetLinkObserveReloadPayload(payload, serverName) {
   if (SHEET_LINK_RELOAD_CHECKING) { return SHEET_LINK_RELOAD_CHECKING; }
   var check = sheetLinkSyncDirtyData();
   SHEET_LINK_RELOAD_CHECKING = check;
-  check.then(function (result) { SHEET_LINK_RELOAD_CHECKING = null; return result; }, function (err) { SHEET_LINK_RELOAD_CHECKING = null; if (typeof console !== 'undefined' && console.warn) { console.warn(err); } });
+  // Lỗi của lời hỏi do cổng hỏi tự báo, ở đây chỉ nhả cờ.
+  check.then(function (result) { SHEET_LINK_RELOAD_CHECKING = null; return result; }, function () { SHEET_LINK_RELOAD_CHECKING = null; });
   return check;
 }
 

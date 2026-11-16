@@ -81,10 +81,6 @@ function selectionPollApplyResult(result) {
   return ACTIONS.setCurrentCustomer({ pick: result.customerId });
 }
 
-function selectionPollWarn(err) {
-  if (typeof console !== 'undefined' && console.warn) { console.warn('Không dò được ô đang chọn; sẽ thử lại ở nhịp sau.', err); }
-}
-
 function selectionPollFinish() {
   SELECTION_POLL.inFlight = false;
   selectionPollPaint();
@@ -118,10 +114,12 @@ function selectionPollTick() {
     }
     return null;
   }).then(function (result) {
+    backgroundErrorClear('selectionPoll');
     selectionPollFinish();
     return result;
   }, function (err) {
-    selectionPollWarn(err);
+    // Lỗi của lời hỏi đã được cổng hỏi báo; còn lại là lỗi của chính nhịp dò.
+    backgroundErrorReport('selectionPoll', err);
     selectionPollFinish();
     return null;
   });

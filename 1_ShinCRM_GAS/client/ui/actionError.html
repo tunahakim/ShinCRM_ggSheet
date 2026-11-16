@@ -6,7 +6,7 @@
 /** Câu nói về sheet Log theo kết quả `callServerErrorLog`. */
 var ACTION_ERROR_LOG_TEXT = {
   pending: 'Đang ghi lỗi này vào sheet Log…',
-  server: 'Máy chủ đã ghi lỗi này vào sheet Log kèm vết gọi.',
+  server: 'Lỗi này đã có trong sheet Log kèm vết gọi.',
   logged: 'Đã ghi lỗi này vào sheet Log.',
   not_logged: 'Chưa ghi được lỗi này vào sheet Log vì máy chủ không nhận lời gọi ghi Log; hãy chụp lại thông báo này.'
 };
@@ -39,5 +39,46 @@ function actionErrorReport(err) {
     if (luot === ACTION_ERROR_SEQ && NOTICES.actionError) { noticeSet('actionError', actionErrorNotice(message, logState)); }
     return logState;
   });
+}
+
+/** Tiêu đề thông báo theo khóa của lời gọi nền; khóa cũng là tên hành động ghi Log. Khóa ngoài bảng là lỗi lập trình. */
+var BACKGROUND_ERROR_TITLE = {
+  selectionProbe: 'Không hỏi được máy chủ ô đang chọn và dữ liệu mới',
+  selectionPoll: 'Nhịp tự dò ô đang chọn bị lỗi'
+};
+var BACKGROUND_ERRORS = {};
+var BACKGROUND_ERROR_SEQ = 0;
+
+function backgroundErrorNotice(key, message, logState) {
+  return {
+    line: 'Lỗi: ' + message,
+    blocks: [{ variant: 'error', title: BACKGROUND_ERROR_TITLE[key], lines: [message, 'Sidebar vẫn tự thử lại; thông báo tự mất khi lần thử sau thành công.'], hint: ACTION_ERROR_LOG_TEXT[logState] }]
+  };
+}
+
+/**
+ * Lỗi của lời gọi nền lặp lại (nhịp dò, nhịp an toàn, tín hiệu Sheet đổi): khác lỗi thao tác ở chỗ lặp vài giây một lần và tự hết. Theo đúng luật GAS áp cho cửa vào tự gọi (`ENTRY_POINT_LOG_ON_CHANGE`): chỉ hiện và ghi Log khi lỗi mới hoặc đổi chữ; lỗi lặp y hệt không ghi thêm dòng Log nào và không vẽ lại màn.
+ * Lần gọi thành công kế tiếp gỡ bằng `backgroundErrorClear`. Không có nút ✕: thông báo đúng chừng nào lỗi còn.
+ */
+function backgroundErrorReport(key, err) {
+  if (!BACKGROUND_ERROR_TITLE[key]) { throw new Error('Lời gọi nền "' + key + '" không có trong BACKGROUND_ERROR_TITLE.'); }
+  var message = err && err.message ? err.message : String(err);
+  if (BACKGROUND_ERRORS[key] && BACKGROUND_ERRORS[key].message === message) { return null; }
+  if (typeof console !== 'undefined' && console.error) { console.error(err); }
+  var seq = BACKGROUND_ERROR_SEQ += 1;
+  BACKGROUND_ERRORS[key] = { message: message, seq: seq };
+  noticeSet(key, backgroundErrorNotice(key, message, 'pending'));
+  return callServerErrorLog(err, key).then(function (logState) {
+    // Lỗi đã đổi chữ hoặc đã hết trong lúc chờ ghi Log thì không vẽ lại thông báo cũ.
+    if (BACKGROUND_ERRORS[key] && BACKGROUND_ERRORS[key].seq === seq) { noticeSet(key, backgroundErrorNotice(key, message, logState)); }
+    return logState;
+  });
+}
+
+/** Lời gọi nền vừa thành công: gỡ thông báo lỗi của nó; chưa có lỗi thì không làm gì. */
+function backgroundErrorClear(key) {
+  if (!BACKGROUND_ERRORS[key]) { return; }
+  delete BACKGROUND_ERRORS[key];
+  noticeSet(key, null);
 }
 </script>
