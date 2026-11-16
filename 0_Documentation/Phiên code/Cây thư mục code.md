@@ -141,6 +141,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       ├── FbmPerfScope.js       Dựng phạm vi và dữ liệu cho phiên đo: thu phạm vi về vài khách thử, xóa vài dòng Activity, chỉnh múi giờ tệp DEV.
 │       ├── FbmPayloadProbe.js    Đo GAS giải JSON và băm gói Activity nhiều cỡ để chọn cỡ gói một lần gọi.
 │       ├── FbmSyncFixture.js     Dựng dữ liệu thử đồng bộ trên Sheet DEV qua cửa bản ghi (ALT00010, CUS-020061, xung đột, mã bị xóa).
+│       ├── FbmRecoverFixture.js     Dựng ca lệnh tạo mất phản hồi (FBM-027) trên khách ALT00010 để thử tra lại mà không phải canh đóng tab FBM.
 │       ├── FbmSyncBackgroundProbe.js Nghiệm thu dừng đồng bộ nền bằng đúng các cửa Sidebar gọi, đóng request không Extension nào gửi.
 │       ├── HashCompatProbe.js    Đếm dòng có dấu vân hiện tại khớp mốc fbmHash đã lưu, dùng sau mỗi lần đổi công thức dấu vân.
 │       ├── HardDeleteGuardProbe.js  Hỏi sổ người gác xóa hẳn trên khách thật (một có ID FBM, một chưa) mà không xóa gì.
