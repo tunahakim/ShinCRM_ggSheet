@@ -29,7 +29,7 @@ FbmSync.startRun = function (options) {
     }
     var initialRequest = current.phase === 'checking_session' && current.cursor && ['authorize_customer', 'identity_user_grid'].indexOf(current.cursor.kind) >= 0;
     var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
-    var resumable = recent ? FbmSync.requestForCursor(current) : null;
+    var resumable = recent && current.cursor && current.cursor.kind && current.cursor.kind !== 'push_wait' ? FbmSync.cursorRequest(current) : null;
     if (resumable && current.cursor && current.cursor.kind !== 'push_wait') {
       var resumeProbe = typeof FbmSync.sessionGateResumeProbeRequest === 'function'
         ? FbmSync.sessionGateResumeProbeRequest(current, resumable, 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...')
@@ -400,7 +400,7 @@ FbmSync.continueStep = function (rawResponse) {
     state.cursor = resume; state.phase = gateMeta.resumePhase || 'checking_session'; state.entity = gateMeta.resumeEntity || '';
     gateMeta.resumeCursor = null;
     FbmSync.stateWrite(state);
-    var resumedRequest = FbmSync.requestForCursor(state);
+    var resumedRequest = FbmSync.cursorRequest(state);
     if (!resumedRequest) {
       state.phase = 'error'; state.lastFailureCode = 'SESSION_RESUME_FAILED'; state.lastError = 'Đã xác minh phiên nhưng không dựng lại được request đang chờ.'; state.message = state.lastError; FbmSync.stateWrite(state);
       return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };

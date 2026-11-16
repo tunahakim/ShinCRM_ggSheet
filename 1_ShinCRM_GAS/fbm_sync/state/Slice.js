@@ -64,54 +64,87 @@ FbmSync.controlFailRun = function (error) {
 };
 
 /**
- * Bảng kiểu cursor → bộ xử lý response của lát. Kiểu không có trong bảng là bước của lượt đồng bộ (`continueRun`).
- * Hàm xử lý tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
+ * Bảng kiểu cursor: mỗi dòng khai bộ xử lý response của lát (`inputs`, `stage`, `end`, hoặc `legacy` + `run` cho chặng cũ), hàm dựng lại request của cursor (`request(state, cfg)`) và cột `gate`: request của cursor chỉ được gửi khi phiên đã xác minh đúng tài khoản liên kết.
+ * Mọi lần dựng lại request từ cursor (phát lại khi nộp lặp, Extension nhận lượt, cứu đường truyền, tiếp tục sau kiểm phiên) đi qua `cursorRequest`, nên không có kiểu cursor nào gửi được mà thiếu dòng. Kiểu không có trong bảng thì `cursorTable` ném.
+ * `request` trả `null` chỉ khi cursor không được phép dựng lại (lệnh ghi FBM). Hàm tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
  */
 FbmSync.CURSOR_TABLE = {
   activity_grid: {
+    gate: true,
+    request: function (state, cfg) { var cursor = state.cursor || {}; return FbmSync.activityBatchRequest(state, cfg, FbmSync.scope(), cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null); },
     inputs: function (state) { return FbmSync.activityGridInputs(state); },
     stage: function (ctx) { return FbmSync.activityGridStage(ctx); },
     end: function (state, end) { return FbmSync.activityGridEnd(state, end); }
   },
+  authorize_activity: { gate: true, request: function (state, cfg) { return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  authorize_customer: { gate: true, request: function (state, cfg) { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
   conflict_refresh: {
+    gate: true,
+    request: function (state, cfg) { var cursor = state.cursor || {}; return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }, cfg); },
     inputs: function (state) { return FbmSync.conflictRefreshInputs(state); },
     stage: function (ctx) { return FbmSync.conflictRefreshStage(ctx); },
     end: function (state, end) { return FbmSync.conflictRefreshEnd(state, end); }
   },
   customer_count: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.customerCountRequest(FbmSync.scope(), cfg); },
     inputs: function (state) { return FbmSync.customerCountInputs(state); },
     stage: function (ctx) { return FbmSync.customerCountStage(ctx); },
     end: function (state, end) { return FbmSync.customerCountEnd(state, end); }
   },
-  login: {
-    inputs: function (state, rawResponse) { return FbmSync.loginInputs(state, rawResponse); },
-    stage: function (ctx) { return FbmSync.loginStage(ctx); },
-    end: function (state, end) { return FbmSync.loginEnd(state, end); }
+  // Cursor `customer_grid` chỉ còn ở lượt kiểm tra liên kết, đọc không giới hạn phạm vi như lúc mở.
+  customer_grid: {
+    gate: true,
+    request: function (state, cfg) { var cursor = state.cursor || {}; return FbmSync.identityCheckCustomerRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false, sourceFields: (state.metadata || {}).customerFields }, cfg); },
+    legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); }
   },
   customer_scan: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.scanJobRequest(state, cfg, FbmSync.scanJobScope(state.cursor)); },
     inputs: function (state) { return FbmSync.customerScanInputs(state); },
     stage: function (ctx) { return FbmSync.customerScanStage(ctx); },
     end: function (state) { return FbmSync.customerScanEnd(state); }
   },
+  identity_user_grid: { gate: false, request: function (state, cfg) { return FbmSync.sessionSystemRequest('identity_user_grid', null, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  login: {
+    gate: false,
+    request: function (state, cfg) { return FbmSync.loginCursorRequest(state, cfg); },
+    inputs: function (state, rawResponse) { return FbmSync.loginInputs(state, rawResponse); },
+    stage: function (ctx) { return FbmSync.loginStage(ctx); },
+    end: function (state, end) { return FbmSync.loginEnd(state, end); }
+  },
+  lookup: { gate: true, request: function (state, cfg) { return FbmSync.lookupBatchRequest(cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
   push_lookup: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.lookupBatchRequest(cfg); },
     inputs: function () { return FbmSync.pushInputs(); },
     stage: function (ctx) { return FbmSync.pushStage(ctx); },
     end: function (state, end) { return FbmSync.pushEnd(state, end); }
   },
+  // Lệnh ghi FBM không bao giờ được dựng lại từ cursor: lần gửi đầu có thể đã tới FBM.
   push_wait: {
+    gate: true,
+    request: function () { return null; },
     inputs: function () { return FbmSync.pushInputs(); },
     stage: function (ctx) { return FbmSync.pushStage(ctx); },
     end: function (state, end) { return FbmSync.pushEnd(state, end); }
   },
-  run: { legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
   scan_job: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.scanJobRequest(state, cfg, FbmSync.scanJobScope(state.cursor)); },
     inputs: function (state) { return FbmSync.activityScanInputs(state); },
     stage: function (ctx) { return FbmSync.activityScanStage(ctx); },
     end: function (state, end) { return FbmSync.activityScanEnd(state, end); }
-  }
+  },
+  session_probe: { gate: false, request: function (state, cfg) { return FbmSync.sessionSystemRequest('session_probe', null, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
 };
 FbmSync.cursorTable = function (kind) {
-  return Object.prototype.hasOwnProperty.call(FbmSync.CURSOR_TABLE, kind) && kind !== 'run' ? FbmSync.CURSOR_TABLE[kind] : FbmSync.CURSOR_TABLE.run;
+  if (Object.prototype.hasOwnProperty.call(FbmSync.CURSOR_TABLE, kind)) { return FbmSync.CURSOR_TABLE[kind]; }
+  var unknown = new Error('Kiểu cursor "' + String(kind || '') + '" không có trong CURSOR_TABLE; đã dừng lượt thay vì đoán bước tiếp.'); unknown.code = 'CURSOR_KIND_UNKNOWN'; throw unknown;
+};
+/** Dựng lại request của cursor đang lưu qua dòng bảng của nó; không lưu payload hay cookie nên lần dựng lại không làm lộ bí mật. */
+FbmSync.cursorRequest = function (state) {
+  return FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).request(state, FbmSync.scriptSettings(state));
 };
 /** Response về qua một cửa: qua các phép kiểm chung (`replyAdmit`) rồi cursor chọn bộ xử lý qua `cursorTable`. Bộ xử lý của từng kiểu cursor không kiểm lại. */
 FbmSync.continue = function (rawResponse) {

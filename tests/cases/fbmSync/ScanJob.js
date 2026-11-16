@@ -205,7 +205,7 @@ async function chay(so) {
   const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey.map((k) => k.Name + '=' + k.Value).join('|'));
   const writeFailEnd = await writeFail.run({
     beforeSend: (request) => { if (request.meta.kind === 'batch' && !firstBatch) { firstBatch = request; } },
-    afterError: (F) => { retryRequest = F.requestForCursor(F.stateRead()); return { request: F.nextEnvelope(retryRequest) }; }
+    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.nextEnvelope(retryRequest) }; }
   });
   const writeFailIds = writeFail.local.customer.map((item) => item.fbmId), writeFailActs = writeFail.local.activity.map((item) => item.fbmId);
   check(so, 'Ghi Sheet lỗi ở bước ghi của lô: cursor không tiến, request kế dựng lại đúng lô đó, lượt đủ 12 khách và 12 giao dịch không trùng', [
@@ -219,7 +219,7 @@ async function chay(so) {
     if (lostDone || request.meta.kind !== 'scan_chunk' || request.meta.job.chunkIndex !== 1) { return raw; }
     lostDone = true;
     const state = lost.F.stateRead();
-    lostRequest = lost.F.requestForCursor(state);
+    lostRequest = lost.F.cursorRequest(state);
     return raw;
   } });
   check(so, 'Mất response một gói: request dựng lại từ cursor là scan_chunk đúng gói đang chờ cùng jobId, FBM chỉ bị gọi một lần, lượt đủ 12 khách', [

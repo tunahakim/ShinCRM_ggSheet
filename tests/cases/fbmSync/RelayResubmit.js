@@ -22,7 +22,7 @@ async function chay(so) {
     if (!FbmSync.requestAnswered(state, FbmSync.responseRequestId(response))) { return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView() }; }
     state.activeRequestId = '';
     FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.requestForCursor(state)), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.cursorRequest(state)), status: FbmSync.statusView() };
   };
   const traLoi = (id) => ({ ok: true, status: 200, body: '{}', trace: [{ stage: 'fbm_tab_replied', requestId: id }] });
   const nop = (fields) => FbmSync.controlDispatch('continue', Object.assign({ machineId: 'may-A' }, fields), 'relay');

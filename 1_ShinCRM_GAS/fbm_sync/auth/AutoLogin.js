@@ -203,6 +203,6 @@ FbmSync.loginResumeRequest = function (state) {
   state.cursor = resume; state.phase = cursor.resumePhase || 'checking_session'; state.entity = cursor.resumeEntity || '';
   state.session.expired = false; state.message = 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...'; state.lastFailureCode = '';
   FbmSync.stateWrite(state);
-  var request = FbmSync.requestForCursor(state);
+  var request = FbmSync.cursorRequest(state);
   return request ? FbmSync.nextEnvelope(request) : null;
 };

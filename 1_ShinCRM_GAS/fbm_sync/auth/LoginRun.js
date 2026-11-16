@@ -172,6 +172,10 @@ FbmSync.loginStepRequest = function (cursor, credential, cfg) {
   }
   return FbmSync.loginRequestPlan(step, cursor.facts || {}, credential, { force: cursor.purpose === 'force' });
 };
+/** Request của ô lượt đăng nhập đang lưu, cho bảng cursor dựng lại (phát lại, tiếp tục): credential lấy theo ô lượt. */
+FbmSync.loginCursorRequest = function (state, cfg) {
+  return FbmSync.loginStepRequest(state.cursor, FbmSync.loginCredential(state.cursor), cfg);
+};
 /** Ô lượt mở đầu lượt đăng nhập (bước trang Login). `fields`: `purpose` (auto, test, force), `draft` (bản mã đăng nhập thử chưa lưu), `expectedIdentity`, `manual` và chỗ quay về của lượt đồng bộ. */
 FbmSync.loginCursorOpen = function (fields) {
   return Object.assign({ kind: 'login', step: 'page', facts: {} }, fields);

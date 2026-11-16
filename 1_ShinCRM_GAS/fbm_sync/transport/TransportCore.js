@@ -36,7 +36,7 @@ FbmSync.pageIdentityReloadRequest = function (state, cursor) {
   state.cursor = Object.assign({}, cursor || {}, { pageReloaded: true });
   state.message = 'Trang FBM trên tab chưa có mã và tên người đăng nhập; đang tải lại trang khách hàng để đối chiếu.';
   FbmSync.stateWrite(state);
-  var request = FbmSync.requestForCursor(state);
+  var request = FbmSync.cursorRequest(state);
   if (!request) { return { ok: false, code: 'SESSION_RESUME_FAILED', request: null, status: FbmSync.statusView(), error: 'Không dựng lại được request để đối chiếu trang FBM.' }; }
   request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH });
   return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
@@ -260,7 +260,7 @@ FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
  */
 FbmSync.cursorStartEnvelope = function (state) {
   var current = state || FbmSync.stateRead();
-  if (FbmSync.sessionIdentityIsVerified(current)) { return FbmSync.nextEnvelope(FbmSync.requestForCursor(current)); }
+  if (FbmSync.sessionIdentityIsVerified(current)) { return FbmSync.nextEnvelope(FbmSync.cursorRequest(current)); }
   return FbmSync.sessionGateResumeProbeRequest(current, current.cursor, 'Đang kiểm tra tab và tài khoản FBM...');
 };
 /**
@@ -340,7 +340,7 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state.message = replay ? 'Đường truyền tới tab FBM đứt giữa chừng; GAS gửi lại request đọc một lần.' : reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
-  request = FbmSync.requestForCursor(state);
+  request = FbmSync.cursorRequest(state);
   if (!request) { return null; }
   if (reload) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
   envelope = FbmSync.nextEnvelope(request);
@@ -462,7 +462,7 @@ FbmSync.requestIssue = function (state, request, now) {
  * Chỗ giữ là một request đang chờ có hạn (`REQUEST_IN_FLIGHT` với nhịp nền máy khác); quá hạn mà không ai nhận thì luật lượt treo đóng lượt như request không được trả lời.
  */
 FbmSync.envelopeHold = function (request) {
-  var state = FbmSync.stateRead(), rebuilt = FbmSync.requestForCursor(state), machineId = String(FbmSync.issueContext.machineId || ''), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
+  var state = FbmSync.stateRead(), rebuilt = FbmSync.cursorRequest(state), machineId = String(FbmSync.issueContext.machineId || ''), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
   if (!machineId) { fail('SYNC_MACHINE_ID_REQUIRED', 'Lệnh mở lượt từ Sidebar thiếu mã máy Extension sẽ chở lượt.'); }
   if (!state.runId) { fail('PICKUP_RUN_ID_MISSING', 'Lượt vừa mở không có mã lượt nên Extension không nhận được.'); }
   if (!rebuilt || String(rebuilt.meta && rebuilt.meta.kind || '') !== String(request.meta && request.meta.kind || '') || String(rebuilt.url || '') !== String(request.url || '')) {
@@ -503,7 +503,7 @@ FbmSync.requestSig = function (request) { return String(request && request.meta 
  * Request dựng lại phải trùng dấu request đang chờ; lệch là lỗi lập trình nên ném ngay chứ không để Extension chạy nhầm bước. Nộp lặp giữ `resubmit.answered` để lần nộp lặp sau nữa vẫn được nhận ra.
  */
 FbmSync.envelopeReissue = function (state, answeredId) {
-  var held = String(state.activeRequestId || ''), request = FbmSync.requestForCursor(state), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
+  var held = String(state.activeRequestId || ''), request = FbmSync.cursorRequest(state), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
   if (!request) { fail('REISSUE_CURSOR_EMPTY', 'Không dựng lại được request đang chờ vì cursor ' + String(state.cursor && state.cursor.kind || 'trống') + ' không có request.'); }
   if (state.activeRequestSig && FbmSync.requestSig(request) !== String(state.activeRequestSig)) { fail('REISSUE_CURSOR_MISMATCH', 'Request dựng lại từ cursor (' + FbmSync.requestSig(request) + ') khác request đang chờ (' + String(state.activeRequestSig) + ').'); }
   FbmSync.requestAnswered(state, held);
@@ -530,26 +530,4 @@ FbmSync.responseRequestId = function (rawResponse) {
     if (item && item.requestId && !/^bridge_/.test(String(item.stage || ''))) { return String(item.requestId); }
   }
   return '';
-};
-/**
- * Dựng lại request đọc từ cursor; không lưu payload/cookie để retry không làm lộ bí mật.
- * Là người điều phối: đọc cài đặt của ô lượt được truyền vào, và phạm vi khách khi cursor cần, rồi truyền xuống hàm dựng.
- */
-FbmSync.requestForCursor = function (state) {
-  var cursor = state.cursor || {}, cfg = FbmSync.scriptSettings(state);
-  if (cursor.kind === 'login') { return FbmSync.loginStepRequest(cursor, FbmSync.loginCredential(cursor), cfg); }
-  if (cursor.kind === 'session_probe') { return FbmSync.sessionSystemRequest('session_probe', null, cfg); }
-  if (cursor.kind === 'authorize_customer') { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }, cfg); }
-  if (cursor.kind === 'authorize_activity') { return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }, cfg); }
-  if (cursor.kind === 'identity_user_grid') { return FbmSync.sessionSystemRequest('identity_user_grid', null, cfg); }
-  if (cursor.kind === 'lookup' || cursor.kind === 'push_lookup') { return FbmSync.lookupBatchRequest(cfg); }
-  // Cursor `customer_grid` chỉ còn ở lượt kiểm tra liên kết, đọc không giới hạn phạm vi như lúc mở.
-  if (cursor.kind === 'customer_grid') {
-    return FbmSync.customerGridRequest({ scope: null, sortExpression: 'stt_rec_kh', type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false, sourceFields: (state.metadata || {}).customerFields }, cfg);
-  }
-  if (FbmSync.isScanCursor(cursor)) { return FbmSync.scanJobRequest(state, cfg, FbmSync.scanJobScope(cursor)); }
-  if (cursor.kind === 'customer_count') { return FbmSync.customerCountRequest(FbmSync.scope(), cfg); }
-  if (cursor.kind === 'activity_grid') { return FbmSync.activityBatchRequest(state, cfg, FbmSync.scope(), cursor.lookup ? FbmSync.gateLookupChunk(cursor) : null); }
-  if (cursor.kind === 'conflict_refresh') { return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }, cfg); }
-  return null;
 };

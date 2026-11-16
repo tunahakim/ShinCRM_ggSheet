@@ -14,7 +14,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
   'statusView', 'staleRunClose', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
-  'withOrchestrationLock', 'nextEnvelope', 'requestForCursor',
+  'withOrchestrationLock', 'nextEnvelope', 'cursorRequest',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
   'pullBatchApply', 'pullPageApply', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'toFbmCodes',

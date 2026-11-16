@@ -122,11 +122,11 @@ async function chay(so) {
 
   // Request mở lượt phải dựng lại được từ cursor: bước đăng nhập giữ bước và cờ hủy phiên cũ, xung đột giữ fbmId.
   const banNhap = { credentialRef: 'cred-1', ciphertext: { iv: '123456789012', ciphertext: 'ciphertext-long-enough' } };
-  const dungLai = (purpose, step) => FbmSync.requestForCursor({ cursor: FbmSync.loginCursorOpen({ purpose, draft: banNhap, step, facts: { salt: 'ab12', database: 'FHN_CRM_App', unit: 'CTY' } }) });
+  const dungLai = (purpose, step) => FbmSync.cursorRequest({ cursor: FbmSync.loginCursorOpen({ purpose, draft: banNhap, step, facts: { salt: 'ab12', database: 'FHN_CRM_App', unit: 'CTY' } }) });
   check(so, 'cursor đăng nhập thử và hủy phiên cũ dựng lại đúng request bước đăng nhập; chỉ hủy phiên cũ gửi cờ force', [
     [dungLai('test', 'page').meta.kind, dungLai('test', 'page').meta.step], dungLai('test', 'login').body.force, dungLai('force', 'login').body.force, dungLai('force', 'login').meta.fill.credentialRef
   ], [['login_step', 'page'], false, true, 'cred-1']);
-  check(so, 'cursor đọc lại xung đột dựng lại đúng request đọc theo ID FBM', FbmSync.requestForCursor({ cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' } }).meta.kind, 'conflict_refresh_grid');
+  check(so, 'cursor đọc lại xung đột dựng lại đúng request đọc theo ID FBM', FbmSync.cursorRequest({ cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' } }).meta.kind, 'conflict_refresh_grid');
 
   FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
   FbmSync.credentialRead = () => FbmSync.credentialShape({ credentialRef: 'cred-test-1234', ciphertext: banNhap.ciphertext });

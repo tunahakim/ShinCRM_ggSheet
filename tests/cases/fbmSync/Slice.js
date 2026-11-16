@@ -112,6 +112,10 @@ async function chay(so) {
   banNgoai.message = 'ngoài lát';
   ngoai.F.stateWrite(banNgoai);
   check(so, 'ngoài lát: mỗi lần đọc là một bản mới, ghi đi thẳng xuống kho', [ngoai.F.stateRead() === ngoai.F.stateRead(), ngoai.trongKho().message, ngoai.kho.soLanGhi], [false, 'ngoài lát', 1]);
+  // Mỗi dòng bảng cursor khai đủ hai ô: cổng phiên và cách dựng lại request. Kiểu lạ ném có mã, không rơi về bộ xử lý mặc định.
+  const bang = hopCoLuot().F;
+  const thieu = Object.keys(bang.CURSOR_TABLE).filter((k) => typeof bang.CURSOR_TABLE[k].request !== 'function' || typeof bang.CURSOR_TABLE[k].gate !== 'boolean');
+  check(so, 'bảng cursor: mọi dòng có ô request (hàm) và ô gate (đúng/sai); kiểu cursor lạ ném CURSOR_KIND_UNKNOWN', [thieu, loi(() => bang.cursorTable('khong_co'))], [[], 'CURSOR_KIND_UNKNOWN']);
 }
 
 module.exports = { chay };

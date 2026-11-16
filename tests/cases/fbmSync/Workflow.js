@@ -1080,7 +1080,7 @@ async function chay(so) {
   const khoaLo = (request) => (request && request.items || []).filter((item) => item.body.externalKey[0].Name === 'stt_rec').map((item) => item.body.externalKey[0].Value);
   check(so, 'phần tử nghi phiên giữa lô: không ghi giao dịch nào của lô, request kế là probe phiên, cursor giữ dựng lại đúng lô cũ', [
     nghiPhien.fullWrites.filter((item) => item.entity === 'activity').length, nghiPhien.fullKinds.slice(-2), nghiState.lastFailureCode,
-    khoaLo(nghiPhien.fullFlow.hop.FbmSync.requestForCursor(Object.assign({}, nghiState, { cursor: nghiResume })))
+    khoaLo(nghiPhien.fullFlow.hop.FbmSync.cursorRequest(Object.assign({}, nghiState, { cursor: nghiResume })))
   ], [0, ['batch:activity', 'session_probe:user'], 'SESSION_SUSPECTED_LIVE', khoaLo(nghiPhien.fullBatches[0])]);
   // Response lô lệch kế hoạch: id lạ hay thiếu phần tử (Extension dừng vì trần dung lượng) đều là lỗi hợp đồng cả lô, vì thiếu phần tử thì không biết khách nào vắng thật.
   const idLa = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw) => Object.assign(raw, { items: raw.items.map((item, index) => index === 1 ? Object.assign({}, item, { id: '99' }) : item) }) });
