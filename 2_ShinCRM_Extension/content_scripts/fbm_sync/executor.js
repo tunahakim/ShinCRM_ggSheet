@@ -8,8 +8,7 @@
   }
   function requestBody(req) {
     if (typeof req.bodyText === 'string') { return req.bodyText; }
-    if (req.body === undefined) { return undefined; }
-    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    if (req.body == null) { return undefined; }    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
   }
   /** Chỉ thu thập giá trị trên trang để thay token request do GAS cấp. */
   function captureTransportValues(request, responseBody, sourceName) {
