@@ -70,7 +70,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/server/view/ViewSheetRenderer.js', 395, 21473, 'giữ', 'một việc: vẽ sheet quản trị'],
   ['2_ShinCRM_Extension/background/service_worker.js', 920, 68537, 'B4/B6/B11', 'điều khiển tab, kho credential, gọi relay, vòng relay, đăng ký sự kiện, lệnh chuông GAS; nâng trần vì md5 và bước điền ô đăng nhập chuyển từ executor sang (executor giảm 134 dòng), tách kho khóa ra tệp riêng ở B11.12'],
   ['2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js', 236, 12858, 'giữ', 'cầu postMessage'],
-  ['2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js', 266, 20672, 'B11', 'đọc/cắt response, bắt dữ liệu tab, ghi khóa trang'],
+  ['2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js', 266, 20736, 'B11', 'đọc/cắt response, bắt dữ liệu tab, ghi khóa trang; nâng 64 byte để bộ thay token bỏ qua request không body (GET)'],
   ['2_ShinCRM_Extension/content_scripts/model/live_model_reader.js', 485, 23041, 'giữ', 'một người điều phối đọc model Sheets'],
   ['2_ShinCRM_Extension/content_scripts/scout/sheet_scout.js', 228, 9099, 'giữ', 'trinh sát Sheet'],
   ['tests/cases/actions.js', 289, 15986, 'giữ', 'một module'],

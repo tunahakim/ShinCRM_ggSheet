@@ -13,9 +13,10 @@ const bytes = (value) => Buffer.byteLength(JSON.stringify(value), 'utf8');
 
 async function chay(so) {
   section('FBM sync — executor việc quét');
-  // Request GET GAS dựng (trang đăng nhập, tài khoản) mang body null; fetch thật ném lỗi nếu GET có body, nên executor phải gửi không body chứ không phải chuỗi "null".
-  const getSent = (await tabGia().send({ id: 'g1', url: 'https://fbm.test/Login.aspx', method: 'GET', body: null, meta: { kind: 'login_page', fetchMs: 5000 } }, '<html></html>')).sent;
-  check(so, 'Executor gửi request GET có body null xuống fetch không kèm body (không phải chuỗi "null"), nên trang đăng nhập FBM không còn lỗi "GET/HEAD cannot have body"', [getSent && getSent.url, getSent && getSent.body], ['https://fbm.test/Login.aspx', undefined]);
+  // Envelope GET đúng dạng GAS dựng (không body, kèm bộ thay {{FBM_PAYLOAD_COOKIE}} mặc định có required:false): fetch thật ném lỗi nếu GET có body, nên bộ thay không được biến "không body" thành chuỗi "undefined".
+  const payloadReplace = { captures: [{ name: 'payloadCookie', source: 'page_html', pattern: '"cookie":"([^"]+)"', flags: 'i', group: 1 }], replacements: [{ token: '{{FBM_PAYLOAD_COOKIE}}', capture: 'payloadCookie', source: 'page_html', required: false, fallback: '' }] };
+  const getSent = (await tabGia().send({ id: 'g1', url: 'https://fbm.test/Login.aspx', method: 'GET', headers: { 'content-type': 'application/json; charset=UTF-8' }, meta: { kind: 'login_step', fetchMs: 5000, transport: payloadReplace } }, '<html></html>')).sent;
+  check(so, 'Executor gửi request GET (envelope GAS, có bộ thay payload cookie) xuống fetch không kèm body, nên trang đăng nhập FBM không còn lỗi "GET/HEAD cannot have body"', [getSent && getSent.url, getSent && getSent.body], ['https://fbm.test/Login.aspx', undefined]);
   // Executor: 3.000 dòng có dấu tiếng Việt (UTF-8 nhiều byte) phải thành nhiều gói, mỗi gói đã serialize không vượt trần; dòng không bị cắt đôi, đúng thứ tự, FBM chỉ bị gọi một lần.
   const executorFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ghi_chu_noi_bo'];
   const bigRows = Array.from({ length: 3000 }, (_, i) => ['R' + i, 'KH' + i, 'Công ty Trách Nhiệm Hữu Hạn Thương Mại Dịch Vụ Đầu Tư Số ' + i + ' ' + 'ă'.repeat(300), 'riêng']);

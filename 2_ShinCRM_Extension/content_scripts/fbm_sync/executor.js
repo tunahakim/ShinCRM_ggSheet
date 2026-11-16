@@ -8,7 +8,7 @@
   }
   function requestBody(req) {
     if (typeof req.bodyText === 'string') { return req.bodyText; }
-    if (req.body == null) { return undefined; }    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    if (req.body === undefined) { return undefined; }    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
   }
   /** Chỉ thu thập giá trị trên trang để thay token request do GAS cấp. */
   function captureTransportValues(request, responseBody, sourceName) {
@@ -41,7 +41,7 @@
   }
   /** Thay token theo chỉ dẫn GAS mà không parse hoặc dựng lại JSON nghiệp vụ. */
   function applyTransportReplacements(request, bodyText) {
-    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', ''), output = bodyText;
+    var transport = request && request.transport || request && request.meta && request.meta.transport || {}, replacements = bodyText !== undefined && Array.isArray(transport.replacements) ? transport.replacements : [], values = captureTransportValues(request, '', ''), output = bodyText;
     replacements.forEach(function (replacement) {
       var item = replacement || {}, token = String(item.token || ''), value = values[String(item.capture || '')];
       if (!token) { return; }
