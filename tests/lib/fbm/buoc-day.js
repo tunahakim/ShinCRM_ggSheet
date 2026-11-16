@@ -21,7 +21,7 @@ function buocDayLoi(F, failure, fromReply) {
     return Object.assign({ patch: F.pushPatch(copy, logs) }, step);
   });
   if (out.end) { return F.pushEndApply(state, out.end); }
-  return { ok: true, request: out.next ? F.nextEnvelope(out.next) : null };
+  return { ok: true, request: out.next ? F.sliceIssue(out.next) : null };
 }
 
 /** Danh sách ứng viên một thực thể trên lần quét cả sheet, với ô lượt đang có trong kho: như chặng đẩy đọc một lần rồi truyền vào phép xét. */

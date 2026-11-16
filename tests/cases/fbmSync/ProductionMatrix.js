@@ -39,8 +39,10 @@ async function chay(so) {
   const fixedNow = 1700000000000;
   const originalNow = protocol.Date.now;
   protocol.Date.now = () => fixedNow;
-  const first = protocol.FbmSync.nextEnvelope({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
-  const second = protocol.FbmSync.nextEnvelope({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
+  // Request nào cũng đi theo cursor đang lưu (cổng phiên xét dòng bảng của cursor); dùng dòng không có cổng để chỉ kiểm phần cấp mã.
+  protocol.FbmSync.statePatch({ cursor: { kind: 'identity_user_grid' } });
+  const first = protocol.FbmSync.sliceIssue({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
+  const second = protocol.FbmSync.sliceIssue({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   protocol.Date.now = originalNow;
   check(so, 'hai envelope cung mili-giay van co requestId khac nhau', [first.id, second.id, first.id !== second.id], [first.id, second.id, true]);
 

@@ -64,8 +64,8 @@ async function chay(so) {
   ], ['FBM_SITE_ACCESS_BLOCKED', null, 'error', 'FBM_SITE_ACCESS_BLOCKED', true, true]);
 
   // Bật tự mở tab FBM mà Extension không thấy tab: GAS cấp lại đúng request một lần kèm lệnh mở tab; không thấy lần nữa thì đóng lượt bằng lỗi.
-  const policy = FbmSync.sessionGatePolicy;
-  FbmSync.sessionGatePolicy = () => Object.assign(policy(), { autoOpenTab: true });
+  const policy = FbmSync.transportPolicy;
+  FbmSync.transportPolicy = () => Object.assign(policy(), { autoOpenTab: true });
   const tabRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
   const tabPick = tabRun.runId ? hoi('may-A').request : null;
   const noTab = (id) => FbmSync.controlDispatch('continue', { machineId: 'may-A', error: { requestId: id, code: 'FBM_TAB_NOT_FOUND', message: 'Không thấy tab FBM.' } }, 'relay');
@@ -73,7 +73,7 @@ async function chay(so) {
   check(so, 'tự mở tab bật, Extension không thấy tab: GAS trả request thử lại cùng bước kèm lệnh mở tab, qua được cửa ra của GAS', [retry.ok, retry.code, retry.request && retry.request.meta.kind, !!(retry.request && retry.request.meta.openFbmContext)], [true, 'FBM_TAB_RETRY_REQUEST_READY', tabPick.meta.kind, true]);
   const twiceNoTab = noTab(retry.request.id);
   check(so, 'thử lại vẫn không thấy tab: không thử lần nữa, lượt về lỗi FBM_TAB_NOT_FOUND', [twiceNoTab.request || null, FbmSync.stateRead().phase, FbmSync.stateRead().lastFailureCode], [null, 'error', 'FBM_TAB_NOT_FOUND']);
-  FbmSync.sessionGatePolicy = policy;
+  FbmSync.transportPolicy = policy;
 
   // Tab không sẵn sàng: Extension không tự tải lại nên GAS quyết, kể cả khi tắt tự mở tab; phát lại đúng một lần kèm lệnh đổi tab về trang khách hàng.
   const notReadyRun = FbmSync.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A', force: true });
@@ -118,7 +118,7 @@ async function chay(so) {
   check(so, 'hộp đen có ô lỗi gọi relay thì GAS ghi Log mang mã và HTTP, trả trailAck đúng mốc, không chép khóa lạ', [acked.trailAck, !!failureLog, failureLog && failureLog.detail.code, failureLog && failureLog.detail.httpStatus, JSON.stringify(failureLog || {}).indexOf('bi-mat') < 0], [failureAt, true, 'RELAY_ENDPOINT_NOT_FOUND', 404, true]);
   check(so, 'relay trả statusView đầy đủ cho Extension chuyển sang Sidebar', [!!acked.status, typeof acked.status.label], [true, 'string']);
 
-  check(so, 'phong bì mang URL ngoài miền FBM bị GAS từ chối trước khi phát', loi(() => FbmSync.nextEnvelope({ url: 'https://evil.test/Main/x', body: {}, meta: { kind: 'session_probe' } })) !== null, true);
+  check(so, 'phong bì mang URL ngoài miền FBM bị GAS từ chối trước khi phát', loi(() => FbmSync.sliceIssue({ url: 'https://evil.test/Main/x', body: {}, meta: { kind: 'session_probe' } })) !== null, true);
 
   // Request mở lượt phải dựng lại được từ cursor: bước đăng nhập giữ bước và cờ hủy phiên cũ, xung đột giữ fbmId.
   const banNhap = { credentialRef: 'cred-1', ciphertext: { iv: '123456789012', ciphertext: 'ciphertext-long-enough' } };

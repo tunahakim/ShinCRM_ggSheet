@@ -4,6 +4,16 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT, TRANG_FBM_THU } = require('../../l
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 const { keoLo } = require('../../lib/fbm/keo-ve');
 const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
+const { noiLat } = require('../../lib/fbm/hop-dong-bo');
+
+/** Đưa lượt vừa mở tới bước kết của chặng xác thực Activity: phiên đã qua cổng (đã xác minh), rồi chạy đúng bước kết thật. */
+function xacThucXong(F) {
+  const state = F.stateRead();
+  state.session = Object.assign({}, state.session, { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' });
+  state.cursor = { kind: 'authorize_activity' };
+  F.stateWrite(state);
+  return F.authorizeEnd(F.stateRead(), { entity: 'activity' });
+}
 
 async function chay(so) {
   section('FBM sync — mở lượt, chế độ chạy và probe phiên');
@@ -23,17 +33,14 @@ async function chay(so) {
   approval.FbmSync.preflightGates = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
   approval.FbmSync.preflightNeedsLocal = (options) => options.mode !== 'read';
   approval.FbmSync.preflightLocal = (options) => { localCalls.push(options.mode); return { ok: true, issues: [], blocking: [], warnings: [], candidateCount: 11 }; };
-  approval.FbmSync.extractAuthorized = () => 'auth-token';
   const firstAsk = approval.FbmSync.start({ mode: 'write' });
   check(so, 'Mở lượt ghi: request đầu là kiểm phiên FBM, chưa đọc hay hash Sheet Customer/Activity', [firstAsk.ok, firstAsk.request.meta.kind, localCalls.length], [true, 'session_probe', 0]);
-  approval.FbmSync.authContinue('customer', { map: {} });
-  const afterAuth = approval.FbmSync.authContinue('activity', { map: {} });
-  check(so, 'Xác thực xong mới quét dữ liệu; số bản ghi lúc kiểm trước phiên không dừng lượt chờ chấp thuận (cổng chấp thuận nằm ở đầu chặng đẩy), đi tiếp sang request dữ liệu', [!!afterAuth, localCalls], [true, ['write']]);
+  const afterAuth = xacThucXong(approval.FbmSync);
+  check(so, 'Xác thực xong mới quét dữ liệu; số bản ghi lúc kiểm trước phiên không dừng lượt chờ chấp thuận (cổng chấp thuận nằm ở đầu chặng đẩy), đi tiếp sang request dữ liệu', [!!(afterAuth && afterAuth.request), localCalls], [true, ['write']]);
   approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
   approval.FbmSync.readLocal = () => [];
   approval.FbmSync.start({ mode: 'read' });
-  approval.FbmSync.authContinue('customer', { map: {} });
-  approval.FbmSync.authContinue('activity', { map: {} });
+  xacThucXong(approval.FbmSync);
   check(so, 'Chiều Lấy không quét hash Sheet ShinCRM ở bất kỳ bước nào', localCalls.length, 1);
   approval.FbmSync.stateWrite(approval.FbmSync.runOpen({ phase: 'idle' }));
   approval.FbmSync.preflightLocal = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
@@ -61,11 +68,11 @@ async function chay(so) {
   orchestration.FbmSync.currentSpreadsheetId = () => 'sheet-push-test';
   orchestration.FbmSync.identityStatus = () => ({ status: 'BOUND' });
   orchestration.FbmSync.statePatch({ runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
-  const businessProbe = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
+  const businessProbe = orchestration.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
   check(so, 'request nghiep vu chi duoc cap sau probe User dat', businessProbe.meta.kind, 'session_probe');
   const businessRequest = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: businessProbe.id }] } });
   check(so, 'probe dat thi moi phat request nghiep vu de kiem fail-closed', [businessRequest.ok, businessRequest.request && businessRequest.request.meta.kind], [true, 'grid']);
-  const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: businessRequest.request.id }] } });
+  const retrySlice = noiLat(orchestration.FbmSync, { ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: businessRequest.request.id }] } });
   check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, null, 'error', 'TRANSPORT_ERROR']);
   const blockedDuplicate = orchestration.FbmSync.start({ mode: 'read' });
   check(so, 'sau loi request chi cho phep nguoi dung chay lai tu dau bang probe', [blockedDuplicate.ok, blockedDuplicate.request && blockedDuplicate.request.meta.kind, orchestration.FbmSync.stateRead().phase], [true, 'session_probe', 'checking_session']);

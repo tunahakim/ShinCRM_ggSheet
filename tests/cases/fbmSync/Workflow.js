@@ -7,7 +7,7 @@ const { section, check } = require('../../lib/assert');
 const { datCongTac, datNen, datPhan, docPhan, datLichNen, docLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
-const { workflowGas, khoDongBo } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, khoDongBo, noiLat } = require('../../lib/fbm/hop-dong-bo');
 const { quaTrangLogin } = require('../../lib/fbm/trang-login');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
@@ -440,7 +440,7 @@ async function chay(so) {
     const state = F.runOpen({ phase: 'push' });
     state.mode = 'push'; state.phase = 'push'; state.entity = 'customer'; state.session = verified; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     F.stateWrite(state);
-    let envelope = F.nextEnvelope(F.pushStageResume(F.stateRead())), lastStep = null;
+    let envelope = F.sliceIssue(F.pushStageResume(F.stateRead())), lastStep = null;
     for (let guard = 0; envelope && guard < 60; guard += 1) {
       if (envelope.meta.kind !== 'batch') {
         const current = F.stateRead(); issued.push(current.cursor.candidate.id);
@@ -692,11 +692,11 @@ async function chay(so) {
   let htmlResult = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const requestId = htmlFailureFlow.hop.FbmSync.stateRead().activeRequestId;
-    htmlResult = htmlFailureFlow.hop.FbmSync.continue({ ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } });
+    htmlResult = noiLat(htmlFailureFlow.hop.FbmSync, { ok: true, status: 200, body: '<html><h1>500 Internal Server Error</h1></html>', transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId }] } });
     if (!htmlResult.request) { break; }
   }
   const htmlState = htmlFailureFlow.hop.FbmSync.stateRead();
-  check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor, đóng các bước mở và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.map((event) => event.action + '|' + event.outcome)], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', ['session_finished|error', 'sync_session_finished|error', 'business_request_failed|error']]);
+  check(so, 'HTML lỗi qua continuation bị fail-closed, giữ cursor, đóng các bước mở và ghi Log lỗi', [htmlStarted.request.meta.kind, htmlResult.ok, htmlResult.request || null, htmlState.phase, htmlState.lastFailureCode, htmlState.cursor.kind, htmlLogs.map((event) => event.action + '|' + event.outcome)], ['identity_user_grid', false, null, 'error', 'PARSE_ERROR', 'identity_user_grid', ['session_finished|error', 'sync_session_finished|error']]);
   scheduleFlow.hop.FbmSync.identityPreflight = () => ({ blocking: false, status: { status: 'BOUND' }, message: '' });
   const now = Date.now();
   vaSoNen(scheduleFlow.hop.FbmSync, { detail: { doneAt: now }, customerFull: { doneAt: 1 }, activityFull: { doneAt: 1 }, heartbeat: { doneAt: 1 } });
@@ -758,7 +758,7 @@ async function chay(so) {
     check(so, 'C2: cổng đóng (dấu khớp) thì Giữ phiên mở đường đếm như cũ (phiên chưa xác minh nên request đầu là probe) và ghi vết cổng đóng; chiều Lấy không đọc cổng, cũng đi đường đếm',
       [closed.result.request && closed.result.request.meta.kind, closed.state.process, closed.state.mode, closed.state.cursor.kind, closed.state.scan, closed.traces.filter((a) => a === 'push_gate_closed').length,
         read.result.request && read.result.request.meta.kind, read.state.process, read.state.scan, read.traces.filter((a) => a === 'push_gate_closed').length],
-      ['session_probe', 'heartbeat', 'write', 'session_probe', 'keepalive', 1, 'session_probe', 'heartbeat', 'keepalive', 0]);
+      ['session_probe', 'heartbeat', 'write', 'session', 'keepalive', 1, 'session_probe', 'heartbeat', 'keepalive', 0]);
   }
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js'] });
   datPhan(waitFlow.hop, 'run', { scopeLimited: false });
@@ -766,9 +766,9 @@ async function chay(so) {
   waitFlow.hop.FbmSync.start({ mode: 'read' });
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
   waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
-  const gapGrid = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
+  const gapGrid = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
-  const gapChunk = waitFlow.hop.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
+  const gapChunk = waitFlow.hop.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
   const gapBudget = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'Lượt chạy tay chụp khoảng cách giữa hai request FBM vào state đầu lượt và gửi kèm mọi envelope; đổi cài đặt giữa lượt chỉ áp lượt sau; hạn Extension cộng khoảng nghỉ dài nhất, trừ gói lấy từ RAM tab',
     [JSON.stringify(waitFlow.hop.FbmSync.stateRead().requestGap), JSON.stringify(gapGrid.meta.requestGap), gapGrid.meta.timeoutMs, gapChunk.meta.timeoutMs],
@@ -778,11 +778,11 @@ async function chay(so) {
   check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.ok, gapTooLong.ok], [false, false]);
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
   waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
-  const gapNone = waitFlow.hop.FbmSync.nextEnvelope(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
+  const gapNone = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const truocCap = Date.now();
-  const loEnvelope = waitFlow.hop.FbmSync.nextEnvelope({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
+  const loEnvelope = waitFlow.hop.FbmSync.sliceIssue({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
     loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
@@ -794,11 +794,11 @@ async function chay(so) {
   deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
   // FBM-031: hạn của request vừa nhận đã qua nhưng lời gọi GAS mới bắt đầu thì vẫn cấp request kế; trần tính từ lúc lời gọi bắt đầu.
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now());
-  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
+  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   check(so, 'trần thời gian GAS tính từ lúc lời gọi bắt đầu, không từ hạn request vừa nhận', [!!notBlockedByRequestDeadline, deadlineFlow.hop.FbmSync.stateRead().lastFailureCode], [true, '']);
   deadlineFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now() - deadlineFlow.hop.FbmSync.BUDGET.gasSoftMs - 1);
-  const blockedByDeadline = deadlineFlow.hop.FbmSync.nextEnvelope(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
+  const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
   deadlineFlow.hop.FbmSync.logStatus(deadlineStatus, 'runtime_limit');
@@ -1075,13 +1075,13 @@ async function chay(so) {
   ], ['done', ['FBM-A1', 'FBM-A2', 'FBM-A4', 'FBM-A5'], 'đã đồng bộ', 'ALT00003', 500, true, 1, true, true]);
   // Một phần tử nghi phiên (401) giữa lô: cả lô không ghi, đi probe; cursor giữ nguyên nên dựng lại đúng lô.
   const nghiPhien = await fullPipeline(false, 'read', { customers: 5, failing: { 'FBM-C3': { ok: false, status: 401, headers: {}, body: '' } } });
-  const nghiState = nghiPhien.fullFlow.hop.FbmSync.stateRead(), nghiResume = nghiPhien.fullFlow.hop.FbmSync.sessionGateMeta(nghiState).resumeCursor || {};
+  const nghiState = nghiPhien.fullFlow.hop.FbmSync.stateRead();
   // Chỉ phần tử giao dịch (khóa `stt_rec`); phần tử đầu đọc thông tin khách của lô.
   const khoaLo = (request) => (request && request.items || []).filter((item) => item.body.externalKey[0].Name === 'stt_rec').map((item) => item.body.externalKey[0].Value);
-  check(so, 'phần tử nghi phiên giữa lô: không ghi giao dịch nào của lô, request kế là probe phiên, cursor giữ dựng lại đúng lô cũ', [
-    nghiPhien.fullWrites.filter((item) => item.entity === 'activity').length, nghiPhien.fullKinds.slice(-2), nghiState.lastFailureCode,
-    khoaLo(nghiPhien.fullFlow.hop.FbmSync.cursorRequest(Object.assign({}, nghiState, { cursor: nghiResume })))
-  ], [0, ['batch:activity', 'session_probe:user'], 'SESSION_SUSPECTED_LIVE', khoaLo(nghiPhien.fullBatches[0])]);
+  check(so, 'phần tử nghi phiên giữa lô: không ghi giao dịch nào của lô, probe thấy phiên sống thì gửi lại đúng lô cũ một lần, lại nghi thì dừng SESSION_SUSPECTED_LIVE', [
+    nghiPhien.fullWrites.filter((item) => item.entity === 'activity').length, nghiPhien.fullKinds.slice(-4), nghiState.phase, nghiState.lastFailureCode,
+    nghiPhien.fullBatches.length, khoaLo(nghiPhien.fullBatches[1])
+  ], [0, ['batch:activity', 'session_probe:user', 'batch:activity', 'session_probe:user'], 'error', 'SESSION_SUSPECTED_LIVE', 2, khoaLo(nghiPhien.fullBatches[0])]);
   // Response lô lệch kế hoạch: id lạ hay thiếu phần tử (Extension dừng vì trần dung lượng) đều là lỗi hợp đồng cả lô, vì thiếu phần tử thì không biết khách nào vắng thật.
   const idLa = await fullPipeline(false, 'read', { customers: 5, editBatch: (raw) => Object.assign(raw, { items: raw.items.map((item, index) => index === 1 ? Object.assign({}, item, { id: '99' }) : item) }) });
   const idLaState = idLa.fullFlow.hop.FbmSync.stateRead();

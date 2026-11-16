@@ -32,13 +32,13 @@ const PHASE_OWNER = '1_ShinCRM_GAS/fbm_sync/state/State.js';
 const PROPERTY_GATE_FILES = ['1_ShinCRM_GAS/fbm_sync/state/PropertyBuffer.js', '1_ShinCRM_GAS/fbm_sync/state/WorkStores.js'];
 
 /**
- * Tệp được nhắc tới bí mật phiên FBM (`cookie`, `customerAuthorized`, `activityAuthorized`): nơi đọc duy nhất (`scriptSettings`), các bộ dựng request đặt chúng vào body gửi FBM, các nơi ghi phiên và lớp gỡ cuối ở cửa ra.
+ * Tệp được nhắc tới bí mật phiên FBM (`cookie`, `customerAuthorized`, `activityAuthorized`): nơi đọc duy nhất (`scriptSettings`), các bộ dựng request đặt chúng vào body gửi FBM, các nơi ghi phiên (kể cả chặng xác thực lưu mã `authorized`) và lớp gỡ cuối ở cửa ra.
  * Cửa ra không lọc theo tên trường nên đây là chỗ chặn bí mật lọt vào kết quả, Log hay thông báo: tệp mới cần biết phiên đã có chưa thì hỏi `sessionAuthorized`.
  */
 const SESSION_SECRET_FILES = [
   '1_ShinCRM_GAS/fbm_sync/read/GridRead.js', '1_ShinCRM_GAS/fbm_sync/transport/RequestSettings.js', '1_ShinCRM_GAS/fbm_sync/write/RequestBuilders.js', '1_ShinCRM_GAS/fbm_sync/state/State.js',
   '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js', '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js', '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js', '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js',
-  '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js'
+  '1_ShinCRM_GAS/fbm_sync/control/ControlPort.js', '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js'
 ];
 
 /** Người điều phối (thiết kế 2.3): khung lượt, lệnh dừng, khung lát, lần hỏi của Extension, cửa lệnh và cửa relay cấp 1 (`EntryPoints.js`: `doPost`, `doGet`, `relayHandle`). Chỉ chúng được đọc/ghi state và ghi `logEvent`; chỗ gọi khác là ngoại lệ. */
@@ -132,7 +132,8 @@ const RULES = [
     find: (file, src) => matchAll(src, /\bfbmHash\s*:(?!\s*\{)|\.fbmHash\s*=(?!=)/)
   },
   {
-    id: 'sessionVerify', title: 'xác minh phiên chỉ qua sessionVerifiedApply', scope: ['gas'], allow: ['1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js'], find: (file, src) => matchAll(src, /\bsessionIdentityVerify\s*\(/, notDefinition)
+    // Phiên chỉ được đánh dấu đã xác minh sau phép quyết danh tính chung (`identityMatchDecide`): ở chặng phiên (cổng trước request nghiệp vụ) và ở bước cuối của lượt đăng nhập.
+    id: 'sessionVerify', title: 'xác minh phiên chỉ ở chặng phiên và chặng đăng nhập', scope: ['gas'], allow: ['1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js', '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js'], find: (file, src) => matchAll(src, /\bsessionIdentityVerify\s*\(/, notDefinition)
   }
 ];
 
@@ -140,7 +141,9 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 2,
+    // Bước kết của chặng (người điều phối của chặng): ghi ô lượt trước khi đóng lượt hoặc chọn request kế.
+    '1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 9,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
@@ -149,9 +152,10 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 34,
+    '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 11,
     '1_ShinCRM_GAS/fbm_sync/transport/PushStage.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 26,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 10,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {
@@ -173,8 +177,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 7,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 23,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 11,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2,
     '2_ShinCRM_Extension/background/service_worker.js': 11,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
   },
@@ -219,8 +223,8 @@ const EXCEPTIONS = {
   phaseClose: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 7,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 5
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 1,
+    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,

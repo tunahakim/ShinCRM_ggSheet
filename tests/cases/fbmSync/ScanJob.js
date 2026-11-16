@@ -205,7 +205,7 @@ async function chay(so) {
   const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey.map((k) => k.Name + '=' + k.Value).join('|'));
   const writeFailEnd = await writeFail.run({
     beforeSend: (request) => { if (request.meta.kind === 'batch' && !firstBatch) { firstBatch = request; } },
-    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.nextEnvelope(retryRequest) }; }
+    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.sliceIssue(retryRequest) }; }
   });
   const writeFailIds = writeFail.local.customer.map((item) => item.fbmId), writeFailActs = writeFail.local.activity.map((item) => item.fbmId);
   check(so, 'Ghi Sheet lỗi ở bước ghi của lô: cursor không tiến, request kế dựng lại đúng lô đó, lượt đủ 12 khách và 12 giao dịch không trùng', [

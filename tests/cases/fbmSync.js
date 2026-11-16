@@ -7,6 +7,7 @@ const NHOM = [
   require("./fbmSync/RunGuards"),
   require("./fbmSync/Run"),
   require("./fbmSync/Slice"),
+  require("./fbmSync/SessionGate"),
   require("./fbmSync/RelayResubmit"),
   require("./fbmSync/RelayLoop"),
   require("./fbmSync/IframeBridge"),

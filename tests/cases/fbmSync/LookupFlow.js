@@ -15,10 +15,11 @@ function chay(so) {
   lookupHop.FbmSync.identityStatus = () => ({ status: 'BOUND' });
   const lookupErrorState = lookupHop.FbmSync.runOpen({ phase: 'checking_session' });
   lookupErrorState.mode = 'write'; lookupErrorState.origin = 'manual'; lookupErrorState.phase = 'checking_session'; lookupErrorState.cursor = { kind: 'lookup', index: 0 }; lookupErrorState.activeRequestId = 'lookup-error-request'; lookupErrorState.session.identityVerified = true; lookupErrorState.session.sessionId = 'lookup-session'; lookupErrorState.session.identitySessionId = 'lookup-session'; lookupHop.FbmSync.stateWrite(lookupErrorState);
-  const lookupError = lookupHop.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-error-request' }] } });
+  let lookupErrorCode = '';
+  try { lookupHop.FbmSync.runSlice(() => lookupHop.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-error-request' }] } })); } catch (error) { lookupErrorCode = String(error.code || ''); }
   check(so, 'lookup loi transport hoac parse fail-closed khong tu dong di tiep',
-    [lookupError.ok, lookupError.request, lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().cursor.kind],
-    [false, null, 'error', 'lookup']);
+    [lookupErrorCode !== '', lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().cursor.kind, lookupHop.FbmSync.stateRead().activeRequestId],
+    [true, 'error', 'lookup', '']);
   const lookupEmptyState = lookupHop.FbmSync.stateRead(); lookupEmptyState.runId = 'lookup-empty-run'; lookupEmptyState.phase = 'checking_session'; lookupEmptyState.cursor = { kind: 'lookup', index: 0 }; lookupEmptyState.activeRequestId = 'lookup-empty-request'; lookupEmptyState.session.identityVerified = true; lookupEmptyState.session.sessionId = 'lookup-session'; lookupEmptyState.session.identitySessionId = 'lookup-session'; lookupHop.FbmSync.stateWrite(lookupEmptyState);
   const lookupEmpty = lookupHop.FbmSync.continue({ ok: true, status: 200, items: [0, 1, 2].map((id) => ({ id: String(id), ok: true, status: 200, body: '{"d":{"Rows":[]}}' })), transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-empty-request' }] } });
   check(so, 'lo danh muc thanh cong nhung khong co dong la ket qua hop le va di tiep',

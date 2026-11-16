@@ -16,7 +16,8 @@ function chay(so) {
   check(so, 'Kiem tra lien ket Customer chi doc ID da lien ket va tra n/N',
     [identityCheckResult.total, identityCheckResult.matched, identityCheckResult.missing, identityCheckResult.missingSample[0].fbmId, identityCheckRequest.body.externalKey.some((item) => item.Name === 'ma_kh'), identityCheckRequest.body.sortExpression],
     [2, 1, 1, 'FBM-2', false, 'stt_rec_kh']);
-  let identityFlowState = { mode: 'check', scan: 'identity_check', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037' }, metadata: {} };
+  // Tới bước kết của chặng xác thực Customer thì phiên đã qua cổng (đã xác minh).
+  let identityFlowState = { mode: 'check', scan: 'identity_check', runId: 'identity-check-run', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', identityVerified: true, sessionId: 'phien-thu', identitySessionId: 'phien-thu' }, metadata: {} };
   builders.FbmSync.stateRead = () => identityFlowState;
   builders.FbmSync.stateWrite = (next) => {
     var fallback = builders.FbmSync.stateDefault();
@@ -27,10 +28,9 @@ function chay(so) {
     });
     return identityFlowState;
   };
-  builders.FbmSync.extractAuthorized = () => 'auth-customer';
-  const identityStarted = builders.FbmSync.authContinue('customer', { map: {} });
+  const identityStarted = builders.FbmSync.authorizeEnd(identityFlowState, { entity: 'customer' });
   check(so, 'Identity check sau authorize chi mo Customer grid, khong mo Activity',
-    [identityStarted.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total],
+    [identityStarted.request.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total],
     ['grid', 'identity_check', 'pull_customer', 2]);
   identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: false, activityAuthorized: false }, metadata: {} };
   identityFlowState.runId = ''; identityFlowState.phase = 'idle'; identityFlowState.cursor = {};
@@ -43,6 +43,14 @@ function chay(so) {
   check(so, 'Identity probe nhan dien du ma so va ten day du, cho xac nhan luu',
     [identityProbeFinished.ok, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName],
     [true, 'done', {}, '2037', 'Le Tuan Anh']);
+  // FBM trả grid User thiếu danh tính: lượt đọc danh tính đóng lỗi có mã (kết quả nghiệp vụ), không ném lỗi GAS và không phát request kế.
+  identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: false, activityAuthorized: false }, metadata: {} };
+  identityFlowState.runId = ''; identityFlowState.phase = 'idle'; identityFlowState.cursor = {};
+  const thieuStarted = builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' });
+  const thieu = builders.FbmSync.continue({ d: { TotalRowCount: 0, Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: thieuStarted.request.id }] } });
+  check(so, 'lượt đọc danh tính gặp grid User thiếu dòng thì đóng lỗi IDENTITY_PROBE_INCOMPLETE, không phát request',
+    [thieuStarted.request.meta.kind, thieu.ok, thieu.code, thieu.request, identityFlowState.phase, identityFlowState.lastFailureCode],
+    ['identity_user_grid', false, 'IDENTITY_PROBE_INCOMPLETE', null, 'error', 'IDENTITY_PROBE_INCOMPLETE']);
   check(so, 'Identity probe thieu dong User thi fail ro rang',
     builders.FbmSync.identityUser({ d: { Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }] } } }).code,
     'IDENTITY_PROBE_INCOMPLETE');

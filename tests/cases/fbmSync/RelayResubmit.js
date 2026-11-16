@@ -14,7 +14,7 @@ async function chay(so) {
   const logs = [];
   hop.logEvent = (line) => { logs.push(line); };
   datCongTac(hop, true);
-  // Bộ xử lý nghiệp vụ giả đi qua đúng hai cổng thật: nhận ra response (`requestAnswered`) rồi cấp request kế (`nextEnvelope`); đếm số lần chạy để biết nộp lặp có chạy lại nghiệp vụ không.
+  // Bộ xử lý nghiệp vụ giả đi qua đúng hai cổng thật: nhận ra response (`requestAnswered`) rồi cấp request kế (`sliceIssue`); đếm số lần chạy để biết nộp lặp có chạy lại nghiệp vụ không.
   let nghiepVu = 0;
   FbmSync.continue = function (response) {
     nghiepVu += 1;
@@ -22,7 +22,7 @@ async function chay(so) {
     if (!FbmSync.requestAnswered(state, FbmSync.responseRequestId(response))) { return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView() }; }
     state.activeRequestId = '';
     FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.cursorRequest(state)), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.sliceIssue(FbmSync.cursorRequest(state)), status: FbmSync.statusView() };
   };
   const traLoi = (id) => ({ ok: true, status: 200, body: '{}', trace: [{ stage: 'fbm_tab_replied', requestId: id }] });
   const nop = (fields) => FbmSync.controlDispatch('continue', Object.assign({ machineId: 'may-A' }, fields), 'relay');

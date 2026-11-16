@@ -20,8 +20,16 @@ function nopLogin(F, body, cursor, origin) {
 }
 /** Lượt tự đăng nhập đang chờ trả lời Login; `manual` là lượt người dùng bấm. */
 function traLoi(F, body, manual) {
-  return nopLogin(F, body, { purpose: 'auto', manual: !!manual, resumeCursor: { kind: 'customer_grid' } }, manual ? 'manual' : 'background');
+  return nopLogin(F, body, { purpose: 'auto', manual: !!manual, afterLogin: { cursor: { kind: 'customer_grid' } } }, manual ? 'manual' : 'background');
 }
+
+/** Hỏi cổng tự đăng nhập của lượt bấm tay bằng đúng đầu vào chặng phiên đọc khi phiên chết. */
+function congTay(F) {
+  const vao = F.sessionInputs({ cursor: { kind: 'session', resume: { cursor: { kind: 'customer_grid' } } } }, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}' });
+  return F.autoLoginGate(Object.assign({ attempt: vao.attempt, now: Date.now(), manual: true }, vao.login));
+}
+/** Ghi một sự kiện vào sổ lần thử qua đúng cổng ghi. */
+function ghiLanThu(F, event) { F.loginAttemptWrite(F.loginAttemptMark(F.loginAttemptRead(), event, Date.now(), 30)); }
 
 async function chay(so) {
   section('FBM sync — LoginReply: đọc câu trả lời Login của FBM');
@@ -39,11 +47,11 @@ async function chay(so) {
     ketQua.code, sai.F.stateRead().phase, sai.F.runInProgress(sai.F.stateRead()), dongLoi.open, sai.F.stateRead().message.indexOf('FBM báo sai tên đăng nhập hoặc mật khẩu. Máy ngừng tự đăng nhập') > 0, sai.F.loginConfigRead().loginHalted, sai.F.statusView().forceLoginOffered
   ], ['AUTO_LOGIN_FAILED', 'error', false, true, true, true, false]);
   check(so, 'đã ngừng thì chặn cả lượt bấm tay (mỗi lần bấm là một lần gửi lại mật khẩu sai) và nói lý do lần trước; lưu lại thông tin đăng nhập thì mở lại', [
-    sai.F.autoLoginCanAttempt(null, { manual: true }).code, sai.F.autoLoginBlockMessage('AUTO_LOGIN_HALTED').indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0,
-    (() => { const cu = sai.F.loginConfigRead(); sai.F.loginConfigSave({ credentialRef: cu.credentialRef, envelope: cu.envelope, public: cu.public }); return [sai.F.loginConfigRead().loginHalted, sai.F.autoLoginCanAttempt(null, { manual: true }).ok]; })()
+    congTay(sai.F).code, sai.F.autoLoginBlockMessage('AUTO_LOGIN_HALTED', null, sai.F.loginAttemptRead().lastError).indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0,
+    (() => { const cu = sai.F.loginConfigRead(); sai.F.loginConfigSave({ credentialRef: cu.credentialRef, envelope: cu.envelope, public: cu.public }); return [sai.F.loginConfigRead().loginHalted, congTay(sai.F).ok]; })()
   ], ['AUTO_LOGIN_HALTED', true, [false, true]]);
-  sai.F.autoLoginMarkFailure('FBM báo sai tên đăng nhập hoặc mật khẩu.', true);
-  sai.F.autoLoginMarkSuccess();
+  ghiLanThu(sai.F, { kind: 'failure', message: 'FBM báo sai tên đăng nhập hoặc mật khẩu.', halt: true });
+  ghiLanThu(sai.F, { kind: 'success' });
   check(so, 'đăng nhập được (đăng nhập thử hoặc hủy phiên cũ thành công) thì mở lại tự đăng nhập', sai.F.loginConfigRead().loginHalted, false);
 
   // Gặp thật 2026-11-01: còn phiên cũ thì FBM trả {"d":"Duplicate"}.

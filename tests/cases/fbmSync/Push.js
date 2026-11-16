@@ -5,6 +5,7 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan 
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
+const { noiLat } = require('../../lib/fbm/hop-dong-bo');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 
 async function chay(so) {
@@ -144,15 +145,15 @@ async function chay(so) {
   push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', cookie: 'cookie' });
   transportState.phase = 'pull_customer'; transportState.activeRequestId = 'test-transport-request'; transportState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] };
   push.FbmSync.stateWrite(transportState);
-  const http500 = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"server"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-transport-request' }] } });
+  const http500 = noiLat(push.FbmSync, { ok: false, status: 500, body: '{"Message":"server"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-transport-request' }] } });
   check(so, 'HTTP 500 cua request nghiep vu fail-closed va giu cursor', [http500.ok, http500.request, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], [false, null, 'error', 'customer_grid']);
   [{ status: 401, body: '' }, { status: 403, body: '' }, { status: 200, body: '<form action="Login.aspx"></form>' }].forEach((failure) => {
     const sessionState = push.FbmSync.runOpen({ phase: 'read' });
     sessionState.phase = 'pull_customer'; sessionState.activeRequestId = 'test-session-request'; sessionState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['x'] };
     push.FbmSync.stateWrite(sessionState);
-    const sessionResult = push.FbmSync.continue({ ok: failure.status === 200, status: failure.status, body: failure.body, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-session-request' }] } });
+    const sessionResult = noiLat(push.FbmSync, { ok: failure.status === 200, status: failure.status, body: failure.body, transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-session-request' }] } });
   const suspicious = failure.status === 401 || failure.status === 403;
-  check(so, 'Session error ' + failure.status + ' duoc probe lai hoac fail-closed', [sessionResult.ok, sessionResult.request && sessionResult.request.meta.kind, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], suspicious ? [true, 'session_probe', 'checking_session', 'session_probe'] : [false, null, 'error', 'customer_grid']);
+  check(so, 'Session error ' + failure.status + ' duoc probe lai hoac fail-closed', [sessionResult.ok, sessionResult.request && sessionResult.request.meta.kind, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().cursor.kind], suspicious ? [true, 'session_probe', 'checking_session', 'session'] : [false, null, 'error', 'customer_grid']);
   });
   const skippedLogs = [];
   push.logEvent = (event) => skippedLogs.push(event);

@@ -94,7 +94,7 @@ async function chay(so) {
    check(so, 'fixture transport dat marker phien song truoc request nghiep vu',
      [orchestration.FbmSync.sessionIdentityIsVerified(orchestration.FbmSync.stateRead()), orchestration.FbmSync.stateRead().cursor.kind],
      [true, 'customer_grid']);
-   const dateEnvelope = orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
+   const dateEnvelope = orchestration.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
    check(so, 'request nghiep vu sau marker live khong bi thay bang probe',
      [dateEnvelope.meta.kind, orchestration.FbmSync.stateRead().cursor.kind, orchestration.FbmSync.stateRead().activeRequestId === dateEnvelope.id],
      ['grid', 'customer_grid', true]);
@@ -108,7 +108,7 @@ async function chay(so) {
     orchestration.FbmSync.responseRequestId({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'gas-request-2' }, { stage: 'bridge_response_sent', requestId: 'sidebar-waiter-2' }] } }),
     'gas-request-2');
   let blockedEndpoint = '';
-  try { orchestration.FbmSync.nextEnvelope({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
+  try { orchestration.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
   check(so, 'endpoint legacy undefined bi chan truoc khi cap envelope',
     blockedEndpoint.indexOf('FBM_ENDPOINT_MISSING') >= 0,
     true);
@@ -131,10 +131,11 @@ async function chay(so) {
     [orchestration.FbmSync.protocol.httpErrorMessage(500, '<html>lỗi</html>'), orchestration.FbmSync.protocol.httpErrorMessage(400, '{"d":{"Bugs":{"Message":"Sai"}}}')],
     ['HTTP 500: FBM không trả nội dung lỗi đọc được.', 'HTTP 400: Sai']);
    orchestration.FbmSync.statePatch({ origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: dateEnvelope.id, deadlineAt: Date.now() + 60000, metadata: { sessionGate: {} }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const retrySlice = orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: dateEnvelope.id }] } });
+   let retryCode = '';
+   try { orchestration.FbmSync.runSlice(() => orchestration.FbmSync.continue({ ok: false, status: 503, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: dateEnvelope.id }] } })); } catch (error) { retryCode = String(error.code || ''); }
     check(so, 'loi request nghiep vu fail-closed khong tu retry',
-      [retrySlice && retrySlice.ok, retrySlice && retrySlice.code, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode],
-      [false, 'TRANSPORT_ERROR', null, 'error', 'TRANSPORT_ERROR']);
+      [retryCode, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode, orchestration.FbmSync.stateRead().activeRequestId],
+      ['TRANSPORT_ERROR', 'error', 'TRANSPORT_ERROR', '']);
   const missingRequestId = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{}}' });
    check(so, 'response thieu requestId bi chan khong an nham reservation',
      [missingRequestId.ok, missingRequestId.code, orchestration.FbmSync.stateRead().activeRequestId],

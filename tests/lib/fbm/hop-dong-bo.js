@@ -57,10 +57,10 @@ function workflowGas(options) {
     'fbm_sync/read/GridRead.js',
     'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js',
     'fbm_sync/write/RequestBuilders.js',
-    'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js',
+    'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js', 'fbm_sync/auth/SessionStage.js',
     'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js',
     'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js',
-    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
+    'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/OpenStages.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js',
     'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js',
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
@@ -72,4 +72,12 @@ function workflowGas(options) {
   return { hop, documentProperties, scriptProperties, scriptLock };
 }
 
-module.exports = { workflowGas, khoDongBo };
+/**
+ * Nộp response như lệnh `continue` thật: chạy trong lát (`runSlice`), nên chặng ném lỗi có mã thì lát đóng lượt lỗi rồi ném tiếp. Trả `{ ok: false, code, request: null, thrown: true }` thay cho lỗi ném để ca kiểm được cả kết quả lẫn ô lượt sau đó.
+ */
+function noiLat(F, response) {
+  try { return F.runSlice(() => F.continue(response)); }
+  catch (error) { return { ok: false, code: String(error && error.code || ''), request: null, thrown: true, error: String(error && error.message || error) }; }
+}
+
+module.exports = { workflowGas, khoDongBo, noiLat };

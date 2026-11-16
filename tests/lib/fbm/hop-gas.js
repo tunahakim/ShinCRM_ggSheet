@@ -93,10 +93,16 @@ function capSauTep(hopCat, duongDan) {
   if (duongDan === 'fbm_sync/transport/TransportCore.js' || duongDan === 'fbm_sync/read/GridRead.js') { capPhienThu(hopCat); }
 }
 
-/** Sau cả lần nạp: hộp có chặng đẩy thì cấp phần dấu lần đẩy sạch cần; hộp có bước kiểm tra phiên thì nạp bước đánh dấu phiên đã xác minh (`AutoLogin.js`), hộp có `Report.js` thì nạp cổng ghi lỗi Sidebar (`ClientError.js`), như bản thật luôn có. */
+/** Sau cả lần nạp: hộp có chặng đẩy thì cấp phần dấu lần đẩy sạch cần; hộp có mở lượt thì nạp lượt đăng nhập và các chặng đầu lượt (`OpenStages.js`), hộp có khung lát thì nạp chặng phiên (`SessionStage.js`), hộp có `Report.js` thì nạp cổng ghi lỗi Sidebar (`ClientError.js`), như bản thật luôn có. */
 function capSauNap(hopCat, duongDans) {
   if (duongDans.indexOf('fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js') >= 0) { capDauDaySach(hopCat); }
-  if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0 && !(hopCat.FbmSync && hopCat.FbmSync.sessionVerifiedApply)) { ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js'].forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep })); }
+  const napThieu = (dau, teps) => { if (!(hopCat.FbmSync && hopCat.FbmSync[dau])) { teps.forEach((tep) => vm.runInContext(docTep(tep), hopCat, { filename: tep })); } };
+  if (duongDans.indexOf('fbm_sync/transport/PullFlow.js') >= 0) {
+    napThieu('autoLoginOpen', ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js']);
+    napThieu('authorizeStage', ['fbm_sync/transport/OpenStages.js']);
+  }
+  // Bước phát request của lát mở chặng phiên khi cursor có cổng: hộp có khung lát thì có chặng phiên, như bản thật.
+  if (duongDans.indexOf('fbm_sync/state/Slice.js') >= 0) { napThieu('sessionStage', ['fbm_sync/auth/SessionStage.js']); }
   if (duongDans.indexOf('fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }
 

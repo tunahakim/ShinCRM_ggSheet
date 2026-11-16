@@ -7,7 +7,8 @@ function moChangDay(xacMinh) {
   st.mode = 'write';
   if (xacMinh) { F.sessionIdentityVerify(st, { userId: '2037', username: 'demo', accountName: 'Demo' }); }
   F.stateWrite(st);
-  F.pushNext = () => ({ next: { url: F.FBM_BASE_URL + '/AppService/FastBusiness.asmx/GetDirViewPage', body: {}, meta: { kind: 'owner_lookup' } } });
+  // Như bản thật: bước có request đặt dấu chờ response (`push_wait`) trước khi trả request.
+  F.pushNext = (copy) => { copy.cursor = F.pushCursor(copy.cursor, { kind: 'push_wait', operation: 'owner_lookup' }); return { next: { url: F.FBM_BASE_URL + '/AppService/FastBusiness.asmx/GetDirViewPage', body: {}, meta: { kind: 'owner_lookup' } } }; };
   return { F, ket: F.pullFinishOrPush(st, {}), st: F.stateRead() };
 }
 

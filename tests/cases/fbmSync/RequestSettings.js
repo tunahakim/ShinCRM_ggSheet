@@ -17,7 +17,7 @@ const BUILDERS = {
   'fbm_sync/transport/CustomerCount.js': ['customerCountRequest'],
   'fbm_sync/reconcile/CategoryLookup.js': ['lookupBatchRequest'],
   'fbm_sync/transport/ActivityBatch.js': ['activityBatchRequest', 'gateOpen'],
-  'fbm_sync/transport/TransportCore.js': ['sessionSystemRequest', 'sessionSystemEnvelope'],
+  'fbm_sync/auth/SessionStage.js': ['sessionProbeRequest'],
   'fbm_sync/auth/LoginTools.js': ['loginRequestPlan'],
   'fbm_sync/auth/LoginRun.js': ['loginStepRequest'],
   'fbm_sync/transport/PushFlow.js': ['pushConfigErrors', 'validateAutoCustomerCode']
