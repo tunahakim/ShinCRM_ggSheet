@@ -51,3 +51,14 @@ function fbmCheckStuckCreate() {
     scope: scope
   };
 }
+
+/** ID FBM của khách ALT00010 trên DEV, để trả dòng về khi bỏ dở ca thử khách. */
+var FBM_RECOVER_ALT_FBM_ID = 'A000050753';
+/** Trả khách thử của `fbmSeedStuckCustomer` về mã và ID FBM cũ, trạng thái chờ đối soát (mốc rỗng để lần kéo sau lập lại mốc), rồi bỏ mã ShinCRM khỏi phạm vi. Không gửi request FBM. */
+function fbmRestoreStuckCustomer() {
+  var codes = settingsValue(FbmSync.SETTING_SECTIONS.run, 'scopeCodes') || [];
+  var customer = FbmSync.readLocal('customer').filter(function (record) { return codes.indexOf(record.id) >= 0 && !String(record.fbmCustomerCode || '').trim(); })[0];
+  if (!customer) { throw new Error('Không thấy khách thử đang trống mã FBM trong phạm vi.'); }
+  fbmFixtureSave('customer', [{ id: customer.id, fbmId: FBM_RECOVER_ALT_FBM_ID, fbmCustomerCode: 'ALT00010', fbmHash: '', syncStatus: FbmSync.SYNC_STATUS.pending }], 'pull');
+  return fbmCheckStuckCreate();
+}
