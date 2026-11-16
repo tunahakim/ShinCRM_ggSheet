@@ -56,7 +56,7 @@ FbmSync.relayCommandAllowed = function (name) {
 };
 
 /**
- * `channel` do lối vào đặt (`relay` chỉ từ `relayHandle`), không lấy từ payload, nên Sidebar không tự xưng là relay được. Phong bì chỉ rời GAS qua relay: trên kênh Sidebar `nextEnvelope` giữ chỗ nhận lượt và kết quả mang `runId` thay phong bì.
+ * `channel` do lối vào đặt (`relay` chỉ từ `relayHandle`), không lấy từ payload, nên Sidebar không tự xưng là relay được. Phong bì chỉ rời GAS qua relay: trên kênh Sidebar bước phát request (`issueThroughGate`) giữ chỗ nhận lượt và kết quả mang `runId` thay phong bì.
  */
 FbmSync.controlDispatch = function (command, payload, channel) {
   var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' ? 'relay' : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;

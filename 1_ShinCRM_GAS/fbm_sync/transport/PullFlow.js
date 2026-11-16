@@ -1,12 +1,12 @@
 /** Dieu phoi preflight va chieu doc tu FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
-/** Mở phiên, kiểm tra khóa phiên và trả về request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
 /** Trả lời chung khi thao tác của người dùng gặp lượt nền đang chạy: không dừng gì, kèm `status` để Sidebar nêu bước và giờ bắt đầu trong popup hỏi. */
 FbmSync.backgroundRunningResult = function () {
   return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.', status: FbmSync.statusView() };
 };
 
+/** Mở lượt và trả request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
 FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
 FbmSync.startRun = function (options) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
@@ -27,19 +27,12 @@ FbmSync.startRun = function (options) {
     if (current.activeRequestId) {
       return { ok: false, code: 'REQUEST_IN_FLIGHT', request: null, message: 'Đã có request FBM đang chờ response; không cấp request chồng.', status: FbmSync.statusView() };
     }
-    var initialRequest = current.phase === 'checking_session' && current.cursor && ['authorize_customer', 'identity_user_grid'].indexOf(current.cursor.kind) >= 0;
-    var recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
-    var resumable = recent && current.cursor && current.cursor.kind && current.cursor.kind !== 'push_wait' ? FbmSync.cursorRequest(current) : null;
-    if (resumable && current.cursor && current.cursor.kind !== 'push_wait') {
-      var resumeProbe = typeof FbmSync.sessionGateResumeProbeRequest === 'function'
-        ? FbmSync.sessionGateResumeProbeRequest(current, resumable, 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...')
-        : FbmSync.nextEnvelope(resumable);
-      return { ok: true, request: resumeProbe, status: FbmSync.statusView(), resumed: true };
-    }
-    if (initialRequest && recent && current.cursor.kind === 'authorize_customer') {
-      return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(current)), status: FbmSync.statusView(), resumed: true };
-    }
-    if (!initialRequest) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
+    // Lượt vừa chạy dở (không request nào chờ) thì nối lại: luôn kiểm lại phiên trước vì lát trước có thể dừng giữa chừng. Cursor khai `resumable: false` trong bảng cursor (lệnh ghi, lượt đăng nhập) thì không nối mù.
+    var kind = String(current.cursor && current.cursor.kind || ''), recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
+    if (!recent || !kind || FbmSync.cursorTable(kind).resumable === false) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
+    // Đang ở chặng phiên thì gửi lại chính request hỏi phiên (chỉ đọc); không mở chặng phiên lồng trong chặng phiên.
+    if (kind !== 'session') { FbmSync.stagePatchApply(current, FbmSync.sessionGateOpen(current, 'issue', 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...', false)); }
+    return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView(), resumed: true };
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
   var state = FbmSync.runOpen({
@@ -78,12 +71,13 @@ FbmSync.startRun = function (options) {
     state.cursor = { kind: 'identity_user_grid' };
     state.message = 'Đang đọc thông tin tài khoản FBM...';
     FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.sessionSystemEnvelope('identity_user_grid', null, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
   }
+  // Xác thực Customer có cổng phiên: request đầu thực gửi là hỏi thử phiên, xác thực đi sau khi đúng tài khoản.
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Đang kiểm tra phiên FBM...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sessionSystemEnvelope('authorize', { entity: 'customer' }, FbmSync.scriptSettings(state)), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
 };
 /**
  * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
@@ -158,48 +152,6 @@ FbmSync.pushGateCheck = function (state, options) {
   return gate;
 };
 
-/** Nhận token bootstrap và chuyển sang lookup hoặc đọc grid. */
-FbmSync.authContinue = function (entity, response) {
-  // Token gắn với phiên và phải lưu trước mọi request ghi.
-  // Không đối chiếu danh tính ở đây: cổng phát request buộc mọi `authorize` đi sau bước kiểm tra phiên (grid User so với liên kết), và response xác thực không mang danh tính (Nghiên cứu FBM ch02 2.7).
-  var auth = FbmSync.extractAuthorized(response), state = FbmSync.stateRead();
-  if (!auth) { throw new Error('FBM không trả mã authorized cho ' + entity + '.'); }
-  state.session[entity === 'customer' ? 'customerAuthorized' : 'activityAuthorized'] = auth;
-  if (entity === 'customer') {
-    if (state.scan === 'identity_probe') {
-      state.cursor = { kind: 'identity_user_grid' }; state.phase = 'checking_session'; state.entity = '';
-      state.message = 'Đã xác thực phiên; đang đọc thông tin tài khoản FBM...';
-      FbmSync.stateWrite(state);
-      return FbmSync.sessionSystemRequest('identity_user_grid', null, FbmSync.scriptSettings(state));
-    }
-    if (state.scan === 'identity_check') {
-      FbmSync.identityCheckBegin(state);
-      state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
-      state.message = 'Đang kiểm tra liên kết Customer FBM...';
-      FbmSync.stateWrite(state);
-      return FbmSync.identityCheckCustomerRequest({ type: 0, count: 2000, gridPageIndex: -1, gridPageValue: null, gridRefresh: false }, FbmSync.scriptSettings(state));
-    }
-    state.cursor = { kind: 'authorize_activity' };
-    state.message = 'Đã xác thực Customer; đang xác thực Activity...';
-    FbmSync.stateWrite(state);
-    return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }, FbmSync.scriptSettings(state));
-  }
-  if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'session', 'ok', {}); }
-  if (FbmSync.preflightLocalStep(state)) { return null; }
-  // Category là cấu hình của người dùng; đồng bộ chỉ đọc và đối chiếu. Chiều Lấy không nạp danh mục FBM (`needsFbmLookups`).
-  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'category', { mode: state.mode, scan: state.scan }); }
-  if (!FbmSync.needsFbmLookups(state)) {
-    var pullRequest = FbmSync.beginCustomerPull(state);
-    if (typeof FbmSync.businessStepFinish === 'function') { FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: 0, errors: Number(state.metadata && state.metadata.categoryBlocks && state.metadata.categoryBlocks.length || 0) }); }
-    FbmSync.stateWrite(state);
-    return pullRequest;
-  }
-  state.cursor = { kind: 'lookup' };
-  state.message = 'Đang kiểm tra danh mục FBM...';
-  FbmSync.stateWrite(state);
-  return FbmSync.lookupBatchRequest(FbmSync.scriptSettings(state));
-};
-
 /** Mô tả trang Customer vừa nhận để dựng con trỏ trang kế: số dòng, dòng đầu, dòng cuối và khóa trang. Kiểm tra liên kết sắp theo `stt_rec_kh` nên khóa trang chỉ có cột đó. */
 FbmSync.customerPageOf = function (rows, identityOrder) {
   var list = rows || [], last = list[list.length - 1] || {};
@@ -237,7 +189,7 @@ FbmSync.finishPullRun = function (state) {
 FbmSync.activityStagesContinue = function (state, extra) {
   var request = FbmSync.activityStageNext(state);
   FbmSync.stateWrite(state);
-  if (request) { return Object.assign({ ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() }, extra || {}); }
+  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() }, extra || {}); }
   return FbmSync.pullFinishOrPush(state, extra);
 };
 
@@ -293,184 +245,4 @@ FbmSync.contractGate = function (rawResponse) {
   FbmSync.stateWrite(state);
   if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'extension_contract_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || ''), reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }); }
   return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
-};
-
-/** Tiến đúng một bước cursor và lưu state trước khi trả request kế tiếp; lượt vừa xong thì nối bước đếm (`runTail`). */
-FbmSync.continueRun = function (rawResponse) { return FbmSync.backgroundTail(FbmSync.runTail(FbmSync.continueStep(rawResponse))); };
-FbmSync.continueStep = function (rawResponse) {
-  var state = FbmSync.stateRead();
-  var cursor = state.cursor || {}, response;
-  FbmSync.replyIntake(state, rawResponse);
-  FbmSync.stateWrite(state);
-  response = FbmSync.protocol.parse(rawResponse);
-  if (cursor.kind === 'session_probe' && !FbmSync.protocol.isLiveSessionResponse(rawResponse)) {
-    return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-  }
-  // Phân loại trên wrapper HTTP gốc; parse trước sẽ làm mất status và biến lỗi vận chuyển thành Bugs giả.
-  // Probe nhận "chưa xác thực" là kết luận phiên chết, đi tiếp nhánh identity bên dưới để vào cổng đăng nhập, không phải dấu hiệu đáng ngờ cần probe nữa.
-  var success = cursor.kind === 'session_probe' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse) ? { ok: true } : FbmSync.protocol.assertSuccess(rawResponse);
-  if (!success.ok) {
-    if (success.code === 'SESSION_SUSPECTED' && cursor.kind !== 'session_probe') {
-      var suspicionProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ; request nghiệp vụ đã dừng để probe lại phiên.');
-      return suspicionProbe ? { ok: true, request: suspicionProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    if (typeof FbmSync.sessionGateHandleFailure === 'function') {
-      var gateFailure = FbmSync.sessionGateHandleFailure(state, cursor, success);
-      if (gateFailure) { return gateFailure; }
-    }
-    var failureReason = (success.bug && (success.bug.Message || success.bug.message)) || 'FBM trả về lỗi nghiệp vụ';
-    state.lastFailureCode = String(success.code || 'FBM_ERROR');
-    state.retryable = success.retryable === true;
-    if (success.code === 'SESSION_EXPIRED') {
-      state.session.customerAuthorized = ''; state.session.activityAuthorized = '';
-      state.message = 'Phiên FBM đã hết hạn; hãy đăng nhập lại trên tab FBM rồi chạy lại.';
-    } else {
-      state.message = failureReason;
-    }
-    state.phase = 'error';
-    state.retryable = false;
-    state.lastFailureCode = String(success.code || 'FBM_ERROR');
-    state.lastError = failureReason;
-    state.message = 'Request FBM thất bại; đã dừng và không gửi lại tự động.';
-    if (typeof FbmSync.sessionGateRecordFailure === 'function') {
-      FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'business_request_failed');
-    } else {
-      FbmSync.stateWrite(state);
-    }
-    return { ok: false, code: String(success.code || 'FBM_ERROR'), status: FbmSync.statusView(), error: success.bug };
-  }
-  state.retryable = false;
-  state.lastFailureCode = '';
-  FbmSync.stateWrite(state);
-
-  // Probe User là bước hệ thống của cổng: đối chiếu đủ bốn định danh rồi
-  // mới trả lại cursor nghiệp vụ ban đầu. Không gọi logic Customer tại đây.
-  if (cursor.kind === 'session_probe') {
-    var probedIdentity = FbmSync.identityUser(response);
-    if (!probedIdentity.ok) {
-      if (typeof FbmSync.protocol.isUnauthenticatedResponse === 'function' && FbmSync.protocol.isUnauthenticatedResponse(rawResponse)) {
-        return FbmSync.sessionGateHandleProbeFailure(state, cursor, rawResponse);
-      }
-      FbmSync.sessionIdentityClear(state);
-      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = probedIdentity.code || 'IDENTITY_PROBE_INCOMPLETE';
-      state.lastError = probedIdentity.message; state.message = probedIdentity.message; FbmSync.stateWrite(state);
-      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_probe_failure'); }
-      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    var probedRuntime = { spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''), userId: probedIdentity.userId, username: probedIdentity.username, accountName: probedIdentity.accountName };
-    // Kiểm liên kết đối chiếu bản nháp đã chụp vào `identityTarget` (người dùng đang gõ, chưa lưu); mọi lượt khác đối chiếu liên kết đã lưu.
-    var checkTarget = state.scan === 'identity_check' && state.identityTarget ? state.identityTarget : null, checkReasons = checkTarget ? FbmSync.identityMismatches(checkTarget, probedRuntime) : [];
-    var probedStatus = checkTarget ? { status: checkReasons.length ? 'REBIND_REQUIRED' : 'BOUND', binding: checkTarget } : typeof FbmSync.identityStatus === 'function' ? FbmSync.identityStatus(probedRuntime) : { status: 'BOUND' };
-    var gridMismatch = (state.scan !== 'identity_probe' && state.scan !== 'identity_check' && probedStatus.status !== 'BOUND') || probedStatus.status === 'REBIND_REQUIRED';
-    // Liên kết phải khớp cả grid User lẫn trang FBM; chưa có liên kết (đọc danh tính để tự điền) thì không có gì để so phía trang.
-    var probedBinding = !gridMismatch && probedStatus.status === 'BOUND' ? probedStatus.binding : null;
-    var pageCheck = probedBinding ? FbmSync.pageIdentityCheck(probedBinding, FbmSync.pageIdentity(rawResponse), cursor.pageReloaded === true) : { status: 'ok' };
-    if (pageCheck.status === 'reload') { return FbmSync.pageIdentityReloadRequest(state, cursor); }
-    if (gridMismatch || pageCheck.status !== 'ok') {
-      var pageMissing = pageCheck.status === 'missing';
-      FbmSync.sessionIdentityClear(state);
-      state.phase = 'error'; state.cursor = {}; state.lastFailureCode = pageMissing ? 'FBM_PAGE_IDENTITY_MISSING' : 'SESSION_IDENTITY_MISMATCH';
-      state.lastError = pageMissing ? 'Đã tải lại trang FBM nhưng vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản nên request nghiệp vụ đã bị chặn.'
-        : checkTarget ? 'Thông tin liên kết đang nhập không khớp tài khoản FBM đang mở ở: ' + FbmSync.identityMismatchLabels(gridMismatch ? checkReasons : pageCheck.reasons) + '.'
-        : gridMismatch ?'Tài khoản FBM hiện tại không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.'
-          : 'Mã hoặc tên người đăng nhập trên trang FBM không khớp liên kết đã xác nhận; request nghiệp vụ đã bị chặn.';
-      state.message = state.lastError; FbmSync.stateWrite(state);
-      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, pageMissing ? 'session_probe_page_missing' : gridMismatch ? 'session_probe_mismatch' : 'session_probe_page_mismatch'); }
-      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    FbmSync.sessionVerifiedApply(state, probedIdentity);
-    if (state.scan === 'identity_probe') {
-      state.metadata = state.metadata || {};
-      state.metadata.identityProbe = probedRuntime;
-      FbmSync.runClose(state, 'done', { message: 'Đã đọc và xác minh nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
-      FbmSync.stateWrite(state);
-      return { ok: true, request: null, status: FbmSync.statusView() };
-    }
-    var gateMeta = FbmSync.sessionGateMeta(state), resume = gateMeta.resumeCursor && gateMeta.resumeCursor.kind ? gateMeta.resumeCursor : { kind: 'authorize_customer' };
-    if (gateMeta.probeOnly === true) {
-      gateMeta.probeOnly = false;
-      state.cursor = {}; state.phase = 'error'; state.entity = '';
-      state.lastFailureCode = 'SESSION_SUSPECTED_LIVE';
-      state.lastError = 'FBM trả phản hồi đáng ngờ nhưng probe vẫn xác nhận phiên sống; request nghiệp vụ đã bị dừng để không gửi lại.';
-      state.message = state.lastError;
-      FbmSync.stateWrite(state);
-      if (typeof FbmSync.sessionGateRecordFailure === 'function') { FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'session_suspected_live'); }
-      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    state.cursor = resume; state.phase = gateMeta.resumePhase || 'checking_session'; state.entity = gateMeta.resumeEntity || '';
-    gateMeta.resumeCursor = null;
-    FbmSync.stateWrite(state);
-    var resumedRequest = FbmSync.cursorRequest(state);
-    if (!resumedRequest) {
-      state.phase = 'error'; state.lastFailureCode = 'SESSION_RESUME_FAILED'; state.lastError = 'Đã xác minh phiên nhưng không dựng lại được request đang chờ.'; state.message = state.lastError; FbmSync.stateWrite(state);
-      return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    return { ok: true, request: FbmSync.nextEnvelope(resumedRequest), status: FbmSync.statusView(), sessionVerified: true };
-  }
-
-  // Hai bước đầu chỉ lấy authorized token cho từng controller.
-  if (cursor.kind === 'authorize_customer') {
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.authContinue('customer', response)), status: FbmSync.statusView() };
-  }
-  // Sau xác thực Activity lượt có thể dừng (liên kết sai, kiểm tra dữ liệu chặn): trả đúng lý do dừng chứ không trả "không có request".
-  if (cursor.kind === 'authorize_activity') {
-    var activityRequest = FbmSync.authContinue('activity', response), after = activityRequest ? null : FbmSync.stateRead();
-    if (after && after.phase === 'error') { return { ok: false, code: after.lastFailureCode, request: null, status: FbmSync.statusView(), error: after.lastError }; }
-    return { ok: true, request: FbmSync.nextEnvelope(activityRequest), status: FbmSync.statusView() };
-  }
-  if (cursor.kind === 'identity_user_grid') {
-    var identityUser = FbmSync.identityUser(response);
-    if (!identityUser.ok) {
-      FbmSync.runFail(state, identityUser.code, identityUser.message); FbmSync.stateWrite(state);
-      return { ok: false, code: identityUser.code, status: FbmSync.statusView(), error: identityUser.message };
-    }
-    FbmSync.sessionIdentityRecord(state, identityUser);
-    state.metadata = state.metadata || {};
-    state.metadata.identityProbe = {
-      spreadsheetId: String(FbmSync.currentSpreadsheetId ? FbmSync.currentSpreadsheetId() : ''),
-      userId: identityUser.userId,
-      username: identityUser.username,
-      accountName: identityUser.accountName
-    };
-    FbmSync.runClose(state, 'done', { message: 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
-    FbmSync.stateWrite(state);
-    return { ok: true, status: FbmSync.statusView() };
-  }
-  // Chế độ ghi phải nạp danh mục trước khi dựng payload ghi; chiều đẩy nạp lại giữa các lô ở chặng đẩy (`push_lookup`).
-  if (cursor.kind === 'lookup') {
-    if (!FbmSync.lookupBatchApply(state, rawResponse)) {
-      var lookupProbe = FbmSync.sessionGateProbeRequest(state, cursor, 'Phản hồi FBM đáng ngờ khi đọc danh mục; chưa đối chiếu gì, đang probe lại phiên.');
-      return lookupProbe ? { ok: true, request: lookupProbe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
-    }
-    if (FbmSync.canWriteFbm(state.mode)) {
-      // Category is user-owned configuration; sync only reads and validates it.
-      state.message = 'Đã đọc danh mục FBM; đang đối chiếu Category...';
-    }
-    var customerRequest = FbmSync.beginCustomerPull(state), categoryBlocks = state.metadata && state.metadata.categoryBlocks || [];
-    if (typeof FbmSync.businessStepFinish === 'function') {
-      FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: Number(FbmSync.SYNC_LOOKUPS.length || 0), errors: Number(categoryBlocks.length || 0) });
-    }
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.nextEnvelope(customerRequest), status: FbmSync.statusView() };
-  }
-  // Danh sách toàn bộ khách đi bằng việc quét; kiểm tra liên kết vẫn đọc grid thường theo `stt_rec_kh`.
-  if (cursor.kind === 'customer_grid' && state.scan === 'identity_check') {
-    var customerGrid = FbmSync.rowsToRecords('customer', response), eligibleCustomerRows = customerGrid.rows.filter(function (row) { return !FbmSync.isTemporaryRecord('customer', row); });
-    if (customerGrid.sourceFields) { state.metadata.customerFields = customerGrid.sourceFields; }
-    var identityFirstPage = Number(cursor.pageIndex) < 0;
-    state.metadata.customerScan = FbmSync.customerScanRecord(identityFirstPage ? null : state.metadata.customerScan, customerGrid.rows, customerGrid.total, null);
-    if (identityFirstPage) { state.progress = { done: 0, total: state.metadata.customerScan.total }; }
-    FbmSync.identityCheckPage(state, eligibleCustomerRows);
-    FbmSync.progressCustomersDone(state, customerGrid.rows.length);
-    if (FbmSync.customerNext(state, FbmSync.customerPageOf(customerGrid.rows, true), customerGrid.total)) {
-      var identityCursor = state.cursor;
-      FbmSync.stateWrite(state);
-      return { ok: true, request: FbmSync.nextEnvelope(FbmSync.identityCheckCustomerRequest({ type: 1, count: identityCursor.count, gridPageIndex: identityCursor.pageIndex, gridPageValue: identityCursor.pageValue, pageItems: identityCursor.pageItems, gridRefresh: false, sourceFields: state.metadata.customerFields }, FbmSync.scriptSettings(state))), status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
-    }
-    FbmSync.identityCheckFinish(state);
-    FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' }); FbmSync.stateWrite(state);
-    return { ok: true, status: FbmSync.statusView(), imported: eligibleCustomerRows.length };
-  }
-  state.phase = 'error'; state.lastError = 'Không nhận diện được cursor đồng bộ.'; FbmSync.stateWrite(state);
-  return { ok: false, status: FbmSync.statusView(), error: state.lastError };
 };

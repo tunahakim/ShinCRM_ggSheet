@@ -55,7 +55,7 @@ FbmSync.BUDGET = {
 /** Hạn một lần fetch theo loại request; executor đọc từ `meta.fetchMs`, không giữ con số riêng. */
 FbmSync.budgetFetchMs = function (meta) { return String(meta && meta.kind || '') === 'scan_job' ? FbmSync.BUDGET.scanFetchMs : FbmSync.BUDGET.fetchMs; };
 
-/** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và khoảng nghỉ dài nhất trước nó; `nextEnvelope` không cấp khoảng nghỉ cho gói lấy từ RAM tab nên `requestGap` khi đó rỗng. */
+/** Hạn Extension phải trả một envelope: chờ tab một lần, cộng mỗi request một lần fetch và khoảng nghỉ dài nhất trước nó; `requestIssue` không cấp khoảng nghỉ cho gói lấy từ RAM tab nên `requestGap` khi đó rỗng. */
 FbmSync.budgetTimeoutMs = function (request, requestGap) {
   var budget = FbmSync.BUDGET, items = request && request.items ? request.items : [request || {}], total = budget.tabReadyMs, gapMs = Math.max(0, Number(requestGap && requestGap.maxMs || 0));
   items.forEach(function (item) {

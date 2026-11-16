@@ -64,7 +64,7 @@ FbmSync.keepaliveCountOpen = function (direction, carry) {
   state.scheduleMode = FbmSync.modeOf(direction);
   state.metadata.countTail = { pending: false, mode: state.scheduleMode, message: 'Giữ phiên FBM OK.', recount: FbmSync.customerCountApplies(direction) };
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.cursorStartEnvelope(state), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
 };
 
 /**

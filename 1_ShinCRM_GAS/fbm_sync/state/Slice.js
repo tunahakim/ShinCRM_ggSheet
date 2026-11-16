@@ -1,6 +1,6 @@
 /**
  * Khung một lát đồng bộ: mọi lệnh có lát (`start`, `continue`) chạy trong `runSlice` khi đã cầm khóa điều phối; lệnh `continue` đi đúng một đường `sliceContinue`.
- * Bộ xử lý của chặng cũ trong `CURSOR_TABLE` mang `legacy: true`: chúng tự đọc và ghi ô lượt. Chặng theo hợp đồng chung chạy qua `stageRun`: nhận bản sao ô lượt, trả `{ patch, next | end }`, khung gộp patch và phát request.
+ * Mọi kiểu cursor trong `CURSOR_TABLE` chạy theo hợp đồng chặng chung qua `stageRun`: chặng nhận bản sao ô lượt, trả `{ patch, next | end }` hoặc `session.suspected`, khung gộp patch và phát request.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
@@ -64,9 +64,9 @@ FbmSync.controlFailRun = function (error) {
 };
 
 /**
- * Bảng kiểu cursor: mỗi dòng khai bộ xử lý response của lát (`inputs`, `stage`, `end`, hoặc `legacy` + `run` cho chặng cũ), hàm dựng lại request của cursor (`request(state, cfg)`) và cột `gate`: request của cursor chỉ được gửi khi phiên đã xác minh đúng tài khoản liên kết.
+ * Bảng kiểu cursor: mỗi dòng khai bộ xử lý response của lát theo hợp đồng chặng chung (`inputs` nếu chặng cần đọc kho, `stage`, `end`), hàm dựng lại request của cursor (`request(state, cfg)`) và cột `gate`: request của cursor chỉ được gửi khi phiên đã xác minh đúng tài khoản liên kết.
  * Mọi lần dựng lại request từ cursor (phát lại khi nộp lặp, Extension nhận lượt, cứu đường truyền, tiếp tục sau kiểm phiên) đi qua `cursorRequest`, nên không có kiểu cursor nào gửi được mà thiếu dòng. Kiểu không có trong bảng thì `cursorTable` ném.
- * `request` trả `null` chỉ khi cursor không được phép dựng lại (lệnh ghi FBM). Hàm tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
+ * `request` trả `null` chỉ khi cursor không được phép dựng lại (lệnh ghi FBM). `resumable: false`: lượt dừng giữa chừng ở cursor này không được nối lại khi người dùng bấm chạy (lệnh ghi có thể đã tới FBM; lượt đăng nhập không gửi lại mật khẩu). Hàm tra tên lúc gọi chứ không giữ tham chiếu, để chỗ thay thế (test, bản vá) có hiệu lực.
  */
 FbmSync.CURSOR_TABLE = {
   activity_grid: {
@@ -76,8 +76,18 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.activityGridStage(ctx); },
     end: function (state, end) { return FbmSync.activityGridEnd(state, end); }
   },
-  authorize_activity: { gate: true, request: function (state, cfg) { return FbmSync.sessionSystemRequest('authorize', { entity: 'activity' }, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
-  authorize_customer: { gate: true, request: function (state, cfg) { return FbmSync.sessionSystemRequest('authorize', { entity: 'customer' }, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  authorize_activity: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.authorizeRequest('activity', cfg); },
+    stage: function (ctx) { return FbmSync.authorizeStage(ctx); },
+    end: function (state, end) { return FbmSync.authorizeEnd(state, end); }
+  },
+  authorize_customer: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.authorizeRequest('customer', cfg); },
+    stage: function (ctx) { return FbmSync.authorizeStage(ctx); },
+    end: function (state, end) { return FbmSync.authorizeEnd(state, end); }
+  },
   conflict_refresh: {
     gate: true,
     request: function (state, cfg) { var cursor = state.cursor || {}; return FbmSync.conflictRefreshRequest(cursor.entity, { id: cursor.id, fbmId: cursor.fbmId }, cfg); },
@@ -96,7 +106,8 @@ FbmSync.CURSOR_TABLE = {
   customer_grid: {
     gate: true,
     request: function (state, cfg) { var cursor = state.cursor || {}; return FbmSync.identityCheckCustomerRequest({ type: Number(cursor.type || 0), count: Number(cursor.count || 2000), gridPageIndex: cursor.pageIndex === undefined ? -1 : cursor.pageIndex, gridPageValue: cursor.pageValue === undefined ? null : cursor.pageValue, pageItems: cursor.pageItems, gridRefresh: false, sourceFields: (state.metadata || {}).customerFields }, cfg); },
-    legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); }
+    stage: function (ctx) { return FbmSync.identityCheckGridStage(ctx); },
+    end: function (state, end) { return FbmSync.identityCheckGridEnd(state, end); }
   },
   customer_scan: {
     gate: true,
@@ -105,15 +116,28 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.customerScanStage(ctx); },
     end: function (state) { return FbmSync.customerScanEnd(state); }
   },
-  identity_user_grid: { gate: false, request: function (state, cfg) { return FbmSync.sessionSystemRequest('identity_user_grid', null, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  // Lượt đọc danh tính để tự điền liên kết: chưa có liên kết để xác minh nên không có cổng.
+  identity_user_grid: {
+    gate: false,
+    request: function (state, cfg) { return FbmSync.identityUserRequest(cfg); },
+    inputs: function () { return FbmSync.identityUserGridInputs(); },
+    stage: function (ctx) { return FbmSync.identityUserGridStage(ctx); },
+    end: function (state, end) { return FbmSync.identityUserGridEnd(state, end); }
+  },
   login: {
     gate: false,
+    resumable: false,
     request: function (state, cfg) { return FbmSync.loginCursorRequest(state, cfg); },
     inputs: function (state, rawResponse) { return FbmSync.loginInputs(state, rawResponse); },
     stage: function (ctx) { return FbmSync.loginStage(ctx); },
     end: function (state, end) { return FbmSync.loginEnd(state, end); }
   },
-  lookup: { gate: true, request: function (state, cfg) { return FbmSync.lookupBatchRequest(cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } },
+  lookup: {
+    gate: true,
+    request: function (state, cfg) { return FbmSync.lookupBatchRequest(cfg); },
+    stage: function (ctx) { return FbmSync.lookupStage(ctx); },
+    end: function (state) { return FbmSync.lookupEnd(state); }
+  },
   push_lookup: {
     gate: true,
     request: function (state, cfg) { return FbmSync.lookupBatchRequest(cfg); },
@@ -124,6 +148,7 @@ FbmSync.CURSOR_TABLE = {
   // Lệnh ghi FBM không bao giờ được dựng lại từ cursor: lần gửi đầu có thể đã tới FBM.
   push_wait: {
     gate: true,
+    resumable: false,
     request: function () { return null; },
     inputs: function () { return FbmSync.pushInputs(); },
     stage: function (ctx) { return FbmSync.pushStage(ctx); },
@@ -136,7 +161,14 @@ FbmSync.CURSOR_TABLE = {
     stage: function (ctx) { return FbmSync.activityScanStage(ctx); },
     end: function (state, end) { return FbmSync.activityScanEnd(state, end); }
   },
-  session_probe: { gate: false, request: function (state, cfg) { return FbmSync.sessionSystemRequest('session_probe', null, cfg); }, legacy: true, run: function (rawResponse) { return FbmSync.continueRun(rawResponse); } }
+  // Chặng phiên không có cổng: chính nó là bước xác minh.
+  session: {
+    gate: false,
+    request: function (state, cfg) { return FbmSync.sessionProbeRequest(state.cursor, cfg); },
+    inputs: function (state, rawResponse) { return FbmSync.sessionInputs(state, rawResponse); },
+    stage: function (ctx) { return FbmSync.sessionStage(ctx); },
+    end: function (state, end) { return FbmSync.sessionEnd(state, end); }
+  }
 };
 FbmSync.cursorTable = function (kind) {
   if (Object.prototype.hasOwnProperty.call(FbmSync.CURSOR_TABLE, kind)) { return FbmSync.CURSOR_TABLE[kind]; }
@@ -151,12 +183,12 @@ FbmSync.continue = function (rawResponse) {
   var state = FbmSync.stateRead(), stop = FbmSync.replyAdmit(state, FbmSync.responseRequestId(rawResponse), rawResponse);
   if (stop) { return stop; }
   var entry = FbmSync.cursorTable(String((state.cursor || {}).kind || ''));
-  // Lượt nền vừa đóng thì `backgroundTail` ghi sổ tiến trình và mở tiến trình đến hạn kế; chặng cũ tự gọi trong `continueRun`.
-  return entry.legacy ? entry.run(rawResponse) : FbmSync.backgroundTail(FbmSync.stageRun(entry, state, rawResponse));
+  // Lượt nền vừa đóng thì `backgroundTail` ghi sổ tiến trình và mở tiến trình đến hạn kế.
+  return FbmSync.backgroundTail(FbmSync.stageRun(entry, state, rawResponse));
 };
 
 /**
- * Sổ sách chung khi response của request đang chờ về tới, trước khi chặng đọc nó: bỏ request đang chờ, ghi dấu vết vận chuyển, đánh dấu cổng phiên đã nhận response, giữ cookie Extension bắt được.
+ * Sổ sách chung khi response của request đang chờ về tới, trước khi chặng đọc nó: bỏ request đang chờ, ghi dấu vết vận chuyển, bỏ dấu phát lại của đường truyền, giữ cookie Extension bắt được.
  * Sửa trên ô lượt của lát; người gọi ghi.
  */
 FbmSync.replyIntake = function (state, rawResponse) {
@@ -164,43 +196,55 @@ FbmSync.replyIntake = function (state, rawResponse) {
   state.activeRequestId = ''; state.deadlineAt = 0; state.lastProgressAt = Date.now();
   if (transportTrace) { FbmSync.traceImport(state, transportTrace, { runId: state.runId, requestId: requestId, phase: state.phase, operation: cursor.operation, entity: state.entity, recordId: state.current }); }
   FbmSync.traceEvent(state, 'fbm_response_received', { requestId: requestId, httpStatus: meta.httpStatus, responseLength: meta.responseLength });
-  FbmSync.sessionGateResponseStarted(state);
+  FbmSync.transportRetryClear(state);
   FbmSync.applyTransportSession(state, rawResponse);
   return state;
 };
 
 /**
  * Người điều phối một chặng theo hợp đồng chung: đọc đầu vào chặng cần qua cổng chủ của chúng (`inputs`), chạy chặng trên bản sao ô lượt (chặng không sửa được ô lượt thật), gộp patch rồi:
- * `next` thì phát request qua `sliceIssue`; `session.suspected` thì nhường cổng phiên probe lại; `end` thì giao kết quả cho bước kết của chặng (`end`). Chặng ném lỗi thì `runSlice` đóng lượt lỗi.
+ * `next` thì phát request qua `sliceIssue`; `session.suspected` thì mở chặng phiên (`sessionSuspectRun`); `end` thì giao kết quả cho bước kết của chặng (`end`). Chặng ném lỗi thì `runSlice` đóng lượt lỗi.
+ * Request gửi lại sau phản hồi đáng ngờ về bình thường thì gỡ dấu đã gửi lại, để lần đáng ngờ sau lại được gửi lại một lần; chặng phiên không gỡ vì chính nó đặt dấu.
  */
 FbmSync.stageRun = function (entry, state, rawResponse) {
+  var kind = String(state.cursor && state.cursor.kind || '');
   FbmSync.replyIntake(state, rawResponse);
   FbmSync.stateWrite(state);
   var inputs = entry.inputs ? entry.inputs(state, rawResponse) : {}, settings = FbmSync.scriptSettings(state), out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, settings: settings, now: Date.now() }); });
-  if (out.session && out.session.suspected) {
-    var probe = FbmSync.sessionGateProbeRequest(state, state.cursor, out.session.suspected);
-    return probe ? { ok: true, request: probe, status: FbmSync.statusView(), probing: true } : { ok: false, code: 'SESSION_PROBE_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: state.lastError };
-  }
+  if (out.session && out.session.suspected) { return FbmSync.sessionSuspectRun(state, out.session.suspected); }
+  if (kind !== 'session' && state.metadata && state.metadata.suspectReplayed === true) { FbmSync.stagePatchApply(state, { metadata: { suspectReplayed: false } }); }
   if (out.next) { return { ok: true, request: FbmSync.sliceIssue(out.next), status: FbmSync.statusView() }; }
   if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
   return entry.end(state, out.end);
 };
 /**
- * Bước phát request của lát: kênh Sidebar giữ chỗ nhận lượt; công tắc tổng tắt thì đóng lượt như lệnh Dừng; hết ngân sách lời gọi thì tạm dừng; cổng phiên chọn request thật sẽ gửi (hỏi thử, đăng nhập); rồi `requestIssue` cấp mã, hạn và bọc phong bì. Trả phong bì, chỗ giữ, hoặc `null` khi không phát.
+ * Bước phát request của lát, theo thứ tự: kênh Sidebar giữ chỗ nhận lượt (Extension nhận lượt thì phát lại từ cursor qua đúng bước này); công tắc tổng tắt thì đóng lượt như lệnh Dừng; hết ngân sách lời gọi thì tạm dừng; cổng phiên (cursor có `gate` mà phiên chưa xác minh thì mở chặng phiên, request gửi đi là request hỏi thử); rồi `requestIssue` cấp mã.
+ * Đây là chỗ duy nhất mở chặng phiên trước khi gửi, và cổng xét theo dòng bảng của cursor đang lưu, nên request nào cũng phải có cursor (cursor trống ném `CURSOR_KIND_UNKNOWN`). `sliceIssue` nhận request chặng đã dựng; `cursorIssue` dựng từ cursor đang lưu (sau khi đổi cursor: mở lượt, nối lại, đếm khách).
  */
 FbmSync.sliceIssue = function (request) {
-  if (!request) { return null; }
-  if (FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar') { return FbmSync.envelopeHold(request); }
+  return request ? FbmSync.issueThroughGate(function () { return request; }) : null;
+};
+FbmSync.cursorIssue = function () {
+  return FbmSync.issueThroughGate(FbmSync.cursorRequest);
+};
+FbmSync.issueThroughGate = function (build) {
+  var state = FbmSync.stateRead(), sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar');
+  // Cổng sẽ mở thì request gửi đi là request hỏi phiên: không dựng request nghiệp vụ (có cursor chưa đủ dữ liệu để dựng trước khi phiên được xác minh).
+  var gated = !sidebar && FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
+  var request = gated ? null : build(state);
+  if (!gated && !request) { return null; }
+  if (sidebar) { return FbmSync.envelopeHold(request); }
   if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
     FbmSync.stopPendingApply(true);
     return null;
   }
-  var state = FbmSync.stateRead();
+  // Chạm trần thì tạm dừng với cursor nghiệp vụ còn nguyên (Log và Sidebar thấy đúng chỗ dừng), không mở chặng phiên chỉ để dừng.
   if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(state); }
-  var sent;
-  try { sent = FbmSync.sessionGateGuard(state, request); }
-  catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
-  return sent ? FbmSync.requestIssue(FbmSync.stateRead(), sent, Date.now()) : null;
+  if (gated) {
+    FbmSync.stagePatchApply(state, FbmSync.sessionGateOpen(state, 'issue', 'Đang kiểm tra tab và tài khoản FBM...', false));
+    request = FbmSync.cursorRequest(state);
+  }
+  return FbmSync.requestIssue(state, request, Date.now());
 };
 /**
  * Chạy một công cụ theo hợp đồng chung trên bản sao ô lượt (công cụ không sửa được ô lượt thật) rồi gộp patch nó trả. Công cụ ném lỗi có thể kèm `logs` đã gom (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.
@@ -213,12 +257,13 @@ FbmSync.stageCall = function (state, tool) {
   return out;
 };
 /**
- * Gộp patch của chặng vào ô lượt của lát rồi đánh dấu ghi. `metadata` gộp nông vào metadata hiện có; `logs` là các dòng Log chặng muốn ghi, mang mã lượt khi dòng chưa có; trường khác thay nguyên giá trị.
+ * Gộp patch của chặng vào ô lượt của lát rồi đánh dấu ghi. `metadata` gộp nông vào metadata hiện có; `logs` là các dòng Log chặng muốn ghi, mang mã lượt khi dòng chưa có; `loginAttempt` là sổ lần thử đăng nhập mới, ghi qua cổng của nó (`loginAttemptWrite`), không vào ô lượt; trường khác thay nguyên giá trị.
  */
 FbmSync.stagePatchApply = function (state, patch) {
   var value = patch || {};
   Object.keys(value).forEach(function (key) {
     if (key === 'logs') { return; }
+    if (key === 'loginAttempt') { FbmSync.loginAttemptWrite(value.loginAttempt); return; }
     if (key === 'metadata') { state.metadata = Object.assign(state.metadata || {}, value.metadata); return; }
     state[key] = value[key];
   });
@@ -267,19 +312,19 @@ FbmSync.transportFailureRun = function (payload) {
   var state = FbmSync.stateRead(), stop = FbmSync.replyAdmit(state, requestId, null);
   if (stop) { return stop; }
   var failureCode = String(value.code || 'FBM_TRANSPORT_UNAVAILABLE'), failureMessage = String(value.message || 'Extension không gửi được request tới tab FBM.').slice(0, 240), recovered = null, plan;
-  // Lỗi khi đọc chính sách đăng nhập hay dựng lại request hỏng thuộc cổng phiên: đóng lượt an toàn, không thử tiếp.
-  try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.sessionGatePolicy()); }
-  catch (policyError) { return FbmSync.sessionGateFailClosed(state, policyError); }
+  // Lỗi khi đọc chính sách hay dựng lại request hỏng: đóng lượt an toàn, không thử tiếp.
+  try { plan = FbmSync.transportRecoverPlan(state, requestId, failureCode, FbmSync.transportPolicy()); }
+  catch (policyError) { return FbmSync.transportFailClosed(state, policyError); }
   if (plan === 'activity_windows' || plan === 'scan_restart') { return FbmSync.scanRecoverRun(state, plan, failureCode, failureMessage); }
   if (plan === 'replay_budget') { failureMessage = ('Đường truyền tới tab FBM chập chờn: lượt đã phát lại request ' + FbmSync.BUDGET.transportReplaysPerRun + ' lần, dừng để không gửi dồn. ' + failureMessage).slice(0, 240); }
   if (plan === 'reload_page' || plan === 'open_tab' || plan === 'replay') {
     try { recovered = FbmSync.transportReissue(state, requestId, failureCode, failureMessage, plan); }
-    catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
+    catch (gateError) { return FbmSync.transportFailClosed(state, gateError); }
   }
   if (recovered) { return recovered; }
   state.lastProgressAt = Date.now();
   // Ghi Log khi lượt còn mở để dòng mang nhãn lượt; đóng lượt trước thì nhãn rơi về kênh gọi.
-  FbmSync.sessionGateRecordFailure(state, failureCode, failureMessage, 'transport_failure');
+  FbmSync.transportFailureRecord(state, failureCode, failureMessage, 'transport_failure');
   if (FbmSync.runInProgress(state)) {
     FbmSync.runFail(state, failureCode, failureMessage, { cursor: {} });
   } else {

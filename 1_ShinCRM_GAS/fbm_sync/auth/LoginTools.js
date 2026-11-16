@@ -76,16 +76,17 @@ FbmSync.identityDraftFilled = function (expected) {
 
 /**
  * Quyết định khớp danh tính sau đăng nhập. `expected` là bản nháp đăng nhập thử (có thể điền dở, chỉ so ô đã điền) hoặc `null`; `bound` là kết quả `identityStatus(runtime)` người điều phối đã đọc (chỉ cần khi không có bản nháp); `page` là danh tính trên trang FBM vừa mở.
- * Trả `BOUND`, `REBIND_REQUIRED`, `PAGE_RELOAD` (trang chưa hiện mã/tên, tải lại một lần) hoặc `PAGE_MISSING` (đã tải lại vẫn thiếu).
+ * Trả `status`: `BOUND`, `REBIND_REQUIRED`, `PAGE_RELOAD` (trang chưa hiện mã/tên, tải lại một lần) hoặc `PAGE_MISSING` (đã tải lại vẫn thiếu); kèm `reasons` (trường lệch hoặc thiếu) và, khi lệch, `source` (`grid` hay `page`) để người gọi viết câu báo.
  */
 FbmSync.identityMatchDecide = function (input) {
   var v = input || {}, draft = FbmSync.identityDraftFilled(v.expected), expected = draft ? FbmSync.identityNormalize(v.expected) : null, runtime = v.runtime || {};
-  var status = draft ? (FbmSync.identityMismatches(expected, FbmSync.identityFilledFields(expected, runtime)).length ? 'REBIND_REQUIRED' : 'BOUND') : String(v.bound && v.bound.status || '');
-  if (status !== 'BOUND') { return { status: 'REBIND_REQUIRED' }; }
+  var gridReasons = draft ? FbmSync.identityMismatches(expected, FbmSync.identityFilledFields(expected, runtime)) : (v.bound && v.bound.reasons || []);
+  var status = draft ? (gridReasons.length ? 'REBIND_REQUIRED' : 'BOUND') : String(v.bound && v.bound.status || '');
+  if (status !== 'BOUND') { return { status: 'REBIND_REQUIRED', source: 'grid', reasons: gridReasons }; }
   var page = FbmSync.pageIdentityCheck(draft ? expected : v.bound.binding, v.page, v.pageReloaded === true);
-  if (page.status === 'reload') { return { status: 'PAGE_RELOAD' }; }
-  if (page.status === 'missing') { return { status: 'PAGE_MISSING' }; }
-  return { status: page.status === 'mismatch' ? 'REBIND_REQUIRED' : 'BOUND' };
+  if (page.status === 'reload') { return { status: 'PAGE_RELOAD', reasons: page.reasons }; }
+  if (page.status === 'missing') { return { status: 'PAGE_MISSING', reasons: page.reasons }; }
+  return page.status === 'mismatch' ? { status: 'REBIND_REQUIRED', source: 'page', reasons: page.reasons } : { status: 'BOUND', reasons: [] };
 };
 
 /**

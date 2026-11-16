@@ -28,40 +28,13 @@ FbmSync.pageIdentity = function (rawResponse) {
 };
 /** URL GAS ra lệnh tab FBM tải lại trước khi gửi request (`meta.reloadFbmPage`): trang khách hàng là trang mặc định sau đăng nhập và có đủ hai giá trị của `pageIdentity`. */
 FbmSync.FBM_IDENTITY_PAGE_PATH = '/Main/zccrAccount.aspx';
-/**
- * Phát lại đúng request vừa gửi của cursor hiện tại (probe User hoặc grid User sau đăng nhập), kèm lệnh tải tab về trang khách hàng.
- * Cờ `pageReloaded` trong cursor đánh dấu đã tải lại, để lần đọc sau vẫn thiếu thì `pageIdentityCheck` báo lỗi chứ không tải lại mãi.
- */
-FbmSync.pageIdentityReloadRequest = function (state, cursor) {
-  state.cursor = Object.assign({}, cursor || {}, { pageReloaded: true });
-  state.message = 'Trang FBM trên tab chưa có mã và tên người đăng nhập; đang tải lại trang khách hàng để đối chiếu.';
-  FbmSync.stateWrite(state);
-  var request = FbmSync.cursorRequest(state);
-  if (!request) { return { ok: false, code: 'SESSION_RESUME_FAILED', request: null, status: FbmSync.statusView(), error: 'Không dựng lại được request để đối chiếu trang FBM.' }; }
-  request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH });
-  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
+/** Gắn lệnh tải lại trang khách hàng vào request (Extension tải tab rồi mới gửi); trả request mới, không sửa bản truyền vào. */
+FbmSync.pageReloadAttach = function (request) {
+  return Object.assign({}, request, { meta: Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH }) });
 };
-/** Cổng tự giữ dấu hiệu cho request login do chính cổng khởi động. */
-FbmSync.sessionGateToken = function () {
+/** Mã phiên GAS cấp lúc xác minh: dấu xác minh gắn với mã này, nên phiên sau khi đăng nhập lại mang mã khác và phải xác minh lại. */
+FbmSync.sessionTokenNew = function () {
   return 'sg_' + Utilities.getUuid().replace(/[^A-Za-z0-9_-]/g, '');
-};
-FbmSync.sessionGatePolicy = function () {
-  var policy = settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy);
-  // Tự mở tab là mục con của Tự đăng nhập: mục cha tắt thì không còn hiệu lực.
-  return { autoLogin: policy.enabled && FbmSync.loginConfigRead().configured === true, autoOpenTab: policy.enabled && policy.autoOpenTab };
-};
-FbmSync.sessionGateMeta = function (state) {
-  state.metadata = state.metadata || {};
-  state.metadata.sessionGate = state.metadata.sessionGate || {};
-  return state.metadata.sessionGate;
-};
-/** Nhóm request hệ thống chỉ cổng phiên được quyền dựng và phát. */
-FbmSync.SESSION_SYSTEM_KINDS = ['login_step', 'authorize', 'identity_user_grid', 'session_probe', 'heartbeat'];
-/** Request hệ thống được đi khi phiên chưa xác minh: chính các bước xác minh. Giữ phiên đọc dữ liệu khách (request đếm mang điều kiện quyền) nên không thuộc nhóm này. */
-FbmSync.SESSION_PROBE_EXEMPT_KINDS = ['login_step', 'identity_user_grid', 'session_probe'];
-FbmSync.isSessionSystemRequest = function (request) {
-  var kind = String(request && request.meta && request.meta.kind || '');
-  return FbmSync.SESSION_SYSTEM_KINDS.indexOf(kind) >= 0;
 };
 FbmSync.sessionIdentityIsVerified = function (state) {
   var session = state && state.session || {};
@@ -81,7 +54,7 @@ FbmSync.sessionIdentityVerify = function (state, identity) {
   FbmSync.sessionIdentityRecord(state, identity);
   var session = state.session;
   session.expired = false;
-  if (!String(session.sessionId || '')) { session.sessionId = FbmSync.sessionGateToken(); }
+  if (!String(session.sessionId || '')) { session.sessionId = FbmSync.sessionTokenNew(); }
   session.identityVerified = true;
   session.identitySessionId = String(session.sessionId);
   session.identityVerifiedAt = Date.now();
@@ -104,44 +77,23 @@ FbmSync.sessionIdentityClear = function (state) {
   if (state) { state.session = session; }
   return state;
 };
-/** Request hệ thống của cổng phiên. `cfg` là `scriptSettings(state)` của ô lượt bên gọi. Request các bước đăng nhập do lượt đăng nhập dựng (`loginStepRequest`). */
-FbmSync.sessionSystemRequest = function (kind, value, cfg) {
-  var request, options = value && typeof value === 'object' ? value : {};
-  if (kind === 'authorize') { request = FbmSync.authorizeRequest(value && value.entity || value || 'customer', cfg); }
-  else if (kind === 'session_probe') { request = FbmSync.identityUserRequest(cfg); request.meta.kind = 'session_probe'; }
-  else if (kind === 'identity_user_grid') { request = FbmSync.identityUserRequest(cfg); }
-  else { return null; }
-  request.meta = Object.assign({}, request.meta || {}, { systemRequest: true });
-  if (options.requireIdentityProbe === true) { request.meta.requireIdentityProbe = true; }
-  return request;
-};
-FbmSync.sessionSystemEnvelope = function (kind, value, cfg) {
-  var request = FbmSync.sessionSystemRequest(kind, value, cfg);
-  return request ? FbmSync.nextEnvelope(request) : null;
-};
-/** Ô lượt đang là lượt đăng nhập: request của nó (bước trang Login, authorize, grid User) đi qua cổng mà không bị đổi thành hỏi thử hay mở đăng nhập lồng. Chỉ người mở lượt đăng nhập đặt được ô lượt này. */
-FbmSync.sessionGateCursorIsInternal = function (state) {
-  return String(state && state.cursor && state.cursor.kind || '') === 'login';
-};
-FbmSync.sessionGateRequestCode = function (request, state) {
-  if (!request && state && state.lastFailureCode) { return String(state.lastFailureCode); }
-  return FbmSync.sessionGateOwnsRequest(request, state) ? 'AUTO_' + 'LOGIN_REQUEST_READY' : 'HEARTBEAT_REQUEST_READY';
-};
-FbmSync.sessionGateOwnsRequest = function (request, state) {
-  return String(request && request.meta && request.meta.kind || '') === 'login_step' && FbmSync.sessionGateCursorIsInternal(state);
+/** Chính sách cứu đường truyền đọc từ cài đặt: tự mở tab là mục con của Tự đăng nhập, mục cha tắt thì không còn hiệu lực. */
+FbmSync.transportPolicy = function () {
+  var policy = settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy);
+  return { autoOpenTab: policy.enabled === true && policy.autoOpenTab === true };
 };
 /**
- * Mọi sự kiện cổng phiên, kể cả sự kiện không kết thúc phiên (hết hạn đang đăng nhập lại, thử lại tìm tab), đều có một dòng Log riêng (FBM-029).
+ * Mọi sự kiện đường truyền, kể cả sự kiện không kết thúc lượt (thử lại tìm tab, gửi lại request đọc), đều có một dòng Log riêng (FBM-029).
  * Ghi state lỗi thì ném lên lát để `runSlice` chuyển phiên sang lỗi; nuốt ở đây thì Sidebar thấy state cũ còn Log không có gì.
  */
-FbmSync.sessionGateRecordFailure = function (state, code, message, action, cause, facts) {
-  var current = state || FbmSync.stateRead(), reason = String(message || 'Cổng phát request FBM đã dừng vì lỗi.').slice(0, 240), detail;
+FbmSync.transportFailureRecord = function (state, code, message, action, cause, facts) {
+  var current = state || FbmSync.stateRead(), reason = String(message || 'Đường truyền tới FBM đã dừng vì lỗi.').slice(0, 240), detail;
   current.lastFailureCode = String(code || 'FBM_SESSION_GATE_FAILED');
   current.lastError = reason;
   current.message = reason;
   FbmSync.stateWrite(current);
   detail = { code: current.lastFailureCode, phase: String(current.phase || ''), runId: String(current.runId || '') };
-  // Chỉ ghi mã/loại lỗi gốc, không ghi message: exception trong cổng có thể mang nội dung cấu hình đăng nhập.
+  // Chỉ ghi mã/loại lỗi gốc, không ghi message: exception có thể mang nội dung cấu hình đăng nhập.
   if (cause) { detail.causeCode = String(cause.code || cause.name || 'Error'); }
   // `facts` chỉ nhận dấu hiệu đã lọc sẵn (mã, độ dài, tên khóa), không nhận giá trị response.
   if (facts) { detail.response = facts; }
@@ -149,177 +101,25 @@ FbmSync.sessionGateRecordFailure = function (state, code, message, action, cause
   if (typeof flushLog === 'function') { flushLog(); }
   return current;
 };
-/** Lỗi nội bộ của cổng phải dừng trước khi cấp envelope; mã lỗi gốc đi vào Log để còn điều tra. */
-FbmSync.sessionGateFailClosed = function (state, cause) {
+/** Lỗi nội bộ khi đọc chính sách hay dựng lại request phải dừng trước khi cấp envelope; mã lỗi gốc đi vào Log để còn điều tra. */
+FbmSync.transportFailClosed = function (state, cause) {
   var current = state || {};
   current.activeRequestId = '';
   current.deadlineAt = 0;
   current.phase = 'error';
   current.retryable = false;
   current.cursor = {};
-  FbmSync.sessionGateRecordFailure(current, 'FBM_SESSION_GATE_EXCEPTION', 'Cổng phiên FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'session_gate_exception', cause);
+  FbmSync.transportFailureRecord(current, 'FBM_SESSION_GATE_EXCEPTION', 'Bước phát request FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'transport_exception', cause);
   return null;
-};
-/** Tự đăng nhập bị chặn hoặc bị FBM từ chối: ghi Log trước để dòng mang nhãn lượt, rồi đóng lượt lỗi qua `runFail` (không "Tạm dừng"); ngoài lượt thì không để phase đang chạy treo. */
-FbmSync.sessionGateBlock = function (current, code, message, opts) {
-  var opt = opts || {};
-  current.retryable = false;
-  FbmSync.sessionGateRecordFailure(current, code, message, opt.action || 'session_gate_blocked', null, opt.facts);
-  if (FbmSync.runInProgress(current)) { FbmSync.runFail(current, code, current.message, opt.cursor ? { cursor: opt.cursor } : null); }
-  else if (FbmSync.ACTIVE_PHASES.indexOf(String(current.phase)) >= 0) { current.phase = 'error'; current.activeRequestId = ''; current.cursor = opt.cursor || current.cursor; }
-  return FbmSync.stateWrite(current);
-};
-/** Khởi động owner login từ cổng; flow không cần biết cách đăng nhập. */
-FbmSync.sessionGateStart = function (state, failedCursor) {
-  var current = state || FbmSync.stateRead(), policy = FbmSync.sessionGatePolicy(), cursor = failedCursor || current.cursor || {}, allowed, request, gate;
-  if (cursor.kind === 'login' && current.activeRequestId) {
-    current.phase = 'waiting_session';
-    current.retryable = true;
-    current.lastFailureCode = 'AUTO_LOGIN_IN_PROGRESS';
-    current.message = 'Đang chờ tiến trình xác thực FBM hiện tại; chưa gửi request song song.';
-    FbmSync.stateWrite(current);
-    return null;
-  }
-  if (cursor.kind === 'push_wait') {
-    FbmSync.sessionGateBlock(current, 'SESSION_EXPIRED_AT_WRITE', 'Phiên FBM hết hạn trong lúc chờ ghi; đã chặn gửi lại để tránh ghi trùng.');
-    return null;
-  }
-  if (typeof FbmSync.beginAutoLogin !== 'function') { return null; }
-  if (!policy.autoLogin) {
-    var canAttempt = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt() : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
-    var code = String(canAttempt.code || 'AUTO_LOGIN_NOT_CONFIGURED');
-    FbmSync.sessionGateBlock(current, code, FbmSync.autoLoginBlockMessage(code, canAttempt));
-    return null;
-  }
-  allowed = FbmSync.beginAutoLogin(current, cursor, { heartbeat: cursor.kind === 'heartbeat' });
-  if (!allowed) {
-    var blocked = typeof FbmSync.autoLoginCanAttempt === 'function' ? FbmSync.autoLoginCanAttempt(null, FbmSync.autoLoginAttemptOptions(current, cursor)) : { code: 'AUTO_LOGIN_NOT_CONFIGURED' };
-    FbmSync.sessionGateBlock(current, blocked.code || 'AUTO_LOGIN_NOT_CONFIGURED', FbmSync.autoLoginBlockMessage(blocked.code, blocked));
-    return null;
-  }
-  gate = FbmSync.sessionGateMeta(current);
-  gate.loginStartedAt = Date.now();
-  FbmSync.stateWrite(current);
-  return allowed;
-};
-/** Phản ứng tập trung khi response xác nhận phiên đã hết hạn. */
-FbmSync.sessionGateHandleFailure = function (state, cursor, failure) {
-  var value = failure || {};
-  if (String(value.code || '') !== 'SESSION_EXPIRED' || (cursor && cursor.kind === 'push_wait')) { return null; }
-  if (typeof FbmSync.beginAutoLogin !== 'function') { return null; }
-  state.session = state.session || {};
-  FbmSync.sessionIdentityClear(state);
-  state.session.customerAuthorized = '';
-  state.session.activityAuthorized = '';
-  FbmSync.stateWrite(state);
-  if (typeof FbmSync.sessionGateRecordFailure === 'function') {
-    FbmSync.sessionGateRecordFailure(state, 'SESSION_EXPIRED', 'Phiên FBM đã hết hạn; cổng đang xử lý đăng nhập lại an toàn.', 'session_expired');
-  }
-  var request, envelope;
-  try { request = FbmSync.sessionGateStart(state, cursor); } catch (gateError) { return FbmSync.sessionGateFailClosed(state, gateError); }
-  if (!request) { return { ok: false, code: String(state.lastFailureCode || 'SESSION_EXPIRED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
-  try { envelope = FbmSync.nextEnvelope(request); } catch (envelopeError) { return FbmSync.sessionGateFailClosed(state, envelopeError); }
-  if (!envelope) { return { ok: false, code: String(state.lastFailureCode || 'FBM_SESSION_GATE_FAILED'), request: null, status: FbmSync.statusView(), error: state.lastError }; }
-  return { ok: true, request: envelope, status: FbmSync.statusView() };
-};
-/**
- * Chuyển state sang bước probe phiên và ghi lại chỗ quay về: cursor, phase và entity luôn đi cùng nhau.
- * Thiếu phase thì sau probe hay đăng nhập, việc không thuộc lượt nào (Giữ phiên) bị trả về `checking_session` — một phase đang chạy — và lượt treo không request nào chờ.
- */
-FbmSync.sessionGateEnterProbe = function (current, resumeCursor, message) {
-  var gate = FbmSync.sessionGateMeta(current);
-  gate.resumeCursor = Object.assign({}, resumeCursor || {});
-  gate.resumePhase = String(current.phase || 'checking_session');
-  gate.resumeEntity = String(current.entity || '');
-  current.cursor = { kind: 'session_probe' };
-  current.phase = 'checking_session';
-  current.entity = '';
-  current.message = String(message);
-  return gate;
-};
-/** Tạo probe hệ thống sau một response nghiệp vụ đáng ngờ; không retry nghiệp vụ. */
-FbmSync.sessionGateProbeRequest = function (state, failedCursor, reason) {
-  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateEnterProbe(current, failedCursor, reason || 'Đang probe lại phiên FBM để xác minh phản hồi đáng ngờ.');
-  gate.probeOnly = true;
-  gate.probeRetryCount = 0;
-  FbmSync.stateWrite(current);
-  return FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe', null, FbmSync.scriptSettings(current)));
-};
-/** Ép probe ở đầu một lượt/lát mới rồi mới trả lại cursor nghiệp vụ. */
-FbmSync.sessionGateResumeProbeRequest = function (state, resumeCursor, reason) {
-  var current = state || FbmSync.stateRead();
-  FbmSync.sessionGateEnterProbe(current, resumeCursor || current.cursor, reason || 'Đang kiểm tra lại phiên FBM trước khi tiếp tục lát mới...');
-  current.activeRequestId = '';
-  current.deadlineAt = 0;
-  FbmSync.stateWrite(current);
-  return FbmSync.sessionSystemEnvelope('session_probe', null, FbmSync.scriptSettings(current));
-};
-/**
- * Mở request đầu của cursor đã lưu (Giữ phiên). Request đọc khách mang mã người dùng của phiên đã xác minh nên không dựng được trước khi xác minh:
- * phiên chưa xác minh thì mở bằng probe, nhánh probe dựng lại request từ cursor sau khi xác minh.
- */
-FbmSync.cursorStartEnvelope = function (state) {
-  var current = state || FbmSync.stateRead();
-  if (FbmSync.sessionIdentityIsVerified(current)) { return FbmSync.nextEnvelope(FbmSync.cursorRequest(current)); }
-  return FbmSync.sessionGateResumeProbeRequest(current, current.cursor, 'Đang kiểm tra tab và tài khoản FBM...');
-};
-/**
- * Dấu "phiên hết hạn" và cờ cổng phiên còn lại từ lượt đã kết thúc: người dùng có thể đã tự đăng nhập trên tab FBM từ đó (09/06 không đăng nhập lại khi phiên còn hợp lệ).
- * Không tốn request hỏi riêng: bỏ dấu và cờ cổng của lượt cũ, request việc thật của lượt mới tự nhận diện phiên; phiên chết thì cổng đăng nhập theo chu kỳ chờ như mọi response khác.
- * Cờ "đã thử đăng nhập" chỉ chặn lặp đăng nhập trong một lượt; để sót sang lần hỏi sau thì phiên chết lần nữa bị dừng nhầm thay vì đăng nhập lại. Giãn cách giữa các lần đăng nhập do chu kỳ thử lại giữ, không do cờ này.
- * Chỉ sửa state trong bộ nhớ; nơi gọi tự ghi.
- */
-FbmSync.sessionGateForgetStale = function (state) {
-  if (!state) { return; }
-  var gate = FbmSync.sessionGateMeta(state);
-  if (state.session) { state.session.expired = false; }
-  gate.probeOnly = false; gate.loginAttempted = false; gate.probeRetryCount = 0;
-};
-/**
- * Xử lý probe không đạt; chỉ probe được phép khởi động auto-login, tối đa một lần.
- * Probe sau request nghiệp vụ đáng ngờ mà FBM trả lời rõ "chưa xác thực" là phiên đã chết thật (người dùng đăng nhập nơi khác): đi cổng đăng nhập theo chu kỳ chờ như probe đầu lượt, không dừng lỗi chờ lượt sau.
- */
-FbmSync.sessionGateHandleProbeFailure = function (state, cursor, response) {
-  var current = state || FbmSync.stateRead(), gate = FbmSync.sessionGateMeta(current), suspicious = FbmSync.protocol.isSessionSuspicious(response);
-  if (gate.probeOnly === true && FbmSync.protocol.isUnauthenticatedResponse(response)) { gate.probeOnly = false; }
-  if (suspicious && Number(gate.probeRetryCount || 0) < 1) {
-    gate.probeRetryCount = 1;
-    current.message = 'Phản hồi FBM đáng ngờ; đang probe lại phiên đúng một lần.';
-    current.lastFailureCode = 'SESSION_PROBE_RETRY';
-    FbmSync.stateWrite(current);
-    return { ok: true, request: FbmSync.nextEnvelope(FbmSync.sessionSystemRequest('session_probe', null, FbmSync.scriptSettings(current))), status: FbmSync.statusView() };
-  }
-  if (gate.probeOnly === true || gate.loginAttempted === true) {
-    var code = gate.probeOnly === true ? 'SESSION_PROBE_UNCERTAIN' : 'SESSION_PROBE_FAILED_AFTER_LOGIN';
-    var message = gate.probeOnly === true
-      ? 'Không xác minh được phiên FBM sau request đáng ngờ; request nghiệp vụ đã bị dừng.'
-      : 'Đăng nhập FBM đã hoàn tất nhưng probe phiên không đạt; đã dừng để tránh lặp đăng nhập.';
-    FbmSync.sessionGateRecordFailure(current, code, message, 'session_probe_failure');
-    current.phase = 'error'; current.cursor = {}; current.activeRequestId = ''; current.deadlineAt = 0; current.retryable = false; current.lastFailureCode = code; current.lastError = message; current.message = message;
-    FbmSync.stateWrite(current);
-    return { ok: false, code: code, request: null, status: FbmSync.statusView(), error: message };
-  }
-  if (gate.resumeCursor && gate.resumeCursor.kind === 'push_wait') {
-    FbmSync.sessionGateRecordFailure(current, 'SESSION_EXPIRED_AT_WRITE', 'Phiên FBM không được xác minh trong lúc chờ ghi; đã chặn để tránh ghi trùng.', 'session_expired_at_write');
-    current.phase = 'paused'; current.cursor = gate.resumeCursor; current.activeRequestId = ''; current.deadlineAt = 0; current.retryable = false;
-    current.lastFailureCode = 'SESSION_EXPIRED_AT_WRITE'; current.lastError = 'Phiên FBM không được xác minh trong lúc chờ ghi; đã chặn để tránh ghi trùng.'; current.message = current.lastError;
-    FbmSync.stateWrite(current);
-    return { ok: false, code: 'SESSION_EXPIRED_AT_WRITE', request: null, status: FbmSync.statusView(), error: current.lastError };
-  }
-  FbmSync.sessionIdentityClear(current);
-  var request = FbmSync.sessionGateStart(current, cursor), envelope;
-  if (!request) { return { ok: false, code: String(current.lastFailureCode || 'SESSION_PROBE_FAILED'), request: null, status: FbmSync.statusView(), error: current.lastError }; }
-  envelope = FbmSync.nextEnvelope(request);
-  return envelope ? { ok: true, request: envelope, status: FbmSync.statusView() } : { ok: false, code: 'AUTO_LOGIN_REQUEST_UNAVAILABLE', request: null, status: FbmSync.statusView(), error: current.lastError };
 };
 /**
  * Bảng lỗi đường truyền: nơi duy nhất quyết GAS làm gì khi Extension không gửi được request (không đọc kho, không ghi; chính sách tự mở tab được truyền vào).
- * Mỗi request được phát lại tối đa một lần (`noTabRetryRequestId`), cả lượt tối đa `BUDGET.transportReplaysPerRun` lần; chạm trần thì `replay_budget` (dừng, báo đường truyền chập chờn). `replay`: request đọc thuần mất giữa đường thì gửi lại.
+ * Mỗi request được phát lại tối đa một lần (`metadata.transportRetryId`), cả lượt tối đa `BUDGET.transportReplaysPerRun` lần; chạm trần thì `replay_budget` (dừng, báo đường truyền chập chờn). `replay`: request đọc thuần mất giữa đường thì gửi lại.
  * `activity_windows`: quét giao dịch quá sức thì chia cửa sổ ngày. `scan_restart`: tab mất việc quét thì chạy lại việc. `reload_page`: tab không sẵn sàng thì phát lại kèm lệnh đổi trang (Extension không tự tải lại). `open_tab`: không có tab và chính sách cho mở. `stop`: còn lại, kể cả lần phát lại của chính request vừa cứu tab.
  */
 FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
-  var value = String(code || ''), cursor = state && state.cursor || {}, gate = state && state.metadata && state.metadata.sessionGate || {};
-  var reissued = String(gate.noTabRetryRequestId || '') === String(requestId || '');
+  var value = String(code || ''), cursor = state && state.cursor || {};
+  var reissued = String(state && state.metadata && state.metadata.transportRetryId || '') === String(requestId || '');
   if (FbmSync.ACTIVITY_WINDOW_CODES.indexOf(value) >= 0 && cursor.kind === 'scan_job' && cursor.entity === 'activity' && !(Number(cursor.chunkCount || 0) > 0)) { return 'activity_windows'; }
   if (value === 'FBM_SCAN_JOB_GONE' && FbmSync.isScanCursor(cursor)) { return 'scan_restart'; }
   var plan = 'stop';
@@ -332,29 +132,28 @@ FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
 };
 /** Phát lại đúng request vừa hỏng một lần theo kế hoạch `reload_page`, `open_tab` hoặc `replay` của `transportRecoverPlan`; ghi dấu request phát lại để lần hỏng kế là `stop` và đếm vào trần gửi lại của lượt. */
 FbmSync.transportReissue = function (state, requestId, code, message, plan) {
-  var reload = plan === 'reload_page', replay = plan === 'replay', gate = FbmSync.sessionGateMeta(state), request, envelope;
+  var reload = plan === 'reload_page', replay = plan === 'replay', request, envelope;
   state.activeRequestId = '';
   state.deadlineAt = 0;
-  gate.noTabRetryRequestId = String(requestId || '');
+  state.metadata.transportRetryId = String(requestId || '');
   state.metadata.transportReplays = Number(state.metadata.transportReplays || 0) + 1;
   state.message = replay ? 'Đường truyền tới tab FBM đứt giữa chừng; GAS gửi lại request đọc một lần.' : reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
   FbmSync.stateWrite(state);
   request = FbmSync.cursorRequest(state);
   if (!request) { return null; }
-  if (reload) { request.meta = Object.assign({}, request.meta || {}, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
-  envelope = FbmSync.nextEnvelope(request);
+  if (reload) { request = FbmSync.pageReloadAttach(request); }
+  envelope = FbmSync.sliceIssue(request);
   if (!envelope) { return null; }
   state = FbmSync.stateRead();
-  gate = FbmSync.sessionGateMeta(state);
-  gate.noTabRetryRequestId = String(envelope.id || '');
+  state.metadata.transportRetryId = String(envelope.id || '');
   state.message = replay ? 'Đang gửi lại request đọc sau khi đường truyền tới tab FBM đứt.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
-  FbmSync.sessionGateRecordFailure(state, String(code || ''), (replay ? 'Gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
+  FbmSync.transportFailureRecord(state, String(code || ''), (replay ? 'Gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
   return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
-FbmSync.sessionGateResponseStarted = function (state) {
-  var gate = state && state.metadata && state.metadata.sessionGate;
-  if (gate && gate.noTabRetryRequestId) { gate.noTabRetryRequestId = ''; }
+/** Response của request vừa phát lại đã về: bỏ dấu phát lại để lần hỏng sau của request khác lại được cứu một lần. */
+FbmSync.transportRetryClear = function (state) {
+  if (state && state.metadata && state.metadata.transportRetryId) { state.metadata.transportRetryId = ''; }
   return state;
 };
 FbmSync.pauseForRuntimeLimit = function (state) {
@@ -371,41 +170,13 @@ FbmSync.pauseForRuntimeLimit = function (state) {
   return null;
 };
 /**
- * Kênh của lời gọi đang chạy, do cửa lệnh đặt: `relay` (Extension) hoặc `sidebar`. Phong bì chỉ rời GAS qua relay; trên kênh Sidebar `nextEnvelope` giữ chỗ nhận lượt thay vì phát, Extension đến nhận bằng `continue{runId}`.
+ * Kênh của lời gọi đang chạy, do cửa lệnh đặt: `relay` (Extension) hoặc `sidebar`. Phong bì chỉ rời GAS qua relay; trên kênh Sidebar bước phát request (`issueThroughGate`) giữ chỗ nhận lượt thay vì phát, Extension đến nhận bằng `continue{runId}`.
  * Lời gọi không qua cửa lệnh (test nội bộ) không có kênh và phát thẳng như relay. `logs` gom dòng Log thường của công cụ, cửa lệnh ghi ở cuối lời gọi.
  */
 FbmSync.issueContext = null;
-/** Tên cũ của bước phát request của lát; chặng cũ còn gọi tên này tới khi chuyển sang hợp đồng chặng. */
-FbmSync.nextEnvelope = function (request) { return FbmSync.sliceIssue(request); };
-/**
- * Phần cổng phiên của bước phát request: request đăng nhập thử nhận thẻ của cổng; request nghiệp vụ khi danh tính phiên chưa xác minh thì đổi thành hỏi thử; phiên đã hết hạn thì cổng mở đăng nhập. Trả request thật sẽ gửi, hoặc `null` khi cổng đã đóng lượt.
- */
-FbmSync.sessionGateGuard = function (pendingState, request) {
-  var internalLogin = FbmSync.sessionGateOwnsRequest(request, pendingState);
-  // Mọi request nghiệp vụ và authorize đầu lượt phải qua probe User.
-  // Probe là request hệ thống nên không quay lại nhánh này.
-  var gateCursorKinds = ['customer_count', 'customer_grid', 'activity_grid','lookup', 'push_lookup', 'push_scan', 'push_wait'];
-  var requestKind = String(request.meta && request.meta.kind || ''), cursorNeedsGate = gateCursorKinds.indexOf(String(pendingState.cursor && pendingState.cursor.kind || '')) >= 0 && String(pendingState.cursor && pendingState.cursor.kind || '') !== 'push_wait';
-  // Mọi request không thuộc nhóm hệ thống đều phải qua cổng; không cho
-  // caller né cổng bằng cách đặt một tên meta.kind lạ.
-  var requestNeedsGate = FbmSync.SESSION_PROBE_EXEMPT_KINDS.indexOf(requestKind) < 0 || cursorNeedsGate;
-  var loginFlowOwnsSystemRequest = FbmSync.sessionGateCursorIsInternal(pendingState);
-  if (requestKind !== 'session_probe' && !internalLogin && !loginFlowOwnsSystemRequest && !FbmSync.sessionIdentityIsVerified(pendingState) && requestNeedsGate) {
-    var originalCursor = Object.assign({}, pendingState.cursor || {});
-    if (originalCursor.kind !== 'session_probe') {
-      FbmSync.sessionGateEnterProbe(pendingState, originalCursor, 'Đang kiểm tra tab và tài khoản FBM...');
-      FbmSync.stateWrite(pendingState);
-      request = FbmSync.sessionSystemRequest('session_probe', null, FbmSync.scriptSettings(pendingState));
-    }
-  }
-  if (pendingState.session && pendingState.session.expired === true && !internalLogin && (!FbmSync.isSessionSystemRequest(request) || String(request.meta && request.meta.kind || '') === 'heartbeat')) {
-    return FbmSync.sessionGateStart(pendingState, pendingState.cursor || {});
-  }
-  return request;
-};
 /**
  * Bước phát request của lát, sau khi cổng phiên đã chọn request thật sẽ gửi: kiểm miền FBM của từng request, cấp `requestId`, đặt hạn chờ, ghi request đang chờ vào ô lượt và bọc phong bì cho Extension.
- * Không quyết gửi hay không: công tắc tổng, ngân sách và cổng phiên do `nextEnvelope` xét trước.
+ * Không quyết gửi hay không: cổng phiên, công tắc tổng và ngân sách do `issueThroughGate` xét trước.
  */
 FbmSync.requestIssue = function (state, request, now) {
   (request.items || [request]).forEach(function (item) {
@@ -432,14 +203,14 @@ FbmSync.requestIssue = function (state, request, now) {
   var requestGap = String(meta.kind || '') !== 'scan_chunk' && state.requestGap && Number(state.requestGap.maxMs) > 0 ? { minMs: Number(state.requestGap.minMs || 0), maxMs: Number(state.requestGap.maxMs) } : null;
   if (requestGap) { meta.requestGap = requestGap; }
   try {
-    var sessionPolicy = FbmSync.sessionGatePolicy();
+    var sessionPolicy = FbmSync.transportPolicy();
     if (sessionPolicy.autoOpenTab) {
       meta.openFbmContext = { url: FbmSync.FBM_BASE_URL + '/Main/zccrAccount.aspx', active: false };
     } else {
       delete meta.openFbmContext;
     }
   } catch (gateError) {
-    return FbmSync.sessionGateFailClosed(state, gateError);
+    return FbmSync.transportFailClosed(state, gateError);
   }
   meta.timeoutMs = FbmSync.budgetTimeoutMs(request, requestGap);
   meta.fetchMs = FbmSync.budgetFetchMs(meta);
@@ -511,7 +282,7 @@ FbmSync.envelopeReissue = function (state, answeredId) {
   state.activeRequestId = '';
   state.deadlineAt = 0;
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.nextEnvelope(request), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() };
 };
 /** Nộp lặp: lượt còn request đang chờ thì phát lại nó, lượt đã đóng thì trả status để Extension kết thúc chuỗi. Không chạy lại nghiệp vụ của lần nộp đầu. */
 FbmSync.envelopeResubmit = function (state) {

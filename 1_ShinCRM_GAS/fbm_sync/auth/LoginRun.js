@@ -14,6 +14,7 @@ FbmSync.LOGIN_DEFAULT_CHOICES = { database: 'FHN_CRM_App', unit: 'CTY' };
 FbmSync.loginInputs = function (state, rawResponse) {
   var cursor = state.cursor || {}, input = { credential: FbmSync.loginCredential(cursor) };
   if (cursor.step === 'identity') {
+    input.attempt = FbmSync.loginAttemptRead();
     var identity = FbmSync.identityUser(rawResponse);
     input.identity = identity;
     if (identity.ok) {
@@ -97,7 +98,11 @@ FbmSync.loginStage = function (ctx) {
     if (match.status === 'PAGE_RELOAD') { return go('identity', 'Trang FBM trên tab chưa có mã và tên người đăng nhập; đang tải lại trang khách hàng để đối chiếu.', { pageReloaded: true }); }
     if (match.status === 'PAGE_MISSING') { return stop({ code: 'FBM_PAGE_IDENTITY_MISSING', message: 'Đăng nhập xong nhưng đã tải lại trang FBM vẫn không thấy mã và tên người đăng nhập trên trang; không xác minh được tài khoản.', action: 'login_identity_page_missing' }); }
     if (match.status !== 'BOUND') { return stop({ code: 'LOGIN_IDENTITY_MISMATCH', mismatch: true, runtime: ctx.inputs.runtime, action: 'login_identity_mismatch' }); }
-    return stop({ ok: true, identity: identity, runtime: ctx.inputs.runtime });
+    // Đăng nhập xong đúng tài khoản: phiên đã xác minh, và gỡ khóa lần thử nếu đang khóa (chỉ ghi khi đang khóa).
+    var verified = stop({ ok: true, identity: identity, runtime: ctx.inputs.runtime });
+    verified.patch.session = FbmSync.sessionIdentityVerify(state, identity).session;
+    if (FbmSync.loginAttemptLocked(ctx.inputs.attempt)) { verified.patch.loginAttempt = FbmSync.loginAttemptMark(ctx.inputs.attempt, { kind: 'success' }, ctx.now, 0); }
+    return verified;
   }
   var unknown = new Error('Bước đăng nhập lạ trong ô lượt: ' + step); unknown.code = 'LOGIN_STEP_UNKNOWN'; throw unknown;
 };
@@ -123,7 +128,7 @@ FbmSync.loginEnd = function (state, end) {
   var failure = end.mismatch ? 'Tài khoản FBM vừa đăng nhập không khớp liên kết đã xác nhận.' : reply ? (end.reason === 'transport' && end.bug && (end.bug.Message || end.bug.message) || reply.text) : String(end.message || '');
   var saved = FbmSync.credentialRead(), storedCredential = !cursor.draft || (saved.configured && String(saved.credentialRef) === String(cursor.draft.credentialRef || ''));
   var halt = !!(reply && reply.halt);
-  if (storedCredential && (halt || auto)) { FbmSync.autoLoginMarkFailure(failure, halt); }
+  if (storedCredential && (halt || auto)) { FbmSync.stagePatchApply(state, { loginAttempt: FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'failure', message: failure, halt: halt }, Date.now(), retryMinutes) }); }
   if (end.mismatch && auto) { FbmSync.autoLoginTurnOff(); }
   state.loginForceOffered = end.reason === 'oldSession' && cursor.purpose !== 'force';
   var message = end.mismatch
@@ -131,14 +136,15 @@ FbmSync.loginEnd = function (state, end) {
     : FbmSync.loginFailMessage(cursor, failure, reply, retryMinutes);
   var code = end.code || (auto ? 'AUTO_LOGIN_FAILED' : 'LOGIN_FAILED');
   FbmSync.sessionIdentityClear(state);
-  FbmSync.sessionGateBlock(state, code, message, { action: end.action || 'login_failure', facts: end.facts, cursor: {} });
+  FbmSync.stagePatchApply(state, { logs: [{ action: end.action || 'login_failure', outcome: LOG_ERROR, reason: message.slice(0, 240), detail: { code: code, phase: String(state.phase || ''), response: end.facts } }] });
+  FbmSync.runFail(state, code, message, { cursor: {} });
+  FbmSync.stateWrite(state);
   var result = { ok: false, code: code, request: null, status: FbmSync.statusView(), error: message, message: message };
   if (end.runtime) { result.identity = end.runtime; }
   return result;
 };
 
 FbmSync.loginSucceed = function (state, cursor, end) {
-  FbmSync.sessionVerifiedApply(state, end.identity);
   state.lastFailureCode = ''; state.lastError = ''; state.retryable = false;
   if (cursor.purpose !== 'auto') {
     var force = cursor.purpose === 'force';
@@ -148,15 +154,16 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, status: FbmSync.statusView(), message: state.message };
   }
   FbmSync.businessStepFinish(state, 'auto_login', 'ok', {});
-  FbmSync.stateWrite(state);
-  var resumed = FbmSync.loginResumeRequest(state);
-  if (!resumed) {
-    FbmSync.runFail(state, 'AUTO_LOGIN_RESUME_FAILED', 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.');
+  var back = cursor.afterLogin || {};
+  if (!back.cursor || !back.cursor.kind) {
+    var lost = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.';
+    FbmSync.stagePatchApply(state, { logs: [{ action: 'login_resume_failure', outcome: LOG_ERROR, reason: lost, detail: { code: 'AUTO_LOGIN_RESUME_FAILED', cursor: String(back.cursor && back.cursor.kind || '') } }] });
+    FbmSync.runFail(state, 'AUTO_LOGIN_RESUME_FAILED', lost, { cursor: {} });
     FbmSync.stateWrite(state);
-    FbmSync.sessionGateRecordFailure(state, state.lastFailureCode, state.message, 'login_resume_failure');
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
-  return { ok: true, code: cursor.resumeHeartbeat ? 'AUTO_LOGIN_OK' : '', request: resumed, status: FbmSync.statusView() };
+  FbmSync.stagePatchApply(state, { cursor: back.cursor, phase: back.phase || 'checking_session', entity: back.entity || '', message: 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...' });
+  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
 };
 
 /**
@@ -167,8 +174,7 @@ FbmSync.loginStepRequest = function (cursor, credential, cfg) {
   if (step === 'authorize') { return FbmSync.authorizeRequest('customer', cfg); }
   if (step === 'identity') {
     var request = FbmSync.identityUserRequest(cfg);
-    if (cursor.pageReloaded === true) { request.meta = Object.assign({}, request.meta, { reloadFbmPage: FbmSync.FBM_BASE_URL + FbmSync.FBM_IDENTITY_PAGE_PATH }); }
-    return request;
+    return cursor.pageReloaded === true ? FbmSync.pageReloadAttach(request) : request;
   }
   return FbmSync.loginRequestPlan(step, cursor.facts || {}, credential, { force: cursor.purpose === 'force' });
 };

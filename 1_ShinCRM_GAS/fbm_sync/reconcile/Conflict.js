@@ -68,7 +68,7 @@ FbmSync.runConflictOpenCommand = function () {
   state.cursor = { kind: 'conflict_refresh', entity: item.entity, id: item.id, fbmId: String(item.fbmId || '') };
   state.message = 'Đang đọc FBM để mở xung đột ' + item.id + '...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.nextEnvelope(request), remaining: queue.length, status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(request), remaining: queue.length, status: FbmSync.statusView() };
 };
 
 /** Bước kết của chặng `conflict_refresh` trong bảng cursor: trả DTO cho Sidebar, hoặc làm việc ghi chặng đã quyết (tự đóng theo bản FBM, rời hàng đợi). */

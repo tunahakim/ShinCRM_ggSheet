@@ -41,22 +41,10 @@ FbmSync.loginConfigPublic = function () {
   return { ok: true, configured: value.configured === true, credentialRef: value.configured ? String(value.credentialRef || '') : '', public: value.public || {}, lastAttemptAt: Number(value.lastAttemptAt || 0), lastLoginAt: Number(value.lastLoginAt || 0), nextRetryAt: Number(value.nextRetryAt || 0), lastError: String(value.lastError || '') };
 };
 
-/** Lượt người dùng bấm chạy thì không chịu chu kỳ chờ: chu kỳ chỉ để chạy nền không thử dồn dập, còn người bấm cần được thử ngay hoặc nhận hướng dẫn (chủ dự án chốt 2026-10-07). Lượt nền và heartbeat do máy tự gọi nên vẫn chịu chu kỳ. Cạm bẫy: mọi lượt chạy đều mở đầu bằng `session_probe`, nên không được loại theo loại cursor đó mà phải nhìn nguồn lượt. Mỗi lượt bấm vẫn chỉ thử một lần vì đăng nhập hỏng thì lượt kết thúc. */
-FbmSync.autoLoginAttemptOptions = function (state, cursor) {
-  // Probe chỉ là bước kiểm tra: việc thật là cursor nó sẽ trả về. Giữ phiên đi qua probe mà bị tính là lượt tay thì đăng nhập không chịu chu kỳ chờ.
-  var target = cursor && cursor.kind === 'session_probe' ? FbmSync.sessionGateMeta(state).resumeCursor || {} : cursor;
-  var kind = String(target && target.kind || '');
-  return { manual: String(state && state.origin || '') === 'manual' && !!(state && state.runId) && kind !== 'heartbeat' };
-};
-
-FbmSync.autoLoginCanAttempt = function (now, options) {
-  return FbmSync.autoLoginGate({ masterEnabled: settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled'), policy: settingsValues(FbmSync.SETTING_SECTIONS.loginPolicy), credential: FbmSync.credentialRead(), attempt: FbmSync.loginAttemptRead(), now: Number(now || Date.now()), manual: !!(options && options.manual === true) });
-};
-
-/** Lý do cổng không được tự đăng nhập, theo đúng kết quả autoLoginCanAttempt trả về.
+/** Lý do cổng không được tự đăng nhập, theo đúng mã `autoLoginGate` trả về; `lastErrorText` là lý do lần thử trước, người gọi đọc từ sổ lần thử và truyền vào.
  * Thông báo chờ phải mang lý do lần trước và giờ được thử lại: chỉ nói "đang chờ" thì người dùng bấm lại mãi mà không biết phải sửa gì (gặp thật 2026-10-07). */
-FbmSync.autoLoginBlockMessage = function (code, blocked) {
-  var lastError = String(FbmSync.loginConfigRead().lastError || '').trim();
+FbmSync.autoLoginBlockMessage = function (code, blocked, lastErrorText) {
+  var lastError = String(lastErrorText || '').trim();
   var reason = lastError ? ' Lý do lần trước: ' + lastError.replace(/[.\s]+$/, '') + '.' : '';
   var retryAt = Number(blocked && blocked.retryAt || 0), when = '';
   if (retryAt) { var at = new Date(retryAt); when = ' sau ' + ('0' + at.getHours()).slice(-2) + ':' + ('0' + at.getMinutes()).slice(-2); }
@@ -75,26 +63,6 @@ FbmSync.autoLoginMarkAttempt = function (now) {
   var at = Number(now || Date.now());
   FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'attempt', transportText: FbmSync.LOGIN_REPLIES.transport.text }, at, settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes')));
   return at;
-};
-
-FbmSync.autoLoginMarkSuccess = function (now) {
-  var at = Number(now || Date.now());
-  FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'success' }, at, 0));
-  return at;
-};
-
-/** Bước duy nhất đánh dấu phiên đã xác minh đúng tài khoản (sau đăng nhập, đầu lượt). Phiên chạy được là bằng chứng mới nhất nên gỡ mọi khóa, kể cả sai mật khẩu (có thể đã đổi trên FBM). Chỉ ghi khi đang khóa. */
-FbmSync.sessionVerifiedApply = function (state, identity) {
-  FbmSync.sessionIdentityVerify(state, identity);
-  var value = FbmSync.loginConfigRead();
-  if (Number(value.lastAttemptAt || 0) > Number(value.lastLoginAt || 0) || value.loginHalted || String(value.lastError || '')) { FbmSync.autoLoginMarkSuccess(); }
-  return state;
-};
-
-/** `halt`: FBM đã trả lời từ chối mà thử lại cũng không khá hơn (sai mật khẩu, câu trả lời chưa gặp), nên ngừng tự đăng nhập tới khi lưu lại thông tin hoặc đăng nhập thử được (09/01 "Ba kết quả của một lượt đăng nhập"). */
-FbmSync.autoLoginMarkFailure = function (message, halt) {
-  FbmSync.loginAttemptWrite(FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'failure', message: message, halt: halt === true }, Date.now(), settingsValue(FbmSync.SETTING_SECTIONS.loginPolicy, 'retryMinutes')));
-  return FbmSync.loginConfigPublic();
 };
 
 /** Tắt tự đăng nhập qua cổng cài đặt khi đăng nhập xong mà sai tài khoản đã liên kết; không tắt được thì ném để không lặp lại đăng nhập sai tài khoản. */
@@ -180,29 +148,13 @@ FbmSync.loginResponseFacts = function (response) {
     deniedFlag: !!(data && typeof data === 'object' && data.Authorized === false)
   };
 };
-/** Mở lượt đăng nhập tự động thay cho request đọc vừa gặp phiên hết hạn; ô lượt giữ chỗ quay về. Request ghi không được tự lặp. */
-FbmSync.beginAutoLogin = function (state, failedCursor, options) {
-  var attempt = FbmSync.autoLoginAttemptOptions(state, failedCursor), allowed = FbmSync.autoLoginCanAttempt(null, attempt);
-  if (!allowed.ok) { return null; }
-  var opt = options || {};
-  var gate = FbmSync.sessionGateMeta(state);
-  gate.loginAttempted = true;
-  gate.probeRetryCount = 0;
-  var resumeCursor = failedCursor && failedCursor.kind === 'session_probe' && gate.resumeCursor ? gate.resumeCursor : (failedCursor || {});
+/**
+ * Mở lượt đăng nhập tự động khi chặng phiên kết luận phiên chết và cổng tự đăng nhập cho phép (người điều phối cấp 2: ghi dấu lần thử trước khi gửi mật khẩu, mở bước nghiệp vụ, đặt cursor đăng nhập mang chỗ quay về `afterLogin`, rồi phát).
+ * `metadata.autoLoginTried` sống theo lượt (`runOpen` dựng metadata mới): mỗi lượt tự đăng nhập tối đa một lần, phiên chết lần nữa trong cùng lượt thì dừng.
+ */
+FbmSync.autoLoginOpen = function (state, login) {
   FbmSync.autoLoginMarkAttempt();
-  state.cursor = FbmSync.loginCursorOpen({ purpose: 'auto', manual: attempt.manual, resumeCursor: Object.assign({}, resumeCursor), resumePhase: String(gate.resumePhase || state.phase || ''), resumeEntity: String(gate.resumeEntity || state.entity || ''), resumeHeartbeat: opt.heartbeat === true || resumeCursor.kind === 'heartbeat' });
-  state.phase = 'checking_session'; state.entity = ''; state.session.expired = true; state.message = 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...'; state.lastFailureCode = 'AUTO_LOGIN_STARTED';
   FbmSync.businessStepStart(state, 'auto_login', { mode: state.mode, scan: state.scan });
-  FbmSync.sessionIdentityClear(state);
-  FbmSync.stateWrite(state);
-  return FbmSync.loginStepRequest(state.cursor, FbmSync.credentialRead());
-};
-
-FbmSync.loginResumeRequest = function (state) {
-  var cursor = state && state.cursor || {}, resume = cursor.resumeCursor || {};
-  state.cursor = resume; state.phase = cursor.resumePhase || 'checking_session'; state.entity = cursor.resumeEntity || '';
-  state.session.expired = false; state.message = 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...'; state.lastFailureCode = '';
-  FbmSync.stateWrite(state);
-  var request = FbmSync.cursorRequest(state);
-  return request ? FbmSync.nextEnvelope(request) : null;
+  FbmSync.stagePatchApply(state, { metadata: { autoLoginTried: true }, cursor: FbmSync.loginCursorOpen({ purpose: 'auto', manual: login.manual === true, afterLogin: login.afterLogin }), phase: 'checking_session', entity: '', message: 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...', lastFailureCode: 'AUTO_LOGIN_STARTED' });
+  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
 };

@@ -43,6 +43,11 @@ FbmSync.loginAttemptRead = function () {
 /**
  * Công cụ tính (thuần): dấu lần thử sau một sự kiện. `attempt` lúc lượt đăng nhập bắt đầu: ghi sẵn lý do đường truyền, vì lượt hỏng giữa đường không về tới bước ghi lý do mà khóa chờ đã đặt. `success`: phiên xác minh được là bằng chứng mới nhất nên gỡ mọi khóa, kể cả sai mật khẩu. `failure`: `halt` khi FBM đã từ chối mà thử lại cũng không khá hơn. `saved`: lưu mật khẩu mới thì gỡ khóa ngừng và lý do, giữ hạn thử lại. `cleared`: credential bị xóa thì bỏ cả hạn thử lại, giữ mốc giờ.
  */
+/** Sổ lần thử đang khóa (lần thử sau lần thành công, đã ngừng, hoặc còn lý do lỗi): phiên chạy được thì gỡ. Thuần. */
+FbmSync.loginAttemptLocked = function (attempt) {
+  var value = attempt || {};
+  return Number(value.lastAttemptAt || 0) > Number(value.lastLoginAt || 0) || value.loginHalted === true || !!String(value.lastError || '');
+};
 FbmSync.loginAttemptMark = function (current, event, now, retryMinutes) {
   var next = FbmSync.loginAttemptShape(current), at = Number(now), kind = String(event && event.kind || ''), retryMs = Number(retryMinutes) * 60 * 1000;
   if (kind === 'attempt') { next.lastAttemptAt = at; next.lastError = String(event.transportText || ''); next.nextRetryAt = at + retryMs; }

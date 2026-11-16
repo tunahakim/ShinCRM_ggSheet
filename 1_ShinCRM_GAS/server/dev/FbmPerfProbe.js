@@ -14,15 +14,15 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
   'statusView', 'staleRunClose', 'shouldLogStatus', 'logStatus', 'recordIssuesFlush', 'transportValue',
-  'withOrchestrationLock', 'nextEnvelope', 'cursorRequest',
+  'withOrchestrationLock', 'sliceIssue', 'cursorIssue', 'cursorRequest',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
   'pullBatchApply', 'pullPageApply', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'toFbmCodes',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanStage', 'readReasonOf', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
   'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'logPreflight', 'identityPreflight', 'pushCandidates',
-  'sessionGateResponseStarted', 'applyTransportSession', 'authContinue', 'lookupPairs',
-  'sessionGateStart', 'sessionGateHandleFailure', 'sessionGateProbeRequest', 'sessionGateResumeProbeRequest', 'sessionGateHandleProbeFailure', 'transportRecoverPlan', 'transportReissue', 'sessionGateRecordFailure',
+  'transportRetryClear', 'applyTransportSession', 'authorizeStage', 'authorizeEnd', 'lookupPairs',
+  'sessionStage', 'sessionEnd', 'sessionSuspectRun', 'autoLoginOpen', 'transportRecoverPlan', 'transportReissue', 'transportFailureRecord',
   'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors',
   'heartbeatRun', 'stopPendingApply', 'backgroundSettle', 'machineAskRecord', 'staleRunCheck', 'backgroundNext', 'backgroundTail', 'processBookRead', 'pushGateCheck', 'startRun', 'runTail', 'runOpen', 'runSlice', 'preflightLocal'
 ];
