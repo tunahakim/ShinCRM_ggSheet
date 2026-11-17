@@ -95,9 +95,22 @@ async function chay(so) {
     return { ok: true };
   });
   h.hop.FBM_SYNC_RUN_SILENCE_MS = 20;
+  const veH = [];
+  h.hop.fbmSyncPaint = (status) => { veH.push(status); };
   const kqH = await h.hop.fbmSyncDrive('start', { kind: 'pull' }, 'đồng bộ');
+  check(so, 'Status hỏi GAS khi Extension im được vẽ cả lúc lượt còn chạy lẫn lúc đã đóng (màn không giữ status cũ, nút Hủy phiên cũ GAS mở thì hiện)', veH.map((s) => [s.runId, s.phase]), [['L7', 'running'], ['L7', 'running'], ['L7', 'error']]);
   check(so, 'Extension im quá hạn: Sidebar hỏi GAS, lượt còn chạy thì chờ tiếp, lượt đã đóng thì kết thúc bằng mã và chữ trong status GAS', [hoi, kqH.ok, kqH.code, kqH.error, h.hop.FBM_SYNC_CLIENT.runWaiter], [2, false, 'RUN_ABANDONED', 'Lượt bị bỏ dở.', null]);
   check(so, 'Hỏi GAS thấy lượt vẫn chờ Extension nhận (tin đánh thức đầu bị mất): Sidebar đánh thức lại đúng một lần', h.rpc.filter((item) => item[0] === 'CRM_FBM_RUN_NOW').map((item) => item[1]), [{ retryMs: [5000, 15000], trigger: 'run_now' }, { retryMs: [], trigger: 'run_now' }]);
+  const k = taoSidebar((name) => {
+    if (name === 'fbmDriveCommand') { return moLuot('L8'); }
+    if (name === 'fbmGetSyncStatus') { return { status: { runId: 'L8', running: true, phase: 'running', stuck: true, stuckCode: 'SYNC_STALE_RUN', warnings: [{ text: 'Lượt kẹt.' }] } }; }
+    return { ok: true };
+  });
+  k.hop.FBM_SYNC_RUN_SILENCE_MS = 20;
+  const veK = [];
+  k.hop.fbmSyncPaint = (status) => { veK.push(status); };
+  const kqK = await k.hop.fbmSyncDrive('start', { kind: 'pull' }, 'đồng bộ');
+  check(so, 'Hỏi GAS thấy lượt kẹt: kết thúc bằng mã kẹt và vẽ status kẹt GAS trả', [kqK.code, kqK.error, veK.length, veK[veK.length - 1].stuck], ['SYNC_STALE_RUN', 'Lượt kẹt.', 2, true]);
 }
 
 module.exports = { chay };
