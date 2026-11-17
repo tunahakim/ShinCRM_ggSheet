@@ -140,7 +140,7 @@ FbmSync.loginEnd = function (state, end) {
   FbmSync.stagePatchApply(state, { logs: [{ action: end.action || 'login_failure', outcome: LOG_ERROR, reason: message.slice(0, 240), detail: { code: code, phase: String(state.phase || ''), response: end.facts } }] });
   FbmSync.runFail(state, code, message, { cursor: {} });
   FbmSync.stateWrite(state);
-  var result = { ok: false, code: code, request: null, status: FbmSync.statusView(), error: message, message: message };
+  var result = { ok: false, code: code, request: null, error: message, message: message };
   if (end.runtime) { result.identity = end.runtime; }
   return result;
 };
@@ -159,7 +159,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     FbmSync.stateWrite(state);
     if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, reason: message, detail: { runId: String(state.runId || '') } }); }
     if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }, state); }
-    return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, status: FbmSync.statusView(), message: message };
+    return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, message: message };
   }
   FbmSync.businessStepFinish(state, 'auto_login', 'ok', {});
   var back = cursor.afterLogin || {};
@@ -168,10 +168,10 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     FbmSync.stagePatchApply(state, { logs: [{ action: 'login_resume_failure', outcome: LOG_ERROR, reason: lost, detail: { code: 'AUTO_LOGIN_RESUME_FAILED', cursor: String(back.cursor && back.cursor.kind || '') } }] });
     FbmSync.runFail(state, 'AUTO_LOGIN_RESUME_FAILED', lost, { cursor: {} });
     FbmSync.stateWrite(state);
-    return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
+    return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError };
   }
   FbmSync.stagePatchApply(state, { cursor: back.cursor, phase: back.phase || 'checking_session', entity: back.entity || '', message: 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...' });
-  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state) };
 };
 
 /**

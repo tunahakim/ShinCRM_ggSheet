@@ -1,124 +1,5 @@
-/** Snapshot tiến độ công khai cho Sidebar; không tự tạo request FBM. */
+/** Ghi Log trạng thái lượt, gom vấn đề theo bản ghi và bản xem trước; không tự tạo request FBM. */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
-
-/** Đổi phase nội bộ thành nhãn hiển thị ngắn. */
-FbmSync.statusLabel = function (phase) {
-  return ({ idle: 'Sẵn sàng', checking_session: 'Đang kiểm tra phiên FBM', pull_customer: 'Đang đọc khách hàng', pull_activity: 'Đang đọc giao dịch', reconcile: 'Đang đối chiếu', push: 'Đang ghi dữ liệu', paused: 'Tạm dừng', conflict: 'Có xung đột', error: 'Có lỗi', done: 'Hoàn tất' })[phase] || String(phase || '');
-};
-/** Nhãn hướng dữ liệu để Sidebar không phải suy diễn từ cursor nội bộ. */
-FbmSync.syncDirection = function (state) {
-  var phase = String(state && state.phase || ''), mode = String(state && state.mode || 'read');
-  // Lượt Giữ phiên có đẩy hiện chiều của lịch nền, không theo mode `push` của lượt.
-  if (state && state.scan === 'keepalive') { return FbmSync.syncDirection({ phase: 'done', mode: state.scheduleMode }); }
-  if (phase === 'checking_session') { return 'Kết nối FBM'; }
-  if (phase === 'push') { return 'ShinCRM → FBM'; }
-  if (phase === 'done' && mode === 'write') { return 'Hai chiều'; }
-  if (mode === 'push') { return 'ShinCRM → FBM'; }
-  if (mode === 'check') { return 'Kiểm tra'; }
-  return 'FBM → ShinCRM';
-};
-/** Nhãn thực thể hiện tại; dùng "Chuẩn bị phiên" khi chưa có bản ghi. */
-FbmSync.syncEntityLabel = function (entity, phase) {
-  if (entity === 'customer') { return 'Khách hàng'; }
-  if (entity === 'activity') { return 'Giao dịch'; }
-  if (phase === 'checking_session') { return 'Chuẩn bị phiên'; }
-  return 'Tổng hợp';
-};
-/** Chỉ đưa dữ liệu render sang Sidebar; state nội bộ có lookup, cursor form và khóa vẫn ở GAS. */
-FbmSync.statusMetadata = function (metadata) {
-  var data = metadata || {}, keys = ['audit', 'categoryBlocks', 'identityBlocks', 'identityProbe', 'identityCheck', 'activityBulkMissing', 'activityBulkMissingCount', 'customerErrors', 'preflightIssues'];
-  var out = keys.reduce(function (result, key) {
-    if (data[key] !== undefined) { result[key] = data[key]; }
-    return result;
-  }, {});
-  // Hàng đợi xung đột nằm trên Sheet; Sidebar chỉ nhận số đếm, bản ghi cụ thể đến khi người dùng mở chế độ xung đột.
-  out.conflictCount = Number(data.conflictCount || 0);
-  var store = FbmSync.pushFailuresRead(), failures = store.hashes, failureKeys = Object.keys(failures), details = store.details;
-  out.pushFailureCount = failureKeys.length;
-  out.pushFailures = {};
-  out.pushFailureDetails = {};
-  failureKeys.slice(0, 20).forEach(function (key) { out.pushFailures[key] = failures[key]; if (details[key] !== undefined) { out.pushFailureDetails[key] = details[key]; } });
-  return out;
-};
-/** Cursor công khai chỉ dùng để chẩn đoán trạng thái; không trả bản ghi, OldValue hay khóa về trình duyệt. */
-FbmSync.statusCursor = function (cursor) {
-  var value = cursor || {};
-  return { kind: String(value.kind || ''), operation: String(value.operation || ''), entity: String(value.entity || ''), index: Number(value.index || 0) };
-};
-/** Chuyển state GAS thành các chặng hiển thị cố định; Sidebar không tự đoán từ cursor. */
-FbmSync.pipelineDefinition = function (state) {
-  var value = state || {}, scan = String(value.scan || 'full'), mode = String(value.mode || 'read'), cursor = value.cursor || {};
-  if (scan === 'identity_probe') { return { kind: 'identity_probe', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'identity', label: 'Đọc nhận diện tài khoản' }] }; }
-  if (scan === 'identity_check') { return { kind: 'identity_check', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'customer', label: 'Quét Customer' }, { id: 'reconcile', label: 'Đối chiếu liên kết' }] }; }
-  if (String(cursor.kind || '') === 'login') {
-    return { kind: 'login_test', steps: [{ id: 'login', label: 'Đăng nhập FBM' }, { id: 'session', label: 'Kiểm tra phiên' }, { id: 'identity', label: 'Xác minh tài khoản' }] };
-  }
-  if (scan === 'activity_bulk') { return { kind: 'activity_bulk', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }, { id: 'sheet', label: 'Cập nhật Sheet' }] }; }
-  if (scan === 'detail') { return { kind: 'detail', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'activity', label: 'Đọc Activity theo vòng xoay' }, { id: 'reconcile', label: 'Đối soát' }] }; }
-  if (mode === 'push') { return { kind: 'push', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }] }; }
-  var pull = [{ id: 'session', label: 'Kiểm tra phiên FBM' }, { id: 'category', label: 'Category' }, { id: 'customer', label: 'Đọc Customer' }, { id: 'activity', label: 'Đọc Activity' }, { id: 'reconcile', label: 'Đối soát' }];
-  if (mode !== 'check') { pull.push({ id: 'sheet', label: 'Cập nhật Sheet' }); }
-  if (mode === 'write') {
-    pull = pull.concat([{ id: 'record', label: 'Kiểm tra bản ghi' }, { id: 'form', label: 'Mở form FBM' }, { id: 'write', label: 'Ghi FBM' }, { id: 'verify', label: 'Đọc xác nhận' }, { id: 'baseline', label: 'Cập nhật baseline' }]);
-  }
-  return { kind: mode === 'check' ? 'check' : mode === 'write' ? 'write' : 'read', steps: pull };
-};
-/** Xác định duy nhất một chặng đang chờ/xử lý từ state đã có trên GAS. */
-FbmSync.pipelineCurrentStep = function (state, definition) {
-  var value = state || {}, phase = String(value.phase || ''), cursor = value.cursor || {}, kind = String(cursor.kind || ''), operation = String(cursor.operation || ''), available = {};
-  (definition.steps || []).forEach(function (step) { available[step.id] = true; });
-  if (phase === 'done' || phase === 'idle') { return ''; }
-  if (kind === 'lookup') { return available.category ? 'category' : ''; }
-  if (kind === 'login' && cursor.step === 'authorize') { return available.session ? 'session' : 'login'; }
-  if (kind === 'identity_user_grid' || (kind === 'login' && cursor.step === 'identity')) { return available.identity ? 'identity' : 'session'; }
-  if (kind === 'customer_grid') { return available.customer ? 'customer' : ''; }
-  if (kind === 'activity_grid' || (kind === 'scan_job' && cursor.entity === 'activity')) { return available.activity ? 'activity' : ''; }
-  if (kind === 'push_scan') { return available.record ? 'record' : ''; }
-  if (/(?:customer|activity)_(?:create|edit)_open$/.test(kind)) { return available.form ? 'form' : ''; }
-  if (kind === 'push_wait') {
-    if (/verify/.test(operation)) { return available.verify ? 'verify' : 'write'; }
-    return available.write ? 'write' : '';
-  }
-  if (phase === 'pull_customer') { return available.customer ? 'customer' : ''; }
-  if (phase === 'pull_activity') { return available.activity ? 'activity' : ''; }
-  if (phase === 'reconcile' || phase === 'conflict') { return available.reconcile ? 'reconcile' : ''; }
-  if (phase === 'push') { return available.record ? 'record' : ''; }
-  if (phase === 'checking_session') { return available.login && kind === 'login' ? 'login' : 'session'; }
-  return '';
-};
-/** DTO tiến độ chỉ dùng để vẽ; marker hoàn tất luôn xuất phát từ state GAS cùng lượt. */
-FbmSync.pipelineView = function (state) {
-  var value = state || {}, phase = String(value.phase || 'idle'), definition = FbmSync.pipelineDefinition(value), current = FbmSync.pipelineCurrentStep(value, definition), currentIndex = -1;
-  (definition.steps || []).forEach(function (step, index) { if (step.id === current) { currentIndex = index; } });
-  var title = phase === 'idle' ? 'Pipeline sẽ chạy' : phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : phase === 'conflict' ? 'Pipeline dừng để xử lý xung đột' : 'Pipeline đang chạy';
-  return {
-    kind: definition.kind,
-    title: title,
-    steps: (definition.steps || []).map(function (step, index) {
-      var stepState = phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' || phase === 'conflict' ? 'error' : phase === 'paused' ? 'paused' : 'current') : 'pending';
-      return { id: step.id, label: step.label, state: stepState };
-    })
-  };
-};
-/** Trả về snapshot gọn để Sidebar render một lần. */
-/** Chữ Sidebar hiện khi status thấy lượt đã chết mà chưa ai thu hồi; status không ghi nên chỉ báo lần bấm kế sẽ đóng nó. */
-FbmSync.STUCK_STATUS_MESSAGE = 'Lượt đồng bộ đang kẹt: không còn request nào chờ FBM trả lời trong hạn (Extension đã tắt, máy tắt hoặc mất mạng). Bấm Đồng bộ để đóng lượt này và chạy lại.';
-FbmSync.statusView = function () {
-  var state = FbmSync.stateRead();
-  var metadata = FbmSync.statusMetadata(state.metadata);
-  metadata.preview = FbmSync.previewRead();
-  if (typeof FbmSync.traceRead === 'function') { metadata.traceTail = FbmSync.traceRead(20); }
-  // `running` là chỗ duy nhất đổi phase thành 'đang chạy' cho Sidebar; Sidebar không chép danh sách phase.
-  var running = FbmSync.ACTIVE_PHASES.indexOf(String(state.phase || '')) >= 0;
-  // Lượt chết mà chưa ai thu hồi (Extension im giữa lượt): status chỉ báo, không ghi; lần `start` hoặc nhịp nền kế tiếp đóng nó.
-  var stale = FbmSync.staleRunCheck(state, Date.now());
-  var enabled = settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled');
-  var background = settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled');
-  // Tập đang chờ duyệt đọc từ cổng chặng đẩy, không suy từ phase; cổng hỏng thì ném như mọi kho hỏng.
-  var gate = FbmSync.pushGateRead(), pendingApproval = gate && gate.status === 'pending' ? { count: Number(gate.count || 0), fingerprint: String(gate.fingerprint || '') } : null;
-  var machine = FbmSync.machineView(FbmSync.backgroundMachineRead(), Date.now(), FbmSync.machineSilentMinutes(settingsValues(FbmSync.SETTING_SECTIONS.extension)), enabled && background);
-  return { ok: true, stuck: !!stale, stuckCode: stale ? stale.code : '', stuckMessage: stale ? FbmSync.STUCK_STATUS_MESSAGE : '', enabled: enabled, masterEnabled: enabled, backgroundEnabled: background, runId: state.runId, follows: String(state.follows || ''), origin: String(state.origin || 'manual'), mode: state.mode, canPush: FbmSync.canWriteFbm(state.mode), scan: state.scan || 'full', scanPack: state.scanPack || '', scanLabel: state.scan === 'keepalive' ? FbmSync.KEEPALIVE_SCAN_LABEL : '', process: String(state.process || ''), backgroundMachine: machine, login: FbmSync.credentialPublicView(), phase: state.phase, label: FbmSync.statusLabel(state.phase), direction: FbmSync.syncDirection(state), entity: state.entity, entityLabel: FbmSync.syncEntityLabel(state.entity, state.phase), pipeline: FbmSync.pipelineView(state), cursor: FbmSync.statusCursor(state.cursor), session: { customer: FbmSync.sessionAuthorized(state, 'customer'), activity: FbmSync.sessionAuthorized(state, 'activity'), expired: state.session.expired === true, lastHeartbeatAt: Number(state.session.lastHeartbeatAt || 0) }, metadata: metadata, counts: state.counts, progress: state.progress, current: state.current, message: state.message, startedAt: state.startedAt, updatedAt: state.updatedAt, nextRunAt: state.nextRunAt, lastError: state.lastError, lastFailureCode: state.lastFailureCode || '', retryable: state.retryable === true, running: running, forceLoginOffered: state.loginForceOffered === true && !running, pendingApproval: pendingApproval, awaitingPickup: FbmSync.pickupHeld(state) && Date.now() < Number(state.deadlineAt || 0) };
-};
 
 /**
  * Bộ gom vấn đề theo bản ghi trong RAM của một lần chạy GAS. Một lát xử lý đúng một response FBM, nên mỗi nhóm
@@ -148,20 +29,19 @@ FbmSync.recordIssuesFlush = function (state) {
   return keys.length;
 };
 
-/** Ghi snapshot nghiệp vụ; payload/cookie không bao giờ đi vào Log. */
-FbmSync.logStatus = function (status, action) {
-  if (!status || typeof logEvent !== 'function') { return; }
-  var phase = String(status.phase || 'idle');
-  var state = typeof FbmSync.stateRead === 'function' ? FbmSync.stateRead() : {};
+/** Ghi snapshot nghiệp vụ của ô lượt người gọi vừa đọc; payload/cookie không bao giờ đi vào Log. */
+FbmSync.logStatus = function (state, action) {
+  if (!state || typeof logEvent !== 'function') { return; }
+  var phase = String(state.phase || 'idle');
   // Phiên có sổ bước nghiệp vụ đã có dòng mở/đóng bước (đóng tại stateWrite), nên không ghi thêm snapshot cho mỗi lát.
-  if (state && state.runId && String(state.runId) === String(status.runId || '') && state.metadata && state.metadata.businessSteps) { return; }
-  var outcome = phase === 'error' || status.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
+  if (state.runId && state.metadata && state.metadata.businessSteps) { return; }
+  var outcome = phase === 'error' || state.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
   var writer = outcome === LOG_ERROR || phase === 'done' ? logEvent : logTrace;
   writer({
     source: 'fbm_sync', action: action || 'slice', outcome: outcome,
-    entity: status.entity || '', recordId: status.current || '',
-    reason: status.message || status.label || phase,
-    detail: { runId: String(status.runId || ''), phase: phase, cursor: status.cursor && status.cursor.kind ? String(status.cursor.kind) : '', direction: status.direction || '', entityLabel: status.entityLabel || '', counts: status.counts || {}, lastError: status.lastError || '' }
+    entity: state.entity || '', recordId: state.current || '',
+    reason: state.message || FbmSync.statusLabel(phase) || phase,
+    detail: { runId: String(state.runId || ''), phase: phase, cursor: String(state.cursor && state.cursor.kind || ''), direction: FbmSync.syncDirection(state), entityLabel: FbmSync.syncEntityLabel(state.entity, phase), counts: state.counts || {}, lastError: state.lastError || '' }
   });
 };
 /** Chỉ ghi khi đổi giai đoạn hoặc kết thúc để không làm chậm từng request FBM. */
@@ -182,26 +62,6 @@ FbmSync.logStaleResponse = function (state, responseRequestId, action) {
   logEvent(closed
     ? { source: 'fbm_sync', action: 'closed_run_response_dropped', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Bỏ response FBM của lượt đã dừng; không ghi gì vào dữ liệu.', detail: { responseRequestId: String(responseRequestId) } }
     : { source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
-};
-/**
- * Sidebar báo một lỗi. Chỉ dừng phiên khi Sidebar nêu đúng mã của phiên đang chạy (`runId`) — tức phiên do chính Sidebar đang chạy hỏng. Lỗi không kèm mã hoặc mã không khớp (lỗi lưu cài đặt, kiểm tra liên kết, phiên nền Extension đang chạy) chỉ ghi Log qua cổng chung `clientErrorLog` (nguồn `sidebar`, đúng tên thao tác), không đụng phiên: một nút bấm hỏng không được giết phiên nền nó không sở hữu.
- */
-FbmSync.logTransportError = function (message, action, runId) {
-  var reason = String(message || 'Không nhận được phản hồi từ Extension.'), before = FbmSync.stateRead();
-  if (!runId || String(before.runId || '') !== String(runId)) {
-    clientErrorLog(action, reason);
-    return FbmSync.statusView();
-  }
-  // Chạy trong khóa của cửa lệnh (lệnh `client_error`); khóa bận thì cửa lệnh ghi Log lúc bỏ.
-  var outcome = FbmSync.runFailCurrent(reason, 'FBM_CLIENT_ERROR');
-  var recorded = String(before.phase || '') === 'error' && String(before.lastError || '').indexOf(reason) >= 0;
-  // runFailCurrent đã đóng bước đang chạy với đúng lý do này, nên chỉ ghi thêm khi phiên không được chuyển sang lỗi ở đây.
-  if (!(outcome && outcome.failed) && !recorded && typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: action || 'transport_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || before.metadata && before.metadata.businessRunId || ''), reason: 'Sidebar báo lỗi phiên đồng bộ: ' + reason });
-  }
-  var status = FbmSync.statusView();
-  status.phase = 'error'; status.lastError = status.lastError || reason; status.message = status.lastError;
-  return status;
 };
 FbmSync.PREVIEW_KEY = 'FBM_SYNC_PREVIEW_V1';
 FbmSync.PREVIEW_LIMIT = 10;

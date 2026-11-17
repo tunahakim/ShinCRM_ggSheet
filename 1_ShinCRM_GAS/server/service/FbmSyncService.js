@@ -15,7 +15,7 @@ function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, s
 function fbmGetSyncStatus() { return fbmCommandRun('fbmGetSyncStatus', 'status', {}); }
 function fbmGetSyncTrace() { return fbmCommandRun('fbmGetSyncTrace', 'trace_read', {}); }
 /** Lỗi phía Sidebar không gắn với một request: `runId` chỉ có khi lỗi thuộc lượt Sidebar đang tự chạy, GAS mới dừng lượt đó. */
-function fbmLogSyncError(message, clientTrace, action, runId) { return fbmCommandRun('fbmLogSyncError', 'client_error', { message: message, clientTrace: clientTrace, action: action, runId: runId }); }
+function fbmLogSyncError(message, clientTrace, action) { return fbmCommandRun('fbmLogSyncError', 'client_error', { message: message, clientTrace: clientTrace, action: action }); }
 /** Lưu cài đặt FBM theo tên phần: `patches` là `{ tênPhần: { trường: chuỗi ô } }`, GAS kiểm và trả `problems`; `confirmLow` chỉ true khi người dùng đã xác nhận lịch nền dày. */
 function fbmSaveSettings(patches, confirmLow) { return fbmCommandRun('fbmSaveSettings', 'save_settings', { patches: patches || {}, confirmLow: confirmLow === true }); }
 function fbmResetSettings(section) { return fbmCommandRun('fbmResetSettings', 'reset_settings', { section: section }); }

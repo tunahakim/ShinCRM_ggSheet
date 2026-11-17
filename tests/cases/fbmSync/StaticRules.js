@@ -148,7 +148,9 @@ const EXCEPTIONS = {
     // Lưu kết nối chạy trong khóa điều phối ngoài lượt: đọc ô lượt để từ chối khi đang có lượt.
     '1_ShinCRM_GAS/fbm_sync/reconcile/ConnectionSave.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
+    // Người đọc của status: đọc ô lượt một lần rồi giao cho bộ dựng thuần.
+    '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 1,
     // Hàm chuyển kho một lần là cửa vào riêng: đọc pha để chặn khi đang có lượt; xóa cùng server/dev/.
     '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
@@ -173,7 +175,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 3,
+    '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 10,
@@ -208,13 +211,12 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 3,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1
   },
   // Còn lại: Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đóng, và đối tượng status (không phải ô lượt).
   phaseClose: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2
   },

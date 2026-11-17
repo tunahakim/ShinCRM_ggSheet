@@ -25,5 +25,5 @@ FbmSync.pushFailuresClearCommand = function () {
   }).value;
   FbmSync.pushFailuresRemove(opened.reset.concat(opened.missing));
   logEvent({ source: 'fbm_sync', action: 'push_retry_batch_enabled', outcome: LOG_OK, reason: 'Người dùng chủ động mở lại nhóm bản ghi lỗi đẩy.', detail: { total: keys.length, reset: opened.reset.length, missing: opened.missing.length } });
-  return { ok: true, total: keys.length, reset: opened.reset.length, missing: opened.missing.length, message: 'Đã mở lại ' + opened.reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.', status: FbmSync.statusView() };
+  return { ok: true, total: keys.length, reset: opened.reset.length, missing: opened.missing.length, message: 'Đã mở lại ' + opened.reset.length + ' bản ghi lỗi; hãy chạy lại phiên Ghi thật để gửi theo hàng đợi.' };
 };

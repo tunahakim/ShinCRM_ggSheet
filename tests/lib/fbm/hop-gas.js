@@ -105,6 +105,8 @@ function capSauNap(hopCat, duongDans) {
   }
   // Bước phát request của lát mở chặng phiên khi cursor có cổng: hộp có khung lát thì có chặng phiên, như bản thật.
   if (duongDans.indexOf('fbm_sync/state/Slice.js') >= 0) { napThieu('sessionStage', ['fbm_sync/auth/SessionStage.js']); }
+  // Người đọc status nằm tệp riêng cạnh Report.js; bản thật luôn có cả hai.
+  if (duongDans.indexOf('fbm_sync/report/Report.js') >= 0) { napThieu('statusViewBuild', ['fbm_sync/report/StatusView.js']); }
   if (duongDans.indexOf('fbm_sync/state/BackgroundMachine.js', 'fbm_sync/report/Report.js') >= 0 && !hopCat.clientErrorLog) { vm.runInContext(docTep('server/log/ClientError.js'), hopCat, { filename: 'server/log/ClientError.js' }); }
 }
 

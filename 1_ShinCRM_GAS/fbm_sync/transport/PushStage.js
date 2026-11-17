@@ -46,7 +46,7 @@ FbmSync.pushEndApply = function (state, end) {
   FbmSync.pushListClear();
   if (end.kind === 'fail') {
     FbmSync.runFail(state, end.code, end.message, { keepRecords: true });
-    return { ok: false, code: end.code, request: null, status: FbmSync.statusView(), error: end.message };
+    return { ok: false, code: end.code, request: null, error: end.message };
   }
   if (end.mark) {
     FbmSync.pushGateWrite({ status: 'clean', mark: end.mark, at: Date.now() });
@@ -57,7 +57,7 @@ FbmSync.pushEndApply = function (state, end) {
   } else {
     FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) + (end.remaining ? ' Còn ' + end.remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '') + (end.note || ''), keepRecords: true });
   }
-  return { ok: true, request: null, status: FbmSync.statusView() };
+  return { ok: true, request: null };
 };
 
 /** Một chỗ mở chặng đẩy cho mọi chiều (người điều phối của chiều đọc gọi): dấu trang chưa có danh sách nên bước đầu tiên quét cả hai sheet. Trả request đầu tiên, hoặc `null` khi lượt đã chốt. */

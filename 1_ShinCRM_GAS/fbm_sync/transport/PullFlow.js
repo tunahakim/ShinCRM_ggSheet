@@ -3,7 +3,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Trả lời chung khi thao tác của người dùng gặp lượt nền đang chạy: không dừng gì, kèm `status` để Sidebar nêu bước và giờ bắt đầu trong popup hỏi. */
 FbmSync.backgroundRunningResult = function () {
-  return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.', status: FbmSync.statusView() };
+  return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.' };
 };
 
 /** Mở lượt và trả request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. `current` là ô lượt người gọi đang cầm (bản của lát). */
@@ -14,7 +14,7 @@ FbmSync.startRun = function (options, current) {
   // Tra dãy chặng trước mọi việc: mức quét lạ ném `SYNC_UNKNOWN_SCAN` khi lượt cũ chưa bị đụng tới.
   var plan = FbmSync.runPlanOfStart(opt.scan, opt.pack);
   if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
-    return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
+    return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.' };
   }
   var stale = FbmSync.staleRunCheck(current, Date.now());
   if (stale) { current = FbmSync.staleRunClose(current, stale); }
@@ -24,14 +24,14 @@ FbmSync.startRun = function (options, current) {
     // Lượt nền không tự nhường: Sidebar hỏi người dùng, chỉ lệnh `stop_background` mới dừng nó.
     if (opt.manual === true && String(current.origin || '') === 'background') { return FbmSync.backgroundRunningResult(); }
     if (current.activeRequestId) {
-      return { ok: false, code: 'REQUEST_IN_FLIGHT', request: null, message: 'Đã có request FBM đang chờ response; không cấp request chồng.', status: FbmSync.statusView() };
+      return { ok: false, code: 'REQUEST_IN_FLIGHT', request: null, message: 'Đã có request FBM đang chờ response; không cấp request chồng.' };
     }
     // Lượt vừa chạy dở (không request nào chờ) thì nối lại: luôn kiểm lại phiên trước vì lát trước có thể dừng giữa chừng. Cursor khai `resumable: false` trong bảng cursor (lệnh ghi, lượt đăng nhập) thì không nối mù.
     var kind = String(current.cursor && current.cursor.kind || ''), recent = Date.now() - Number(current.updatedAt || 0) <= 60000;
-    if (!recent || !kind || FbmSync.cursorTable(kind).resumable === false) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
+    if (!recent || !kind || FbmSync.cursorTable(kind).resumable === false) { return { ok: false, code: 'SYNC_BUSY' }; }
     // Đang ở chặng phiên thì gửi lại chính request hỏi phiên (chỉ đọc); không mở chặng phiên lồng trong chặng phiên.
     if (kind !== 'session') { FbmSync.stagePatchApply(current, FbmSync.sessionGateOpen(current, 'issue', 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...', false)); }
-    return { ok: true, request: FbmSync.cursorIssue(current), status: FbmSync.statusView(), resumed: true };
+    return { ok: true, request: FbmSync.cursorIssue(current), resumed: true };
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
   var state = FbmSync.runOpen({
@@ -70,12 +70,12 @@ FbmSync.startRun = function (options, current) {
     // chỉ để tự động điền, vì token này không được probe sử dụng.
     state.cursor = { kind: 'identity_user_grid' };
     state.message = 'Đang đọc thông tin tài khoản FBM...';
-    return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.cursorIssue(state) };
   }
   // Xác thực Customer có cổng phiên: request đầu thực gửi là hỏi thử phiên, xác thực đi sau khi đúng tài khoản.
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Đang kiểm tra phiên FBM...';
-  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state) };
 };
 /**
  * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
@@ -116,7 +116,7 @@ FbmSync.preflightApply = function (state, preflight) {
   if (!preflight.ok) {
     var first = preflight.blocking[0] || {};
     FbmSync.runFail(state, 'SYNC_PREFLIGHT_FAILED', 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.'));
-    return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
+    return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', error: state.lastError };
   }
   return null;
 };
@@ -184,7 +184,7 @@ FbmSync.finishPullRun = function (state) {
 /** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */
 FbmSync.activityStagesContinue = function (state, extra) {
   var request = FbmSync.activityStageNext(state);
-  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() }, extra || {}); }
+  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(state, request) }, extra || {}); }
   return FbmSync.pullFinishOrPush(state, extra);
 };
 
@@ -216,11 +216,11 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
     if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
-    result.request = FbmSync.sliceIssue(state, FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
+    result.request = FbmSync.sliceIssue(state, FbmSync.pushStageOpen(state));
     return result;
   }
   FbmSync.finishPullRun(state);
-  result.status = FbmSync.statusView();
+ 
   return result;
 };
 
@@ -237,5 +237,5 @@ FbmSync.contractGate = function (state, rawResponse) {
   if (!closed.failed) { current.phase = 'error'; current.lastFailureCode = mismatch.code; current.retryable = false; current.lastError = mismatch.message; current.message = mismatch.message; }
   current.activeRequestId = ''; current.deadlineAt = 0;
   FbmSync.stagePatchApply(current, { logs: [{ action: 'extension_contract_mismatch', outcome: LOG_ERROR, cycleId: runId, reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }] });
-  return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
+  return { ok: false, code: mismatch.code, request: null, error: mismatch.message };
 };

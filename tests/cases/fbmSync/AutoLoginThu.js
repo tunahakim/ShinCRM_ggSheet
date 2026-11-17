@@ -56,24 +56,24 @@ async function chay(so) {
   nopBuoc(heartbeat.FbmSync, { purpose: 'auto', manual: true, step: 'login', facts: { salt: 'ab12cd34', database: 'FHN_CRM_App', unit: 'CTY' }, afterLogin: { cursor: { kind: 'customer_grid' } } }, { ok: true, status: 200, body: '{"d":"Duplicate"}' }, { origin: 'manual', session: { expired: true } });
   const textText = heartbeat.FbmSync.stateRead().message;
   check(so, 'Login trả d:"Duplicate" thì báo còn giữ phiên cũ và mở nút hủy phiên cũ',
-    [textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().forceLoginOffered],
+    [textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().actions.forceLogin],
     [true, true, true]);
   const serviceSource = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8');
   check(so, 'mọi lệnh mở lượt (đăng nhập thử, hủy phiên cũ, kiểm liên kết, đồng bộ) đi qua cửa fbmDriveCommand và vỏ runEntryPoint để Log được ghi ra sheet', ['fbmDriveCommand'].map((name) => serviceSource.indexOf('function ' + name + '(') >= 0 && serviceSource.indexOf("fbmCommandRun('" + name + "'") >= 0).concat(/function fbmCommandRun\([^)]*\) \{ return runEntryPoint\(name, 'fbm_sync'/.test(serviceSource)), [true, true]);
   // FBM-057: nút hủy phiên cũ. GAS chỉ mở sau khi FBM trả lời từ chối; đăng nhập tự động luôn là login mềm.
   check(so, 'FBM từ chối đăng nhập thì status mở nút hủy phiên cũ; request đăng nhập tự động không mang cờ hủy phiên',
-    [heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.loginRequestPlan('login', {}, heartbeat.FbmSync.credentialRead(), {}).body.force],
+    [heartbeat.FbmSync.statusView().actions.forceLogin, heartbeat.FbmSync.loginRequestPlan('login', {}, heartbeat.FbmSync.credentialRead(), {}).body.force],
     [true, false]);
   const forceLogsBefore = gateLogs.length;
   const forceStart = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('force', {}, heartbeat.FbmSync.stateRead()));
   const forceLoginStep = quaTrang((reply) => (reply.body === TRA_BUOC.login ? { ok: true, request: null, held: heartbeat.FbmSync.stateRead() } : heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply))), forceStart.request).held.cursor;
   const forceLoginRequest = heartbeat.FbmSync.loginStepRequest(forceLoginStep, heartbeat.FbmSync.credentialRead());
   check(so, 'bấm hủy phiên cũ gửi đăng nhập có cờ hủy phiên bằng thông tin đã lưu, đóng nút lại và ghi Log',
-    [forceStart.ok, forceLoginRequest.body.force, forceLoginRequest.meta.fill.credentialRef, heartbeat.FbmSync.statusView().forceLoginOffered, heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('force', {}, heartbeat.FbmSync.stateRead())).code, gateLogs.slice(forceLogsBefore).some((event) => event.action === 'login_force_requested')],
+    [forceStart.ok, forceLoginRequest.body.force, forceLoginRequest.meta.fill.credentialRef, heartbeat.FbmSync.statusView().actions.forceLogin, heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('force', {}, heartbeat.FbmSync.stateRead())).code, gateLogs.slice(forceLogsBefore).some((event) => event.action === 'login_force_requested')],
     [true, true, 'cred-heartbeat-123', false, 'LOGIN_FORCE_NOT_OFFERED', true]);
   heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":false}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: heartbeat.FbmSync.stateRead().activeRequestId }] } }));
   check(so, 'đã hủy phiên cũ mà FBM vẫn báo sai mật khẩu thì nói đúng như vậy và không mở lại nút hủy phiên',
-    [heartbeat.FbmSync.stateRead().message.indexOf('Hủy phiên cũ rồi đăng nhập không thành công: FBM báo sai tên đăng nhập hoặc mật khẩu') === 0, heartbeat.FbmSync.statusView().forceLoginOffered],
+    [heartbeat.FbmSync.stateRead().message.indexOf('Hủy phiên cũ rồi đăng nhập không thành công: FBM báo sai tên đăng nhập hoặc mật khẩu') === 0, heartbeat.FbmSync.statusView().actions.forceLogin],
     [true, false]);
   const throttleText = heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', { retryAt: new Date(2026, 9, 7, 16, 48).getTime() }, heartbeat.FbmSync.loginAttemptRead().lastError);
   check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay',

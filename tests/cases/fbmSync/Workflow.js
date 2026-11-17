@@ -238,7 +238,7 @@ async function chay(so) {
   ], [firstRequest.url, 'User', '461020379855cFHN_CRM_App']);
   const finished = engine.hop.FbmSync.runSlice(() => engine.hop.FbmSync.continue(executorRaw(transport.reply, firstRequest.id)));
   check(so, 'tu dong dien: GAS nhan response Extension va tra draft chua luu binding', [
-    finished.ok, finished.request || null, finished.status.phase, finished.status.metadata.identityProbe, engine.hop.FbmSync.bindingRead().spreadsheetId || null
+    finished.ok, finished.request || null, engine.hop.FbmSync.statusView().phase, engine.hop.FbmSync.statusView().metadata.identityProbe, engine.hop.FbmSync.bindingRead().spreadsheetId || null
   ], [true, null, 'done', { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' }, null]);
 
   const incomplete = workflowGas();
@@ -474,15 +474,15 @@ async function chay(so) {
   const lookupLost = categoryPushRun({ failSecond: true });
   const lostState = lookupLost.F.stateRead();
   check(so, 'giữa lượt đẩy không lấy được danh mục FBM thì dừng paused, không đẩy tiếp, Sidebar thấy lý do và Log ghi lỗi', [
-    lookupLost.issued.length, lostState.phase, lookupLost.lastStep.request, lookupLost.lastStep.status.phase,
+    lookupLost.issued.length, lostState.phase, lookupLost.lastStep.request, lookupLost.F.statusView().phase,
     lookupLost.logs.filter((event) => event.action === 'category_block' && event.outcome === 'error').map((event) => event.reason),
-    (lookupLost.lastStep.status.metadata.categoryBlocks || []).map((block) => block.source + ': ' + block.reason)
+    (lookupLost.F.statusView().metadata.categoryBlocks || []).map((block) => block.source + ': ' + block.reason)
   ], [20, 'paused', null, 'paused', ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR). Bỏ toàn bộ chiều đẩy kỳ này.'], ['@CAT_NGUON_KH: Không lấy được danh mục FBM (TRANSPORT_ERROR).']]);
   const breaker = categoryPushRun({ realBreaker: true, longReason: true }), breakerState = breaker.F.stateRead();
   const breakerStoreText = breaker.F.props().getProperty(breaker.F.PUSH_FAILURES_KEY), breakerStore = JSON.parse(breakerStoreText);
   check(so, 'bản ghi đẩy lỗi chạm pushFailuresMax thì dừng paused, không gửi thêm lệnh FBM, Sidebar thấy tổng và lý do, Log ghi lỗi; khóa lỗi đẩy vẫn dưới 9.000 byte dù lý do dài', [
-    breaker.issued.length, breakerState.phase, breakerState.lastFailureCode, breaker.lastStep.request, breaker.lastStep.status.metadata.pushFailureCount,
-    /20 bản ghi đẩy lỗi/.test(breaker.lastStep.status.message), breaker.logs.filter((event) => event.action === 'push_failures_limit' && event.outcome === 'error').length,
+    breaker.issued.length, breakerState.phase, breakerState.lastFailureCode, breaker.lastStep.request, breaker.F.statusView().metadata.pushFailureCount,
+    /20 bản ghi đẩy lỗi/.test(breaker.F.statusView().message), breaker.logs.filter((event) => event.action === 'push_failures_limit' && event.outcome === 'error').length,
     Buffer.byteLength(breakerStoreText, 'utf8') <= 9000, Object.keys(breakerStore.details).length, Object.keys(breakerStore.details).slice(-1)[0],
     breaker.F.props().getProperty('FBM_SYNC_STATE_V1').indexOf('pushFailure') < 0
   ], [breaker.F.BUDGET.pushFailuresMax, 'paused', 'PUSH_FAILURES_LIMIT', null, 20, true, 1, true, breaker.F.BUDGET.pushFailureDetailsMax, 'customer:C-20', true]);
@@ -800,7 +800,7 @@ async function chay(so) {
   const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
-  deadlineFlow.hop.FbmSync.logStatus(deadlineStatus, 'runtime_limit');
+  deadlineFlow.hop.FbmSync.logStatus(deadlineState, 'runtime_limit');
   const deadlineLog = deadlineLogs[deadlineLogs.length - 1] || {};
   const deadlineUi = taoBoTest();
   deadlineUi.hop.fbmSyncPaint(deadlineStatus);
@@ -826,7 +826,7 @@ async function chay(so) {
   quotaUi.hop.fbmSyncPaint(quotaResult.status);
   check(so, 'DocumentProperties đầy trả DTO lỗi Sidebar, giữ cursor và Log runId/phase/cursor', [
     quotaResult.ok, quotaResult.code, quotaResult.status && quotaResult.status.runId, quotaResult.status && quotaResult.status.phase,
-    quotaResult.status && quotaResult.status.cursor && quotaResult.status.cursor.kind, quotaLog.detail && quotaLog.detail.runId,
+    quotaFlow.hop.FbmSync.stateRead().cursor.kind, quotaLog.detail && quotaLog.detail.runId,
     quotaLog.detail && quotaLog.detail.phase, quotaLog.detail && quotaLog.detail.cursor && quotaLog.detail.cursor.kind,
     quotaUi.content.textContent.indexOf('DocumentProperties') >= 0 || quotaUi.content.textContent.indexOf('lưu trạng thái') >= 0
   ], [false, 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED', 'quota-run', 'error', 'customer_grid', 'quota-run', 'pull_customer', 'customer_grid', true]);
@@ -1216,7 +1216,7 @@ async function chay(so) {
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
   }));
   check(so, 'Dừng khi request đọc đang bay: đóng lượt ngay, response về sau (kể cả lô bị Extension cắt dở) bị loại, không cấp request, không ghi gì vào state', [
-    stopNow.code || '', stopNow.status.phase, stopState.runId === stopStarted.status.runId, JSON.stringify(stopState.cursor), stopped.ok, stopped.code, stopped.request || null, JSON.stringify(stopAfterResponse.hop.FbmSync.stateRead()) === JSON.stringify(stopState)
+    stopNow.code || '', stopAfterResponse.hop.FbmSync.statusView().phase, stopState.runId === stopStarted.status.runId, JSON.stringify(stopState.cursor), stopped.ok, stopped.code, stopped.request || null, JSON.stringify(stopAfterResponse.hop.FbmSync.stateRead()) === JSON.stringify(stopState)
   ], ['SYNC_STOPPED', 'paused', true, '{}', false, 'STALE_RESPONSE', null, true]);
 
   const masterOff = workflowGas();
@@ -1281,7 +1281,7 @@ async function chay(so) {
   const cancelNow = cancelling.hop.FbmSync.runStopCommand('any');
   const cancelState = cancelling.hop.FbmSync.stateRead();
   check(so, 'Dừng khi request dò danh tính đang bay: xóa reservation và cursor ngay, nhớ mã request vừa đóng', [
-    cancelNow.status.phase, cancelState.activeRequestId, JSON.stringify(cancelState.cursor), cancelState.closedRequestId === cancellingStarted.request.id
+    cancelling.hop.FbmSync.statusView().phase, cancelState.activeRequestId, JSON.stringify(cancelState.cursor), cancelState.closedRequestId === cancellingStarted.request.id
   ], ['paused', '', '{}', true]);
 
   const reloaded = workflowGas();

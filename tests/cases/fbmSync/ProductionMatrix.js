@@ -389,7 +389,7 @@ async function chay(so) {
   const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
   const cfBackground = CF.runSlice(() => CF.runConflictOpenCommand());
   const cfAfterBackground = CF.stateRead();
-  check(so, 'Mở xung đột giữa lượt nền trả mã để Sidebar hỏi dừng hay chờ, không phát request và không đụng lượt nền', [cfBackground.code, !!cfBackground.status, cfBackground.request, cfAfterBackground.runId, cfAfterBackground.activeRequestId, cfAfterBackground.metadata.manualPending || null], ['SYNC_BACKGROUND_RUNNING', true, undefined, 'nen-1', 'nen-req', null]);
+  check(so, 'Mở xung đột giữa lượt nền trả mã để Sidebar hỏi dừng hay chờ, không phát request và không đụng lượt nền', [cfBackground.code, cfBackground.request, cfAfterBackground.runId, cfAfterBackground.activeRequestId, cfAfterBackground.metadata.manualPending || null], ['SYNC_BACKGROUND_RUNNING', undefined, 'nen-1', 'nen-req', null]);
   cfAfterBackground.runId = ''; cfAfterBackground.origin = 'manual'; cfAfterBackground.phase = 'done'; cfAfterBackground.activeRequestId = ''; CF.stateWrite(cfAfterBackground);
   const cfOpen = CF.runSlice(() => CF.runConflictOpenCommand());
   check(so, 'FBM-024: phiên mới không làm mất hàng đợi xung đột; mở chế độ xung đột chỉ phát request đọc bản ghi FBM đầu hàng đợi',

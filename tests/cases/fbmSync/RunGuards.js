@@ -90,11 +90,11 @@ function chay(so) {
     ['background', 'customerFull']);
   const manualRequest = F.runSlice(() => F.start({ mode: 'read', manual: true }, F.stateRead()));
   check(so, 'chạy tay giữa lượt nền không tự dừng nền mà trả mã để Sidebar hỏi người dùng',
-    [manualRequest.ok, manualRequest.code, !!manualRequest.status, F.stateRead().runId],
-    [false, 'SYNC_BACKGROUND_RUNNING', true, 'background-run']);
+    [manualRequest.ok, manualRequest.code, F.stateRead().runId],
+    [false, 'SYNC_BACKGROUND_RUNNING', 'background-run']);
   const stopRequest = F.runStopCommand('background'), afterStop = F.stateRead();
   check(so, 'lệnh dừng nền đóng lượt nền ngay: tạm dừng, running:false, giữ runId để vẽ kết quả, nhớ request đang bay, giữ tên tiến trình để lần hỏi sau ghi sổ',
-    [stopRequest.ok, stopRequest.code, stopRequest.status.running, afterStop.phase, afterStop.runId, afterStop.activeRequestId, afterStop.closedRequestId, afterStop.process],
+    [stopRequest.ok, stopRequest.code, F.statusView().running, afterStop.phase, afterStop.runId, afterStop.activeRequestId, afterStop.closedRequestId, afterStop.process],
     [true, 'SYNC_BACKGROUND_STOPPED', false, 'paused', 'background-run', '', 'background-request', 'customerFull']);
   const beforeLate = JSON.stringify(F.stateRead());
   const late = F.runSlice(() => F.continue({ d: { Rows: [] }, transport: { contract, trace: [{ requestId: 'background-request' }] } }));

@@ -41,7 +41,7 @@ FbmSync.conflictPendingNote = function (state, count) {
 
 /** Lỗi chung của chế độ xung đột; trả status để Sidebar vẽ lại đúng state hiện tại. */
 FbmSync.conflictFail = function (code, message) {
-  return { ok: false, code: code, message: message, status: FbmSync.statusView() };
+  return { ok: false, code: code, message: message };
 };
 
 
@@ -61,19 +61,19 @@ FbmSync.runConflictOpenCommand = function () {
     if (state.phase === 'conflict') { state.phase = 'done'; }
     state.message = 'Không còn xung đột chờ quyết.';
     FbmSync.stateWrite(state);
-    return { ok: true, empty: true, remaining: 0, status: FbmSync.statusView() };
+    return { ok: true, empty: true, remaining: 0 };
   }
   var item = queue[0], request = FbmSync.conflictRefreshRequest(item.entity, item, FbmSync.scriptSettings(state));
   if (!request) { return FbmSync.conflictDropUnreadable(state, item.entity, item.id, 'không có ID FBM để đọc lại'); }
   state.cursor = { kind: 'conflict_refresh', entity: item.entity, id: item.id, fbmId: String(item.fbmId || '') };
   state.message = 'Đang đọc FBM để mở xung đột ' + item.id + '...';
   FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sliceIssue(state, request), remaining: queue.length, status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(state, request), remaining: queue.length };
 };
 
 /** Bước kết của chặng `conflict_refresh` trong bảng cursor: trả DTO cho Sidebar, hoặc làm việc ghi chặng đã quyết (tự đóng theo bản FBM, rời hàng đợi). */
 FbmSync.conflictRefreshEnd = function (state, end) {
-  if (end.kind === 'view') { return { ok: true, conflict: end.view, status: FbmSync.statusView() }; }
+  if (end.kind === 'view') { return { ok: true, conflict: end.view }; }
   if (end.kind === 'settle') {
     var read = end.read, settled = FbmSync.conflictSettle(state, read, function (local, latest) { return FbmSync.preserveLocalFields(read.entity, local, latest); }, 'Xung đột ' + read.id + ' không còn trường lệch; đã tự đóng theo bản FBM.');
     return settled.ok ? Object.assign(settled, { conflict: null }) : settled;
@@ -103,7 +103,7 @@ FbmSync.conflictDropUnreadable = function (state, entity, id, reason) {
   if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = 'Bản ghi ' + id + ' ' + reason + '. Đã chuyển sang "' + FbmSync.SYNC_STATUS.missing + '" và rời hàng đợi; kiểm tra bản ghi này trên FBM. Còn ' + remaining + ' xung đột.';
   FbmSync.stateWrite(state);
-  return { ok: false, code: 'CONFLICT_RECORD_UNREADABLE', message: state.message, remaining: remaining, status: FbmSync.statusView() };
+  return { ok: false, code: 'CONFLICT_RECORD_UNREADABLE', message: state.message, remaining: remaining };
 };
 
 /**
@@ -161,7 +161,7 @@ FbmSync.snapshotMatch = function (latest, entity, gate, openedHash) {
 FbmSync.conflictReject = function (state, entity, id, message) {
   state.message = message; FbmSync.stateWrite(state);
   logEvent({ source: 'fbm_sync', action: 'conflict_reopen', outcome: LOG_WARN, entity: entity, recordId: id, cycleId: String(state.runId || ''), reason: message });
-  return { ok: false, code: 'CONFLICT_REOPEN', message: message, status: FbmSync.statusView() };
+  return { ok: false, code: 'CONFLICT_REOPEN', message: message };
 };
 
 /**
@@ -205,5 +205,5 @@ FbmSync.conflictSettle = function (state, read, build, message) {
   if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = message;
   FbmSync.stateWrite(state);
-  return { ok: true, remaining: remaining, status: FbmSync.statusView() };
+  return { ok: true, remaining: remaining };
 };

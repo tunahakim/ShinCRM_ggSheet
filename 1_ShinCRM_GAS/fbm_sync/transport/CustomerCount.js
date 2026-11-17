@@ -59,7 +59,7 @@ FbmSync.runTail = function (result) {
   state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_count' };
   state.message = 'Đang đếm lại số khách FBM...';
   FbmSync.stateWrite(state);
-  return Object.assign({}, result, { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() });
+  return Object.assign({}, result, { ok: true, request: FbmSync.cursorIssue(state) });
 };
 
 /** Đầu vào của chặng đếm, đọc qua cổng chủ: số khách mốc. */
@@ -98,13 +98,13 @@ FbmSync.customerCountEnd = function (state, end) {
   if (end.changed) { state.process = ''; }
   FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
-  if (!end.changed) { return { ok: true, request: null, status: FbmSync.statusView() }; }
+  if (!end.changed) { return { ok: true, request: null }; }
   return FbmSync.recountStart(tail.mode || state.mode, state.origin, carry, state);
 };
 
 /** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`, `follows` là mã lượt vừa đóng để Sidebar đang chờ lượt đó chờ tiếp lượt này); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
 FbmSync.recountStart = function (mode, origin, carry, state) {
   var started = FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false }, carry), state);
-  if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); started.status = FbmSync.statusView(); }
+  if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); }
   return started;
 };

@@ -26,7 +26,7 @@ function chay(so) {
   const doc = hopDangNhap();
   biChan(doc, { origin: 'manual', mode: 'read', scan: 'full', scanPack: 'quick' });
   check(so, 'lượt đồng bộ tay chỉ đọc bị chặn vì còn phiên cũ: mở nút hủy phiên cũ và nhớ đúng chiều, gói của lượt bị chặn',
-    [doc.statusView().forceLoginOffered, doc.stateRead().loginForceResume], [true, { mode: 'read', pack: 'quick' }]);
+    [doc.statusView().actions.forceLogin, doc.stateRead().loginForceResume], [true, { mode: 'read', pack: 'quick' }]);
   const [moDoc, maDangNhap, tiep] = huyPhienCu(doc);
   check(so, 'hủy phiên cũ xong thì GAS mở lại lượt đồng bộ tay cùng chiều và gói, mã lượt mới nối mã lượt đăng nhập để Sidebar chờ tiếp; nút hủy phiên đóng lại',
     [moDoc, tiep.ok, !!tiep.request, doc.stateRead().origin, doc.stateRead().mode, doc.stateRead().scanPack, doc.stateRead().runId !== maDangNhap, doc.statusView().follows === maDangNhap, doc.stateRead().loginForceOffered, doc.stateRead().loginForceResume],

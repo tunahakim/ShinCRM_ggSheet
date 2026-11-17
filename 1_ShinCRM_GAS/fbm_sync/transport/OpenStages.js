@@ -6,14 +6,14 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Kết quả trả về sau khi bước kết đã chọn request kế (hoặc không): lượt đóng lỗi thì trả đúng lý do dừng chứ không trả "không có request". */
 FbmSync.openStageResult = function (state, request) {
-  if (request) { return { ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() }; }
-  if (state.phase === 'error') { return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError }; }
-  return { ok: true, request: null, status: FbmSync.statusView() };
+  if (request) { return { ok: true, request: FbmSync.sliceIssue(state, request) }; }
+  if (state.phase === 'error') { return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError }; }
+  return { ok: true, request: null };
 };
 /** Đổi cursor rồi phát request của cursor mới (qua cổng phiên). */
 FbmSync.openStageMove = function (state, patch) {
   FbmSync.stagePatchApply(state, patch);
-  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state) };
 };
 
 /** Chặng xác thực: lấy mã `authorized` của controller rồi giao bước kết chọn chặng kế. Mã gắn với phiên nên lưu vào ô phiên trước mọi request ghi. */
@@ -66,11 +66,11 @@ FbmSync.identityUserGridEnd = function (state, end) {
   if (end.fail) {
     FbmSync.runFail(state, end.fail.code, end.fail.message);
     FbmSync.stateWrite(state);
-    return FbmSync.runTail({ ok: false, code: end.fail.code, request: null, status: FbmSync.statusView(), error: end.fail.message });
+    return FbmSync.runTail({ ok: false, code: end.fail.code, request: null, error: end.fail.message });
   }
   FbmSync.runClose(state, 'done', { message: 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
   FbmSync.stateWrite(state);
-  return FbmSync.runTail({ ok: true, request: null, status: FbmSync.statusView() });
+  return FbmSync.runTail({ ok: true, request: null });
 };
 
 /** Chặng nạp danh mục đầu lượt (chế độ ghi cần danh mục trước khi dựng payload; chiều đẩy nạp lại giữa các lô ở `push_lookup`). Cả lô lỗi đường truyền thì dừng lượt (không đi tiếp với danh mục rỗng); phần tử nghi phiên thì nhường chặng phiên, cursor còn nguyên nên dựng lại đúng lô. */
@@ -109,5 +109,5 @@ FbmSync.identityCheckGridEnd = function (state, end) {
   FbmSync.identityCheckFinish(state);
   FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' });
   FbmSync.stateWrite(state);
-  return FbmSync.runTail({ ok: true, request: null, status: FbmSync.statusView(), imported: eligible.length });
+  return FbmSync.runTail({ ok: true, request: null, imported: eligible.length });
 };

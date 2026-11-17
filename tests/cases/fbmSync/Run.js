@@ -122,7 +122,7 @@ async function chay(so) {
   Object.assign(cu, { activeRequestId: '', deadlineAt: 0, updatedAt: Date.now() - ket.F.STALE_RUN_MS - 1000 });
   ket.data.FBM_SYNC_STATE_V1 = JSON.stringify(cu);
   const truocStatus = ket.data.FBM_SYNC_STATE_V1, xem = ket.F.statusView();
-  check(so, 'status gặp lượt chết: báo stuck kèm mã và chữ hướng dẫn, không ghi ô lượt', [xem.stuck, xem.stuckCode, /Bấm Đồng bộ/.test(xem.stuckMessage), ket.data.FBM_SYNC_STATE_V1 === truocStatus], [true, 'SYNC_STALE_RUN', true, true]);
+  check(so, 'status gặp lượt chết: báo stuck kèm mã và chữ hướng dẫn, không ghi ô lượt', [xem.stuck, xem.stuckCode, /Bấm Đồng bộ/.test(xem.warnings[0].text), ket.data.FBM_SYNC_STATE_V1 === truocStatus], [true, 'SYNC_STALE_RUN', true, true]);
   const truocMoi = ket.logs.length;
   const moi = ket.F.runSlice(() => ket.F.start({ mode: 'read', origin: 'manual', manual: true }, ket.F.stateRead()));
   const thuHoi = ket.logs.slice(truocMoi).filter((line) => line.action === 'stale_run')[0] || {};

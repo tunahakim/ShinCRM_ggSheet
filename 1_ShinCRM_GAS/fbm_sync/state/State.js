@@ -80,7 +80,7 @@ FbmSync.orchestrationLock = function () { return LockService.getScriptLock(); };
 FbmSync.withOrchestrationLock = function (work, waitMs) {
   var lock = FbmSync.orchestrationLock();
   if (waitMs === undefined) { waitMs = SETTINGS.LOCK_WAIT_MS; }
-  if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.', status: FbmSync.statusView() }; }
+  if (!documentStoreTryLock(lock, waitMs)) { return { ok: false, code: 'BUSY', request: null, message: 'GAS đang xử lý một lượt đồng bộ khác; chưa thay đổi state.' }; }
   // State ghi gộp trước khi nhả khóa, để lượt chờ khóa đọc được bản hoàn chỉnh (PropertyBuffer.js).
   try { return FbmSync.withPropertyBuffer(work); } finally { lock.releaseLock(); }
 };
@@ -289,11 +289,6 @@ FbmSync.stateWriteMinimal = function (full, failure) {
 // Lỗi kho state: gặp ở lần đọc status thì người dùng không tự thoát được, nên GAS mở nút "Đặt lại phiên đồng bộ" (FBM-044).
 FbmSync.STATE_STORAGE_CODES = ['DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTY_CORRUPT', 'FBM_DOCUMENT_PROPERTIES_QUOTA', 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED'];
 FbmSync.stateStorageError = function (error) { return !!error && FbmSync.STATE_STORAGE_CODES.indexOf(String(error.code || '')) >= 0; };
-/** Snapshot thay cho status khi kho state hỏng: lý do kèm cờ mở nút đặt lại. Không ghi Log: cửa lệnh gặp lỗi kho ghi (`storageFailureLog`). */
-FbmSync.stateStuckView = function (error) {
-  var reason = String(error && error.message || error || '');
-  return { ok: false, code: 'SYNC_STATE_STUCK', failureCode: String(error && error.code || ''), resetOffered: true, runId: '', phase: 'error', label: 'Có lỗi', message: 'Màn đồng bộ đang kẹt: ' + reason, lastError: reason, counts: {} };
-};
 /** Xóa ô lượt khỏi kho (lối thoát khi kho state hỏng, lệnh `stateReset`); xóa hỏng thì ném lỗi có mã. */
 FbmSync.stateErase = function () {
   try { FbmSync.props().deleteProperty(FbmSync.STATE_KEY); } catch (deleteError) {

@@ -38,25 +38,14 @@ function chay(so) {
     [nemNen, nenHb.nen.FbmSync.stateRead().phase], ['Lỗi lát nền', 'error']);
 
   const client = dungState();
-  napServer(client.nen, 'fbm_sync/report/Report.js', 'server/log/ClientError.js');
-  client.nen.FbmSync.statusView = () => ({ phase: client.nen.FbmSync.stateRead().phase, lastError: client.nen.FbmSync.stateRead().lastError });
-  const maPhien = String(client.nen.FbmSync.stateRead().runId || '');
+  napServer(client.nen, 'fbm_sync/report/Report.js', 'server/log/ClientError.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/write/RequestBuilders.js');
   const truocLa = client.dong.length;
-  client.nen.FbmSync.logTransportError('Lỗi lưu cài đặt', 'save_connection');
-  client.nen.FbmSync.logTransportError('Lỗi của vòng chạy cũ', 'sync_run', 'ma-phien-khac');
-  check(so, 'Sidebar báo lỗi không kèm đúng mã phiên đang chạy: phiên giữ nguyên, mỗi lỗi một dòng Log nguồn sidebar đúng tên thao tác',
-    [maPhien !== '', client.nen.FbmSync.stateRead().phase, client.dong.slice(truocLa).map((e) => e.source + '|' + e.action + '|' + e.reason)],
-    [true, 'pull_customer', ['sidebar|save_connection|Lỗi lưu cài đặt', 'sidebar|sync_run|Lỗi của vòng chạy cũ']]);
-  const truocClient = client.dong.length;
-  client.nen.FbmSync.logTransportError('Extension không trả response', 'sync_run', maPhien);
-  check(so, 'Sidebar báo lỗi khi phiên đang chạy: phiên chuyển error, bước đang chạy đóng với đúng lý do',
-    [client.nen.FbmSync.stateRead().phase, client.dong.slice(truocClient).filter((e) => e.outcome === 'error').map((e) => e.detail.step).join(','), client.dong.slice(truocClient)[0].reason.indexOf('Extension không trả response') >= 0],
-    ['error', 'pull_customer,run', true]);
-  const truocLan2 = client.dong.length;
-  client.nen.FbmSync.logTransportError('Extension không trả response', 'sync_run', maPhien);
-  client.nen.FbmSync.logTransportError('Lỗi khác sau khi phiên đã dừng', 'sync_run', maPhien);
-  check(so, 'Sidebar báo lỗi khi phiên đã lỗi: lỗi trùng không ghi lại, lỗi mới vẫn có một dòng Log',
-    client.dong.slice(truocLan2).map((e) => e.outcome + '|' + e.reason), ['error|Sidebar báo lỗi phiên đồng bộ: Lỗi khác sau khi phiên đã dừng']);
+  const phaseTruoc = client.nen.FbmSync.stateRead().phase;
+  client.nen.FbmSync.controlDispatch('client_error', { action: 'save_connection', message: 'Lỗi lưu cài đặt' }, 'sidebar');
+  client.nen.FbmSync.controlDispatch('client_error', { action: 'sync_run', message: 'Extension không trả response' }, 'sidebar');
+  check(so, 'Sidebar báo lỗi: mỗi lỗi một dòng Log nguồn sidebar đúng tên thao tác, lượt đang chạy giữ nguyên (lượt chết do nhịp nền thu hồi)',
+    [client.nen.FbmSync.stateRead().phase === phaseTruoc, client.dong.slice(truocLa).filter((e) => e.source === 'sidebar').map((e) => e.action + '|' + e.reason)],
+    [true, ['save_connection|Lỗi lưu cài đặt', 'sync_run|Extension không trả response']]);
   // FBM-009/FBM-020: lỗi theo bản ghi gom trong RAM, xả ra Sheet Log ở ranh giới lát, kể cả khi lát bị exception.
   const gom = dungState();
   napServer(gom.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/report/Report.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/write/SheetSave.js');
@@ -104,10 +93,10 @@ function chay(so) {
   const truocGhi = ghi.dong.length;
   let nemGhi = '';
   try { ghi.nen.FbmSync.controlDispatch('continue', { response: {} }); } catch (err) { nemGhi = err.code; }
-  const sauGhi = ghi.nen.FbmSync.stateRead(), viewGhi = ghi.nen.FbmSync.statusView ? ghi.nen.FbmSync.statusView() : sauGhi;
+  const sauGhi = ghi.nen.FbmSync.stateRead();
   check(so, 'ghi Sheet bị chặn khi pull: phiên chuyển error có lý do đọc được, cursor đứng nguyên, không cộng số thành công',
-    [nemGhi, sauGhi.phase, sauGhi.lastFailureCode, /Không ghi được 2 bản ghi customer vào Sheet.*Mã KH FBM của CUS-3/.test(sauGhi.lastError), JSON.stringify(sauGhi.cursor || {}) === cursorGhi, Number(sauGhi.counts.succeeded || 0), viewGhi.phase],
-    ['FBM_SHEET_WRITE_FAILED', 'error', 'FBM_SHEET_WRITE_FAILED', true, true, 0, 'error']);
+    [nemGhi, sauGhi.phase, sauGhi.lastFailureCode, /Không ghi được 2 bản ghi customer vào Sheet.*Mã KH FBM của CUS-3/.test(sauGhi.lastError), JSON.stringify(sauGhi.cursor || {}) === cursorGhi, Number(sauGhi.counts.succeeded || 0)],
+    ['FBM_SHEET_WRITE_FAILED', 'error', 'FBM_SHEET_WRITE_FAILED', true, true, 0]);
   const dongGhi = ghi.dong.slice(truocGhi);
   check(so, 'ghi Sheet bị chặn khi pull: Log có dòng kết thúc bước với lỗi và dòng lỗi bản ghi mang mã CUS-3',
     [dongGhi.some((e) => e.outcome === 'error' && e.detail && e.detail.step === 'run'), dongGhi.filter((e) => e.action === 'pull_record_issue').map((e) => e.recordId + '|' + e.outcome)],

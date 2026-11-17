@@ -47,11 +47,11 @@ FbmSync.stopAllowed = function (state, scope) {
  */
 FbmSync.runStopCommand = function (scope) {
   var verdict = FbmSync.STOP_SCOPE_VERDICTS[scope], state = FbmSync.stateRead(), refused = FbmSync.stopAllowed(state, scope);
-  if (refused) { return Object.assign(refused, { status: FbmSync.statusView() }); }
+  if (refused) { return refused; }
   FbmSync.stopFlagWrite({ runId: String(state.runId), verdict: verdict, at: Date.now() });
   var applied = FbmSync.withOrchestrationLock(function () { return FbmSync.stopPendingApply(); }, 0);
-  if (applied && applied.code === 'BUSY') { return { ok: true, code: 'SYNC_STOP_PENDING', status: FbmSync.statusView() }; }
-  return { ok: true, code: verdict === 'stopped' ? 'SYNC_BACKGROUND_STOPPED' : 'SYNC_STOPPED', status: FbmSync.statusView() };
+  if (applied && applied.code === 'BUSY') { return { ok: true, code: 'SYNC_STOP_PENDING' }; }
+  return { ok: true, code: verdict === 'stopped' ? 'SYNC_BACKGROUND_STOPPED' : 'SYNC_STOPPED' };
 };
 
 /**

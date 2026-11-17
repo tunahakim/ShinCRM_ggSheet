@@ -5,8 +5,8 @@
 /** Mở ngay một lượt nền chỉ đọc trong khóa điều phối và ranh giới lát như cửa lệnh làm (lệnh `start` của Sidebar chỉ mở lượt tay), để nghiệm thu nút dừng nền mà không chờ nhịp hỏi của Extension. Lượt nằm ở bước kiểm phiên tới khi Extension hỏi; chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
 function fbmDevOpenBackgroundRun() {
   var opened = FbmSync.withOrchestrationLock(function () { return FbmSync.runSlice(function () { return FbmSync.start({ mode: 'read', scan: 'full', origin: 'background', manual: false }, FbmSync.stateRead()); }); });
-  var status = FbmSync.statusView();
-  return { ok: opened && opened.ok !== false, code: opened && opened.code || '', running: status.running, origin: status.origin, phase: status.phase, message: status.message };
+  var state = FbmSync.stateRead();
+  return { ok: opened && opened.ok !== false, code: opened && opened.code || '', running: FbmSync.runInProgress(state), origin: state.origin, phase: state.phase, message: state.message };
 }
 
 /** Nghiệm thu dừng nền bằng đúng các hàm Sidebar gọi: mở lượt nền, lệnh tay bị chặn bằng `SYNC_BACKGROUND_RUNNING`, dừng nền thì kênh rảnh ngay, lệnh tay gọi lại mở được lượt tay; cuối cùng hủy lượt tay để DEV về rảnh. Chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
@@ -31,7 +31,7 @@ function fbmDevProbeStopBackground() {
 /** Request do hàm dò dòng lệnh cấp không có Extension nào gửi đi; báo lỗi truyền tải qua đúng cửa Sidebar dùng để lượt đang chờ đóng lại thay vì treo. Chỉ DEV. */
 function fbmDevReleaseUnsentRequest() {
   var requestId = String(FbmSync.stateRead().activeRequestId || '');
-  if (!requestId) { return { released: false, status: FbmSync.statusView().phase }; }
+  if (!requestId) { return { released: false, status: FbmSync.stateRead().phase }; }
   var state = FbmSync.stateRead();
   var result = FbmSync.controlDispatch('continue', { machineId: String(state.driverMachineId || ''), error: { requestId: requestId, code: 'DEV_PROBE_NOT_SENT', message: 'Hàm dò DEV cấp request nhưng không gửi qua Extension.' } }, 'relay');
   var status = result && (result.status || result) || {};

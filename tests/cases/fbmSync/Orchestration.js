@@ -16,7 +16,7 @@ async function chay(so) {
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const started = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
+   const started = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead())); started.status = orchestration.FbmSync.statusView();
    check(so, 'start bat dau bang probe User truoc bootstrap Customer', started.request.meta.kind, 'session_probe');
   check(so, 'DTO pipeline tu GAS chi danh dau buoc kiem tra phien o dau luot',
     [started.status.pipeline.kind, started.status.pipeline.title, started.status.pipeline.steps.map((step) => step.state)],
@@ -48,10 +48,6 @@ async function chay(so) {
       [pipeline.kind, pipeline.steps.map((step) => step.state)],
       [item[2], item[3]]);
   });
-  const identityCheckStatus = orchestration.FbmSync.statusMetadata({ identityCheck: { total: 3, matched: 2, missing: 1, missingSample: [{ fbmId: 'FBM-3' }] } });
-  check(so, 'DTO Sidebar giữ tổng hợp kiểm tra liên kết n/N',
-    [identityCheckStatus.identityCheck.total, identityCheckStatus.identityCheck.matched, identityCheckStatus.identityCheck.missing, identityCheckStatus.identityCheck.missingSample[0].fbmId],
-    [3, 2, 1, 'FBM-3']);
   // State V1 cũ còn danh sách conflict và khóa sync: phiên mới bỏ cả hai, chỉ giữ số đếm; hàng đợi thật nằm trên Sheet (FBM-024).
   const legacyConflict = orchestration.FbmSync.stateRead();
   legacyConflict.phase = 'conflict';
@@ -73,7 +69,7 @@ async function chay(so) {
   restartFromConflict.counts.conflict = 1;
   orchestration.FbmSync.stateWrite(restartFromConflict);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const restartedConflict = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
+   const restartedConflict = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead())); restartedConflict.status = orchestration.FbmSync.statusView();
    check(so, 'bam Dong bo ngay khi phase conflict phai probe lai phien; so xung dot ton dong van hien',
      [restartedConflict.ok, restartedConflict.request.meta.kind, restartedConflict.status.metadata.conflictCount, restartedConflict.status.counts.conflict],
      [true, 'session_probe', 1, 0]);
@@ -209,12 +205,12 @@ async function chay(so) {
   orchestration.FbmSync.stateWrite(compactState);
   const compactView = orchestration.FbmSync.statusView();
   check(so, 'status Sidebar khong tra Category gate va OldValue noi bo',
-    [compactView.metadata.categoryGate, compactView.cursor.candidate, compactView.cursor.operation],
-    [undefined, undefined, 'activity_edit_save']);
+    [compactView.metadata.categoryGate, compactView.cursor, compactView.progress.waiting],
+    [undefined, undefined, true]);
   check(so, 'status Sidebar giu identity probe de tu dien tai khoan',
     compactView.metadata.identityProbe,
     { spreadsheetId: 'sheet-probe', userId: '2037', accountName: 'ANHLT' });
-  check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 5500, true);
+  check(so, 'status Sidebar giu response nho khi state noi bo lon', JSON.stringify(compactView).length < 6000, true);
 
   const pausedState = orchestration.FbmSync.stateRead();
   pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};

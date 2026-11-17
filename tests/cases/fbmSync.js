@@ -45,6 +45,7 @@ const NHOM = [
   require("./fbmSync/Identity"),
   require("./fbmSync/WebAppRelay"),
   require("./fbmSync/Orchestration"),
+  require("./fbmSync/StatusView"),
   require("./fbmSync/LookupFlow"),
   require("./fbmSync/PushConfig"),
   require("./fbmSync/LegacyTrigger"),

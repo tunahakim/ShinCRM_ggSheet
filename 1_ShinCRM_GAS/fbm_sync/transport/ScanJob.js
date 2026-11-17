@@ -109,7 +109,7 @@ FbmSync.scanRecoverRun = function (state, plan, code, message) {
   var windowStart = windows ? FbmSync.activityWindowStart(FbmSync.readLocal('activity'), FbmSync.dateNormalize(new Date(now))) : '';
   var cfg = FbmSync.scriptSettings(state), scope = FbmSync.scanJobScope(state.cursor || {});
   var out = FbmSync.stageCall(state, function (copy) { return windows ? FbmSync.activityWindowPlan(copy, code, message, windowStart, now, cfg) : FbmSync.scanRestartPlan(copy, message, cfg, scope); });
-  var result = { ok: true, request: FbmSync.sliceIssue(state, out.next), status: FbmSync.statusView() };
+  var result = { ok: true, request: FbmSync.sliceIssue(state, out.next) };
   if (!windows) { result.restarted = true; }
   return result;
 };

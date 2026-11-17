@@ -62,7 +62,7 @@ function kiemLenhLuu(so) {
     [goiSai.ok, nen.hop.settingsValue('fbm_master', 'enabled'), buoc], [false, true, []]);
   const goiDat = luu({ fbm_run: { approvalThreshold: '4' }, fbm_master: { enabled: false } });
   check(so, 'cả gói đạt thì ghi cả hai và công tắc vừa tắt áp điều kiện dừng ngay, trả cài đặt và trạng thái mới',
-    [goiDat.ok, nen.hop.settingsValue('fbm_run', 'approvalThreshold'), nen.hop.settingsValue('fbm_master', 'enabled'), buoc, goiDat.status.phase], [true, 4, false, ['stop'], 'idle']);
+    [goiDat.ok, nen.hop.settingsValue('fbm_run', 'approvalThreshold'), nen.hop.settingsValue('fbm_master', 'enabled'), buoc, nen.hop.FbmSync.statusView().phase], [true, 4, false, ['stop'], 'idle']);
 
   const giu = nen.props['SETTINGS:fbm_run'];
   const thieu = luu({ fbm_run: { scopeCodes: 'ALT00010, CUS-029999' } });

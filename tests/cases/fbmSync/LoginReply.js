@@ -44,7 +44,7 @@ async function chay(so) {
   const ketQua = traLoi(sai.F, '{"d":false}');
   const dongLoi = sai.logs.filter((line) => line.action === 'login_failure')[0] || {};
   check(so, 'sai mật khẩu chạy nền: lượt đóng lỗi, dòng Log ghi lúc lượt còn mở, báo đúng lý do và máy ngừng tự đăng nhập, không mở nút hủy phiên cũ', [
-    ketQua.code, sai.F.stateRead().phase, sai.F.runInProgress(sai.F.stateRead()), dongLoi.open, sai.F.stateRead().message.indexOf('FBM báo sai tên đăng nhập hoặc mật khẩu. Máy ngừng tự đăng nhập') > 0, Object.assign({}, sai.F.credentialRead(), sai.F.loginAttemptRead()).loginHalted, sai.F.statusView().forceLoginOffered
+    ketQua.code, sai.F.stateRead().phase, sai.F.runInProgress(sai.F.stateRead()), dongLoi.open, sai.F.stateRead().message.indexOf('FBM báo sai tên đăng nhập hoặc mật khẩu. Máy ngừng tự đăng nhập') > 0, Object.assign({}, sai.F.credentialRead(), sai.F.loginAttemptRead()).loginHalted, sai.F.statusView().actions.forceLogin
   ], ['AUTO_LOGIN_FAILED', 'error', false, true, true, true, false]);
   check(so, 'đã ngừng thì chặn cả lượt bấm tay (mỗi lần bấm là một lần gửi lại mật khẩu sai) và nói lý do lần trước; lưu lại thông tin đăng nhập thì mở lại', [
     congTay(sai.F).code, sai.F.autoLoginBlockMessage('AUTO_LOGIN_HALTED', null, sai.F.loginAttemptRead().lastError).indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0,
@@ -58,7 +58,7 @@ async function chay(so) {
   const cu = hopDangNhap();
   traLoi(cu.F, '{"d":"Duplicate"}');
   check(so, 'còn phiên cũ chạy nền: lượt đóng lỗi, không ngừng tự đăng nhập mà hẹn chu kỳ thử lại, mở nút hủy phiên cũ', [
-    cu.F.stateRead().phase, Object.assign({}, cu.F.credentialRead(), cu.F.loginAttemptRead()).loginHalted, cu.F.stateRead().message.indexOf('còn giữ phiên đăng nhập cũ') > 0, cu.F.stateRead().message.indexOf('Chạy nền tự thử lại sau 30 phút') > 0, cu.F.statusView().forceLoginOffered
+    cu.F.stateRead().phase, Object.assign({}, cu.F.credentialRead(), cu.F.loginAttemptRead()).loginHalted, cu.F.stateRead().message.indexOf('còn giữ phiên đăng nhập cũ') > 0, cu.F.stateRead().message.indexOf('Chạy nền tự thử lại sau 30 phút') > 0, cu.F.statusView().actions.forceLogin
   ], ['error', false, true, true, true]);
 
   // Gặp thật 2026-10-07: FBM trả {"d":null}; câu trả lời chưa gặp không được đoán thành phiên cũ hay sai mật khẩu.
@@ -68,7 +68,7 @@ async function chay(so) {
   traLoi(la.F, '{"d":"Locked"}', true);
   const tayText = la.F.stateRead().message, dongLa = la.logs.filter((line) => line.action === 'login_failure');
   check(so, 'câu trả lời chưa gặp: báo chưa gặp và ngừng tự đăng nhập; lượt bấm tay không hứa tự thử lại mà chỉ cách xem trên tab FBM; không mở nút hủy phiên cũ; Log ghi dạng của d và mã chữ ngắn', [
-    nenText.indexOf('câu trả lời chưa gặp') > 0, nenText.indexOf('Máy ngừng tự đăng nhập') > 0, tayText.indexOf('Đăng nhập thử') > 0, tayText.indexOf('tự thử lại') < 0, la.F.statusView().forceLoginOffered, Object.assign({}, la.F.credentialRead(), la.F.loginAttemptRead()).loginHalted, dongLa.map((line) => line.detail.response.dType + ':' + (line.detail.response.dCode || ''))
+    nenText.indexOf('câu trả lời chưa gặp') > 0, nenText.indexOf('Máy ngừng tự đăng nhập') > 0, tayText.indexOf('Đăng nhập thử') > 0, tayText.indexOf('tự thử lại') < 0, la.F.statusView().actions.forceLogin, Object.assign({}, la.F.credentialRead(), la.F.loginAttemptRead()).loginHalted, dongLa.map((line) => line.detail.response.dType + ':' + (line.detail.response.dCode || ''))
   ], [true, true, true, true, false, true, ['null:', 'string:Locked']]);
 
   // Đăng nhập thử bằng bản nháp chưa lưu không chứng minh thông tin đã lưu sai.

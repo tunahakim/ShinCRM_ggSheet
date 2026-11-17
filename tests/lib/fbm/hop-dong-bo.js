@@ -65,6 +65,13 @@ function workflowGas(options) {
     'server/service/FbmSyncService.js',
     'server/dev/FbmSyncStateProbe.js'
   , 'fbm_sync/write/SheetSave.js', ...(opt.extraFiles || []));
+  // Cửa lệnh gắn status sau khi nhả khóa; ca kiểm gọi thẳng lát nên hộp gắn giống vậy để đọc status của đúng bước.
+  const runSlice = hop.FbmSync.runSlice;
+  hop.FbmSync.runSlice = function (work, state) {
+    const result = runSlice.call(this, work, state);
+    if (result && typeof result === 'object' && !result.status) { result.status = hop.FbmSync.statusView(); }
+    return result;
+  };
   hop.FbmSync.currentSpreadsheetId = () => 'sheet-workflow';
   hop.FbmSync.configValue = () => '';
   // `readLocal: 'sheet'` giữ readLocal thật (đi qua bản chụp Sheet) để đếm số lần đọc Sheet.

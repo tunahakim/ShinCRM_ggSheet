@@ -59,7 +59,7 @@ FbmSync.settingsSaveCommand = function (input) {
   if (merged[FbmSync.SETTING_SECTIONS.master] && merged[FbmSync.SETTING_SECTIONS.master].enabled === false) { FbmSync.stopPendingApply(); }
   if (merged[FbmSync.SETTING_SECTIONS.background]) { FbmSync.scheduleRetryClear(); }
   FbmSync.scopeLengthWarn(scopeLines);
-  return { ok: true, scopeLines: scopeLines, settings: FbmSync.settingsView(), status: FbmSync.statusView() };
+  return { ok: true, scopeLines: scopeLines, settings: FbmSync.settingsView() };
 };
 
 /** Bước sau khi lịch nền đã lưu (trong khóa điều phối của lệnh): đọc sổ tiến trình, xóa lịch thử lại của tiến trình đang tắt, có xóa thì ghi một lần. */
@@ -89,7 +89,7 @@ FbmSync.masterSwitchCommand = function (enabled) {
   var saved = settingsSave(patches);
   if (!saved.ok) { return FbmSync.settingsRejected(saved.problems, null); }
   var stop = enabled === true ? null : FbmSync.runStopCommand('master');
-  return { ok: true, enabled: enabled === true, code: stop ? stop.code : '', status: FbmSync.statusView() };
+  return { ok: true, enabled: enabled === true, code: stop ? stop.code : '' };
 };
 
 /** Lệnh `set_background` (trong khóa): bật/tắt lịch nền qua cổng cài đặt. */
@@ -98,7 +98,7 @@ FbmSync.backgroundSwitchCommand = function (enabled) {
   patches[FbmSync.SETTING_SECTIONS.background] = { enabled: enabled === true };
   var saved = settingsSave(patches);
   if (!saved.ok) { return FbmSync.settingsRejected(saved.problems, null); }
-  return { ok: true, enabled: enabled === true, settings: FbmSync.settingsView(), status: FbmSync.statusView() };
+  return { ok: true, enabled: enabled === true, settings: FbmSync.settingsView() };
 };
 
 /** Lệnh `reset_settings` (trong khóa): đặt một phần cài đặt FBM về mặc định, lối thoát khi khóa của phần đó hỏng. Ghi Log vì đây là xóa cài đặt người dùng đã đặt. */
@@ -107,7 +107,7 @@ FbmSync.settingsResetCommand = function (input) {
   settingsReset(section.name);
   if (section.name === FbmSync.SETTING_SECTIONS.background) { FbmSync.scheduleRetryClear(); }
   logEvent({ source: 'fbm_sync', action: 'settings_reset', outcome: LOG_WARN, reason: 'Đã đặt "' + section.label + '" về mặc định theo yêu cầu người dùng.', detail: { section: section.name } });
-  return { ok: true, settings: FbmSync.settingsView(), status: FbmSync.statusView() };
+  return { ok: true, settings: FbmSync.settingsView() };
 };
 
 /**
@@ -132,7 +132,7 @@ FbmSync.backgroundMachineAssignCommand = function (input) {
   if (!machineId) { var missing = new Error('Chưa có mã máy Extension: máy này chưa cài Extension ShinCRM hoặc Extension chưa chạy.'); missing.code = 'MACHINE_ID_REQUIRED'; throw missing; }
   var previous = FbmSync.backgroundMachineRead(), machine = FbmSync.backgroundMachineWrite(FbmSync.machineAssigned(machineId, input.name, Date.now()));
   logEvent({ source: 'fbm_sync', action: 'background_machine_assign', outcome: LOG_OK, reason: 'Giao máy "' + machine.name + '" chạy đồng bộ nền' + (previous.machineId && previous.machineId !== machineId ? ' thay máy "' + previous.name + '".' : '.'), detail: { machineId: machine.machineId, fromMachineId: previous.machineId } });
-  return { ok: true, status: FbmSync.statusView() };
+  return { ok: true };
 };
 
 /** Lệnh `release_background_machine` (trong khóa): gỡ máy chạy nền; từ lần hỏi kế, không máy nào chạy nền tới khi giao máy mới. */
@@ -140,5 +140,5 @@ FbmSync.backgroundMachineReleaseCommand = function () {
   var previous = FbmSync.backgroundMachineRead();
   FbmSync.backgroundMachineWrite(null);
   logEvent({ source: 'fbm_sync', action: 'background_machine_release', outcome: LOG_WARN, reason: previous.machineId ? 'Đã gỡ máy "' + previous.name + '" khỏi chạy nền; chưa máy nào chạy đồng bộ nền.' : 'Gỡ máy chạy nền khi chưa giao máy nào.', detail: { machineId: previous.machineId } });
-  return { ok: true, status: FbmSync.statusView() };
+  return { ok: true };
 };

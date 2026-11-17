@@ -48,7 +48,7 @@ function kiemKhoTrangThai(so) {
   Object.assign(F, { identityStatus: () => ({ status: 'BOUND' }), settingsView: () => ({}), credentialPublicView: () => ({ configured: true }) });
   const ket = trongLanGoi(nen.hop, () => F.statusRead()).status;
   check(so, 'state hỏng thì status trả "kẹt" kèm nút đặt lại và ghi Log, không ném lỗi',
-    [ket.code, ket.resetOffered, ket.phase, docLog(nen).some((row) => row.join('|').indexOf('state_stuck') >= 0)], ['SYNC_STATE_STUCK', true, 'error', true]);
+    [ket.code, ket.actions.reset, ket.phase, docLog(nen).some((row) => row.join('|').indexOf('state_stuck') >= 0)], ['SYNC_STATE_STUCK', true, 'error', true]);
   const datLai = trongLanGoi(nen.hop, () => F.stateReset());
   check(so, 'đặt lại xóa state phiên hỏng, giữ hash chờ xác nhận và ghi Log',
     [datLai.ok, nen.props.FBM_SYNC_STATE_V1, nen.props.FBM_SYNC_PENDING_PUSHES_V1, F.stateRead().phase, docLog(nen).some((row) => row.join('|').indexOf('state_reset') >= 0)],

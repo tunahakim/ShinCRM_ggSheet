@@ -14,7 +14,7 @@ FbmSync.runSlice = function (work, state) {
   if (owner) { FbmSync.sliceStore = { state: state || null, snapshot: state ? JSON.stringify(state) : '', dirty: false }; }
   try {
     // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
-    result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() } : FbmSync.stopBeforeIssue(work());
+    result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null } : FbmSync.stopBeforeIssue(work());
   } catch (error) {
     failure = error;
     FbmSync.controlFailRun(error);
@@ -38,7 +38,7 @@ FbmSync.sliceClose = function (failure) {
 FbmSync.stopBeforeIssue = function (result) {
   if (!result || !result.request) { return result; }
   if (!FbmSync.stopPendingApply(true).stopped) { return result; }
-  return Object.assign({}, result, { code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() });
+  return Object.assign({}, result, { code: 'SYNC_STOPPED', request: null });
 };
 /**
  * Lát trả lời không kèm request trong khi lượt còn ở phase đang chạy và không request nào đang chờ: không ai còn đẩy lượt đi tiếp (Extension hết việc, Sidebar không có gì để gửi).
@@ -51,7 +51,7 @@ FbmSync.runLeftOpenClose = function (result) {
   var phase = String(state.phase || ''), cursorKind = String(state.cursor && state.cursor.kind || '');
   FbmSync.runFailCurrent('GAS trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt để lịch nền chạy lại ở lần hỏi sau.', 'RUN_LEFT_OPEN');
   logEvent({ source: 'fbm_sync', action: 'run_left_open', outcome: LOG_ERROR, cycleId: String(state.runId || ''), reason: 'Lỗi GAS: trả lời hết việc trong khi lượt vẫn mở (phase ' + phase + ', cursor ' + (cursorKind || 'trống') + '); đã đóng lượt.' });
-  return Object.assign({}, result, { ok: false, code: 'RUN_LEFT_OPEN', status: FbmSync.statusView(), error: FbmSync.stateRead().lastError });
+  return Object.assign({}, result, { ok: false, code: 'RUN_LEFT_OPEN', error: FbmSync.stateRead().lastError });
 };
 
 /** Ghi phiên lỗi sau exception của lát. Lỗi gốc luôn được ném lại ở chỗ gọi; ghi state hỏng thì chỉ thêm một dòng Log, không thay lỗi gốc. */
@@ -213,7 +213,7 @@ FbmSync.stageRun = function (entry, state, rawResponse) {
   var inputs = entry.inputs ? entry.inputs(state, rawResponse) : {}, settings = FbmSync.scriptSettings(state), out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, settings: settings, now: Date.now() }); });
   if (out.session && out.session.suspected) { return FbmSync.sessionSuspectRun(state, out.session.suspected); }
   if (kind !== 'session' && state.metadata && state.metadata.suspectReplayed === true) { FbmSync.stagePatchApply(state, { metadata: { suspectReplayed: false } }); }
-  if (out.next) { return { ok: true, request: FbmSync.sliceIssue(state, out.next), status: FbmSync.statusView() }; }
+  if (out.next) { return { ok: true, request: FbmSync.sliceIssue(state, out.next) }; }
   if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
   return entry.end(state, out.end);
 };
@@ -283,7 +283,7 @@ FbmSync.stagePatchApply = function (state, patch) {
  */
 FbmSync.replyAdmit = function (state, requestId, rawResponse) {
   var stale = FbmSync.staleRunCheck(state, Date.now());
-  if (stale) { var closed = FbmSync.staleRunClose(state, stale); return { ok: false, code: closed.lastFailureCode, request: null, status: FbmSync.statusView(), error: closed.lastError, stale: true }; }
+  if (stale) { var closed = FbmSync.staleRunClose(state, stale); return { ok: false, code: closed.lastFailureCode, request: null, error: closed.lastError, stale: true }; }
   if (!FbmSync.requestAnswered(state, requestId)) { return FbmSync.staleReplyDrop(state, requestId, !rawResponse); }
   return rawResponse ? FbmSync.contractGate(state, rawResponse) : null;
 };
@@ -296,10 +296,10 @@ FbmSync.sliceContinue = function (input, state) {
   FbmSync.traceImport(state, input.clientTrace);
   if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return FbmSync.transportFailureRun(input.error); }
-  if (input.source === 'relay' && !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', request: null, status: FbmSync.statusView() }; }
+  if (input.source === 'relay' && !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', request: null }; }
   // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật. Xét theo lượt chứ không theo kênh: lượt tay cũng nộp qua relay.
-  var before = FbmSync.statusView(), result = FbmSync.continue(input.response);
-  if (before.origin !== 'background' && result && FbmSync.shouldLogStatus(before, result.status)) { FbmSync.logStatus(result.status, 'slice'); }
+  var before = FbmSync.stateRead(), result = FbmSync.continue(input.response), after = FbmSync.stateRead();
+  if (before.origin !== 'background' && result && FbmSync.shouldLogStatus(before, after)) { FbmSync.logStatus(after, 'slice'); }
   return result;
 };
 
@@ -307,7 +307,7 @@ FbmSync.sliceContinue = function (input, state) {
 FbmSync.staleReplyDrop = function (state, requestId, isError) {
   FbmSync.logStaleResponse(state, requestId, isError ? 'transport_failure_stale' : 'stale_response');
   var message = isError ? 'Lỗi cầu nối không còn thuộc request đang chờ.' : 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.';
-  return { ok: false, code: 'STALE_RESPONSE', request: null, status: FbmSync.statusView(), error: message };
+  return { ok: false, code: 'STALE_RESPONSE', request: null, error: message };
 };
 
 /**
@@ -338,5 +338,5 @@ FbmSync.transportFailureRun = function (payload) {
     Object.assign(state, { activeRequestId: '', deadlineAt: 0, lastFailureCode: failureCode, retryable: false, lastError: failureMessage, message: failureMessage, cursor: {}, phase: 'error' });
   }
   FbmSync.stateWrite(state);
-  return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
+  return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError };
 };

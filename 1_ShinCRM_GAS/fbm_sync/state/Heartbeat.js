@@ -32,7 +32,7 @@ FbmSync.keepaliveCountOpen = function (direction, carry) {
   var state = FbmSync.runOpen({ origin: 'background', mode: direction, scan: 'keepalive', phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_count' }, message: 'Đang giữ phiên FBM...', process: carry.process, pollAt: carry.pollAt });
   state.scheduleMode = FbmSync.modeOf(direction);
   state.metadata.countTail = { pending: false, mode: state.scheduleMode, message: 'Giữ phiên FBM OK.', recount: FbmSync.customerCountApplies(direction) };
-  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state) };
 };
 
 /**
@@ -60,7 +60,7 @@ FbmSync.backgroundTail = function (result) {
   var state = FbmSync.stateRead(), pollAt = Number(state.pollAt || 0);
   if (FbmSync.processOutcome(state) !== 'done' || !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled') || !settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled')) { return result; }
   var next = FbmSync.backgroundNext({ now: Date.now(), pollAt: pollAt, book: FbmSync.processBookRead() });
-  return Object.assign({}, result, { ok: true, request: next && next.request || null, status: FbmSync.statusView() });
+  return Object.assign({}, result, { ok: true, request: next && next.request || null });
 };
 
 /** Máy hỏi chạy nền được hay không, và ghi kho máy: máy được giao ghi lần hỏi cuối; máy tự nhận ghi thành máy được giao kèm Log và thông báo chung (còn tới khi người dùng bấm ✕); máy lạ ghi Log. Trả kết luận của `machineCheck`. */
@@ -106,8 +106,8 @@ FbmSync.heartbeatDecide = function (input) {
   var verdict = FbmSync.machineAskRecord({ machineId: machineId, keyRefs: ask.keyRefs }, now);
   // Máy đang chở lượt tay của chính nó vẫn giữ chuông dù không phải máy nền.
   var driving = FbmSync.runInProgress(state) && String(state.driverMachineId || '') === machineId;
-  if (verdict.verdict === 'refused') { return { ok: true, noop: true, code: verdict.code, request: null, poll: driving ? FbmSync.pollKeep() : FbmSync.pollStop(verdict.code), status: FbmSync.statusView() }; }
-  var idle = function (code, extra) { return Object.assign({ ok: true, noop: true, code: code, request: null, poll: FbmSync.pollKeep(), status: FbmSync.statusView() }, extra || {}); };
+  if (verdict.verdict === 'refused') { return { ok: true, noop: true, code: verdict.code, request: null, poll: driving ? FbmSync.pollKeep() : FbmSync.pollStop(verdict.code) }; }
+  var idle = function (code, extra) { return Object.assign({ ok: true, noop: true, code: code, request: null, poll: FbmSync.pollKeep() }, extra || {}); };
   if (purpose === 'check') { return idle('ASK_CHECK_ONLY'); }
   var stale = FbmSync.staleRunCheck(state, now, { abandoned: true });
   // Lượt nền bị đóng vì bỏ dở là lần lỗi của tiến trình của nó: `runClose` ghi sổ ngay để tiến trình đó chờ thử lại, không chạy lại liền trong lần hỏi này.
@@ -120,5 +120,5 @@ FbmSync.heartbeatDecide = function (input) {
   // Lượt nền mở trong lát như lượt tay: lỗi giữa lúc mở đóng lượt lỗi, và mọi sửa ô lượt được ghi một lần cuối lát.
   var started = FbmSync.runSlice(function () { return FbmSync.backgroundNext({ now: now, pollAt: now, book: book, startup: purpose === 'startup' }); }, state);
   if (!started) { return idle('NO_PROCESS_DUE'); }
-  return Object.assign({}, started, { request: started.request || null, poll: FbmSync.pollKeep(), status: FbmSync.statusView() });
+  return Object.assign({}, started, { request: started.request || null, poll: FbmSync.pollKeep() });
 };

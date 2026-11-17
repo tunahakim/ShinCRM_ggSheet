@@ -8,6 +8,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * `reply`: lệnh mang kết quả FBM hoặc báo lỗi về; GAS bận mà bỏ thì bên gửi không gửi lại, nên phải ghi Log lúc bỏ.
  * `relay`: Web App relay được gọi lệnh này.
  * `drives`: lệnh mở lượt Extension phải chở; Sidebar gửi kèm mã máy Extension sẽ nhận lượt, thiếu thì từ chối trước khi chạy để không có lượt mở mà không ai nhận được.
+ * `view: false`: kết quả không mang status (lệnh tự trả gói đọc riêng hoặc không liên quan màn đồng bộ). Mọi lệnh khác nhận status do cửa lệnh gắn đúng một lần ở cuối, công cụ không tự gắn.
  * `guard`: phép chặn chạy trong khóa trước người điều phối và trước ranh giới lát; nhận ô lượt cửa lệnh đọc trong khóa, không tự đọc; trả kết quả là từ chối, không ghi gì.
  */
 FbmSync.COMMANDS = {
@@ -28,12 +29,13 @@ FbmSync.COMMANDS = {
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
   retry_push_failures: { lock: true, run: function () { return FbmSync.pushFailuresClearCommand(); } },
-  client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace); return { ok: true, status: FbmSync.logTransportError(input.message, input.action, input.runId) }; } },
-  relay_config: { lock: true, run: function () { return FbmSync.relayConfig(false); } },
-  relay_rotate_key: { lock: true, run: function () { return FbmSync.relayConfig(true); } },
-  relay_switch_log: { run: function (input) { return FbmSync.relaySwitchDecisionLog(input.decision === 'switch' ? 'switch' : 'keep', input.fromSpreadsheetId); } },
-  status: { run: function () { return FbmSync.statusRead(); } },
-  trace_read: { run: function () { return { ok: true, trace: FbmSync.traceRead(24) }; } }
+  // Lỗi Sidebar chỉ ghi Log: lượt chỉ đóng qua `continue` mang lỗi của Extension, một nút bấm hỏng không được đóng lượt.
+  client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace); clientErrorLog(input.action, String(input.message || 'Sidebar báo lỗi không kèm lý do.')); return { ok: true }; } },
+  relay_config: { lock: true, view: false, run: function () { return FbmSync.relayConfig(false); } },
+  relay_rotate_key: { lock: true, view: false, run: function () { return FbmSync.relayConfig(true); } },
+  relay_switch_log: { view: false, run: function (input) { return FbmSync.relaySwitchDecisionLog(input.decision === 'switch' ? 'switch' : 'keep', input.fromSpreadsheetId); } },
+  status: { view: false, run: function () { return FbmSync.statusRead(); } },
+  trace_read: { view: false, run: function () { return { ok: true, trace: FbmSync.traceRead(24) }; } }
 };
 
 FbmSync.commandSpec = function (name) {
@@ -74,6 +76,8 @@ FbmSync.controlDispatch = function (command, payload, channel) {
   };
   try {
     result = spec.lock ? FbmSync.withOrchestrationLock(run) : run();
+    // Đọc sau khi nhả khóa: kho ghi chờ đã xả, status thấy đúng thứ lệnh vừa ghi.
+    if (spec.view !== false) { result.status = FbmSync.statusReadSafe(); }
   } catch (error) {
     if (!FbmSync.stateStorageError(error)) { throw error; }
     result = FbmSync.storageFailureResult(error);
@@ -97,11 +101,13 @@ FbmSync.channelResult = function (result, via) {
 
 /** Kho state hỏng khi đang ghi: trả status "kẹt" kèm lối đặt lại thay vì ném, không thì người dùng không có lối thoát (FBM-044). */
 FbmSync.storageFailureResult = function (error) {
-  var code = String(error && error.code || ''), status;
-  try { status = FbmSync.statusView(); } catch (readError) { status = FbmSync.stateStuckView(readError); FbmSync.storageFailureLog(error, status); return { ok: false, code: status.code, error: status.lastError, status: status }; }
-  FbmSync.storageFailureLog(error, status);
+  var code = String(error && error.code || ''), input, status;
+  try { input = FbmSync.statusInputRead(); } catch (readError) { status = FbmSync.stateStuckView(readError); FbmSync.storageFailureLog(error, status, null); return { ok: false, code: status.code, error: status.lastError, status: status }; }
+  status = FbmSync.statusViewBuild(input);
+  FbmSync.storageFailureLog(error, status, input.state);
   // Phiên còn đứng ở pha đang chạy nghĩa là cả bản state rút gọn cũng không ghi được: mở lối đặt lại.
-  status.resetOffered = FbmSync.ACTIVE_PHASES.indexOf(String(status.phase || '')) >= 0;
+  status.actions.reset = status.running === true;
+  status.tone = 'error';
   status.ok = false;
   status.phase = 'error';
   status.lastFailureCode = code;
@@ -112,10 +118,10 @@ FbmSync.storageFailureResult = function (error) {
 };
 
 /** Một dòng Log cho lỗi kho state mà cửa lệnh bắt được: công cụ kho chỉ ném lỗi kèm `detail`, không tự ghi. */
-FbmSync.storageFailureLog = function (error, status) {
+FbmSync.storageFailureLog = function (error, status, state) {
   var minimal = error && error.minimal, view = status || {};
   var message = String(error && error.message || error) + (minimal ? ' Đã lưu bản rút gọn để đóng phiên ở "' + String(minimal.state.phase || '') + '"' + (minimal.cursorKept ? '.' : ', bỏ cả con trỏ và khóa ghi.') : '');
-  logEvent({ source: 'fbm_sync', action: error && error.detail ? 'state_write' : 'state_stuck', outcome: LOG_ERROR, cycleId: String(view.runId || ''), reason: String(error && error.code || ''), detail: Object.assign({ message: message, runId: String(view.runId || ''), phase: String(view.phase || ''), cursor: view.cursor || {}, minimal: !!minimal }, error && error.detail || {}) });
+  logEvent({ source: 'fbm_sync', action: error && error.detail ? 'state_write' : 'state_stuck', outcome: LOG_ERROR, cycleId: String(view.runId || ''), reason: String(error && error.code || ''), detail: Object.assign({ message: message, runId: String(view.runId || ''), phase: String(view.phase || ''), cursor: (minimal ? minimal.state.cursor : state && state.cursor) || {}, minimal: !!minimal }, error && error.detail || {}) });
 };
 
 /**
@@ -174,7 +180,7 @@ FbmSync.commandStart = function (input) {
   FbmSync.stopPendingApply();
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };
   var result = spec.slice ? FbmSync.runSlice(run) : run();
-  if (kind === 'sync' && result && result.status) { FbmSync.logStatus(result.status, 'start'); }
+  if (kind === 'sync' && result) { FbmSync.logStatus(FbmSync.stateRead(), 'start'); }
   return result;
 };
 
@@ -184,9 +190,9 @@ FbmSync.commandStart = function (input) {
 FbmSync.continueGuard = function (input, state) {
   var machineId = String(input.machineId || '');
   if (state.runId && String(state.driverMachineId || '') !== machineId) {
-    return { ok: false, code: 'RUN_DRIVER_MISMATCH', message: 'Lượt ' + String(state.runId) + ' đang do máy khác chở; GAS không nhận kết quả từ máy này.', status: FbmSync.statusView() };
+    return { ok: false, code: 'RUN_DRIVER_MISMATCH', message: 'Lượt ' + String(state.runId) + ' đang do máy khác chở; GAS không nhận kết quả từ máy này.' };
   }
-  if (!input.response && !input.error) { return { ok: false, code: 'CONTINUE_EMPTY', message: 'Lệnh nộp không mang kết quả hay lỗi của request nào.', status: FbmSync.statusView() }; }
+  if (!input.response && !input.error) { return { ok: false, code: 'CONTINUE_EMPTY', message: 'Lệnh nộp không mang kết quả hay lỗi của request nào.' }; }
   return null;
 };
 
@@ -195,13 +201,19 @@ FbmSync.continueGuard = function (input, state) {
  * Kho state hỏng thì phần trạng thái là bản "kẹt" kèm nút đặt lại, các phần khác vẫn đọc bình thường.
  */
 FbmSync.statusRead = function () {
-  var status;
-  try { status = FbmSync.statusView(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } status = FbmSync.stateStuckView(error); FbmSync.storageFailureLog(error, status); }
-  return { ok: true, status: status, identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.credentialPublicView() };
+  return { ok: true, status: FbmSync.statusReadSafe(), identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.credentialPublicView() };
+};
+/** Status của cửa lệnh; kho state hỏng thì thành bản "kẹt" kèm nút đặt lại thay vì ném, để người dùng luôn có lối thoát. */
+FbmSync.statusReadSafe = function () {
+  try { return FbmSync.statusView(); } catch (error) {
+    if (!FbmSync.stateStorageError(error)) { throw error; }
+    var stuck = FbmSync.stateStuckView(error);
+    FbmSync.storageFailureLog(error, stuck);
+    return stuck;
+  }
 };
 /** Đặt lại phiên kẹt rồi trả status mới; bị từ chối thì trả status hiện tại kèm lý do để Sidebar hiện đúng chỗ. */
 FbmSync.controlResetState = function () {
-  var reset = FbmSync.stateReset(), status = FbmSync.statusView();
-  status.message = reset.ok ? 'Đã đặt lại phiên đồng bộ. Bấm "Bắt đầu đồng bộ" để chạy lại từ đầu.' : reset.message;
-  return reset.ok ? { ok: true, status: status } : { ok: false, code: reset.code, message: reset.message, status: status };
+  var reset = FbmSync.stateReset();
+  return reset.ok ? { ok: true, message: 'Đã đặt lại phiên đồng bộ. Bấm "Bắt đầu đồng bộ" để chạy lại từ đầu.' } : { ok: false, code: reset.code, message: reset.message };
 };

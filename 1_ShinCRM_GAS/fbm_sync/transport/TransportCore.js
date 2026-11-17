@@ -151,7 +151,7 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state.metadata.transportRetryId = String(envelope.id || '');
   state.message = replay ? 'Đang kiểm tra lại phiên FBM trước khi gửi lại request đọc.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
   FbmSync.transportFailureRecord(state, String(code || ''), (replay ? 'Kiểm tra lại phiên rồi gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
-  return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
+  return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope };
 };
 /** Response của request vừa phát lại đã về: bỏ dấu phát lại để lần hỏng sau của request khác lại được cứu một lần. */
 FbmSync.transportRetryClear = function (state) {
@@ -279,11 +279,11 @@ FbmSync.envelopeReissue = function (state, answeredId) {
   if (answeredId) { state.resubmit = { answered: String(answeredId), issued: '' }; FbmSync.requestWatch.lastAnswered = String(answeredId); }
   state.activeRequestId = '';
   state.deadlineAt = 0;
-  return { ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(state, request) };
 };
 /** Nộp lặp: lượt còn request đang chờ thì phát lại nó, lượt đã đóng thì trả status để Extension kết thúc chuỗi. Không chạy lại nghiệp vụ của lần nộp đầu. */
 FbmSync.envelopeResubmit = function (state) {
-  if (!state.activeRequestId) { return { ok: true, request: null, status: FbmSync.statusView() }; }
+  if (!state.activeRequestId) { return { ok: true, request: null }; }
   return FbmSync.envelopeReissue(state, state.resubmit.answered);
 };
 /** Lấy requestId từ trace transport mà GAS đã yêu cầu Extension giữ lại. */
