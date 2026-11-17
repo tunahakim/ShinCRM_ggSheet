@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null, tone: { tone: '', updatedAt: 0 } };
+var FBM_SYNC_CLIENT = { installed: false, commandPending: '', conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null, tone: { tone: '', updatedAt: 0 } };
 /** Hạn chờ Extension trả lời một lệnh qua cầu nối (mã máy, nhận lượt, mã hóa, lưu cấu hình); các lệnh này không gọi FBM nên trả lời gần như ngay. */
 var FBM_SYNC_EXTENSION_RPC_MS = 5000;
 /** Extension im lâu hơn mức này trong lượt tay thì Sidebar hỏi GAS một lần xem lượt còn chạy không, để lượt không treo khi Chrome tắt worker giữa chừng. */
@@ -630,6 +630,8 @@ function fbmSyncInstall() {
       var configKey = settingsInput[id].split('.')[0] === 'module' ? 'module' : settingsInput[id].split('.')[0] === 'loginPolicy' ? 'loginPolicy' : settingsInput[id].split('.')[0];
       fbmSyncConfigSetDraftValue(configKey, settingsInput[id].split('.').slice(1).join('.'), String(target.value || ''));
     }
+    // Ô số phút của Lịch nền: thẻ vẽ lại từ bản nháp, ô không ghi vào đây thì số vừa gõ mất khi status GAS tới.
+    if (target.hasAttribute && target.hasAttribute('data-sync-process-minutes')) { fbmSyncConfigSetDraftValue('background', String(target.getAttribute('data-sync-process-minutes') || '') + 'Minutes', String(target.value || '')); }
     if (id === 'fbm-login-username') {
       var loginUsernameValue = String(target.value || ''); FBM_SYNC_CLIENT.loginDraft.username = loginUsernameValue; FBM_SYNC_CLIENT.pendingLoginEnvelope = null; fbmSyncClearAccountNotice('login'); fbmSyncScheduleLoginPasswordState();
     }
@@ -710,11 +712,11 @@ function fbmSyncCancelExtensionBatch() {
  * Gặp lượt nền đang chạy thì hỏi người dùng (`fbmSyncAfterBackground`); chọn dừng nền thì mở lại đúng một lần. Lời gọi GAS lỗi thì không thử lại ngầm: nơi gọi báo lỗi, người dùng bấm lại.
  */
 function fbmSyncDrive(command, payload, task) {
-  return fbmSyncExtensionRpc('CRM_FBM_MACHINE_ID', {}, 'đọc mã máy').then(function (machine) {
+  return fbmSyncCommandHold(command, function () { return fbmSyncExtensionRpc('CRM_FBM_MACHINE_ID', {}, 'đọc mã máy').then(function (machine) {
     var input = Object.assign({}, payload || {}, { machineId: String(machine && machine.machineId || '') });
     var start = function () { return callServer('fbmDriveCommand', [command, input]); };
     return start().then(function (first) { return fbmSyncAfterBackground(first, task, start); });
-  }).then(function (started) {
+  }); }).then(function (started) {
     if (!started || started.ok === false || !started.runId) { return started; }
     if (started.status) { fbmSyncStatusApply(started.status, fbmSyncStatusTicket()); }
     var finished = fbmSyncRunWait(started.runId);
@@ -723,6 +725,12 @@ function fbmSyncDrive(command, payload, task) {
       throw error;
     });
   });
+}
+/** Ô `commandPending` (một chủ) giữ lệnh đang gửi tới khi GAS trả lời và người dùng chọn xong ở popup lượt nền; nút Chạy vẽ theo ô này nên status về giữa chừng (đồng hồ hỏi GAS) không mở lại nút, không có lần bấm thứ hai sinh popup thứ hai. Không kéo dài qua lúc chờ lượt chạy xong để nút Dừng bấm được. */
+function fbmSyncCommandHold(command, send) {
+  var paint = function (value) { FBM_SYNC_CLIENT.commandPending = value; if (FBM_SYNC_CLIENT.active && FBM_SYNC_CLIENT.lastStatus) { fbmSyncPatchRun(document.getElementById('sidebar-body'), FBM_SYNC_CLIENT.lastStatus); } };
+  paint(String(command));
+  return Promise.resolve().then(send).finally(function () { paint(''); });
 }
 /** Đánh thức Extension hỏi GAS ngay; đánh thức thừa vô hại vì GAS trả lời theo ô lượt. `trigger` là lý do hỏi: `run_now` (mặc định, nhận lượt tay) hoặc `config` (cài đặt vừa đổi). */
 function fbmSyncExtensionWake(retryMs, trigger) { return fbmSyncExtensionRpc('CRM_FBM_RUN_NOW', { retryMs: retryMs, trigger: trigger || 'run_now' }, 'hỏi GAS nhận lượt'); }

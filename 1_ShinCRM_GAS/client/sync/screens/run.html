@@ -11,7 +11,8 @@ function fbmSyncPipelineBlock(status, id) {
 function fbmSyncRunActionBlock(status) {
   status = status || {};
   var schema = FBM_SYNC_RUN_SCHEMA.action, actions = status.actions || {}, run = String(actions.run || 'start'), statusReady = fbmSyncStatusReady();
-  return Button({ id: run === 'start' ? schema.ids.start : schema.ids.cancel, label: statusReady ? schema.labels[run] : schema.loading, className: uiResolveActionClass(run === 'start' ? 'start' : 'cancel', 'button'), disabled: !statusReady || actions.runDisabled === true });
+  var pending = !!FBM_SYNC_CLIENT.commandPending;
+  return Button({ id: run === 'start' ? schema.ids.start : schema.ids.cancel, label: !statusReady ? schema.loading : pending ? schema.sending : schema.labels[run], className: uiResolveActionClass(run === 'start' ? 'start' : 'cancel', 'button'), disabled: !statusReady || pending || actions.runDisabled === true });
 }
 function fbmSyncRunBackgroundSettingsBlock(status) {
   var schema = FBM_SYNC_RUN_SCHEMA.action;

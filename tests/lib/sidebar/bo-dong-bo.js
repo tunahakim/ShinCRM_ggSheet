@@ -24,7 +24,7 @@ function taoSidebarDongBo() {
     active: true, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
     identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
-    identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
+    identityAction: '', identityLastAction: '', commandPending: '', loginStatus: null, syncSettings: null, lastStatus: null,
     traceEvents: [], installed: false
   };
   hop.FBM_SYNC_UI_SCHEMA = {

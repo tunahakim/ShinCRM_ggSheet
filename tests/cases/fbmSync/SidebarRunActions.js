@@ -145,6 +145,27 @@ async function testKhoaNutKhiDangLam(so) {
   check(so, 'nút Bắt đầu khóa trong lúc việc chạy và mở lại khi xong', [khiDang, nut.disabled], [true, false]);
 }
 
+async function testGiuLenhTrongState(so) {
+  // Lượt nền kẹt giữ khóa GAS nên lệnh Bắt đầu có thể chờ hàng chục giây; đồng hồ hỏi GAS vẽ lại màn giữa chừng không được mở lại nút, không thì lần bấm thứ hai sinh popup thứ hai bị đóng im lặng.
+  const { hop } = taoBo();
+  let traLoi = null, loiGui = null;
+  hop.callServer = (name) => name === 'fbmDriveCommand' ? new Promise((resolve, reject) => { traLoi = resolve; loiGui = reject; }) : Promise.resolve({ ok: true });
+  const nut = () => hop.fbmSyncRunActionBlock(statusGas({ phase: 'idle' }));
+  const dangGui = hop.fbmSyncDrive('start', { kind: 'sync', mode: 'read' }, 'run');
+  await choVong();
+  const khiCho = [hop.FBM_SYNC_CLIENT.commandPending, nut().disabled, nut().label];
+  traLoi({ ok: false, code: 'X', status: statusGas({ phase: 'error' }) });
+  await dangGui;
+  const sauKhiTra = [hop.FBM_SYNC_CLIENT.commandPending, !!nut().disabled];
+  const lanHai = hop.fbmSyncDrive('start', { kind: 'sync', mode: 'read' }, 'run').then(() => 'ok', () => 'loi');
+  await choVong();
+  loiGui(new Error('mạng'));
+  const ketLanHai = await lanHai;
+  check(so, 'lệnh đang gửi giữ ở ô commandPending: status vẽ lại vẫn khóa nút Chạy kèm chữ Đang gửi lệnh; GAS trả lời hoặc lỗi thì ô gỡ, nút mở',
+    [khiCho, sauKhiTra, ketLanHai, hop.FBM_SYNC_CLIENT.commandPending],
+    [['start', true, 'Đang gửi lệnh...'], ['', false], 'loi', '']);
+}
+
 async function chay(so) {
   section('FBM sync — Sidebar: nút Chạy, Dừng, Đặt lại, Hủy phiên cũ, Chấp thuận');
   try { taoSidebarDongBo(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
@@ -154,6 +175,7 @@ async function chay(so) {
   await testDatLaiVaHuyPhien(so);
   await testChapThuan(so);
   await testKhoaNutKhiDangLam(so);
+  await testGiuLenhTrongState(so);
 }
 
 module.exports = { chay };
