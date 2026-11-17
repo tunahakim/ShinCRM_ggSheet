@@ -97,7 +97,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── LoadService.js        Gom cả một lượt nạp: đo ngân sách ô, đọc tham số, danh mục, toàn bộ khách, rồi giao dịch theo gói.
 │   │   ├── SaveService.js        Vỏ bọc vào ra của hai cửa ghi: bọc lỗi, gắn khối trạng thái bẩn, đo mili giây. Luật ghi nằm ở gate\, không nằm đây.
 │   │   ├── SelectionService.js   Cổng một request khi không có Extension: probeSelectionAndReload trả selection, mã khách khi vị trí đổi và quyết định reload trong cùng response. Mở tệp bằng shinOpenBook chứ không lấy tệp đang hoạt động.
-│   │   ├── FbmSyncService.js     Hàm Sidebar gọi của đồng bộ FBM, mỗi hàm là adapter một dòng vào `FbmSync.controlDispatch`; khai ranh giới ghi vết và mục cài đặt của FBM vào bảng khai mở của lõi.
+│   │   ├── FbmSyncService.js     Cửa duy nhất Sidebar gọi của đồng bộ FBM: `fbmCommand(command, payload)` qua `runEntryPoint` vào `FbmSync.controlDispatch` (hàm dò DEV dùng `fbmCommandRun_` với kênh `dev`); khai ranh giới ghi vết và mục cài đặt của FBM vào bảng khai mở của lõi.
 │   │   └── NoticeService.js      Cửa vào Sidebar bấm ✕ một thông báo, trả lại danh sách thông báo.
 │   ├── log\
 │   │   ├── LogGate.js            Cửa ghi log: gom dòng trong RAM, định dạng dòng, flushLog điều phối việc ghi xuống sheet Log bằng đúng một lệnh.

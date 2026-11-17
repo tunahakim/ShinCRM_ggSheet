@@ -32,11 +32,11 @@ function taoHanhTrinh() {
   const { hop, dom, content } = taoSidebarDongBo();
   const calls = [];
   let enabled = true, backgroundEnabled = true;
-  hop.callServer = (name, args) => {
-    calls.push({ name, args: args || [] });
-    if (name === 'fbmGetSyncStatus') return Promise.resolve(statusNghi({ enabled, backgroundEnabled }));
-    if (name === 'fbmSetMasterSwitch') { enabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled, status: statusNghi({ enabled, backgroundEnabled }) }); }
-    if (name === 'fbmSetBackgroundSwitch') { backgroundEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: backgroundEnabled }); }
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name, payload) => {
+    calls.push({ name, payload: payload || {} });
+    if (name === 'status') return Promise.resolve(statusNghi({ enabled, backgroundEnabled }));
+    if (name === 'set_master') { enabled = !!payload && payload.enabled === true; return Promise.resolve({ ok: true, enabled, status: statusNghi({ enabled, backgroundEnabled }) }); }
     return Promise.resolve({ ok: true, settings: {}, status: statusNghi() });
   };
   hop.fbmSyncInstall();

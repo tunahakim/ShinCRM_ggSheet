@@ -10,7 +10,8 @@ function dung(subscreen) {
   const { hop, dom, content } = taoSidebarDongBo();
   const notices = {}, calls = [];
   hop.noticeSet = (key, value) => { notices[key] = value; };
-  hop.callServer = (name, args) => { calls.push([name, args]); return Promise.resolve({ ok: true }); };
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name, payload) => { calls.push([name, payload]); return Promise.resolve({ ok: true }); };
   hop.FBM_SYNC_CLIENT.subscreen = subscreen;
   hop.FBM_SYNC_CLIENT.statusReady = true;
   return { hop, dom, content, notices, calls };
@@ -118,7 +119,7 @@ async function chay(so) {
   tk.hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: Object.assign(statusGas({ phase: 'done', scan: 'login_test' }), { message: '' }) });
   await tk.hop.fbmSyncTestLogin(null); await tam();
   check(so, 'đăng nhập thử: thẻ hiện message GAS; GAS thiếu message thì báo lỗi hợp đồng và ghi Log, không có câu dự phòng', [
-    coCau, theTk[theTk.length - 1][1], /GAS không trả câu báo/.test(tk.notices.fbmClient && tk.notices.fbmClient.line), tk.calls.some((c) => c[0] === 'fbmLogSyncError')
+    coCau, theTk[theTk.length - 1][1], /GAS không trả câu báo/.test(tk.notices.fbmClient && tk.notices.fbmClient.line), tk.calls.some((c) => c[0] === 'client_error')
   ], [['login', 'success', 'Câu GAS báo đăng nhập.'], 'error', true, true]);
 
   // Cầu nối Extension chưa bắt tay: lỗi chưa tới GAS nên không có status mới; status GAS gần nhất giữ nguyên.
@@ -132,7 +133,7 @@ async function chay(so) {
   await cn.hop.fbmSyncRun('read'); await tam();
   check(so, 'Extension chưa bắt tay: không gọi GAS mở lượt, không vẽ status giả, lỗi ở dòng báo và ghi Log', [
     cn.calls.map((c) => c[0]), ve.filter((status) => status !== gan).length, cn.hop.FBM_SYNC_CLIENT.lastStatus === gan, /bắt tay từ Extension/.test(cn.notices.fbmClient && cn.notices.fbmClient.line)
-  ], [['fbmLogSyncError'], 0, true, true]);
+  ], [['client_error'], 0, true, true]);
 }
 
 module.exports = { chay };

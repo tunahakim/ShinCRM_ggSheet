@@ -27,7 +27,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming', 'probeClientError',
   'probeSaveGate', 'probeHardDeleteGuards', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent',
   'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
-  'fbmDriveCommand', 'fbmGetSyncStatus', 'fbmCancelSync', 'fbmSyncStateProbe', 'fbmSetMasterSwitch', 'fbmRetryPushFailures', 'fbmConfirmConflict', 'fbmGetRelayConfig', 'fbmRotateRelayKey', 'fbmGetSyncTrace', 'fbmSupervisorTrigger', 'fbmSaveConnection', 'fbmSaveSettings'
+  'fbmDevStatus', 'fbmDevCancel', 'fbmDevTrace', 'fbmSyncStateProbe', 'fbmSupervisorTrigger'
 ];
 
 /**

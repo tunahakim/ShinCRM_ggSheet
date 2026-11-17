@@ -278,17 +278,24 @@ FbmSync.logContextNote = function (state) {
   if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
 /**
- * Nhãn của dòng: dòng thuộc lượt (mang mã lượt, lượt đang chạy, hoặc lượt lời gọi này đã làm kể cả vừa đóng) lấy nhãn chốt lúc mở (`runLabel`). Chỉ lời gọi không làm cho lượt nào mới theo nơi gọi: Extension (relay) là Nền, Sidebar là Tay.
+ * Nhãn của dòng: dòng thuộc lượt (mang mã lượt, lượt đang chạy, hoặc lượt lời gọi này đã làm kể cả vừa đóng) lấy nhãn chốt lúc mở (`runLabel`). Chỉ lời gọi không làm cho lượt nào mới theo nơi gọi: Extension (relay) là Nền, hàm dò DEV là Dò DEV, Sidebar là Tay. Dòng ghi trong một lệnh (cửa lệnh gắn kênh và mã máy, không lấy từ payload) thêm nguồn lệnh và đuôi máy để biết lệnh đến từ đâu, máy nào gây ra dòng đó.
  * Cạm bẫy: không đoán theo nơi gọi cho dòng của lượt, vì lượt tay cũng nộp câu trả lời FBM qua relay (dòng cuối lượt Đăng nhập thử từng ghi "Nền").
  */
 FbmSync.logContextText = function (entry) {
+  var label = FbmSync.logContextLabel(entry), context = FbmSync.issueContext;
+  if (!label || !context) { return label; }
+  return label + ' · từ ' + (FbmSync.LOG_SOURCE_NAMES[context.channel] || context.channel) + (context.machineId ? ' · máy ' + String(context.machineId).slice(-6) : '');
+};
+/** Tên nguồn lệnh trên dòng Log: lượt (Tay/Nền) nói lượt do ai mở, nguồn nói lệnh này đến từ đâu (lượt tay vẫn nộp kết quả FBM qua relay). */
+FbmSync.LOG_SOURCE_NAMES = { sidebar: 'Sidebar', relay: 'Extension', dev: 'hàm dò DEV' };
+FbmSync.logContextLabel = function (entry) {
   var state = FbmSync._logContextState, run = FbmSync._logCallRun, cycleId = String(entry && entry.cycleId || '');
   if (!state) { return ''; }
   if (cycleId && cycleId === String(state.runId || '')) { return state.runLabel || FbmSync.runLabelOf(state); }
   if (run && cycleId === run.runId) { return run.label; }
   if (FbmSync.runInProgress(state)) { return state.runLabel || FbmSync.runLabelOf(state); }
   if (run) { return run.label; }
-  var relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
-  return relay ? 'Nền' : 'Tay';
+  var channel = FbmSync.issueContext ? FbmSync.issueContext.channel : '';
+  return channel === 'relay' ? 'Nền' : channel === 'dev' ? 'Dò DEV' : 'Tay';
 };
 

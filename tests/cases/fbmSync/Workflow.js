@@ -1278,7 +1278,7 @@ async function chay(so) {
   orphan.lastProgressAt = orphan.updatedAt;
   reloaded.hop.FbmSync.stateWrite(orphan);
   reloaded.documentProperties.setProperty(reloaded.hop.FbmSync.STATE_KEY, JSON.stringify(orphan));
-  const reloadedStatus = reloaded.hop.fbmGetSyncStatus();
+  const reloadedStatus = reloaded.hop.fbmCommand('status');
   // Đọc trạng thái chỉ đọc: lượt kẹt quá hạn chỉ được đóng ở cửa mở lượt, không đóng khi Sidebar mở lại.
   check(so, 'reload sau khi callback dừng bị mất: đọc trạng thái không ghi, phiên treo vẫn nguyên chờ cửa mở lượt thu hồi', [
     reloadedStatus.ok, reloadedStatus.status.phase, reloadedStatus.status.runId, reloaded.hop.FbmSync.stateRead().phase, reloaded.hop.FbmSync.stateRead().activeRequestId
@@ -1294,7 +1294,7 @@ async function chay(so) {
     cu.documentProperties.setProperty(cu.hop.FbmSync.STATE_KEY, JSON.stringify(legacy));
     cu.documentProperties.setProperty('FBM_SYNC_PENDING_PUSHES_V1', JSON.stringify({ 'customer:CUS-000001': { hash: 'h-cho' } }));
     const truocDoc = cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY);
-    const trangThai = cu.hop.fbmGetSyncStatus().status;
+    const trangThai = cu.hop.fbmCommand('status').status;
     const docXong = cu.documentProperties.getProperty(cu.hop.FbmSync.STATE_KEY);
     // Đọc trạng thái không ghi; cửa mở lượt mới thu hồi lượt dở của bản cũ trước khi mở lượt.
     const cuState = cu.hop.FbmSync.stateRead(), verdict = cu.hop.FbmSync.staleRunCheck(cuState, Date.now());

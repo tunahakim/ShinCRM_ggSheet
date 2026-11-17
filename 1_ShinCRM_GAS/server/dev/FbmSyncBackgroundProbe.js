@@ -13,10 +13,10 @@ function fbmDevOpenBackgroundRun() {
 function fbmDevProbeStopBackground() {
   var view = function (status) { var s = status || {}; return { running: s.running, origin: s.origin, phase: s.phase }; };
   var opened = fbmDevOpenBackgroundRun();
-  var blocked = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' });
-  var stopped = fbmStopBackground();
-  var restarted = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' });
-  var cancelled = fbmCancelSync();
+  var blocked = fbmCommandRun_('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' }, 'dev');
+  var stopped = fbmCommandRun_('stop_background', {}, 'dev');
+  var restarted = fbmCommandRun_('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' }, 'dev');
+  var cancelled = fbmCommandRun_('cancel', {}, 'dev');
   var released = fbmDevReleaseUnsentRequest();
   return {
     opened: opened,
@@ -46,8 +46,8 @@ function fbmDevProbeStartAfterStale() {
     state.updatedAt = Date.now() - FbmSync.STALE_RUN_MS - 60000; state.activeRequestId = ''; state.deadlineAt = 0;
     FbmSync.stateStore(state);
   });
-  var t0 = Date.now(), started = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' }), t1 = Date.now();
+  var t0 = Date.now(), started = fbmCommandRun_('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' }, 'dev'), t1 = Date.now();
   var trace = FbmSync.traceRead(60).filter(function (row) { return Number(row.at || 0) >= t0; }).map(function (row) { return { ms: Number(row.at) - t0, stage: row.stage, operation: row.operation, error: row.error }; });
-  var cancelled = fbmCancelSync(), released = fbmDevReleaseUnsentRequest();
+  var cancelled = fbmCommandRun_('cancel', {}, 'dev'), released = fbmDevReleaseUnsentRequest();
   return { opened: opened, startMs: t1 - t0, started: { ok: started.ok, code: started.code || '', runId: started.runId || '', phase: started.status && started.status.phase }, trace: trace, cancelled: { ok: cancelled.ok, code: cancelled.code || '' }, released: released };
 }

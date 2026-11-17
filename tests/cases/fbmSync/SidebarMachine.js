@@ -17,7 +17,8 @@ function taoMay(machineReply, gas) {
     if (action === 'CRM_FBM_MACHINE_ID') { return machineReply instanceof Error ? Promise.reject(machineReply) : Promise.resolve(machineReply); }
     return Promise.resolve({ ok: true, accepted: true });
   };
-  hop.callServer = (name, args) => { calls.push([name, args]); return Promise.resolve().then(() => gas(name, args)); };
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name, payload) => { calls.push([name, payload]); return Promise.resolve().then(() => gas(name, payload)); };
   hop.noticeSet = (key, value) => { notices.push([key, value]); };
   hop.fbmSyncReportError = (error) => { errors.push(String(error && error.message || error)); };
   hop.fbmSyncSettingsMachineRepaint = () => false;
@@ -62,7 +63,7 @@ async function chay(so) {
   await c.hop.fbmSyncAssignBackgroundMachine();
   check(so, 'Nút "Dùng máy này chạy nền": gửi GAS mã máy Extension và tên máy dựng từ trình duyệt, báo thành công, đánh thức Extension hỏi GAS với lý do config để bật lại chuông, mở khóa nút', [
     c.calls[0], c.hop.FBM_SYNC_CLIENT.settingsNotices.machine.kind, c.rpc.filter((item) => item[0] === 'CRM_FBM_RUN_NOW').map((item) => item[1]), c.hop.FBM_SYNC_CLIENT.machineBusy
-  ], [['fbmAssignBackgroundMachine', [{ machineId: 'may-A-123456', name: 'Máy Windows · 123456' }]], 'success', [{ retryMs: [], trigger: 'config' }], false]);
+  ], [['assign_background_machine', { machineId: 'may-A-123456', name: 'Máy Windows · 123456' }], 'success', [{ retryMs: [], trigger: 'config' }], false]);
 
   const d = taoMay({ machineId: 'may-A-123456' }, () => ({ ok: false, code: 'MACHINE_ID_REQUIRED', message: 'Chưa có mã máy Extension.' }));
   d.hop.navigator = { userAgent: '' };
@@ -79,7 +80,7 @@ async function chay(so) {
   await e.hop.fbmSyncReleaseBackgroundMachine();
   check(so, 'Nút gỡ máy hỏi xác nhận trước; quay lại thì không gọi GAS, đồng ý thì gọi lệnh gỡ',
     [hoi, e.calls.map((item) => item[0])],
-    [[schema.releaseConfirm.title, schema.releaseConfirm.title], ['fbmReleaseBackgroundMachine']]);
+    [[schema.releaseConfirm.title, schema.releaseConfirm.title], ['release_background_machine']]);
 
   const f = taoMay({ machineId: 'may-A-123456' }, () => ({ ok: true }));
   const im = { assigned: true, machineId: 'may-B', name: 'Máy Mac · may-B', notice: { code: 'MACHINE_SILENT', level: 'warning', text: 'Máy chạy nền Máy Mac không hỏi GAS quá 20 phút.' } };
@@ -92,7 +93,7 @@ async function chay(so) {
     f.notices.map((item) => [item[0], item[1] && item[1].line])
   ], [true, true, '[]', [['fbmBackgroundMachine', im.notice.text], ['fbmBackgroundMachine', null]]]);
 
-  const g = taoMay({ machineId: 'may-A-123456' }, (name) => (name === 'fbmGetSyncStatus' ? { status: { phase: 'pull_customer', running: true, tone: 'running', origin: 'background', updatedAt: 5 } } : { ok: true }));
+  const g = taoMay({ machineId: 'may-A-123456' }, (name) => (name === 'status' ? { status: { phase: 'pull_customer', running: true, tone: 'running', origin: 'background', updatedAt: 5 } } : { ok: true }));
   const painted = [];
   g.hop.fbmSyncPaint = (value) => { painted.push(value.phase); g.hop.fbmSyncWatchArm(value); };
   g.hop.fbmSyncWatchArm({ running: true, tone: 'running', origin: 'background' });
@@ -108,7 +109,7 @@ async function chay(so) {
   g.hop.fbmSyncWatchArm({ running: true, tone: 'running' });
   check(so, 'Máy không chở lượt: lượt đang chạy mà Sidebar không chờ lượt nào thì hỏi GAS sau một nhịp im, vẽ status GAS trả và đặt lại đồng hồ; lượt hết, lượt kẹt (GAS cho tone lỗi) hoặc màn mở và Sidebar đang chờ lượt tay của mình thì không đặt', [
     timer.ms, g.calls.map((item) => item[0]), painted, sauHoi, datKhiXong, datKhiKet, g.hop.timers.length
-  ], [g.hop.FBM_SYNC_RUN_SILENCE_MS, ['fbmGetSyncStatus'], ['pull_customer'], 2, 2, 2, 2]);
+  ], [g.hop.FBM_SYNC_RUN_SILENCE_MS, ['status'], ['pull_customer'], 2, 2, 2, 2]);
   g.hop.FBM_SYNC_CLIENT.lastStatus = { running: true, tone: 'running' };
   g.hop.fbmSyncWatchArm(g.hop.FBM_SYNC_CLIENT.lastStatus);
   const truocDong = g.hop.timers[g.hop.timers.length - 1];

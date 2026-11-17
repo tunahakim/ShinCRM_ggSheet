@@ -3,6 +3,8 @@ const { taoSidebarDongBo, dongBao } = require('../../lib/sidebar/bo-dong-bo');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
 const { statusGas, stateDangChay } = require('../../lib/fbm/status-gas');
 const { bamNut, choVong } = require('../../lib/sidebar/hanh-trinh');
+/** Sidebar chỉ được gọi GAS qua `fbmSyncCommand`; gọi thẳng `callServer` là lỗi. */
+const CAM_GOI_THANG = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
 
 /** Sidebar đã có status đầu tiên, kho dòng báo thật đủ để thấy lời báo, Extension trả lời mã máy và nhận lượt. */
 function taoBo() {
@@ -34,7 +36,7 @@ async function testChayLoi(so) {
   const { hop } = taoBo();
   const ve = [], log = [];
   hop.fbmSyncPaint = (status) => { ve.push(status.phase); };
-  hop.callServer = (name, args) => { log.push(name === 'fbmLogSyncError' ? [name, args[2]] : name); return Promise.resolve({ ok: true }); };
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name, payload) => { log.push(name === 'client_error' ? [name, payload.action] : name); return Promise.resolve({ ok: true }); };
   hop.fbmSyncDrive = () => Promise.resolve({ ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không thấy tab FBM', status: statusGas({ phase: 'error', lastError: 'Không thấy tab FBM' }) });
   await hop.fbmSyncRun('read');
   check(so, 'GAS từ chối mở lượt: vẽ status lỗi của GAS và hiện chữ GAS ở dòng báo, không ghi Log thêm',
@@ -44,7 +46,7 @@ async function testChayLoi(so) {
   await hop.fbmSyncRun('read');
   check(so, 'kết quả không kèm status là hợp đồng GAS sai: báo lỗi và ghi Log, không kết thúc im lặng',
     [dongBao(hop), log],
-    [['fbmClient:GAS không trả kết quả đồng bộ.'], [['fbmLogSyncError', 'sync_run']]]);
+    [['fbmClient:GAS không trả kết quả đồng bộ.'], [['client_error', 'sync_run']]]);
 }
 
 async function testDung(so) {
@@ -54,21 +56,21 @@ async function testDung(so) {
   hop.fbmSyncPaint = (status) => { ve.push(status.phase); };
   let ketChoLuot = null;
   hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-dang-chay', resolve: (value) => { ketChoLuot = value; }, reject: () => {}, timer: null };
-  hop.callServer = () => Promise.resolve({ ok: true, status: statusGas({ phase: 'paused', message: 'Đã dừng phiên đồng bộ.' }) });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = () => Promise.resolve({ ok: true, status: statusGas({ phase: 'paused', message: 'Đã dừng phiên đồng bộ.' }) });
   await hop.fbmSyncCancel();
   check(so, 'Dừng báo Extension cắt lô qua cổng RPC duy nhất; GAS đóng được lượt thì kết thúc chỗ chờ bằng status GAS, không chờ response lô đang bay',
     [rpc.map((item) => [item[0], item[1]]), hop.FBM_SYNC_CLIENT.runWaiter, ketChoLuot && ketChoLuot.ok, ketChoLuot && ketChoLuot.status.phase, ve], [[['CRM_FBM_CANCEL', {}]], null, true, 'paused', ['paused']]);
 
   const cho = { runId: 'run-2', resolve: () => { throw new Error('không được kết thúc chỗ chờ'); }, reject: () => {}, timer: null };
   hop.FBM_SYNC_CLIENT.runWaiter = cho;
-  hop.callServer = () => Promise.resolve({ ok: true, code: 'SYNC_STOP_PENDING', status: statusGas(stateDangChay({ runId: 'run-2' }), { stopFlag: { runId: 'run-2', verdict: 'cancelled' } }) });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = () => Promise.resolve({ ok: true, code: 'SYNC_STOP_PENDING', status: statusGas(stateDangChay({ runId: 'run-2' }), { stopFlag: { runId: 'run-2', verdict: 'cancelled' } }) });
   const khiCho = await hop.fbmSyncCancel();
   check(so, 'SYNC_STOP_PENDING có chỗ chờ: vẽ status GAS (nút Đang dừng theo `actions.run`), giữ chỗ chờ để status đóng lượt về qua relay',
     [khiCho.actions.run, hop.FBM_SYNC_CLIENT.runWaiter === cho],
     ['stopping', true]);
 
   hop.FBM_SYNC_CLIENT.runWaiter = null;
-  hop.callServer = (name) => (name === 'fbmCancelSync' ? Promise.reject(new Error('GAS_TEST_FAILURE')) : Promise.resolve({ ok: true }));
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => (name === 'cancel' ? Promise.reject(new Error('GAS_TEST_FAILURE')) : Promise.resolve({ ok: true }));
   await hop.fbmSyncCancel();
   check(so, 'Dừng thất bại vẫn hiện lỗi ở dòng báo', dongBao(hop), ['fbmClient:GAS_TEST_FAILURE']);
 
@@ -76,7 +78,7 @@ async function testDung(so) {
   const banVe = [];
   banHop.fbmSyncExtensionRpc = () => Promise.resolve({});
   banHop.fbmSyncPaint = (status) => { banVe.push(status.actions.run); };
-  banHop.callServer = (name) => (name === 'fbmCancelSync' ? Promise.resolve({ ok: false, code: 'SYNC_STOP_BUSY', message: 'GAS đang bận; bấm Dừng lại sau ít giây.', status: statusGas(stateDangChay({ runId: 'run-ket' })) }) : Promise.resolve({ ok: true }));
+  banHop.callServer = CAM_GOI_THANG; banHop.fbmSyncCommand = (name) => (name === 'cancel' ? Promise.resolve({ ok: false, code: 'SYNC_STOP_BUSY', message: 'GAS đang bận; bấm Dừng lại sau ít giây.', status: statusGas(stateDangChay({ runId: 'run-ket' })) }) : Promise.resolve({ ok: true }));
   await banHop.fbmSyncCancel();
   check(so, 'GAS không dừng được lượt kẹt (SYNC_STOP_BUSY): vẽ status GAS trả (nút vẫn là Dừng) rồi hiện câu GAS ở dòng báo, không im lặng', [banVe, dongBao(banHop)], [['cancel'], ['fbmClient:GAS đang bận; bấm Dừng lại sau ít giây.']]);
 }
@@ -85,14 +87,14 @@ async function testDatLaiVaHuyPhien(so) {
   const { hop } = taoBo();
   const calls = [], ve = [];
   hop.fbmSyncPaint = (status) => { ve.push(status.phase); };
-  hop.callServer = (name) => { calls.push(name); return Promise.resolve({ ok: true, status: statusGas({ phase: 'idle' }) }); };
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => { calls.push(name); return Promise.resolve({ ok: true, status: statusGas({ phase: 'idle' }) }); };
   hop.uiDecisionOpen = () => Promise.resolve(false);
   await hop.fbmSyncResetState();
   hop.uiDecisionOpen = () => Promise.resolve(true);
   await hop.fbmSyncResetState();
-  check(so, 'FBM-044: bấm Quay lại ở hộp xác nhận không gọi GAS; bấm Đặt lại mới gọi fbmResetSyncState và vẽ status GAS trả về',
+  check(so, 'FBM-044: bấm Quay lại ở hộp xác nhận không gọi GAS; bấm Đặt lại mới gọi lệnh reset_state và vẽ status GAS trả về',
     [calls, ve],
-    [['fbmResetSyncState'], ['idle']]);
+    [['reset_state'], ['idle']]);
 
   calls.length = 0;
   hop.fbmSyncDrive = (command, payload) => { calls.push('drive:' + payload.kind); return Promise.resolve({ ok: true, code: 'LOGIN_OK', status: statusGas({ phase: 'done', message: 'Đã hủy phiên cũ' }) }); };
@@ -107,15 +109,15 @@ async function testDatLaiVaHuyPhien(so) {
 
   const log = [];
   const that = taoBo().hop;
-  that.callServer = (name, args) => { log.push(name === 'fbmLogSyncError' ? 'log:' + args[2] : name); return Promise.resolve({ ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'không mở' }); };
+  that.callServer = CAM_GOI_THANG; that.fbmSyncCommand = (name, payload) => { log.push(name === 'client_error' ? 'log:' + payload.action : name); return Promise.resolve({ ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'không mở' }); };
   that.uiDecisionOpen = () => Promise.resolve(true);
   await that.fbmSyncForceLogin();
   check(so, 'GAS từ chối hủy phiên cũ mà không kèm status: báo lỗi và ghi Log việc force_login',
     [log, dongBao(that)],
-    [['fbmDriveCommand', 'log:force_login'], ['fbmClient:không mở']]);
+    [['start', 'log:force_login'], ['fbmClient:không mở']]);
 
   const gas = taoBo().hop, logGas = [];
-  gas.callServer = (name) => { logGas.push(name); return Promise.resolve({}); };
+  gas.callServer = CAM_GOI_THANG; gas.fbmSyncCommand = (name) => { logGas.push(name); return Promise.resolve({}); };
   gas.uiDecisionOpen = () => Promise.resolve(true);
   gas.fbmSyncDrive = () => Promise.resolve({ ok: false, code: 'LOGIN_FAILED', error: 'FBM từ chối đăng nhập', status: statusGas({ phase: 'paused', lastError: 'FBM từ chối đăng nhập' }) });
   await gas.fbmSyncForceLogin();
@@ -157,7 +159,7 @@ async function testGiuLenhTrongState(so) {
   // Lượt nền kẹt giữ khóa GAS nên lệnh Bắt đầu có thể chờ hàng chục giây; đồng hồ hỏi GAS vẽ lại màn giữa chừng không được mở lại nút, không thì lần bấm thứ hai sinh popup thứ hai bị đóng im lặng.
   const { hop } = taoBo();
   let traLoi = null, loiGui = null;
-  hop.callServer = (name) => name === 'fbmDriveCommand' ? new Promise((resolve, reject) => { traLoi = resolve; loiGui = reject; }) : Promise.resolve({ ok: true });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => name === 'start' ? new Promise((resolve, reject) => { traLoi = resolve; loiGui = reject; }) : Promise.resolve({ ok: true });
   const nut = () => hop.fbmSyncRunActionBlock(statusGas({ phase: 'idle' }));
   const dangGui = hop.fbmSyncDrive('start', { kind: 'sync', mode: 'read' }, 'run');
   await choVong();

@@ -45,11 +45,11 @@ FbmSync.commandSpec = function (name) {
   }
   return FbmSync.COMMANDS[name];
 };
-/** Cửa mở lượt của Sidebar chỉ nhận lệnh có cờ `drives`; lệnh khác đi qua cửa riêng của nó. */
-FbmSync.driveCommandName = function (name) {
-  if (FbmSync.commandSpec(String(name || '')).drives === true) { return String(name); }
-  var rejected = new Error('Lệnh "' + String(name || '') + '" không phải lệnh mở lượt.');
-  rejected.code = 'DRIVE_COMMAND_REJECTED';
+/** Lệnh có cờ `relay` chỉ đi qua relay, lệnh không có cờ không bao giờ đi qua relay: Sidebar (và hàm dò DEV) không gọi được `continue`/`heartbeat` dù chung một cửa `fbmCommand`. */
+FbmSync.commandChannelCheck = function (name, spec, via) {
+  if ((spec.relay === true) === (via === 'relay')) { return; }
+  var rejected = new Error('Lệnh "' + name + '" không được gọi từ kênh ' + via + '.');
+  rejected.code = 'COMMAND_CHANNEL_REJECTED';
   throw rejected;
 };
 FbmSync.relayCommandAllowed = function (name) {
@@ -57,10 +57,11 @@ FbmSync.relayCommandAllowed = function (name) {
 };
 
 /**
- * `channel` do lối vào đặt (`relay` chỉ từ `relayHandle`), không lấy từ payload, nên Sidebar không tự xưng là relay được. Phong bì chỉ rời GAS qua relay: trên kênh Sidebar bước phát request (`issueThroughGate`) giữ chỗ nhận lượt và kết quả mang `runId` thay phong bì.
+ * `channel` do lối vào đặt (`relay` chỉ từ `relayHandle`, `dev` chỉ từ hàm dò DEV qua `fbmCommandRun_`), không lấy từ payload, nên Sidebar không tự xưng là relay được. Kênh và mã máy là nhãn nguồn của lệnh: mọi dòng Log của lời gọi mang chúng (`logContextText`). Phong bì chỉ rời GAS qua relay: trên kênh Sidebar bước phát request (`issueThroughGate`) giữ chỗ nhận lượt và kết quả mang `runId` thay phong bì.
  */
 FbmSync.controlDispatch = function (command, payload, channel) {
-  var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' ? 'relay' : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;
+  var name = String(command || ''), spec = FbmSync.commandSpec(name), via = channel === 'relay' || channel === 'dev' ? channel : 'sidebar', input = Object.assign({}, payload || {}, { source: via }), result;
+  FbmSync.commandChannelCheck(name, spec, via);
   var finish = function (raw) { return FbmSync.publicResult(raw); };
   if (spec.drives && !String(input.machineId || '')) { return finish({ ok: false, code: 'SYNC_MACHINE_ID_REQUIRED', message: 'Sidebar chưa lấy được mã máy của Extension nên chưa mở lượt được; tải lại Sidebar rồi thử lại.' }); }
   var body = function () {
@@ -71,7 +72,8 @@ FbmSync.controlDispatch = function (command, payload, channel) {
   var run = function () {
     FbmSync.issueContext = { channel: via, machineId: String(input.machineId || ''), logs: [] };
     // Dòng Log công cụ gửi qua `callLogAdd` ghi ở cuối lời gọi, còn trong khóa, kể cả khi lệnh ném lỗi.
-    try { return body(); } finally { var logs = FbmSync.issueContext.logs; FbmSync.issueContext = null; logs.forEach(function (line) { logEvent(line); }); }
+    // Ghi trước khi bỏ ngữ cảnh lệnh để dòng Log vẫn mang nhãn nguồn (kênh, máy).
+    try { return body(); } finally { FbmSync.issueContext.logs.forEach(function (line) { logEvent(line); }); FbmSync.issueContext = null; }
   };
   try {
     result = spec.lock ? FbmSync.withOrchestrationLock(run) : run();

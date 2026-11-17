@@ -31,16 +31,17 @@ async function testVongDoiMoDong(so) {
   hop.FBM_SYNC_CLIENT.statusRequestSeq = 0;
   hop.FBM_SYNC_CLIENT.lastServerUpdatedAt = 0;
   const openCalls = [];
-  hop.callServer = (name) => {
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name) => {
     openCalls.push(name);
-    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: statusGas({ phase: 'idle' }), identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: goiCaiDat({ fbm_run: { approvalThreshold: 7 } }), login: { configured: false } }); }
+    if (name === 'status') { return Promise.resolve({ ok: true, status: statusGas({ phase: 'idle' }), identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: goiCaiDat({ fbm_run: { approvalThreshold: 7 } }), login: { configured: false } }); }
     return Promise.resolve({ ok: true });
   };
 
   await hop.syncPanelToggle();
   check(so, 'Mở màn Đồng bộ FBM chỉ gọi GAS một lần và nạp đủ bốn phần của gói',
     [openCalls, hop.FBM_SYNC_CLIENT.statusReady, hop.FBM_SYNC_CLIENT.identityDraft.userId, hop.FBM_SYNC_CLIENT.syncSettings.fbm_run.approvalThreshold, hop.FBM_SYNC_CLIENT.loginStatus.configured, hop.FBM_SYNC_CLIENT.loginPasswordMode],
-    [['fbmGetSyncStatus'], true, 'u-1', 7, false, 'draft']);
+    [['status'], true, 'u-1', 7, false, 'draft']);
   check(so, 'mo FBM dung chung header body va an info footer cua man truoc',
     [hop.FBM_SYNC_CLIENT.active,
       dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active'),
@@ -87,20 +88,22 @@ async function testMoManLoi(so) {
   // Gói mở màn hỏng: lỗi hiện ở dòng báo của màn đồng bộ một lần và ghi Log, không nuốt.
   const { hop } = taoBoTest();
   const calls = [];
-  hop.callServer = (name, args) => {
-    calls.push([name, name === 'fbmLogSyncError' ? [args[0], args[2]] : null]);
-    return name === 'fbmGetSyncStatus' ? Promise.reject(new Error('GAS hỏng')) : Promise.resolve({ ok: true });
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name, payload) => {
+    calls.push([name, name === 'client_error' ? [payload.message, payload.action] : null]);
+    return name === 'status' ? Promise.reject(new Error('GAS hỏng')) : Promise.resolve({ ok: true });
   };
   hop.FBM_SYNC_CLIENT.active = false;
   const kq = await hop.syncPanelToggle();
   check(so, 'Gói mở màn lỗi thì báo một lần ở dòng báo và ghi Log một lần, không nuốt lỗi',
-    [kq, dongBao(hop), calls.filter((c) => c[0] === 'fbmLogSyncError').map((c) => c[1])], [null, ['fbmClient:GAS hỏng'], [['GAS hỏng', 'sidebar_open']]]);
+    [kq, dongBao(hop), calls.filter((c) => c[0] === 'client_error').map((c) => c[1])], [null, ['fbmClient:GAS hỏng'], [['GAS hỏng', 'sidebar_open']]]);
 
   // Lượt tay mở rồi mà Sidebar đóng trước khi đánh thức Extension: mở lại màn thấy lượt còn chờ nhận thì đánh thức lại.
   const wake = taoBoTest(), wakes = [];
   wake.hop.fbmSyncExtensionRpc = (action, fields) => { wakes.push([action, fields]); return Promise.resolve({ ok: true, accepted: true }); };
   const dangCho = statusGas(stateDangChay({ activeRequestId: hangGas().PICKUP_PREFIX + 'r-1' }));
-  wake.hop.callServer = (name) => Promise.resolve(name === 'fbmGetSyncStatus' ? { ok: true, status: dangCho, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: {}, login: { configured: false } } : { ok: true });
+  wake.hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  wake.hop.fbmSyncCommand = (name) => Promise.resolve(name === 'status' ? { ok: true, status: dangCho, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: {}, login: { configured: false } } : { ok: true });
   wake.hop.FBM_SYNC_CLIENT.active = false;
   await wake.hop.syncPanelToggle();
   check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS',

@@ -167,9 +167,9 @@ function fbmProbeStuckState() {
   var props = FbmSync.props(), original = props.getProperty(FbmSync.STATE_KEY), out = {};
   try {
     props.setProperty(FbmSync.STATE_KEY, '{"phase":"push"');
-    var stuck = fbmGetSyncStatus();
+    var stuck = fbmCommandRun_('status', {}, 'dev');
     out.stuck = { code: stuck.code, resetOffered: stuck.resetOffered, phase: stuck.phase, message: stuck.message };
-    var reset = fbmResetSyncState();
+    var reset = fbmCommandRun_('reset_state', {}, 'dev');
     out.reset = { ok: reset.ok !== false, phase: reset.phase, message: reset.message, stateAfter: props.getProperty(FbmSync.STATE_KEY) };
   } finally {
     if (original === null) { props.deleteProperty(FbmSync.STATE_KEY); } else { props.setProperty(FbmSync.STATE_KEY, original); }

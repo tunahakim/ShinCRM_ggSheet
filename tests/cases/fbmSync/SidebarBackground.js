@@ -2,6 +2,8 @@
 const { taoSidebarDongBo } = require('../../lib/sidebar/bo-dong-bo');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
 const { statusGas, stateDangChay } = require('../../lib/fbm/status-gas');
+/** Sidebar chỉ được gọi GAS qua `fbmSyncCommand`; gọi thẳng `callServer` là lỗi. */
+const CAM_GOI_THANG = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
 
 function demHen(hop) {
   const hen = [];
@@ -22,8 +24,8 @@ async function chayVoiNen(choice, dungChua) {
   hop.fbmSyncPaint = (status) => { ghi.ve.push(status.phase); };
   hop.fbmSyncExtensionRpc = (action) => { ghi.rpc.push(action); return Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true }); };
   hop.uiDecisionChoose = (opts) => { ghi.popup = opts; return Promise.resolve(choice); };
-  hop.callServer = (name) => {
-    if (name === 'fbmDriveCommand') { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nen } : { ok: false, code: 'TEST_STOP', status: statusGas({ phase: 'done' }) }); }
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => {
+    if (name === 'start') { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nen } : { ok: false, code: 'TEST_STOP', status: statusGas({ phase: 'done' }) }); }
     ghi.goi.push(name);
     return Promise.resolve(dungChua ? { ok: true, code: 'SYNC_STOP_PENDING', status: nen } : { ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: statusGas({ phase: 'paused' }) });
   };
@@ -44,9 +46,9 @@ async function testPopupNen(so) {
     [cho.goi, cho.start, cho.ket.code],
     [[], 1, 'SYNC_BACKGROUND_SKIPPED']);
   check(so, 'Chọn dừng nền: đúng một lệnh dừng nền, vẽ status GAS trả về rồi gọi lại lệnh gốc ngay không chờ không dò; kết quả của lệnh gốc đi thẳng ra',
-    [dung.goi, dung.ve, dung.start, dung.ket.code], [['fbmStopBackground'], ['paused', 'done'], 2, 'TEST_STOP']);
+    [dung.goi, dung.ve, dung.start, dung.ket.code], [['stop_background'], ['paused', 'done'], 2, 'TEST_STOP']);
   check(so, 'Dừng nền khi lát nền đang giữ khóa (SYNC_STOP_PENDING): vẫn gọi lại lệnh gốc ngay (GAS đóng lượt nền khi mở lượt); Extension được báo cắt lô ở cả hai trường hợp',
-    [dungHong.goi, dungHong.start, dungHong.rpc.indexOf('CRM_FBM_CANCEL') >= 0, dung.rpc.indexOf('CRM_FBM_CANCEL') >= 0], [['fbmStopBackground'], 2, true, true]);
+    [dungHong.goi, dungHong.start, dungHong.rpc.indexOf('CRM_FBM_CANCEL') >= 0, dung.rpc.indexOf('CRM_FBM_CANCEL') >= 0], [['stop_background'], 2, true, true]);
 }
 
 async function testNutXMoiThaoTac(so) {
@@ -57,7 +59,7 @@ async function testNutXMoiThaoTac(so) {
     hop.fbmSyncPaint = (status) => { ghi.ve.push(status); };
     hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
     hop.uiDecisionChoose = () => Promise.resolve('cancel');
-    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nen } : null); };
+    hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => { ghi.goi.push(name); return Promise.resolve(name === 'start' || name === 'open_conflict' ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nen } : null); };
     chuanBi(hop);
     await bam(hop);
     const c = hop.FBM_SYNC_CLIENT;
@@ -79,18 +81,18 @@ async function testNutXMoiThaoTac(so) {
   }, (hop) => hop.fbmSyncConflictTabLoad());
   check(so, 'Nút X: màn quay về như vừa mở và vẽ bằng status thật GAS, chỉ một lần gọi lệnh gốc (kiểm liên kết, tự điền, tab Xung đột)',
     [lienKet.goi, lienKet.sau, lienKet.veCuoi, tuDien.goi, tuDien.sau, tuDien.veCuoi, xungDot.goi, xungDot.sau, xungDot.veCuoi, xungDot.dangMo],
-    [['fbmDriveCommand'], sach, true, ['fbmDriveCommand'], sach, true, ['fbmDriveCommand'], sach, true, false]);
+    [['start'], sach, true, ['start'], sach, true, ['open_conflict'], sach, true, false]);
 }
 
 async function testDocTrangThai(so) {
   const { hop } = taoSidebarDongBo();
-  hop.callServer = () => Promise.resolve({ ok: true, status: statusGas({ phase: 'idle', runId: '', updatedAt: Date.now() + 1000 }) });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = () => Promise.resolve({ ok: true, status: statusGas({ phase: 'idle', runId: '', updatedAt: Date.now() + 1000 }) });
   hop.fbmSyncPaint = () => undefined;
   const docThat = await hop.fbmSyncStatusOnce();
   check(so, 'Đọc trạng thái luôn trả status GAS kể cả khi đã vẽ',
     [docThat && docThat.phase, docThat && docThat.runId],
     ['idle', '']);
-  hop.callServer = (name) => (name === 'fbmGetSyncStatus' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => (name === 'status' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
   const loi = await hop.fbmSyncStatusOnce().then(() => null, (error) => error.message);
   check(so, 'Đọc trạng thái hỏng: ném lại lỗi cho nơi gọi và báo ở dòng báo, không vẽ status giả',
     [loi, Object.keys(hop.NOTICES).indexOf('fbmClient') >= 0],
@@ -125,7 +127,7 @@ async function testLuotKep(so) {
   const { hop } = taoSidebarDongBo();
   const hen = demHen(hop), calls = [];
   const kep = statusGas(stateDangChay({ runId: 'run-11', activeRequestId: '', deadlineAt: 0, updatedAt: 1 }));
-  hop.callServer = (name) => { calls.push(name); return Promise.resolve(name === 'fbmGetSyncStatus' ? { status: kep } : {}); };
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => { calls.push(name); return Promise.resolve(name === 'status' ? { status: kep } : {}); };
   hop.FBM_SYNC_CLIENT.active = true;
   let ketQua = null;
   hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-11', resolve(value) { ketQua = value; }, reject() {}, timer: null };
@@ -134,12 +136,12 @@ async function testLuotKep(so) {
   hen[daDat - 1].fn();
   await luot();
   check(so, 'status báo lượt kẹt: chỗ chờ kết thúc với mã và chữ của GAS, không gửi lệnh Dừng, không đặt đồng hồ mới',
-    [kep.stuck, ketQua && ketQua.ok, ketQua && ketQua.code, ketQua && ketQua.error === kep.warnings[0].text, calls.indexOf('fbmCancelSync'), hop.FBM_SYNC_CLIENT.runWaiter, hen.length === daDat],
+    [kep.stuck, ketQua && ketQua.ok, ketQua && ketQua.code, ketQua && ketQua.error === kep.warnings[0].text, calls.indexOf('cancel'), hop.FBM_SYNC_CLIENT.runWaiter, hen.length === daDat],
     [true, false, 'SYNC_STALE_RUN', true, -1, null, true]);
 
   // Lượt còn sống thì chờ tiếp bằng đồng hồ mới; lượt đã đóng thì kết thúc theo status GAS.
   const song = taoSidebarDongBo().hop, henSong = demHen(song);
-  song.callServer = () => Promise.resolve({ status: statusGas(stateDangChay({ runId: 'run-12' })) });
+  song.callServer = CAM_GOI_THANG; song.fbmSyncCommand = () => Promise.resolve({ status: statusGas(stateDangChay({ runId: 'run-12' })) });
   song.FBM_SYNC_CLIENT.active = true;
   song.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-12', resolve() { throw new Error('không được kết thúc'); }, reject() {}, timer: null };
   song.fbmSyncRunWaitArm();
@@ -150,7 +152,7 @@ async function testLuotKep(so) {
     [2, true]);
   const dong = taoSidebarDongBo().hop, henDong = demHen(dong);
   let dongKet = null;
-  dong.callServer = () => Promise.resolve({ status: statusGas({ phase: 'error', runId: 'run-13', lastFailureCode: 'FBM_VERIFY_FAILED', lastError: 'không xác nhận' }) });
+  dong.callServer = CAM_GOI_THANG; dong.fbmSyncCommand = () => Promise.resolve({ status: statusGas({ phase: 'error', runId: 'run-13', lastFailureCode: 'FBM_VERIFY_FAILED', lastError: 'không xác nhận' }) });
   dong.FBM_SYNC_CLIENT.active = true;
   dong.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-13', resolve(value) { dongKet = value; }, reject() {}, timer: null };
   dong.fbmSyncRunWaitArm();

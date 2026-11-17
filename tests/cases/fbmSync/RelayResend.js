@@ -18,7 +18,8 @@ function taoKenh(ackOk) {
   hop.SHEET_LINK_NONCE = 'nonce-relay';
   hop.sheetLinkExtensionAlive = () => true;
   hop.FBM_SYNC_CLIENT.relayOpenId = 0;
-  hop.callServer = (name) => { gasCalls.push(name); return Promise.resolve({ url: 'https://script.example/exec', key: 'khoa-relay', spreadsheetId: 'sheet-dev' }); };
+  hop.callServer = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
+  hop.fbmSyncCommand = (name) => { gasCalls.push(name); return Promise.resolve({ url: 'https://script.example/exec', key: 'khoa-relay', spreadsheetId: 'sheet-dev' }); };
   hop.fbmSyncSetSettingsNotice = (key, kind, message) => { notices.push({ key, kind, message }); };
   return { hop, posts, gasCalls, notices };
 }
@@ -37,7 +38,7 @@ async function chay(so) {
   const haXuong = ok.hop.FBM_SYNC_CLIENT.relayConfigured;
   await cho(); await cho(); await cho();
   check(so, 'Tải lại Extension: Sidebar gửi lại đúng cấu hình đang giữ sang phiên mới, không gọi GAS thêm, có xác nhận lại',
-    [haXuong, ok.posts.length, ok.posts[1] && ok.posts[1].sessionId, ok.posts[1] && ok.posts[1].config.key, ok.gasCalls.filter((name) => name === 'fbmGetRelayConfig').length, ok.hop.FBM_SYNC_CLIENT.relayConfigured],
+    [haXuong, ok.posts.length, ok.posts[1] && ok.posts[1].sessionId, ok.posts[1] && ok.posts[1].config.key, ok.gasCalls.filter((name) => name === 'relay_config').length, ok.hop.FBM_SYNC_CLIENT.relayConfigured],
     [false, 2, 'phien-2', 'khoa-relay', 1, true]);
 
   ok.hop.fbmSyncNotifyBridgeReady();

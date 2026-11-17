@@ -61,7 +61,7 @@ async function chay(so) {
     [textText.indexOf('còn giữ phiên đăng nhập cũ') > 0, textText.indexOf('Hủy phiên cũ và đăng nhập') > 0, heartbeat.FbmSync.statusView().actions.forceLogin],
     [true, true, true]);
   const serviceSource = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', '1_ShinCRM_GAS', 'server', 'service', 'FbmSyncService.js'), 'utf8');
-  check(so, 'mọi lệnh mở lượt (đăng nhập thử, hủy phiên cũ, kiểm liên kết, đồng bộ) đi qua cửa fbmDriveCommand và vỏ runEntryPoint để Log được ghi ra sheet', ['fbmDriveCommand'].map((name) => serviceSource.indexOf('function ' + name + '(') >= 0 && serviceSource.indexOf("fbmCommandRun('" + name + "'") >= 0).concat(/function fbmCommandRun\([^)]*\) \{ return runEntryPoint\(name, 'fbm_sync'/.test(serviceSource)), [true, true]);
+  check(so, 'mọi lệnh mở lượt (đăng nhập thử, hủy phiên cũ, kiểm liên kết, đồng bộ) đi qua cửa fbmCommand và vỏ runEntryPoint để Log được ghi ra sheet', [/function fbmCommand\(command, payload\) \{ return fbmCommandRun_\(/.test(serviceSource), /return runEntryPoint\(name, 'fbm_sync'/.test(serviceSource)], [true, true]);
   // FBM-057: nút hủy phiên cũ. GAS chỉ mở sau khi FBM trả lời từ chối; đăng nhập tự động luôn là login mềm.
   check(so, 'FBM từ chối đăng nhập thì status mở nút hủy phiên cũ; request đăng nhập tự động không mang cờ hủy phiên',
     [heartbeat.FbmSync.statusView().actions.forceLogin, heartbeat.FbmSync.loginRequestPlan('login', {}, heartbeat.FbmSync.credentialRead(), {}).body.force],

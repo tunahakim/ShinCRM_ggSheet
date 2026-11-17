@@ -34,11 +34,11 @@ function fbmSyncExtensionWakeConfig() {
   }).catch(function (error) { fbmSyncReportError(error, 'Không đánh thức được Extension nhận cài đặt mới.', 'extension_wake'); });
 }
 /** Lệnh giao hoặc gỡ máy chạy nền: khóa hai nút trong lúc chờ GAS, báo kết quả ở khối máy nền, vẽ status GAS trả. */
-function fbmSyncBackgroundMachineCommand(serverName, args, doneText) {
+function fbmSyncBackgroundMachineCommand(command, payload, doneText) {
   var schema = FBM_SYNC_SETTINGS_SCHEMA.machine, ticket = fbmSyncStatusTicket();
   FBM_SYNC_CLIENT.machineBusy = true;
   fbmSyncSettingsMachineRepaint();
-  return callServer(serverName, args).then(function (result) {
+  return fbmSyncCommand(command, payload).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.error || result.code) || schema.failed); }
     fbmSyncSetSettingsNotice('machine', 'success', doneText);
     fbmSyncStatusFromResult(result, ticket);
@@ -54,12 +54,12 @@ function fbmSyncBackgroundMachineCommand(serverName, args, doneText) {
 /** Nút "Dùng máy này chạy nền": GAS giao máy có mã Extension này; máy này vừa thành máy nền nên đánh thức Extension bật lại chuông. */
 function fbmSyncAssignBackgroundMachine() {
   var local = FBM_SYNC_CLIENT.localMachine || {};
-  return fbmSyncBackgroundMachineCommand('fbmAssignBackgroundMachine', [{ machineId: local.machineId, name: fbmSyncMachineName(local.machineId) }], FBM_SYNC_SETTINGS_SCHEMA.machine.assigned);
+  return fbmSyncBackgroundMachineCommand('assign_background_machine', { machineId: local.machineId, name: fbmSyncMachineName(local.machineId) }, FBM_SYNC_SETTINGS_SCHEMA.machine.assigned);
 }
 function fbmSyncReleaseBackgroundMachine() {
   var confirm = FBM_SYNC_SETTINGS_SCHEMA.machine.releaseConfirm;
   return uiDecisionOpen(confirm).then(function (go) {
-    return go ? fbmSyncBackgroundMachineCommand('fbmReleaseBackgroundMachine', [], FBM_SYNC_SETTINGS_SCHEMA.machine.released) : null;
+    return go ? fbmSyncBackgroundMachineCommand('release_background_machine', {}, FBM_SYNC_SETTINGS_SCHEMA.machine.released) : null;
   });
 }
 /** Lời báo máy chạy nền của GAS đi vào thông báo chung của Sidebar để người dùng vẫn thấy sau khi rời màn đồng bộ. Status không mang khối máy nền thì giữ nguyên. */

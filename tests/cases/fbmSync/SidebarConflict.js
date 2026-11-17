@@ -2,6 +2,8 @@
 const { taoSidebarDongBo, dongBao } = require('../../lib/sidebar/bo-dong-bo');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
 const { statusGas, stateDangChay } = require('../../lib/fbm/status-gas');
+/** Sidebar chỉ được gọi GAS qua `fbmSyncCommand`; gọi thẳng `callServer` là lỗi. */
+const CAM_GOI_THANG = () => Promise.reject(new Error('Sidebar gọi thẳng callServer, phải đi qua fbmSyncCommand'));
 
 /** Sidebar có status đầu tiên và kho dòng báo thật; popup chung của bản ghi do ca kiểm tự trả lời. */
 function taoBo() {
@@ -48,7 +50,7 @@ async function testQuyetDinh(so) {
 async function testChonVaLuu(so) {
   const { hop } = taoBo();
   const goi = [];
-  hop.callServer = (name) => { goi.push(name); return Promise.resolve({ ok: true }); };
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => { goi.push(name); return Promise.resolve({ ok: true }); };
   datBanGhi(hop, { phone: 'fbm' });
   const nut = { disabled: false };
   hop.fbmSyncSaveConflict(nut);
@@ -72,7 +74,7 @@ async function testGasTraVe(so) {
     const { hop } = taoBo();
     const ghi = { goi: [], mo: 0, status: 0, hoi: [] };
     datBanGhi(hop, { phone: 'shin', name: 'shin' });
-    hop.callServer = (name, args) => { ghi.goi.push(name); if (name === 'fbmConfirmConflict') { ghi.args = args; const lan = ghi.goi.filter((n) => n === 'fbmConfirmConflict').length; return Promise.resolve(lan > 1 ? { ok: true, remaining: 0, status: statusGas({ phase: 'idle' }) } : result); } return Promise.resolve({ ok: true }); };
+    hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name, payload) => { ghi.goi.push(name); if (name === 'confirm_conflict') { ghi.args = [payload.entity, payload.id, payload.choice, payload.merged, payload.fbmValues, payload.shinValues, payload.snapshot]; const lan = ghi.goi.filter((n) => n === 'confirm_conflict').length; return Promise.resolve(lan > 1 ? { ok: true, remaining: 0, status: statusGas({ phase: 'idle' }) } : result); } return Promise.resolve({ ok: true }); };
     hop.fbmSyncOpenConflict = () => { ghi.mo += 1; return Promise.resolve(null); };
     hop.fbmSyncStatusOnce = () => { ghi.status += 1; return Promise.resolve(null); };
     hop.recordConflictChoose = (conflicts) => { ghi.hoi.push(['conflict', conflicts.length]); return Promise.resolve((tuyChon && tuyChon.pick) || 'back'); };
@@ -97,11 +99,11 @@ async function testGasTraVe(so) {
     [1, ['fbmClient:Không còn xung đột']]);
   const bat = await chay({ ok: false, code: 'CONFLICT_RECORD_BUSY', busy: [{ id: 'CUS-1' }] }, { pick: 'retry' });
   check(so, 'bản ghi bận mà người dùng chọn thử lại: hỏi bằng popup bận chung rồi gọi GAS lần hai cùng lựa chọn',
-    [bat.hoi, bat.goi.filter((n) => n === 'fbmConfirmConflict').length > 1],
+    [bat.hoi, bat.goi.filter((n) => n === 'confirm_conflict').length > 1],
     [[['busy', 'customer']], true]);
   const hoanBat = await chay({ ok: false, code: 'CONFLICT_RECORD_BUSY', busy: [{ id: 'CUS-1' }] }, { pick: 'wait' });
   check(so, 'bản ghi bận mà người dùng không thử lại: không gọi lại GAS, lựa chọn trên màn còn nguyên',
-    [hoanBat.goi.filter((n) => n === 'fbmConfirmConflict').length, hoanBat.hop.FBM_SYNC_CLIENT.conflictChoices],
+    [hoanBat.goi.filter((n) => n === 'confirm_conflict').length, hoanBat.hop.FBM_SYNC_CLIENT.conflictChoices],
     [1, { phone: 'shin', name: 'shin' }]);
   const loi = await chay({ ok: false, code: 'CONFLICT_X', message: 'GAS từ chối' });
   check(so, 'GAS từ chối: đọc lại status GAS cho màn khớp nguồn sự thật rồi ném lỗi về nút bấm',
@@ -115,7 +117,7 @@ async function testSheetDoi(so) {
     const { hop } = taoBo();
     const ghi = { goi: 0 };
     datBanGhi(hop, { name: 'fbm' });
-    hop.callServer = (name) => { if (name === 'fbmConfirmConflict') { ghi.goi += 1; return Promise.resolve(ghi.goi === 1 ? { ok: false, code: 'CONFLICT_SHEET_CHANGED', conflicts: doi } : { ok: true, remaining: 0, status: statusGas({ phase: 'idle' }) }); } return Promise.resolve({ ok: true }); };
+    hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = (name) => { if (name === 'confirm_conflict') { ghi.goi += 1; return Promise.resolve(ghi.goi === 1 ? { ok: false, code: 'CONFLICT_SHEET_CHANGED', conflicts: doi } : { ok: true, remaining: 0, status: statusGas({ phase: 'idle' }) }); } return Promise.resolve({ ok: true }); };
     hop.recordConflictChoose = () => Promise.resolve(pick);
     hop.fbmSyncStatusOnce = () => Promise.resolve(null);
     await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'manual', {});
@@ -167,13 +169,13 @@ async function testMoBanGhi(so) {
 async function testBanGhiLoi(so) {
   const { hop } = taoBo();
   const ve = [];
-  hop.callServer = () => Promise.resolve({ ok: true, message: 'Đã mở lại 3 bản ghi lỗi.', status: statusGas({ phase: 'idle' }) });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = () => Promise.resolve({ ok: true, message: 'Đã mở lại 3 bản ghi lỗi.', status: statusGas({ phase: 'idle' }) });
   hop.fbmSyncPaint = (status) => { ve.push(status.phase); };
   await hop.fbmSyncRetryPushFailures();
   check(so, 'Mở lại bản ghi lỗi: hiện nguyên chữ GAS ở dòng báo và vẽ status GAS trả về',
     [dongBao(hop), ve],
     [['fbmClient:Đã mở lại 3 bản ghi lỗi.'], ['idle']]);
-  hop.callServer = () => Promise.resolve({ ok: false, code: 'X', message: 'GAS bận' });
+  hop.callServer = CAM_GOI_THANG; hop.fbmSyncCommand = () => Promise.resolve({ ok: false, code: 'X', message: 'GAS bận' });
   const loi = await hop.fbmSyncRetryPushFailures().then(() => null, (error) => error.message);
   check(so, 'GAS từ chối mở lại: ném lỗi với chữ GAS cho nút bấm báo, không vẽ status',
     [loi, ve.length],

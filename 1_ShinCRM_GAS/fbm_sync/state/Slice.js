@@ -235,7 +235,7 @@ FbmSync.issueThroughGate = function (state, build) {
   return envelope;
 };
 FbmSync.issueEnvelope = function (state, build) {
-  var sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar');
+  var sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel !== 'relay');
   // Cổng sẽ mở thì request gửi đi là request hỏi phiên: không dựng request nghiệp vụ (có cursor chưa đủ dữ liệu để dựng trước khi phiên được xác minh).
   var gated = !sidebar && FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
   var request = gated ? null : build(state);

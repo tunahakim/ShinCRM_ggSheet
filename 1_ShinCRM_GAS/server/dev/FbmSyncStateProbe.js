@@ -108,3 +108,8 @@ function fbmProbePropertySizes() {
   });
   return Object.keys(groups).sort(function (a, b) { return groups[b].bytes - groups[a].bytes; }).slice(0, 25).map(function (group) { return group + ': ' + groups[group].keys + ' khóa, ' + groups[group].bytes + ' ký tự'; }).concat(['Tổng: ' + total + ' ký tự, ' + Object.keys(all).length + ' khóa']);
 }
+
+/** Lệnh không tham số của bảng lệnh đồng bộ FBM chạy từ máy (cửa chạy hàm DEV không truyền tham số): cùng cửa lệnh Sidebar dùng, kênh `dev` nên dòng Log mang nhãn "Dò DEV". */
+function fbmDevStatus() { return fbmCommandRun_('status', {}, 'dev'); }
+function fbmDevCancel() { return fbmCommandRun_('cancel', {}, 'dev'); }
+function fbmDevTrace() { return fbmCommandRun_('trace_read', {}, 'dev'); }

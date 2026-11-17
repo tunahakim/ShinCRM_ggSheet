@@ -23,22 +23,23 @@ async function chay(so) {
     dom.document.getElementById('fbm-sync-policy-auto-open').disabled
   ], [true, true, true, true, true, true]);
   const moduleViewValue = dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed');
-  const masterCallsBeforeModuleViewClick = calls.filter((item) => item.name === 'fbmSetMasterSwitch').length;
+  const masterCallsBeforeModuleViewClick = calls.filter((item) => item.name === 'set_master').length;
   bamNut(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
   check(so, 'switch module trong card ở chế độ xem không gọi GAS',
-    [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length],
+    [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'set_master').length],
     [moduleViewValue, masterCallsBeforeModuleViewClick]);
   bamNut(dom, dom.document.getElementById('fbm-sync-config-module-edit'));
   bamNut(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
   check(so, 'switch module trong card ở chế độ sửa chỉ đổi draft',
-    [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length],
+    [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'set_master').length],
     ['false', masterCallsBeforeModuleViewClick]);
   hop.fbmSyncConfigFinishEdit('module');
   bamNut(dom, dom.document.getElementById('fbm-sync-config-module-cancel'));
   const startupViewValue = dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed');
+  const callsTruocBam = calls.length;
   bamNut(dom, dom.document.getElementById('fbm-sync-run-on-startup'));
   check(so, 'click switch thân ở chế độ xem không đổi draft và không gọi GAS',
-    [dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSaveExtensionConfig').length],
+    [dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed'), calls.length - callsTruocBam],
     [startupViewValue, 0]);
   bamNut(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
   let pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
@@ -64,9 +65,9 @@ async function chay(so) {
     [true, '45', '45']);
   hop.fbmSyncConfigCancelEdit('background', true);
   // Lưu cài đặt FBM: GAS báo ô sai thì tô đúng ô, hỏi xác nhận lịch dày, phần khóa hỏng chỉ còn nút đặt về mặc định.
-  const keepCall = hop.callServer, keepNotice = hop.fbmSyncSetSettingsNotice, keepDecision = hop.uiDecisionOpen, keepSettings = hop.FBM_SYNC_CLIENT.syncSettings, sent = [], notices = [];
+  const keepCall = hop.fbmSyncCommand, keepNotice = hop.fbmSyncSetSettingsNotice, keepDecision = hop.uiDecisionOpen, keepSettings = hop.FBM_SYNC_CLIENT.syncSettings, sent = [], notices = [];
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { notices.push([card, kind, text]); };
-  hop.callServer = (name, args) => { sent.push([name, args[0], args[1]]); return Promise.resolve({ ok: false, code: 'SETTINGS_INVALID', problems: [{ section: 'fbm_extension', field: 'pollMinutes', label: 'Chu kỳ hỏi GAS', reason: 'Chu kỳ hỏi GAS phải từ 1 đến 60 phút.' }] }); };
+  hop.fbmSyncCommand = (name, payload) => { sent.push([name, payload.patches, payload.confirmLow]); return Promise.resolve({ ok: false, code: 'SETTINGS_INVALID', problems: [{ section: 'fbm_extension', field: 'pollMinutes', label: 'Chu kỳ hỏi GAS', reason: 'Chu kỳ hỏi GAS phải từ 1 đến 60 phút.' }] }); };
   bamNut(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
   const badPoll = dom.document.getElementById('fbm-extension-poll-minutes');
   badPoll.value = '0';
@@ -74,25 +75,25 @@ async function chay(so) {
   await choVong(); await choVong();
   check(so, 'GAS báo ô sai: gửi nguyên chuỗi ô, tô đỏ đúng ô, gộp lý do vào thông báo của card và vẫn ở chế độ sửa',
     [sent, badPoll.classList.contains('shin-input-error'), notices.map((item) => [item[0], item[1]]), notices[0] && notices[0][2].indexOf('phải từ 1 đến 60 phút') >= 0, hop.fbmSyncConfigIsEditing('extension')],
-    [[['fbmSaveSettings', { fbm_extension: { pollMinutes: '0', runOnStartup: true } }, false]], true, [['extension', 'error']], true, true]);
+    [[['save_settings', { fbm_extension: { pollMinutes: '0', runOnStartup: true } }, false]], true, [['extension', 'error']], true, true]);
   hop.fbmSyncConfigCancelEdit('extension', true);
   let lowAsked = 0;
   sent.length = 0; notices.length = 0;
   hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(true); };
-  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve(sent.length === 1 ? { ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' } : { ok: true, settings: goiCaiDat(), status: statusNghi() }); };
+  hop.fbmSyncCommand = (name, payload) => { sent.push([name, payload.confirmLow]); return Promise.resolve(sent.length === 1 ? { ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' } : { ok: true, settings: goiCaiDat(), status: statusNghi() }); };
   bamNut(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
   bamNut(dom, dom.document.getElementById('fbm-sync-save-background'));
   await choVong(); await choVong(); await choVong();
   check(so, 'Lịch nền dày: GAS hỏi xác nhận, đồng ý thì gửi lại cùng gói kèm confirmLow rồi thoát chế độ sửa',
-    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.map((item) => item[1])], [1, [['fbmSaveSettings', false], ['fbmSaveSettings', true]], false, ['success']]);
+    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.map((item) => item[1])], [1, [['save_settings', false], ['save_settings', true]], false, ['success']]);
   sent.length = 0; notices.length = 0; lowAsked = 0;
   hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(false); };
-  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve({ ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' }); };
+  hop.fbmSyncCommand = (name, payload) => { sent.push([name, payload.confirmLow]); return Promise.resolve({ ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' }); };
   bamNut(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
   bamNut(dom, dom.document.getElementById('fbm-sync-save-background'));
   await choVong(); await choVong(); await choVong();
   check(so, 'Lịch nền dày mà người dùng quay lại sửa: chỉ một lần gửi, không ghi, vẫn ở chế độ sửa',
-    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.length], [1, [['fbmSaveSettings', false]], true, 0]);
+    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.length], [1, [['save_settings', false]], true, 0]);
   hop.fbmSyncConfigCancelEdit('background', true);
   hop.fbmSyncSetSettingsNotice = keepNotice;
   hop.FBM_SYNC_CLIENT.syncSettings = Object.assign(goiCaiDat({ fbm_extension: null }), { corrupt: [{ section: 'fbm_extension', label: 'Nhịp hỏi GAS của Extension', message: 'Khóa cài đặt bị hỏng.' }] });
@@ -102,13 +103,13 @@ async function chay(so) {
     [!!resetButton, resetButton && resetButton.textContent, dom.document.getElementById('fbm-sync-settings-extension-notice-region').textContent.indexOf('Khóa cài đặt bị hỏng.') >= 0, dom.document.getElementById('fbm-extension-poll-minutes').value, !!content.querySelector('#fbm-sync-config-extension-edit')],
     [true, 'Đặt về mặc định', true, '', false]);
   sent.length = 0;
-  hop.callServer = (name, args) => { sent.push([name, args[0]]); return Promise.resolve({ ok: true, settings: goiCaiDat(), status: statusNghi() }); };
+  hop.fbmSyncCommand = (name, payload) => { sent.push([name, payload.section]); return Promise.resolve({ ok: true, settings: goiCaiDat(), status: statusNghi() }); };
   bamNut(dom, resetButton);
   await choVong(); await choVong(); await choVong();
   check(so, 'Bấm Đặt về mặc định gọi GAS đúng phần, nạp lại cài đặt GAS trả và bỏ lời báo lỗi',
     [sent, hop.FBM_SYNC_CLIENT.syncSettings.fbm_extension.pollMinutes, !!content.querySelector('#fbm-sync-reset-fbm_extension'), dom.document.getElementById('fbm-extension-poll-minutes').value],
-    [[['fbmResetSettings', 'fbm_extension']], 5, false, '5']);
-  hop.callServer = keepCall; hop.uiDecisionOpen = keepDecision; hop.FBM_SYNC_CLIENT.syncSettings = keepSettings;
+    [[['reset_settings', 'fbm_extension']], 5, false, '5']);
+  hop.fbmSyncCommand = keepCall; hop.uiDecisionOpen = keepDecision; hop.FBM_SYNC_CLIENT.syncSettings = keepSettings;
   hop.fbmSyncPaint(statusNghi());
   bamNut(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
   pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
@@ -160,13 +161,14 @@ async function chay(so) {
     settingsActions,
     ['extension', 'background', 'login-policy', 'rotate-relay']);
   const background = dom.document.getElementById('fbm-sync-background-switch');
+  const callsTruocNen = calls.length;
   bamNut(dom, background);
   check(so, 'công tắc lịch nền trong chế độ xem không đổi',
     [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled],
     ['true', false, true]);
   await choVong();
   check(so, 'cài đặt lịch nền chế độ xem không gửi GAS',
-    [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled],
+    [calls.slice(callsTruocNen).map((item) => item.name), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled],
     [[], 'true', false, true]);
 
 }

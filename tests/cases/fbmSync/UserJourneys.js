@@ -41,11 +41,11 @@ async function chay(so) {
   bamNut(dom, master);
   await choVong();
   check(so, 'cong tac tong gui dung mot lenh GAS va cap nhat trang thai',
-    [calls.filter((item) => item.name === 'fbmSetMasterSwitch').length, hop.FBM_SYNC_CLIENT.lastStatus.enabled],
+    [calls.filter((item) => item.name === 'set_master').length, hop.FBM_SYNC_CLIENT.lastStatus.enabled],
     [1, false]);
-  check(so, 'Công tắc tổng vẽ trạng thái từ kết quả lệnh, không hỏi lại fbmGetSyncStatus',
+  check(so, 'Công tắc tổng vẽ trạng thái từ kết quả lệnh, không hỏi lại lệnh status',
     calls.slice(callsBeforeMaster).map((item) => item.name),
-    ['fbmSetMasterSwitch']);
+    ['set_master']);
 
   hop.FBM_SYNC_CLIENT.lastStatus = statusNghi();
   hop.FBM_SYNC_CLIENT.subscreen = 'run';

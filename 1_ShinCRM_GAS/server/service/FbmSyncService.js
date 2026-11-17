@@ -1,33 +1,13 @@
 /**
- * Cửa vào của Sidebar cho đồng bộ FBM: mỗi hàm là một dòng chuyển đúng một lệnh vào `FbmSync.controlDispatch`, không chứa nghiệp vụ, khóa hay lọc kết quả. Tên hàm giữ ổn định vì Sidebar gọi qua `google.script.run`.
+ * Cửa vào duy nhất của Sidebar cho đồng bộ FBM: Sidebar gửi tên lệnh và gói dữ liệu có tên trường, cửa lệnh `FbmSync.controlDispatch` tra bảng lệnh, giữ khóa và trả bản công khai. Tên lệnh làm nhãn Log và vết của lời gọi.
+ * Kênh do cửa vào đặt, không lấy từ payload: Sidebar luôn là `sidebar`, hàm dò DEV đi `fbmCommandRun_` với kênh `dev`; relay đi lối riêng ở `EntryPoints.js`. Hậu tố `_` làm hàm thành riêng tư nên `google.script.run` không gọi được, Sidebar không tự xưng kênh khác được.
  * Nguồn `fbm_sync` bật phạm vi riêng của đồng bộ (gom DocumentProperties, ghi vết) qua `ENTRY_POINT_SCOPES` đăng ký ở cuối tệp.
  */
-function fbmCommandRun(name, command, payload) { return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.controlDispatch(command, payload); }, payload); }
-
-/** Một cửa cho mọi lệnh mở lượt Extension chở (`start`, `open_conflict`); payload mang `machineId` của máy sẽ nhận lượt. Kết quả có `runId` thay phong bì: Sidebar chuyển runId cho Extension, không cầm phong bì. */
-function fbmDriveCommand(command, payload) { return fbmCommandRun('fbmDriveCommand', FbmSync.driveCommandName(command), payload || {}); }
-function fbmCancelSync() { return fbmCommandRun('fbmCancelSync', 'cancel', {}); }
-function fbmStopBackground() { return fbmCommandRun('fbmStopBackground', 'stop_background', {}); }
-function fbmResetSyncState() { return fbmCommandRun('fbmResetSyncState', 'reset_state', {}); }
-/** Chấp thuận tập bản ghi chờ đẩy; `fingerprint` là dấu tập Sidebar đang hiện. Không mở lượt. */
-function fbmRetryPushFailures() { return fbmCommandRun('fbmRetryPushFailures', 'retry_push_failures', {}); }
-function fbmConfirmConflict(entity, id, choice, merged, fbmValues, shinValues, snapshot) { return fbmCommandRun('fbmConfirmConflict', 'confirm_conflict', { entity: entity, id: id, choice: choice, merged: merged, fbmValues: fbmValues, shinValues: shinValues, snapshot: snapshot }); }
-function fbmGetSyncStatus() { return fbmCommandRun('fbmGetSyncStatus', 'status', {}); }
-function fbmGetSyncTrace() { return fbmCommandRun('fbmGetSyncTrace', 'trace_read', {}); }
-/** Lỗi phía Sidebar không gắn với một request: `runId` chỉ có khi lỗi thuộc lượt Sidebar đang tự chạy, GAS mới dừng lượt đó. */
-function fbmLogSyncError(message, clientTrace, action) { return fbmCommandRun('fbmLogSyncError', 'client_error', { message: message, clientTrace: clientTrace, action: action }); }
-/** Lưu cài đặt FBM theo tên phần: `patches` là `{ tênPhần: { trường: chuỗi ô } }`, GAS kiểm và trả `problems`; `confirmLow` chỉ true khi người dùng đã xác nhận lịch nền dày. */
-function fbmSaveSettings(patches, confirmLow) { return fbmCommandRun('fbmSaveSettings', 'save_settings', { patches: patches || {}, confirmLow: confirmLow === true }); }
-function fbmResetSettings(section) { return fbmCommandRun('fbmResetSettings', 'reset_settings', { section: section }); }
-function fbmSetMasterSwitch(enabled) { return fbmCommandRun('fbmSetMasterSwitch', 'set_master', { enabled: enabled === true }); }
-function fbmSaveIdentityBinding(binding) { return fbmCommandRun('fbmSaveIdentityBinding', 'save_identity_binding', { binding: binding || {} }); }
-function fbmSaveConnection(config) { return fbmCommandRun('fbmSaveConnection', 'save_credential', config || {}); }
-/** Giao máy Sidebar đang mở chạy đồng bộ nền: `input` là `{ machineId, name }`, mã do Extension máy đó sinh. */
-function fbmAssignBackgroundMachine(input) { return fbmCommandRun('fbmAssignBackgroundMachine', 'assign_background_machine', input || {}); }
-function fbmReleaseBackgroundMachine() { return fbmCommandRun('fbmReleaseBackgroundMachine', 'release_background_machine', {}); }
-function fbmGetRelayConfig() { return fbmCommandRun('fbmGetRelayConfig', 'relay_config', {}); }
-function fbmRotateRelayKey() { return fbmCommandRun('fbmRotateRelayKey', 'relay_rotate_key', {}); }
-function fbmLogRelaySwitchDecision(decision, fromSpreadsheetId) { return fbmCommandRun('fbmLogRelaySwitchDecision', 'relay_switch_log', { decision: decision, fromSpreadsheetId: fromSpreadsheetId }); }
+function fbmCommand(command, payload) { return fbmCommandRun_(command, payload, 'sidebar'); }
+function fbmCommandRun_(command, payload, channel) {
+  var name = String(command || '');
+  return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.controlDispatch(name, payload || {}, channel === 'dev' ? 'dev' : 'sidebar'); }, payload);
+}
 
 /** Phạm vi riêng của đồng bộ quanh mỗi cửa vào nguồn `fbm_sync`: gom DocumentProperties một lần gọi và ghi mốc vết. Không lưu response FBM vào vết. Lúc đóng, dòng Log của request bị bỏ mà không có trả lời (phát hiện ở cửa ghi ô lượt) được ghi trước khi ghi trace. */
 var ENTRY_POINT_SCOPES = typeof ENTRY_POINT_SCOPES !== 'undefined' ? ENTRY_POINT_SCOPES : {};

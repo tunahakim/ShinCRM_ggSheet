@@ -179,7 +179,7 @@ function fbmSyncToggleMaster() {
   if (FBM_SYNC_CLIENT.masterToggleFlight) { return FBM_SYNC_CLIENT.masterToggleFlight; }
   var enabled = fbmSyncShellEnabled(FBM_SYNC_CLIENT.lastStatus || {}), ticket = fbmSyncStatusTicket();
   fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.master, { disabled: true });
-  return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) {
+  return FBM_SYNC_CLIENT.masterToggleFlight = fbmSyncCommand('set_master', { enabled: !enabled }).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không đổi được công tắc đồng bộ.'); }
     fbmSyncExtensionWakeConfig();
     return fbmSyncStatusFromResult(result, ticket);

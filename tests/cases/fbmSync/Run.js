@@ -121,11 +121,11 @@ async function chay(so) {
   nenNhan.F.logContextNote(null); nenNhan.F.logContextNote(nenNhan.F.stateRead());
   check(so, 'nhãn lượt: lượt tay đóng trong lời gọi đến qua relay, dòng kết thúc ghi sau khi đóng vẫn mang nhãn Tay và mã lượt (từng ghi "Nền")', [
     !!dongTay, dongSlice.luot, dongSlice.cycleId === maTay, nhanTay.split(' · ')[0]
-  ], [true, 'Tay · Đăng nhập thử', true, 'Tay']);
-  check(so, 'nhãn lượt: lượt Hủy phiên cũ mở trong lát có ngay nhãn của nó cho dòng ghi trong cùng lát (từng lấy nhãn ô lượt cũ)', dongEp.luot, 'Tay · Hủy phiên cũ');
+  ], [true, 'Tay · Đăng nhập thử · từ Extension', true, 'Tay']);
+  check(so, 'nhãn lượt: lượt Hủy phiên cũ mở trong lát có ngay nhãn của nó cho dòng ghi trong cùng lát (từng lấy nhãn ô lượt cũ), kèm nguồn lệnh', dongEp.luot, 'Tay · Hủy phiên cũ · từ Sidebar');
   check(so, 'nhãn lượt: lượt nền giữ nhãn Nền sau khi đóng trong cùng lời gọi; lời gọi mới không làm cho lượt nào thì theo nơi gọi (relay Nền, Sidebar Tay, không rõ thì Tay), không mang nhãn lượt cũ', [
     nhanNenDong.split(' · ')[0], nenNhan.F.logContextText({ cycleId: nenNhan.F.stateRead().runId }), nenNhan.F.logContextText(), nhanNgoaiRelay, nhanNgoaiSidebar
-  ], ['Nền', nenNhan.F.stateRead().runLabel, 'Tay', 'Nền', 'Tay']);
+  ], ['Nền', nenNhan.F.stateRead().runLabel, 'Tay', 'Nền · từ Extension', 'Tay · từ Sidebar']);
 
   // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
   const runCu = tayNhan.F.stateRead().runId;

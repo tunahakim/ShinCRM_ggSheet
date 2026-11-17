@@ -105,7 +105,7 @@ async function chay(so) {
   check(so, 'dừng lượt đang giữ chỗ thì đóng ngay, lần hỏi sau không nhận lượt đã dừng', [stopped.code || '', FbmSync.stateRead().phase, FbmSync.stateRead().activeRequestId, hoi('may-A').code], ['SYNC_STOPPED', 'paused', '', 'MACHINE_NOT_ASSIGNED']);
 
   check(so, 'phong bì thật lọt ra kênh Sidebar là lỗi lập trình, ném ENVELOPE_CHANNEL_VIOLATION', loi(() => FbmSync.channelResult({ ok: true, request: { id: 'x', url: 'https://fbo.com.vn:8888/a' } }, 'sidebar')), 'ENVELOPE_CHANNEL_VIOLATION');
-  check(so, 'cửa mở lượt của Sidebar chỉ nhận lệnh có cờ drives', [loi(() => FbmSync.driveCommandName('continue')), loi(() => FbmSync.driveCommandName('heartbeat')), FbmSync.driveCommandName('open_conflict')], ['DRIVE_COMMAND_REJECTED', 'DRIVE_COMMAND_REJECTED', 'open_conflict']);
+  check(so, 'kênh Sidebar và DEV không gọi được lệnh relay, relay không gọi được lệnh Sidebar', [loi(() => FbmSync.controlDispatch('continue', { machineId: 'may-A' })), loi(() => FbmSync.controlDispatch('heartbeat', { machineId: 'may-A' }, 'dev')), loi(() => FbmSync.controlDispatch('start', { machineId: 'may-A' }, 'relay')), loi(() => FbmSync.controlDispatch('status', {}, 'relay'))], ['COMMAND_CHANNEL_REJECTED', 'COMMAND_CHANNEL_REJECTED', 'COMMAND_CHANNEL_REJECTED', 'COMMAND_CHANNEL_REJECTED']);
   check(so, 'payload không tự xưng được là relay: kênh do lối vào đặt', (() => { let seen = ''; const spec = FbmSync.COMMANDS.status, real = spec.run; spec.run = (input) => { seen = input.source; return { ok: true }; }; FbmSync.controlDispatch('status', { source: 'relay' }); spec.run = real; return seen; })(), 'sidebar');
 
   // Relay: thiếu mã máy thì từ chối; ô lỗi gọi relay trong hộp đen được ghi Log một lần và trả mốc để Extension xóa.
