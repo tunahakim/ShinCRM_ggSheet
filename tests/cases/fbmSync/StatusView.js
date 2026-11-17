@@ -47,6 +47,9 @@ async function chay(so) {
     [true, false, false, true, { text: 'anhlt', unavailable: false }]);
   const chet = dung(Object.assign({}, dangChay, { activeRequestId: '', deadlineAt: 0, updatedAt: goc.now - F.STALE_RUN_MS - 1000 }));
   check(so, 'lượt chết: cảnh báo kèm mã và chữ hướng dẫn', [chet.warnings.length, chet.warnings[0].code, /Bấm Đồng bộ/.test(chet.warnings[0].text)], [1, 'SYNC_STALE_RUN', true]);
+  check(so, 'lượt chết có tone lỗi (không còn ai chở lượt nên không có tin nào làm icon ⟳ thôi xoay); bản nhẹ lúc mở Sidebar quyết tone cùng một hàm',
+    [chet.tone, F.toneOf(Object.assign({}, goc.state, dangChay, { activeRequestId: '', deadlineAt: 0, updatedAt: goc.now - F.STALE_RUN_MS - 1000 }), true, goc.now), F.toneOf(Object.assign({}, goc.state, dangChay), true, goc.now), F.toneOf(Object.assign({}, goc.state, dangChay), false, goc.now)],
+    ['error', 'error', 'running', 'off']);
   check(so, 'khách bị chặn khi kéo về thành issue có chữ', dung({ phase: 'done', metadata: { identityBlocks: [{ fbmCustomerCode: 'ALT00010', reason: 'trùng mã' }] } }).issues,
     [{ code: 'IDENTITY_BLOCKED', level: 'warning', text: 'Khách FBM ALT00010 bị chặn khi kéo về: trùng mã' }]);
   const tongHop = F.statusMetadata({ identityCheck: { total: 3, matched: 2, missing: 1, missingSample: [{ fbmId: 'FBM-3' }] } }, { hashes: {}, details: {} });

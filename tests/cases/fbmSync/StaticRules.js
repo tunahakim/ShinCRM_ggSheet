@@ -149,8 +149,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/ConnectionSave.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
-    // Người đọc của status: đọc ô lượt một lần rồi giao cho bộ dựng thuần.
-    '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 1,
+    // Người đọc của status: đọc ô lượt một lần rồi giao cho bộ dựng thuần; bản nhẹ `toneView` lúc mở Sidebar đọc ô lượt một lần rồi giao cho `toneOf`.
+    '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 2,
     // Hàm chuyển kho một lần là cửa vào riêng: đọc pha để chặn khi đang có lượt; xóa cùng server/dev/.
     '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,

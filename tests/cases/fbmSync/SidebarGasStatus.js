@@ -1,4 +1,4 @@
-/** Sidebar Đồng bộ FBM chỉ vẽ status GAS dựng: nút màn Chạy theo `actions`, icon header theo `tone`, thanh tiến trình theo `progress`, câu kiểm liên kết theo `identityResult`, câu đăng nhập thử theo `message`; lỗi chưa tới GAS (cầu nối Extension) chỉ báo ở dòng báo và ghi Log, không vẽ status giả. */
+/** Sidebar Đồng bộ FBM chỉ vẽ status GAS dựng: nút màn Chạy theo `actions`, icon ⟳ thanh công cụ theo `tone`, thanh tiến trình theo `progress`, câu kiểm liên kết theo `identityResult`, câu đăng nhập thử theo `message`; lỗi chưa tới GAS (cầu nối Extension) chỉ báo ở dòng báo và ghi Log, không vẽ status giả. */
 const { section, check } = require('../../lib/assert');
 const { taoSidebarDongBo } = require('../../lib/sidebar/bo-dong-bo');
 const { statusGas, stateDangChay } = require('../../lib/fbm/status-gas');
@@ -25,30 +25,48 @@ function nutChay(hop, dom, status) {
   return nut ? [nut.id, nut.textContent, !!nut.disabled] : null;
 }
 
-function testIconTheoTone(so) {
-  // Icon header theo `tone` GAS dựng: Sidebar không tự suy từ phase hay công tắc.
-  const { hop, dom } = taoSidebarDongBo();
+/** Thêm vào DOM giả một nút `id` có classList (icon ⟳ của thanh công cụ, nút ⋮ của màn đồng bộ). */
+function taoNut(dom, id) {
   const nut = dom.document.createElement('button');
-  nut.id = 'fbm-sync-module-menu';
-  nut.className = 'shin-sync-status-running';
+  nut.id = id;
+  nut.className = '';
   nut.classList = {
-    add: (name) => { nut.className = (nut.className + ' ' + name).trim(); },
+    add: (name) => { if (nut.className.split(/\s+/).indexOf(name) < 0) { nut.className = (nut.className + ' ' + name).trim(); } },
     remove: (name) => { nut.className = nut.className.split(/\s+/).filter((item) => item && item !== name).join(' '); }
   };
   dom.root.appendChild(nut);
-  const chay = () => nut.className.indexOf('shin-sync-status-running') >= 0;
-  hop.fbmSyncPaintHeaderState(statusGas(stateDangChay(), { enabled: false }));
+  return nut;
+}
+
+function testIconTheoTone(so) {
+  // Icon ⟳ (id `fbm-sync-menu`) theo `tone` GAS dựng: Sidebar không tự suy từ phase hay công tắc.
+  const { hop, dom } = taoSidebarDongBo();
+  // Schema thanh công cụ màn xem: chữ nhắc gốc của icon chỉ khai ở đây.
+  hop.UI_SCHEMA = { view: { header: { start: [], end: [{ id: 'fbm-sync-menu', icon: 'sync', tooltip: 'Đồng bộ FBM' }] } } };
+  const icon = taoNut(dom, 'fbm-sync-menu'), menu = taoNut(dom, 'fbm-sync-module-menu');
+  const lop = (nut, ten) => nut.className.split(/\s+/).indexOf(ten) >= 0;
+  const quay = hop.uiSyncClass('shell', 'statusRunning'), loi = hop.uiSyncClass('shell', 'statusError');
+  const t = stateDangChay().updatedAt;
+  hop.FBM_SYNC_CLIENT.active = false;
+  hop.fbmSyncPaint(statusGas(stateDangChay(), { enabled: false }));
   check(so, 'công tắc tổng tắt thì tone off: icon không quay, nhãn không kèm trạng thái',
-    [chay(), nut.getAttribute('aria-label')],
+    [lop(icon, quay), icon.getAttribute('aria-label')],
     [false, 'Đồng bộ FBM']);
-  hop.fbmSyncPaintHeaderState(statusGas(stateDangChay()));
-  check(so, 'lượt đang chạy thì tone running: icon quay, nhãn kèm đang chạy',
-    [chay(), nut.getAttribute('aria-label')],
-    [true, 'Đồng bộ FBM — đang chạy']);
-  hop.fbmSyncPaintHeaderState(statusGas({ phase: 'error' }));
+  hop.fbmSyncPaint(statusGas(stateDangChay({ updatedAt: t + 2 })));
+  check(so, 'màn đồng bộ đóng mà status lượt đang chạy về (lượt nền, giữ phiên): icon ⟳ quay, nhãn kèm đang chạy; nút ⋮ không mang trạng thái',
+    [lop(icon, quay), icon.getAttribute('aria-label'), menu.className, menu.getAttribute('aria-label')],
+    [true, 'Đồng bộ FBM — đang chạy', '', null]);
+  hop.fbmSyncToneTake('idle', t + 1);
+  check(so, 'status cũ hơn status đang giữ (updatedAt nhỏ hơn) không đè đèn', lop(icon, quay), true);
+  hop.fbmSyncPaint(statusGas({ phase: 'error', updatedAt: t + 3 }));
   check(so, 'lượt lỗi thì tone error: icon thôi quay và mang màu lỗi, nhãn kèm có lỗi',
-    [chay(), nut.className.indexOf('shin-sync-status-error') >= 0, nut.getAttribute('aria-label')],
+    [lop(icon, quay), lop(icon, loi), icon.getAttribute('aria-label')],
     [false, true, 'Đồng bộ FBM — có lỗi']);
+  // Thanh công cụ dựng lại cả cụm: node mới không có lớp; renderScreen gọi lại bộ tô từ ô tone đang giữ.
+  hop.fbmSyncToneTake('running', t + 4);
+  const moi = taoNut(dom, 'fbm-sync-menu');
+  hop.fbmSyncToolbarPaint();
+  check(so, 'thanh công cụ dựng lại icon ⟳ mới: tô lại từ ô tone đang giữ, không cần chờ status mới', [lop(moi, quay), moi.getAttribute('aria-label')], [true, 'Đồng bộ FBM — đang chạy']);
 }
 
 async function chay(so) {

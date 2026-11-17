@@ -77,11 +77,11 @@ async function testLoiExtensionKhongCoChoCho(so) {
   // Lỗi Extension khi không có lượt tay đang chờ: dòng báo riêng của Extension và ghi Log; status về sau gỡ dòng báo đó.
   const { hop } = taoSidebarDongBo();
   const log = [];
-  hop.callServer = (name, args) => { log.push([name, args[2]]); return Promise.resolve({ ok: true }); };
+  hop.callServer = (name, args) => { log.push(name === 'fbmGetSyncStatus' ? [name] : [name, args[2]]); return Promise.resolve(name === 'fbmGetSyncStatus' ? { status: statusGas({ phase: 'idle' }) } : { ok: true }); };
   hop.fbmSyncStatusReceived({ failure: { code: 'FBM_TAB_NOT_FOUND', httpStatus: 0, message: 'Không thấy tab FBM' } });
   await choVong();
-  check(so, 'lỗi Extension không có chỗ chờ hiện ở khóa fbmExtension và ghi Log extension_failure',
-    [dongBao(hop).map((d) => d.split(':')[0]), log, hop.NOTICES.fbmExtension.blocks[0].title], [['fbmExtension'], [['fbmLogSyncError', 'extension_failure']], 'Extension đồng bộ FBM báo lỗi']);
+  check(so, 'lỗi Extension không có chỗ chờ: hỏi GAS trạng thái lượt ngay một lần (đèn icon ⟳ không chờ đồng hồ im), hiện ở khóa fbmExtension và ghi Log extension_failure',
+    [dongBao(hop).map((d) => d.split(':')[0]), log, hop.NOTICES.fbmExtension.blocks[0].title], [['fbmExtension'], [['fbmGetSyncStatus'], ['fbmLogSyncError', 'extension_failure']], 'Extension đồng bộ FBM báo lỗi']);
   hop.FBM_SYNC_CLIENT.active = true;
   hop.fbmSyncStatusReceived({ status: statusGas({ phase: 'idle' }) });
   check(so, 'status relay về thì gỡ dòng báo Extension', dongBao(hop), []);

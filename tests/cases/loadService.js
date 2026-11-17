@@ -47,8 +47,11 @@ function chay(so) {
   const rong = hop.loadCore();
   check(so, 'gói lõi có đúng bộ khóa tài liệu 05 chốt, không thiếu không thừa',
     Object.keys(rong).sort(),
-    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'ms', 'notices', 'ok', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
+    ['activity', 'blocked', 'budget', 'categories', 'config', 'customer', 'modules', 'ms', 'notices', 'ok', 'prefs', 'processedRevision', 'reload', 'schema', 'selectionHints', 'settings', 'spreadsheetId', 'timingTrace', 'warnings'].sort());
   check(so, 'sheet trắng nạp trót lọt và không bị chặn', [rong.ok, rong.blocked], [true, false]);
+  hop.CORE_LOAD_PROVIDERS.thu = () => ({ tone: 'running' });
+  check(so, 'khối modules: lõi gọi từng hàm module đăng ký và đặt kết quả dưới đúng tên module', [rong.modules, hop.loadCore().modules.thu], [{}, { tone: 'running' }]);
+  delete hop.CORE_LOAD_PROVIDERS.thu;
   check(so, 'gói lõi mang id tệp để client lọc tin postMessage đúng tệp', rong.spreadsheetId, nen.book.getId());
   check(so, 'không khách nào mà vẫn gửi đủ bảng tên trường',
     [rong.customer.rows.length, rong.customer.fields.length],

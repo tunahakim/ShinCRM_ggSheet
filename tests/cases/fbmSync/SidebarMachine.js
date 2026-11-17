@@ -92,25 +92,30 @@ async function chay(so) {
     f.notices.map((item) => [item[0], item[1] && item[1].line])
   ], [true, true, '[]', [['fbmBackgroundMachine', im.notice.text], ['fbmBackgroundMachine', null]]]);
 
-  const g = taoMay({ machineId: 'may-A-123456' }, (name) => (name === 'fbmGetSyncStatus' ? { status: { phase: 'pull_customer', running: true, origin: 'background', updatedAt: 5 } } : { ok: true }));
+  const g = taoMay({ machineId: 'may-A-123456' }, (name) => (name === 'fbmGetSyncStatus' ? { status: { phase: 'pull_customer', running: true, tone: 'running', origin: 'background', updatedAt: 5 } } : { ok: true }));
   const painted = [];
   g.hop.fbmSyncPaint = (value) => { painted.push(value.phase); g.hop.fbmSyncWatchArm(value); };
-  g.hop.fbmSyncWatchArm({ running: true, origin: 'background' });
+  g.hop.fbmSyncWatchArm({ running: true, tone: 'running', origin: 'background' });
   const timer = g.hop.timers[g.hop.timers.length - 1];
   timer.fn();
   await nghi(); await nghi();
   const sauHoi = g.hop.timers.length;
-  g.hop.fbmSyncWatchArm({ running: false });
+  g.hop.fbmSyncWatchArm({ running: false, tone: 'idle' });
   const datKhiXong = g.hop.timers.length;
+  g.hop.fbmSyncWatchArm({ running: true, tone: 'error', stuck: true });
+  const datKhiKet = g.hop.timers.length;
   g.hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'L1' };
-  g.hop.fbmSyncWatchArm({ running: true });
-  check(so, 'Máy không chở lượt: lượt đang chạy mà Sidebar không chờ lượt nào thì hỏi GAS sau một nhịp im, vẽ status GAS trả và đặt lại đồng hồ; lượt hết hoặc Sidebar đang chờ lượt tay của mình thì không đặt', [
-    timer.ms, g.calls.map((item) => item[0]), painted, sauHoi, datKhiXong, g.hop.timers.length
-  ], [g.hop.FBM_SYNC_RUN_SILENCE_MS, ['fbmGetSyncStatus'], ['pull_customer'], 2, 2, 2]);
-  g.hop.FBM_SYNC_CLIENT.runWaiter = null;
-  g.hop.fbmSyncWatchArm({ running: true });
+  g.hop.fbmSyncWatchArm({ running: true, tone: 'running' });
+  check(so, 'Máy không chở lượt: lượt đang chạy mà Sidebar không chờ lượt nào thì hỏi GAS sau một nhịp im, vẽ status GAS trả và đặt lại đồng hồ; lượt hết, lượt kẹt (GAS cho tone lỗi) hoặc màn mở và Sidebar đang chờ lượt tay của mình thì không đặt', [
+    timer.ms, g.calls.map((item) => item[0]), painted, sauHoi, datKhiXong, datKhiKet, g.hop.timers.length
+  ], [g.hop.FBM_SYNC_RUN_SILENCE_MS, ['fbmGetSyncStatus'], ['pull_customer'], 2, 2, 2, 2]);
+  g.hop.FBM_SYNC_CLIENT.lastStatus = { running: true, tone: 'running' };
+  g.hop.fbmSyncWatchArm(g.hop.FBM_SYNC_CLIENT.lastStatus);
+  const truocDong = g.hop.timers[g.hop.timers.length - 1];
   g.hop.syncScreenClose();
-  check(so, 'Đóng màn đồng bộ thì hủy đồng hồ hỏi GAS', g.hop.timers[g.hop.timers.length - 1].cleared, true);
+  const sauDong = g.hop.timers[g.hop.timers.length - 1];
+  check(so, 'Đóng màn đồng bộ khi lượt còn chạy (kể cả có chỗ chờ lượt tay): đồng hồ hỏi GAS vẫn đặt để đèn trên icon ⟳ biết lượt xong hay kẹt', [truocDong.cleared, sauDong !== truocDong, !!sauDong.cleared, sauDong.ms], [true, true, false, g.hop.FBM_SYNC_RUN_SILENCE_MS]);
+  g.hop.FBM_SYNC_CLIENT.runWaiter = null;
 }
 
 module.exports = { chay };

@@ -106,9 +106,9 @@ async function testChoLuot(so) {
   const daDat = hen.length;
   hop.syncScreenClose();
   hop.fbmSyncStatusReceived({ status: statusGas(stateDangChay({ runId: 'run-10' })) });
-  check(so, 'đóng màn đồng bộ: đồng hồ chờ bị hủy, status relay về sau không đặt đồng hồ mới, chỗ chờ vẫn giữ',
-    [hen[daDat - 1].cleared, hen.length === daDat, hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId],
-    [true, true, 'run-10']);
+  check(so, 'đóng màn đồng bộ: đồng hồ chờ lượt tay bị hủy, status relay về sau chỉ đặt đồng hồ hỏi GAS của đèn icon ⟳ (không đặt lại đồng hồ chờ), chỗ chờ vẫn giữ',
+    [hen[daDat - 1].cleared, hen.length - daDat, hen[hen.length - 1].ms, hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId, hop.FBM_SYNC_CLIENT.runWaiter.timer],
+    [true, 1, hop.FBM_SYNC_RUN_SILENCE_MS, 'run-10', null]);
 
   let ketNoi = null;
   hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-20', resolve(value) { ketNoi = value; }, reject() {}, timer: null };
