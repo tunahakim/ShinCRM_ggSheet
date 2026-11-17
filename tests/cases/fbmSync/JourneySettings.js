@@ -53,6 +53,16 @@ async function chay(so) {
   check(so, 'hủy cấu hình Extension khôi phục giá trị GAS và khóa lại ô nhập',
     [pollMinutes.value, pollMinutes.disabled, !!dom.document.getElementById('fbm-sync-config-extension-edit')],
     ['5', true, true]);
+  bamNut(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
+  const activityMinutes = dom.document.getElementById('fbm-sync-process-activityFull-minutes');
+  activityMinutes.value = '45';
+  dom.document.listeners.input({ target: activityMinutes });
+  hop.fbmSyncConfigState('background').needsRender = true;
+  hop.fbmSyncPaint(Object.assign(statusNghi(), { message: 'Snapshot Lịch nền mới' }));
+  check(so, 'Ô số phút Lịch nền đang sửa: thẻ vẽ lại từ bản nháp vẫn giữ số vừa gõ',
+    [dom.document.getElementById('fbm-sync-process-activityFull-minutes') !== activityMinutes, dom.document.getElementById('fbm-sync-process-activityFull-minutes').value, hop.fbmSyncConfigDraftValue('background', 'activityFullMinutes', '')],
+    [true, '45', '45']);
+  hop.fbmSyncConfigCancelEdit('background', true);
   // Lưu cài đặt FBM: GAS báo ô sai thì tô đúng ô, hỏi xác nhận lịch dày, phần khóa hỏng chỉ còn nút đặt về mặc định.
   const keepCall = hop.callServer, keepNotice = hop.fbmSyncSetSettingsNotice, keepDecision = hop.uiDecisionOpen, keepSettings = hop.FBM_SYNC_CLIENT.syncSettings, sent = [], notices = [];
   hop.fbmSyncSetSettingsNotice = (card, kind, text) => { notices.push([card, kind, text]); };
