@@ -2,7 +2,6 @@
 
 const { section, check } = require('../../lib/assert');
 const { docTep } = require('../../lib/load-gas');
-const { napTheoSidebar } = require('../../lib/sidebar/nap-sidebar');
 const { syncValue, dungHopLienKet, batDauLienKet } = require('../../lib/sidebar/hop-lien-ket');
 
 /** Hộp cát cho phần sheet quản trị: ghi lại từng lời gọi máy chủ kèm lý do lời hỏi, trả câu trả lời dựng theo tên hàm. */
@@ -146,13 +145,11 @@ async function chay(so) {
   check(so, 'payload và lượt vẽ view từ lời hỏi tín hiệu gọi sidebarBusyRun với block: false, progress: true (thanh loading vẫn chạy, không chặn người đang thao tác)',
     syncing._busy.map((item) => [item.block, item.progress]), [[false, true], [false, true]]);
 
-  const fbm = napTheoSidebar(['client/sync/fbmSync.html']);
-  fbm.fbmSyncSetRunning(true); fbm.fbmSyncSetRunning(false);
   const fbmSource = docTep('client/sync/fbmSync.html');
   const sidebarSources = ['client/link/sheetLink.html', 'client/ram/refresh.html', 'client/sync/fbmSync.html'].map((rel) => docTep(rel)).join(' ');
-  check(so, 'cờ lượt chạy đổi qua một cửa và không còn đường hoãn nạp theo đồng bộ phía Sidebar (sync-finished, refreshDeferredBySync, hẹn giờ debounce)',
-    [fbm.FBM_SYNC_CLIENT.running, (fbmSource.match(/FBM_SYNC_CLIENT\.running\s*=[^=]/g) || []).length, /sheetLinkSyncFinished|refreshDeferredBySync|SHEET_LINK_RELOAD_TIMER|forceImmediate|syncRunning/.test(sidebarSources)],
-    [false, 1, false]);
+  check(so, 'Sidebar không giữ cờ lượt chạy riêng (đang chạy là của status GAS) và không còn đường hoãn nạp theo đồng bộ (sync-finished, refreshDeferredBySync, hẹn giờ debounce)',
+    [/FBM_SYNC_CLIENT\.running/.test(fbmSource), /sheetLinkSyncFinished|refreshDeferredBySync|SHEET_LINK_RELOAD_TIMER|forceImmediate|syncRunning/.test(sidebarSources)],
+    [false, false]);
 
   // Lời hỏi chọn ô mang danh sách thông báo thì Sidebar thay trọn phần thông báo máy chủ ngay ở lời trả đó.
   const cho = dungHopLienKet();

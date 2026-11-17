@@ -48,7 +48,7 @@ async function chay(so) {
 
   const d = taoCanh({ ok: true }), veLoi = [];
   d.hop.FBM_SYNC_CLIENT = { active: true };
-  d.hop.fbmSyncPaintError = (err, message, action) => { veLoi.push([message, action]); };
+  d.hop.fbmSyncReportError = (err, message, action) => { veLoi.push([message, action]); };
   d.hop.actionErrorReport(new Error('Lỗi trong màn FBM'));
   check(so, 'Màn đồng bộ FBM giữ khung (dòng đáy ẩn): lỗi sang thẻ lỗi của màn FBM (tự ghi Log), không đặt dòng đáy và không ghi Log lần hai', [
     veLoi, d.hop.NOTICES.actionError === undefined, d.calls.length

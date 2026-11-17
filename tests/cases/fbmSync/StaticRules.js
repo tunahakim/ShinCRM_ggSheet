@@ -163,13 +163,12 @@ const EXCEPTIONS = {
     '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 1
   },
   typeofFunction: {
-    '1_ShinCRM_GAS/client/sync/fbmSync.html': 57,
-    '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 12,
+    '1_ShinCRM_GAS/client/sync/fbmSync.html': 52,
+    '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 10,
     '1_ShinCRM_GAS/client/sync/fbmSyncSettingsScreen.html': 1,
-    '1_ShinCRM_GAS/client/sync/fbmSyncShell.html': 4,
+    '1_ShinCRM_GAS/client/sync/fbmSyncShell.html': 2,
     '1_ShinCRM_GAS/client/sync/fbmSyncStatusScreen.html': 1,
     '1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html': 1,
-    '1_ShinCRM_GAS/client/sync/screens/run.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
@@ -184,7 +183,6 @@ const EXCEPTIONS = {
     '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 3
   },
   phaseList: {
-    '1_ShinCRM_GAS/client/sync/fbmSync.html': 2,
     '1_ShinCRM_GAS/fbm_sync/schema/FbmFields.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1
   },
@@ -194,10 +192,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
-  popup: {
-    '1_ShinCRM_GAS/client/sync/fbmSync.html': 3,
-    '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 1
-  },
+  popup: {},
   kindBranch: {
     '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js': 3,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 6
@@ -272,6 +267,8 @@ function chay(so) {
   check(so, 'mọi đường dẫn trong phạm vi quét đều tồn tại', missing, []);
   check(so, 'phạm vi quét có tệp để quét', files.length > 0, true);
   const readSource = (file) => fs.readFileSync(path.join(REPO, file), 'utf8');
+  const clientAll = listFiles(path.join(REPO, '1_ShinCRM_GAS/client'), ['.html'], '1_ShinCRM_GAS/client').map((file) => ({ file: file, kind: 'client' }));
+  check(so, 'cả thư mục client (không riêng màn đồng bộ) không có popup trình duyệt alert/confirm: hỏi qua uiDecisionOpen, báo qua noticeSet', scanRule(ruleById('popup'), clientAll, readSource), {});
 
   [PHASE_OWNER].concat(PROPERTY_GATE_FILES, SESSION_SECRET_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
     check(so, 'tệp được phép ' + file + ' có trong phạm vi quét', files.some((item) => item.file === file), true);

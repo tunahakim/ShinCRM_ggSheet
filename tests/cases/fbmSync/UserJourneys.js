@@ -1,388 +1,114 @@
-/**
- * Hành trình UI dựa trên Tài liệu 09.08: thao tác qua listener thật của
- * Sidebar, sau đó kiểm lệnh công khai gửi sang GAS và trạng thái người dùng thấy.
- */
+/** Hành trình người dùng trên màn Chạy và Tài khoản của Sidebar Đồng bộ FBM: thao tác qua listener thật, kiểm lệnh gửi GAS và thứ người dùng thấy. */
 const { section, check } = require('../../lib/assert');
-const { goiCaiDat } = require('../../lib/sidebar/fbm-cai-dat');
-const { taoBoTest } = require('./Sidebar');
-
-function tick() { return new Promise((resolve) => setTimeout(resolve, 0)); }
-
-function click(dom, target) {
-  const listener = dom.document.listeners.click;
-  if (!listener) throw new Error('Sidebar chưa đăng ký listener click.');
-  listener({ target, preventDefault() {} });
-}
-
-function change(dom, target) {
-  const listener = dom.document.listeners.change;
-  if (!listener) throw new Error('Sidebar chưa đăng ký listener change.');
-  listener({ target });
-}
-
-function idle() {
-  return { phase: 'idle', label: 'Sẵn sàng', mode: 'read', counts: {}, masterEnabled: true, backgroundEnabled: true };
-}
-
-async function testConnectionSaveValidation(so) {
-  const { hop, dom } = taoBoTest();
-  const calls = [], logs = [], notices = [], errors = [];
-  hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet-a', userId: 'user-a', username: 'USERA', accountName: 'Tai khoan A' };
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: Object.assign({}, hop.FBM_SYNC_CLIENT.identityDraft) };
-  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true };
-  hop.fbmSyncSetAccountNotice = (area, level, message) => { notices.push({ area, level, message }); };
-  const paintError = hop.fbmSyncPaintError;
-  hop.fbmSyncPaintError = (error, message) => { errors.push(String(message || error || '')); return paintError(error, message); };
-  hop.fbmSyncPaint = () => {};
-  hop.fbmSyncStatusOnce = () => Promise.resolve({ phase: 'idle' });
-  hop.fbmSyncConfigFinishEdit = () => {};
-  hop.callServer = (name, args) => { if (name === 'fbmLogSyncError') { logs.push({ name, args }); return Promise.resolve({ ok: true }); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityDraft, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: hop.FBM_SYNC_CLIENT.loginStatus }); };
-  const add = (id, value) => { const input = dom.document.createElement('input'); input.id = id; input.value = value; dom.root.appendChild(input); return input; };
-  const spreadsheet = add('fbm-identity-spreadsheet', 'sheet-a');
-  add('fbm-identity-user', 'user-a'); add('fbm-identity-username', 'USERA'); add('fbm-identity-account', 'Tai khoan A');
-  const username = add('fbm-login-username', '');
-  const password = add('fbm-login-password', '');
-  const button = dom.document.createElement('button');
-
-  spreadsheet.value = 'sheet-a'; dom.document.getElementById('fbm-identity-user').value = '';
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client chặn identity thiếu trường trước khi gọi GAS, chỉ hiện ở card, không ghi Log', [calls.length, button.disabled, notices[0] && notices[0].area, logs.length, errors.length], [0, false, 'identity', 0, 0]);
-
-  dom.document.getElementById('fbm-identity-user').value = 'user-a'; username.value = 'USERA'; password.value = '';
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client chặn username không đi cùng password', [calls.length, button.disabled, notices[1] && notices[1].area], [0, false, 'login']);
-
-  password.value = 'secret'; username.value = 'USERB';
-  hop.window.confirm = () => false;
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client hiện popup và cho hủy khi credential lệch username liên kết', [calls.length, button.disabled, notices[2] && notices[2].area, notices[2] && notices[2].level], [0, false, 'login', 'warning']);
-
-  hop.window.confirm = () => true;
-  hop.fbmSyncEncryptCredentials = () => Promise.reject(new Error('ENCRYPT_FAIL'));
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client vẫn cho lưu sau khi xác nhận lệch, nhưng giữ bản nháp khi mã hóa lỗi', [calls.length, button.disabled, password.value, notices.some((item) => String(item.message).indexOf('ENCRYPT_FAIL') >= 0)], [0, false, 'secret', true]);
-
-  password.value = ''; username.value = '';
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client lưu identity không credential: chỉ gửi nội dung form, không gửi kiểu lưu (GAS quyết giữ hay xóa)', [calls.length, calls[0] && calls[0].name, calls[0] && JSON.stringify(calls[0].args[0].credential), button.disabled], [1, 'fbmSaveConnection', '{"username":""}', false]);
-
-  username.value = 'USERA'; password.value = 'secret';
-  hop.fbmSyncEncryptCredentials = () => Promise.resolve({ credentialRef: 'cred-client-123', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'USERA' } });
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'client gửi credential đã mã hóa đúng payload và xóa password sau save', [calls.length, calls[1] && 'mode' in calls[1].args[0].credential, calls[1] && calls[1].args[0].credential.credentialRef, calls[1] && calls[1].args[0].credential.username, password.value], [2, false, 'cred-client-123', 'USERA', '']);
-  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-client-123', public: { usernameHint: 'USERB' } };
-  username.value = 'USERB'; password.value = '';
-  await hop.fbmSyncSaveConnection(button);
-  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-marker-123', public: { usernameHint: 'USERA' } };
-  username.value = 'USERA'; password.value = '********';
-  hop.FBM_SYNC_CLIENT.configEdits = { connection: { editing: true, snapshot: {}, draft: {} } };
-  hop.FBM_SYNC_CLIENT.loginDraft.username = 'USERA';
-  hop.fbmSyncLoginPasswordEnterDraft(password);
-  const passwordAfterFocus = password.value;
-  hop.fbmSyncBlurLoginPassword(password);
-  const passwordAfterBlur = password.value;
-  hop.FBM_SYNC_CLIENT.loginDraft.username = 'OTHER';
-  hop.fbmSyncSyncLoginPasswordState();
-  const passwordAfterUsernameChange = password.value;
-  hop.FBM_SYNC_CLIENT.loginDraft.username = 'USERA';
-  hop.fbmSyncSyncLoginPasswordState();
-  check(so, 'password marker focus blur va username realtime dung state machine', [passwordAfterFocus, passwordAfterBlur, passwordAfterUsernameChange, password.value], ['', '********', '', '********']);
-  let encryptedMarker = false;
-  hop.fbmSyncEncryptCredentials = () => { encryptedMarker = true; return Promise.reject(new Error('marker must preserve')); };
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'marker password không bị gửi như password mới: chỉ gửi username đã lưu để GAS giữ credential', [calls.length, calls[3] && JSON.stringify(calls[3].args[0].credential), encryptedMarker], [4, '{"username":"USERA"}', false]);
-  hop.FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = true;
-  username.value = ''; password.value = '';
-  await hop.fbmSyncSaveConnection(button);
-  check(so, 'legacy username khong doc duoc thi chan luu/xoa am tham', [calls.length, notices[notices.length - 1] && notices[notices.length - 1].area, notices[notices.length - 1] && notices[notices.length - 1].level], [4, 'login', 'error']);
-  hop.FBM_SYNC_CLIENT.loginStatus.usernameMetadataUnavailable = false;
-  const deleteOrder = [];
-  hop.fbmSyncConfirmCredentialDelete = () => Promise.resolve(true);
-  hop.fbmSyncClearCredentialInExtension = (ref) => { deleteOrder.push('extension:' + ref); return Promise.resolve({ ok: true }); };
-  hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { deleteOrder.push('gas'); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityStatus.binding, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: { configured: false, enabled: false }, keyRefRemove: 'cred-marker-123' }); };
-  await hop.fbmSyncDeleteLoginCredential(button);
-  check(so, 'xóa credential: GAS xóa bản mã trước rồi Sidebar xóa đúng khóa GAS trả về ở Extension (ngược lại thì GAS còn bản mã mà mất khóa)', [deleteOrder, JSON.stringify(calls[calls.length - 1].args[0].credential), hop.FBM_SYNC_CLIENT.loginStatus.configured], [['gas', 'extension:cred-marker-123'], '{"username":""}', false]);
-  hop.FBM_SYNC_CLIENT.loginStatus = { enabled: true, configured: true, credentialRef: 'cred-retry-123', public: { usernameHint: 'USERA' } };
-  const gasFailOrder = [];
-  hop.fbmSyncClearCredentialInExtension = () => { gasFailOrder.push('extension'); return Promise.resolve({ ok: true }); };
-  hop.callServer = (name, args) => { if (name === 'fbmLogSyncError') { logs.push({ name, args }); return Promise.resolve({ ok: true }); } if (name === 'fbmSaveConnection') { gasFailOrder.push('gas'); return Promise.resolve({ ok: false, code: 'SYNC_BUSY', message: 'Đang có phiên đồng bộ' }); } calls.push({ name, args }); return Promise.resolve({ ok: true }); };
-  await hop.fbmSyncDeleteLoginCredential(button);
-  check(so, 'GAS từ chối xóa thì không đụng khóa ở Extension và báo lỗi', [gasFailOrder, hop.FBM_SYNC_CLIENT.loginStatus.configured, notices[notices.length - 1] && notices[notices.length - 1].level], [['gas'], true, 'error']);
-  const keyFailOrder = [];
-  hop.fbmSyncClearCredentialInExtension = () => { keyFailOrder.push('extension'); return Promise.reject(new Error('EXTENSION_CLEAR_FAILED')); };
-  hop.fbmSyncLogClientError = (error, reason, action) => { keyFailOrder.push('log:' + action); return Promise.resolve(null); };
-  hop.callServer = (name, args) => { if (name === 'fbmSaveConnection') { keyFailOrder.push('gas'); } calls.push({ name, args }); return Promise.resolve({ ok: true, binding: hop.FBM_SYNC_CLIENT.identityStatus.binding, identityStatus: hop.FBM_SYNC_CLIENT.identityStatus, login: { configured: false, enabled: false }, keyRefRemove: 'cred-retry-123' }); };
-  await hop.fbmSyncDeleteLoginCredential(button);
-  check(so, 'GAS đã xóa mà Extension không xóa được khóa cũ thì vẫn áp kết quả, ghi Log và cảnh báo (khóa thừa vô hại vì không còn bản mã)', [keyFailOrder, hop.FBM_SYNC_CLIENT.loginStatus.configured, notices.some((item) => item.level === 'warning' && /EXTENSION_CLEAR_FAILED/.test(item.message))], [['gas', 'extension', 'log:credential_key_remove'], false, true]);
-  check(so, 'client cho lưu identity lệch và chỉ gửi username khi password để trống', [calls[2] && JSON.stringify(calls[2].args[0].credential), password.value], ['{"username":"USERB"}', '']);
-  check(so, 'mọi lỗi hệ thống khi lưu kết nối đều hiện Sidebar và ghi Sheet Log (lỗi nhập sai không tính)', [errors.length, logs.length >= errors.length, logs.every((item) => item.name === 'fbmLogSyncError')], [3, true, true]);
-}
+const { statusGas, stateDangChay } = require('../../lib/fbm/status-gas');
+const { taoHanhTrinh, bamNut, doiChon, choVong, statusNghi } = require('../../lib/sidebar/hanh-trinh');
 
 async function chay(so) {
-  await testConnectionSaveValidation(so);
-  section('FBM sync — hành trình người dùng Sidebar');
-  const { hop, dom, content } = taoBoTest();
-  const calls = [];
-  let masterEnabled = true;
-  let backgroundEnabled = true;
-  hop.callServer = (name, args) => {
-    calls.push({ name, args: args || [] });
-    if (name === 'fbmGetSyncStatus') return Promise.resolve(Object.assign(idle(), { masterEnabled, backgroundEnabled }));
-    if (name === 'fbmSetMasterSwitch') { masterEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: masterEnabled, status: Object.assign(idle(), { masterEnabled, backgroundEnabled }) }); }
-    if (name === 'fbmSetBackgroundSwitch') { backgroundEnabled = args && args[0] === true; return Promise.resolve({ ok: true, enabled: backgroundEnabled }); }
-    return Promise.resolve({ ok: true, settings: {}, status: idle() });
-  };
-  hop.fbmSyncInstall();
-  hop.FBM_SYNC_CLIENT.lastStatus = idle();
+  section('FBM sync — hành trình người dùng: màn Chạy, menu, công tắc tổng, Tài khoản');
+  const { hop, dom, content, calls } = taoHanhTrinh();
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  hop.fbmSyncPaint(idle());
+  hop.fbmSyncPaint(statusNghi());
   const runNode = content.children[0];
-  hop.fbmSyncPaint(Object.assign(idle(), { running: true, phase: 'pull_customer', runId: 'run-snapshot', cursor: { kind: 'customer_grid' }, label: 'Snapshot Chạy đồng bộ mới', counts: { completed: 3, succeeded: 2 } }));
-  check(so, 'snapshot GAS vá Chạy đồng bộ tại chỗ, không thay node màn hình', [content.children[0] === runNode, content.textContent.indexOf('Pipeline đang chạy') >= 0], [true, true]);
+  hop.fbmSyncPaint(statusGas(stateDangChay({ runId: 'run-snapshot', counts: { completed: 3, succeeded: 2 } })));
+  check(so, 'snapshot GAS vá Chạy đồng bộ tại chỗ, không thay node màn hình',
+    [content.children[0] === runNode, content.textContent.indexOf('Pipeline đang chạy') >= 0],
+    [true, true]);
 
   ['run', 'account', 'results', 'settings'].forEach((screen) => {
     const button = dom.document.createElement('button');
     button.setAttribute('data-sync-screen', screen);
-    click(dom, button);
-    check(so, 'menu mo dung man hinh ' + screen, [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen')], [screen, screen]);
+    bamNut(dom, button);
+    check(so, 'menu mo dung man hinh ' + screen,
+      [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen')],
+      [screen, screen]);
   });
   const menu = dom.document.getElementById('fbm-sync-module-menu');
-  click(dom, menu);
+  bamNut(dom, menu);
   const nav = dom.document.getElementById('fbm-sync-nav');
   const menuOpened = nav.hidden === false;
-  click(dom, menu);
+  bamNut(dom, menu);
   const menuClosed = nav.hidden === true;
-  click(dom, dom.document.getElementById('fbm-sync-back'));
-  check(so, 'header mo dong menu va nut quay lai dong man dong bo', [menuOpened, menuClosed, hop.FBM_SYNC_CLIENT.active, dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active')], [true, true, false, false]);
+  bamNut(dom, dom.document.getElementById('fbm-sync-back'));
+  check(so, 'header mo dong menu va nut quay lai dong man dong bo',
+    [menuOpened, menuClosed, hop.FBM_SYNC_CLIENT.active, dom.document.getElementById('sidebar-root').classList.contains('shin-sync-active')],
+    [true, true, false, false]);
   hop.FBM_SYNC_CLIENT.active = true;
   hop.FBM_SYNC_CLIENT.statusReady = true;
 
   const master = dom.document.createElement('button');
   master.id = 'fbm-sync-master-switch';
   const callsBeforeMaster = calls.length;
-  click(dom, master);
-  await tick();
-  check(so, 'cong tac tong gui dung mot lenh GAS va cap nhat trang thai', [calls.filter((item) => item.name === 'fbmSetMasterSwitch').length, hop.FBM_SYNC_CLIENT.lastStatus.masterEnabled], [1, false]);
-  check(so, 'Công tắc tổng vẽ trạng thái từ kết quả lệnh, không hỏi lại fbmGetSyncStatus', calls.slice(callsBeforeMaster).map((item) => item.name), ['fbmSetMasterSwitch']);
+  bamNut(dom, master);
+  await choVong();
+  check(so, 'cong tac tong gui dung mot lenh GAS va cap nhat trang thai',
+    [calls.filter((item) => item.name === 'fbmSetMasterSwitch').length, hop.FBM_SYNC_CLIENT.lastStatus.enabled],
+    [1, false]);
+  check(so, 'Công tắc tổng vẽ trạng thái từ kết quả lệnh, không hỏi lại fbmGetSyncStatus',
+    calls.slice(callsBeforeMaster).map((item) => item.name),
+    ['fbmSetMasterSwitch']);
 
-  hop.FBM_SYNC_CLIENT.lastStatus = idle();
+  hop.FBM_SYNC_CLIENT.lastStatus = statusNghi();
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
   const selectedModes = [];
   hop.fbmSyncRun = (mode) => { selectedModes.push(mode); return Promise.resolve({ ok: true }); };
   ['check', 'read', 'push', 'write'].forEach((mode) => {
-    hop.fbmSyncPaint(idle());
+    hop.fbmSyncPaint(statusNghi());
     const select = dom.document.getElementById('fbm-sync-mode');
     select.value = mode;
-    change(dom, select);
-    click(dom, dom.document.getElementById('fbm-sync-start'));
+    doiChon(dom, select);
+    bamNut(dom, dom.document.getElementById('fbm-sync-start'));
   });
-  check(so, 'nguoi dung chon bon loai dong bo thi Sidebar gui dung mode da chon', selectedModes, ['check', 'read', 'push', 'write']);
+  check(so, 'nguoi dung chon bon loai dong bo thi Sidebar gui dung mode da chon',
+    selectedModes,
+    ['check', 'read', 'push', 'write']);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  const awaiting = Object.assign(idle(), { pendingApproval: { count: 12, fingerprint: 'abcd1234-12' } });
+  const awaiting = statusGas({ phase: 'paused' }, { gate: { status: 'pending', count: 12, fingerprint: 'abcd1234-12' } });
   const approved = [];
   hop.fbmSyncApprovePush = (fingerprint) => { approved.push(fingerprint); return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(awaiting);
-  click(dom, dom.document.getElementById('fbm-sync-approve'));
-  const active = Object.assign(idle(), { running: true, phase: 'pull_customer', mode: 'read', runId: 'run-1', cursor: { kind: 'customer_grid' } });
+  bamNut(dom, dom.document.getElementById('fbm-sync-approve'));
+  const active = statusGas(stateDangChay({ runId: 'run-1' }));
   let cancelled = 0;
   hop.fbmSyncCancel = () => { cancelled += 1; return Promise.resolve({ ok: true }); };
   hop.fbmSyncPaint(active);
-  click(dom, dom.document.getElementById('fbm-sync-cancel'));
-  check(so, 'Màn Chạy có nút Chấp thuận khi GAS báo tập chờ duyệt (gửi đúng dấu tập) và nút Dừng khi lượt tay đang chạy', [approved, cancelled], [['abcd1234-12'], 1]);
+  bamNut(dom, dom.document.getElementById('fbm-sync-cancel'));
+  check(so, 'Màn Chạy có nút Chấp thuận khi GAS báo tập chờ duyệt (gửi đúng dấu tập) và nút Dừng khi lượt tay đang chạy',
+    [approved, cancelled],
+    [['abcd1234-12'], 1]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'account';
-  hop.FBM_SYNC_CLIENT.lastStatus = idle();
-  hop.fbmSyncPaint(idle());
+  hop.FBM_SYNC_CLIENT.lastStatus = statusNghi();
+  hop.fbmSyncPaint(statusNghi());
   const accountPassword = dom.document.getElementById('fbm-login-password');
   accountPassword.value = 'mat-khau-khong-duoc-mat';
   const accountRoot = content.children[0];
-  hop.fbmSyncPaint(Object.assign(idle(), { message: 'Snapshot Tài khoản mới' }));
-  check(so, 'snapshot GAS vá Tài khoản mà giữ nguyên form và mật khẩu bản nháp', [content.children[0] === accountRoot, dom.document.getElementById('fbm-login-password') === accountPassword, accountPassword.value], [true, true, 'mat-khau-khong-duoc-mat']);
-  click(dom, dom.document.getElementById('fbm-sync-open-login-policy'));
-  check(so, 'nút Cài đặt đăng nhập tự động mở đúng màn hình Cài đặt phiên', [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen'), !!dom.document.getElementById('fbm-sync-login-policy-card-region')], ['settings', 'settings', true]);
-  const accountScreenButton = dom.document.createElement('button'); accountScreenButton.setAttribute('data-sync-screen', 'account'); click(dom, accountScreenButton);
+  hop.fbmSyncPaint(Object.assign(statusNghi(), { message: 'Snapshot Tài khoản mới' }));
+  check(so, 'snapshot GAS vá Tài khoản mà giữ nguyên form và mật khẩu bản nháp',
+    [content.children[0] === accountRoot, dom.document.getElementById('fbm-login-password') === accountPassword, accountPassword.value],
+    [true, true, 'mat-khau-khong-duoc-mat']);
+  bamNut(dom, dom.document.getElementById('fbm-sync-open-login-policy'));
+  check(so, 'nút Cài đặt đăng nhập tự động mở đúng màn hình Cài đặt phiên',
+    [hop.FBM_SYNC_CLIENT.subscreen, content.getAttribute('data-fbm-sync-screen'), !!dom.document.getElementById('fbm-sync-login-policy-card-region')],
+    ['settings', 'settings', true]);
+  const accountScreenButton = dom.document.createElement('button'); accountScreenButton.setAttribute('data-sync-screen', 'account'); bamNut(dom, accountScreenButton);
   const accountActions = [];
   hop.fbmSyncAutoFill = () => { accountActions.push('autofill'); return Promise.resolve(null); };
   hop.fbmSyncCheckIdentity = () => { accountActions.push('check'); return Promise.resolve(null); };
   hop.fbmSyncSaveConnection = () => { accountActions.push('save-connection'); return Promise.resolve(null); };
   hop.fbmSyncTestLogin = () => { accountActions.push('test-login'); return Promise.resolve(null); };
-  click(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
+  bamNut(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
   hop.fbmSyncConfigFinishEdit('connection');
-  click(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
-  ['fbm-sync-probe-identity', 'fbm-sync-check-identity', 'fbm-sync-login-test', 'fbm-sync-config-connection-save'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'tai khoan FBM gui dung tung thao tac sau khi ket thuc surface connection truoc', accountActions, ['autofill', 'check', 'test-login', 'save-connection']);
-  check(so, 'tai khoan FBM khong nhan doi cong tac tu dang nhap, chinh sach chi nam o Cai dat phien', content.querySelector('#fbm-sync-auto-login'), null);
+  bamNut(dom, dom.document.getElementById('fbm-sync-config-connection-edit'));
+  ['fbm-sync-probe-identity', 'fbm-sync-check-identity', 'fbm-sync-login-test', 'fbm-sync-config-connection-save'].forEach((id) => bamNut(dom, dom.document.getElementById(id)));
+  check(so, 'tai khoan FBM gui dung tung thao tac sau khi ket thuc surface connection truoc',
+    accountActions,
+    ['autofill', 'check', 'test-login', 'save-connection']);
+  check(so, 'tai khoan FBM khong nhan doi cong tac tu dang nhap, chinh sach chi nam o Cai dat phien',
+    content.querySelector('#fbm-sync-auto-login'),
+    null);
   hop.fbmSyncConfigFinishEdit('connection');
 
-  hop.FBM_SYNC_CLIENT.subscreen = 'settings';
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: false };
-  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_background: { activityFullEnabled: true, activityFullMinutes: 30, detailMinutes: 60, detailCustomersPerRun: 50 } });
-  hop.FBM_SYNC_CLIENT.lastStatus = idle();
-  hop.fbmSyncPaint(idle());
-  const settingsRoot = content.children[0];
-  check(so, 'cài đặt phiên ở chế độ xem khóa toàn bộ control thân card', [
-    dom.document.getElementById('fbm-sync-settings-master-switch').disabled,
-    dom.document.getElementById('fbm-sync-run-on-startup').disabled,
-    dom.document.getElementById('fbm-sync-background-switch').disabled,
-    dom.document.getElementById('fbm-sync-process-heartbeat').disabled,
-    dom.document.getElementById('fbm-sync-policy-auto-login').disabled,
-    dom.document.getElementById('fbm-sync-policy-auto-open').disabled
-  ], [true, true, true, true, true, true]);
-  const moduleViewValue = dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed');
-  const masterCallsBeforeModuleViewClick = calls.filter((item) => item.name === 'fbmSetMasterSwitch').length;
-  click(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
-  check(so, 'switch module trong card ở chế độ xem không gọi GAS', [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length], [moduleViewValue, masterCallsBeforeModuleViewClick]);
-  click(dom, dom.document.getElementById('fbm-sync-config-module-edit'));
-  click(dom, dom.document.getElementById('fbm-sync-settings-master-switch'));
-  check(so, 'switch module trong card ở chế độ sửa chỉ đổi draft', [dom.document.getElementById('fbm-sync-settings-master-switch').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSetMasterSwitch').length], ['false', masterCallsBeforeModuleViewClick]);
-  hop.fbmSyncConfigFinishEdit('module');
-  click(dom, dom.document.getElementById('fbm-sync-config-module-cancel'));
-  const startupViewValue = dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed');
-  click(dom, dom.document.getElementById('fbm-sync-run-on-startup'));
-  check(so, 'click switch thân ở chế độ xem không đổi draft và không gọi GAS', [dom.document.getElementById('fbm-sync-run-on-startup').getAttribute('aria-pressed'), calls.filter((item) => item.name === 'fbmSaveExtensionConfig').length], [startupViewValue, 0]);
-  click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
-  let pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
-  pollMinutes.value = '17';
-  dom.document.listeners.input({ target: pollMinutes });
-  hop.fbmSyncPaint(Object.assign(idle(), { message: 'Snapshot Cài đặt mới' }));
-  check(so, 'snapshot GAS vá Cài đặt mà không ghi đè nhịp Extension người dùng đang sửa', [content.children[0] === settingsRoot, dom.document.getElementById('fbm-extension-poll-minutes') === pollMinutes, pollMinutes.value], [true, true, '17']);
-  click(dom, dom.document.getElementById('fbm-sync-config-extension-cancel'));
-  pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
-  check(so, 'hủy cấu hình Extension khôi phục giá trị GAS và khóa lại ô nhập', [pollMinutes.value, pollMinutes.disabled, !!dom.document.getElementById('fbm-sync-config-extension-edit')], ['5', true, true]);
-  // Lưu cài đặt FBM: GAS báo ô sai thì tô đúng ô, hỏi xác nhận lịch dày, phần khóa hỏng chỉ còn nút đặt về mặc định.
-  const keepCall = hop.callServer, keepNotice = hop.fbmSyncSetSettingsNotice, keepDecision = hop.uiDecisionOpen, keepSettings = hop.FBM_SYNC_CLIENT.syncSettings, sent = [], notices = [];
-  hop.fbmSyncSetSettingsNotice = (card, kind, text) => { notices.push([card, kind, text]); };
-  hop.callServer = (name, args) => { sent.push([name, args[0], args[1]]); return Promise.resolve({ ok: false, code: 'SETTINGS_INVALID', problems: [{ section: 'fbm_extension', field: 'pollMinutes', label: 'Chu kỳ hỏi GAS', reason: 'Chu kỳ hỏi GAS phải từ 1 đến 60 phút.' }] }); };
-  click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
-  const badPoll = dom.document.getElementById('fbm-extension-poll-minutes');
-  badPoll.value = '0';
-  click(dom, dom.document.getElementById('fbm-sync-save-extension'));
-  await tick(); await tick();
-  check(so, 'GAS báo ô sai: gửi nguyên chuỗi ô, tô đỏ đúng ô, gộp lý do vào thông báo của card và vẫn ở chế độ sửa',
-    [sent, badPoll.classList.contains('shin-input-error'), notices.map((item) => [item[0], item[1]]), notices[0] && notices[0][2].indexOf('phải từ 1 đến 60 phút') >= 0, hop.fbmSyncConfigIsEditing('extension')],
-    [[['fbmSaveSettings', { fbm_extension: { pollMinutes: '0', runOnStartup: true } }, false]], true, [['extension', 'error']], true, true]);
-  hop.fbmSyncConfigCancelEdit('extension', true);
-  let lowAsked = 0;
-  sent.length = 0; notices.length = 0;
-  hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(true); };
-  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve(sent.length === 1 ? { ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' } : { ok: true, settings: goiCaiDat(), status: idle() }); };
-  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
-  click(dom, dom.document.getElementById('fbm-sync-save-background'));
-  await tick(); await tick(); await tick();
-  check(so, 'Lịch nền dày: GAS hỏi xác nhận, đồng ý thì gửi lại cùng gói kèm confirmLow rồi thoát chế độ sửa',
-    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.map((item) => item[1])], [1, [['fbmSaveSettings', false], ['fbmSaveSettings', true]], false, ['success']]);
-  sent.length = 0; notices.length = 0; lowAsked = 0;
-  hop.uiDecisionOpen = () => { lowAsked += 1; return Promise.resolve(false); };
-  hop.callServer = (name, args) => { sent.push([name, args[1]]); return Promise.resolve({ ok: false, code: 'SCHEDULE_LOW_CONFIRM', message: 'Chu kỳ dưới 5 phút sẽ chạy dày. Vẫn lưu?' }); };
-  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
-  click(dom, dom.document.getElementById('fbm-sync-save-background'));
-  await tick(); await tick(); await tick();
-  check(so, 'Lịch nền dày mà người dùng quay lại sửa: chỉ một lần gửi, không ghi, vẫn ở chế độ sửa',
-    [lowAsked, sent, hop.fbmSyncConfigIsEditing('background'), notices.length], [1, [['fbmSaveSettings', false]], true, 0]);
-  hop.fbmSyncConfigCancelEdit('background', true);
-  hop.fbmSyncSetSettingsNotice = keepNotice;
-  hop.FBM_SYNC_CLIENT.syncSettings = Object.assign(goiCaiDat({ fbm_extension: null }), { corrupt: [{ section: 'fbm_extension', label: 'Nhịp hỏi GAS của Extension', message: 'Khóa cài đặt bị hỏng.' }] });
-  hop.fbmSyncPaint(idle());
-  const resetButton = dom.document.getElementById('fbm-sync-reset-fbm_extension');
-  check(so, 'Phần cài đặt khóa hỏng: hiện lỗi kèm nút Đặt về mặc định, ô để trống và không sửa được',
-    [!!resetButton, resetButton && resetButton.textContent, dom.document.getElementById('fbm-sync-settings-extension-notice-region').textContent.indexOf('Khóa cài đặt bị hỏng.') >= 0, dom.document.getElementById('fbm-extension-poll-minutes').value, !!content.querySelector('#fbm-sync-config-extension-edit')],
-    [true, 'Đặt về mặc định', true, '', false]);
-  sent.length = 0;
-  hop.callServer = (name, args) => { sent.push([name, args[0]]); return Promise.resolve({ ok: true, settings: goiCaiDat(), status: idle() }); };
-  click(dom, resetButton);
-  await tick(); await tick(); await tick();
-  check(so, 'Bấm Đặt về mặc định gọi GAS đúng phần, nạp lại cài đặt GAS trả và bỏ lời báo lỗi',
-    [sent, hop.FBM_SYNC_CLIENT.syncSettings.fbm_extension.pollMinutes, !!content.querySelector('#fbm-sync-reset-fbm_extension'), dom.document.getElementById('fbm-extension-poll-minutes').value],
-    [[['fbmResetSettings', 'fbm_extension']], 5, false, '5']);
-  hop.callServer = keepCall; hop.uiDecisionOpen = keepDecision; hop.FBM_SYNC_CLIENT.syncSettings = keepSettings;
-  hop.fbmSyncPaint(idle());
-  click(dom, dom.document.getElementById('fbm-sync-config-extension-edit'));
-  pollMinutes = dom.document.getElementById('fbm-extension-poll-minutes');
-  pollMinutes.value = '17';
-  dom.document.listeners.input({ target: pollMinutes });
-  check(so, 'Cài đặt phiên không còn vùng thông báo chung trên đầu màn', [dom.document.getElementById('fbm-sync-settings-message-region'), !!dom.document.getElementById('fbm-sync-settings-extension-notice-region'), !!dom.document.getElementById('fbm-sync-settings-background-notice-region'), !!dom.document.getElementById('fbm-sync-settings-login-notice-region')], [null, true, true, true]);
-  hop.fbmSyncSetSettingsNotice('background', 'success', 'Đã nhận lượt scheduler customer; chờ Extension chuyển request.');
-  check(so, 'Thông báo scheduler nằm trong đúng khối Lịch đồng bộ nền', [dom.document.getElementById('fbm-sync-settings-background-notice-region').textContent, dom.document.getElementById('fbm-sync-settings-background-notice-region').textContent.indexOf('Đã nhận lượt scheduler customer; chờ Extension chuyển request.') >= 0], ['Đã nhận lượt scheduler customer; chờ Extension chuyển request.', true]);
-  const settingsActions = [];
-  hop.fbmSyncSaveExtensionSettings = () => { settingsActions.push('extension'); return Promise.resolve(null); };
-  hop.fbmSyncSaveBackgroundSettings = () => { settingsActions.push('background'); return Promise.resolve(null); };
-  hop.fbmSyncSaveLoginPolicy = () => { settingsActions.push('login-policy'); return Promise.resolve(null); };
-  hop.fbmSyncRotateRelay = () => { settingsActions.push('rotate-relay'); return Promise.resolve(null); };
-  const toggles = ['fbm-sync-run-on-startup', 'fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail', 'fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'];
-  click(dom, dom.document.getElementById('fbm-sync-save-extension'));
-  hop.fbmSyncConfigFinishEdit('extension');
-  click(dom, dom.document.getElementById('fbm-sync-config-background-edit'));
-  ['fbm-sync-process-heartbeat', 'fbm-sync-process-customerFull', 'fbm-sync-process-activityFull', 'fbm-sync-process-detail'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  click(dom, dom.document.getElementById('fbm-sync-save-background'));
-  hop.fbmSyncConfigFinishEdit('background');
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'policy-credential', public: { usernameHint: 'USERA' } };
-  click(dom, dom.document.getElementById('fbm-sync-config-loginPolicy-edit'));
-  ['fbm-sync-policy-auto-login', 'fbm-sync-policy-auto-open', 'fbm-sync-policy-retry'].forEach((id) => click(dom, dom.document.getElementById(id)));
-  check(so, 'chinh sach tu dang nhap khoa hai muc con khi muc cha tat', [dom.document.getElementById('fbm-sync-policy-auto-login').disabled, dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], [false, true, true, true]);
-  click(dom, dom.document.getElementById('fbm-sync-policy-auto-login'));
-  check(so, 'bat lai muc cha mo khoa cac muc con', [dom.document.getElementById('fbm-sync-policy-auto-login').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-policy-auto-open').disabled, dom.document.getElementById('fbm-sync-policy-retry').disabled, dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false, false, false]);
-  click(dom, dom.document.getElementById('fbm-sync-policy-retry'));
-  check(so, 'tat retry khoa rieng chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['false', true]);
-  click(dom, dom.document.getElementById('fbm-sync-policy-retry'));
-  check(so, 'bat retry mo khoa lai chu ky thu lai', [dom.document.getElementById('fbm-sync-policy-retry').getAttribute('aria-pressed'), dom.document.getElementById('fbm-sync-login-retry-minutes').disabled], ['true', false]);
-  click(dom, dom.document.getElementById('fbm-sync-save-login-policy'));
-  hop.fbmSyncConfigFinishEdit('loginPolicy');
-  click(dom, dom.document.getElementById('fbm-sync-config-relay-edit'));
-  click(dom, dom.document.getElementById('fbm-sync-rotate-relay'));
-  hop.fbmSyncConfigFinishEdit('relay');
-  check(so, 'cai dat phien doi dung tung cong tac va gui tung lenh luu theo nut bam', settingsActions, ['extension', 'background', 'login-policy', 'rotate-relay']);
-  const background = dom.document.getElementById('fbm-sync-background-switch');
-  click(dom, background);
-  check(so, 'công tắc lịch nền trong chế độ xem không đổi', [background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], ['true', false, true]);
-  await tick();
-  check(so, 'cài đặt lịch nền chế độ xem không gửi GAS', [calls.filter((item) => item.name === 'fbmSetBackgroundSwitch').map((item) => item.args[0]), background.getAttribute('aria-pressed'), background.className.indexOf('is-off') >= 0, background.disabled], [[], 'true', false, true]);
-
-  hop.FBM_SYNC_CLIENT.subscreen = 'results';
-  hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
-  hop.FBM_SYNC_CLIENT.resultPages = {};
-  hop.fbmSyncPaint(Object.assign(idle(), { metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
-  const resultTabsNode = content.querySelector('.shin-sync-tab-row');
-  hop.fbmSyncPaint(Object.assign(idle(), { runId: 'run-ket-qua', counts: { completed: 9, succeeded: 8 }, metadata: { traceTail: Array.from({ length: 21 }, (_, index) => ({ stage: String(index) })) } }));
-  check(so, 'snapshot GAS vá Kết quả tại chỗ, giữ nguyên hàng tab', [content.querySelector('.shin-sync-tab-row') === resultTabsNode, content.textContent.indexOf('Đọc từ FBM: 9') >= 0], [true, true]);
-  const resultTabs = ['summary', 'conflict', 'errors', 'log', 'audit'];
-  const resultTabDescriptions = { summary: 'Tóm tắt kết quả phiên', conflict: 'Các thay đổi chờ xử lý', errors: 'Bản ghi cần xem lại', log: 'Nhật ký hoạt động', audit: 'Kết quả kiểm tra dữ liệu thử nghiệm' };
-  resultTabs.forEach((tab) => {
-    const button = dom.document.createElement('button');
-    button.setAttribute('data-sync-results-tab', tab);
-    click(dom, button);
-    check(so, 'kết quả chuyển đúng tab và đổi mô tả body ' + tab, [hop.FBM_SYNC_CLIENT.resultsTab, content.querySelector('#fbm-sync-results-tab-description-region').textContent, content.querySelector('.shin-sync-tab-row') === resultTabsNode], [tab, resultTabDescriptions[tab], true]);
-  });
-  // Mở tab Xung đột từ hàng tab khi còn xung đột phải tự đọc bản ghi đầu, như nút "Mở xử lý xung đột"; bấm lại lúc đang đọc không gọi thêm.
-  const realOpenConflict = hop.fbmSyncOpenConflict;
-  let conflictOpens = 0;
-  hop.fbmSyncOpenConflict = () => { conflictOpens += 1; return new Promise(() => {}); };
-  const conflictTab = dom.document.createElement('button');
-  conflictTab.setAttribute('data-sync-results-tab', 'conflict');
-  hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.conflictOpening = false;
-  hop.FBM_SYNC_CLIENT.lastStatus = Object.assign(idle(), { metadata: { conflictCount: 0 } });
-  click(dom, conflictTab);
-  const opensWithoutConflict = conflictOpens;
-  hop.FBM_SYNC_CLIENT.lastStatus = Object.assign(idle(), { metadata: { conflictCount: 1 } });
-  click(dom, conflictTab); click(dom, conflictTab);
-  check(so, 'Mở tab Xung đột khi còn xung đột thì tự đọc bản ghi đầu đúng một lần; không còn xung đột thì không gọi', [opensWithoutConflict, conflictOpens], [0, 1]);
-  hop.fbmSyncOpenConflict = realOpenConflict; hop.FBM_SYNC_CLIENT.conflictOpening = false;
-  const page = dom.document.createElement('button');
-  page.setAttribute('data-sync-page', 'log:1');
-  click(dom, page);
-  check(so, 'ket qua phan trang theo nut bam ma khong doi pipeline', [hop.FBM_SYNC_CLIENT.resultPages.log, hop.FBM_SYNC_CLIENT.subscreen], [1, 'results']);
-  let retries = 0;
-  let conflictChoice = '';
-  hop.fbmSyncRetryPushFailures = () => { retries += 1; return Promise.resolve(null); };
-  hop.fbmSyncResolveConflict = (entity, id, choice) => { conflictChoice = entity + ':' + id + ':' + choice; return Promise.resolve(null); };
-  const retry = dom.document.createElement('button'); retry.setAttribute('data-fbm-push-retry-all', 'true');
-  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
-  hop.FBM_SYNC_CLIENT.conflictChoices = { phone: 'shin' }; hop.FBM_SYNC_CLIENT.conflictDraft = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
-  const conflict = dom.document.createElement('button'); conflict.id = 'fbm-sync-conflict-save';
-  click(dom, retry);
-  click(dom, conflict);
-  await tick();
-  check(so, 'ket qua chuyen dung retry va lua chon conflict cua nguoi dung', [retries, conflictChoice], [1, 'customer:CUS-1:shin']);
 }
 
 module.exports = { chay };

@@ -358,7 +358,7 @@ async function chay(so) {
     (fbmServiceSource.match(/^function fbm\w+\(.*\{ return fbmCommandRun\(/gm) || []).length >= 15 && fbmServiceSource.indexOf('function fbmPublicResult') < 0
   ], [true, 2, true, true]);
   check(so, 'status cu khong ve de ghi de loading cua luot moi', syncSource.indexOf('viewEpoch') >= 0 && syncSource.indexOf('epoch !== FBM_SYNC_CLIENT.viewEpoch') >= 0 && syncSource.indexOf('lastServerUpdatedAt') >= 0, true);
-  check(so, 'status bat dau truoc phien khong ve de ghi de loading dang chay', syncSource.indexOf('running: FBM_SYNC_CLIENT.running') >= 0 && syncSource.indexOf('FBM_SYNC_CLIENT.running && !ticket.running') >= 0, true);
+  check(so, 'Sidebar khong tu giu co luot chay: dang chay, nut va thanh tien do lay tu status GAS', syncSource.indexOf('FBM_SYNC_CLIENT.running') < 0 && syncSource.indexOf('ticket.running') < 0, true);
   check(so, 'khong hien tieu de chi tiet khi chi co canh bao preflight', syncStatusSource.indexOf('var hasRecordIssues') >= 0 && syncStatusSource.indexOf('if (!hasRecordIssues)') >= 0, true);
   check(so, 'Sidebar co man hinh giai quyet conflict theo hai phia', syncSource.indexOf('data-fbm-conflict-pick') >= 0 && syncSource.indexOf('function fbmSyncConflictDecision') >= 0 && syncSource.indexOf('fbmPrepareConflictResolution') < 0 && syncSource.indexOf('fbmConfirmConflict') >= 0 && syncConflictSchema.indexOf('all_shin') >= 0 && syncConflictSchema.indexOf('all_fbm') >= 0 && syncAuditSource.indexOf('function fbmSyncConflictContentBlocks') >= 0, true);
   check(so, 'Sidebar khong gui relay config truoc khi boot bat tay', sidebarSource.indexOf('fbmSyncConfigureRelay().catch(function () {})') < 0, true);

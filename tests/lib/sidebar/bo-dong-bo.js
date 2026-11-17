@@ -12,19 +12,20 @@ function taoSidebarDongBo() {
   const content = dom.document.createElement('div'); content.id = 'sidebar-body'; dom.root.appendChild(content);
   const footer = dom.document.createElement('div'); footer.id = 'sidebar-footer'; footer.hidden = true; dom.root.appendChild(footer);
 
-  const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, confirm: () => true, addEventListener: () => {} } });
+  const hop = taoHopCat({ document: dom.document, window: { top: null, innerWidth: 300, innerHeight: 800, addEventListener: () => {} } });
   // Hằng của sheetLink.html, bộ test fbmSync không nạp tệp đó.
   hop.SHEET_LINK_ORIGIN = 'https://docs.google.com';
-  // Dòng thông báo của notices.html; bộ test không nạp tệp đó, test cần xem thông báo thì tự thay hàm này.
-  hop.noticeSet = () => {};
+  // Dòng thông báo của notices.html; bộ test không nạp tệp đó nên giữ thông báo đang hiện trong `hop.NOTICES` (khóa → dòng), `null` là gỡ.
+  hop.NOTICES = {};
+  hop.noticeSet = (key, notice) => { if (notice) { hop.NOTICES[key] = notice; } else { delete hop.NOTICES[key]; } };
   // Đồng hồ giả không tự nổ: ca cần chạy đồng hồ lấy hàm trong `hop.timers` rồi gọi.
   hop.timers = []; hop.setTimeout = (fn, ms) => hop.timers.push({ fn, ms }); hop.clearTimeout = (id) => { if (hop.timers[id - 1]) { hop.timers[id - 1].cleared = true; } };
   hop.FBM_SYNC_CLIENT = {
-    active: true, running: false, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
+    active: true, statusReady: true, mode: 'read', resultPages: {}, resultsTab: 'summary', identityStatus: {},
     subscreen: 'run',
     identityDraft: { spreadsheetId: '', userId: '', accountName: '' }, loginDraft: { username: '' },
     identityAction: '', identityLastAction: '', loginStatus: null, syncSettings: null, lastStatus: null,
-    traceEvents: [], installed: false, waiting: {}, relayWaiters: {}, credentialWaiters: {}
+    traceEvents: [], installed: false
   };
   hop.FBM_SYNC_UI_SCHEMA = {
     screens: [
@@ -52,7 +53,7 @@ function taoSidebarDongBo() {
     box.classList = { add: (name) => { box.className = (box.className + ' ' + name).trim(); } };
     return parent.appendChild(box);
   };
-  hop.fbmSyncPaintError = null;
+  hop.fbmSyncReportError = null;
   // Theo thứ tự Sidebar thật và có dữ liệu GAS chèn lúc dựng khung (tên mức quét, tiến trình nền).
   napTheoSidebar([
     'client/ui/icons.html', 'client/ui/fieldInvalid.html', 'client/ui/uiClassMap.html', 'client/ui/uiBuilder.html', 'client/ui/screenBuild.html', 'client/ui/renderEngine.html', 'client/util/valueText.html', 'client/schema/fieldLogic.html',
@@ -63,8 +64,12 @@ function taoSidebarDongBo() {
     'client/sync/screens/run.html', 'client/sync/screens/results.html',
     'client/sync/screens/settings.html', 'client/sync/fbmSyncSettingsScreen.html',
     'client/sync/fbmSyncStatusScreen.html', 'client/sync/fbmSyncAuditScreen.html', 'client/sync/fbmSyncShell.html', 'client/sync/fbmSyncMachine.html', 'client/ui/popupList.html', 'client/ui/recordDecision.html', 'client/sync/fbmSync.html'], hop);
-  hop.FBM_SYNC_CLIENT.active = true;
+  // fbmSync.html khai lại FBM_SYNC_CLIENT khi nạp; Sidebar dựng sẵn coi như đã nhận status đầu tiên, ca cần trạng thái chưa nhận thì tự đặt `statusReady = false`.
+  hop.FBM_SYNC_CLIENT.active = true; hop.FBM_SYNC_CLIENT.statusReady = true;
   return { hop, dom, screen: dom.root, content };
 }
 
-module.exports = { taoSidebarDongBo };
+/** Các dòng báo đang hiện dạng `khóa:chữ`, bỏ dòng báo máy chạy nền vì nó tự hiện theo máy và không thuộc ca đang kiểm. */
+function dongBao(hop) { return Object.keys(hop.NOTICES).filter((key) => key !== 'fbmBackgroundMachine').map((key) => key + ':' + hop.NOTICES[key].line); }
+
+module.exports = { taoSidebarDongBo, dongBao };

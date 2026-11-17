@@ -19,7 +19,7 @@ function taoMay(machineReply, gas) {
   };
   hop.callServer = (name, args) => { calls.push([name, args]); return Promise.resolve().then(() => gas(name, args)); };
   hop.noticeSet = (key, value) => { notices.push([key, value]); };
-  hop.fbmSyncPaintError = (error) => { errors.push(String(error && error.message || error)); };
+  hop.fbmSyncReportError = (error) => { errors.push(String(error && error.message || error)); };
   hop.fbmSyncSettingsMachineRepaint = () => false;
   hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat();
   return { hop, rpc, calls, notices, errors };

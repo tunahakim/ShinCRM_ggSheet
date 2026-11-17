@@ -109,7 +109,6 @@ const EXCEPTIONS = {
     'cases/fbmSync/Rotation.js': 1,
     'cases/fbmSync/ScanPack.js': 1,
     'cases/fbmSync/SidebarDrive.js': 1,
-    'cases/fbmSync/UserJourneys.js': 1,
     'cases/fbmSync/Workflow.js': 1
   }
 };

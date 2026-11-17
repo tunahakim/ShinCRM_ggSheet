@@ -84,8 +84,8 @@ async function chay(so) {
     if (lanG === 1) { throw new Error('Exception: DEADLINE_EXCEEDED'); }
     return { ok: false, code: 'NO_CONFLICT' };
   });
-  const kqG = await g.hop.fbmSyncDrive('open_conflict', {}, 'mở xung đột');
-  check(so, 'Apps Script chưa nạp được mã dự án: thử lại đúng một lần với cùng thân', [lanG, kqG.code, JSON.stringify(g.calls[0][1]) === JSON.stringify(g.calls[1][1])], [2, 'NO_CONFLICT', true]);
+  const loiG = await g.hop.fbmSyncDrive('open_conflict', {}, 'mở xung đột').then(() => null, (error) => String(error && error.message || error));
+  check(so, 'Lời gọi GAS lỗi (Apps Script chưa nạp được mã dự án): không thử lại ngầm, lỗi về nơi gọi để báo người dùng bấm lại', [lanG, loiG], [1, 'Exception: DEADLINE_EXCEEDED']);
 
   // Extension im lặng (worker bị tắt): hỏi GAS; lượt còn chạy thì chờ tiếp, lượt đã đóng thì kết thúc theo status GAS.
   let hoi = 0;

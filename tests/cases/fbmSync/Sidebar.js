@@ -1,25 +1,11 @@
-/** Smoke test DOM cho toàn bộ màn hình và nhánh thao tác chính của Sidebar Đồng bộ FBM. */
-const { taoSidebarDongBo: taoBoTest } = require('../../lib/sidebar/bo-dong-bo');
+/** Khung Sidebar Đồng bộ FBM: vòng đời mở và đóng màn, header và vùng báo đầu màn (cảnh báo, issue, lệch username). */
+const { taoSidebarDongBo: taoBoTest, dongBao } = require('../../lib/sidebar/bo-dong-bo');
 const { section, check, ghiLoiNap } = require('../../lib/assert');
 const { goiCaiDat } = require('../../lib/sidebar/fbm-cai-dat');
+const { statusGas, stateDangChay, hangGas } = require('../../lib/fbm/status-gas');
 
-function render(hop, content, fn, status) {
-  content.textContent = '';
-  hop.RENDER_INDEX = { nodes: {}, menus: {}, ctx: null, dem: 0 };
-  fn(content, status || {});
-  return content;
-}
 
-function demTheoThuocTinh(node, attribute) {
-  let count = 0;
-  (node.children || []).forEach((child) => {
-    if (child.hasAttribute && child.hasAttribute(attribute)) { count += 1; }
-    count += demTheoThuocTinh(child, attribute);
-  });
-  return count;
-}
-
-async function testSharedShellLifecycle(so) {
+async function testVongDoiMoDong(so) {
   const { hop, dom, content } = taoBoTest();
   const header = dom.document.getElementById('sidebar-header');
   const info = dom.document.getElementById('sidebar-info');
@@ -47,7 +33,7 @@ async function testSharedShellLifecycle(so) {
   const openCalls = [];
   hop.callServer = (name) => {
     openCalls.push(name);
-    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: { phase: 'idle', masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: goiCaiDat({ fbm_run: { approvalThreshold: 7 } }), login: { configured: false } }); }
+    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, status: statusGas({ phase: 'idle' }), identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: goiCaiDat({ fbm_run: { approvalThreshold: 7 } }), login: { configured: false } }); }
     return Promise.resolve({ ok: true });
   };
 
@@ -65,7 +51,8 @@ async function testSharedShellLifecycle(so) {
       lifecycleCalls],
     [true, true, true, true, true, 'run', ['stash']]);
   check(so, 'mo FBM cat cac dai ngoai shell de khong chong len man dong bo',
-    [search.hidden, undo.hidden, warning.hidden], [true, true, true]);
+    [search.hidden, undo.hidden, warning.hidden],
+    [true, true, true]);
 
   const closeResult = hop.syncScreenClose();
   check(so, 'dong FBM phuc hoi dung form va footer, khong con class man dong bo',
@@ -79,931 +66,124 @@ async function testSharedShellLifecycle(so) {
       lifecycleCalls],
     ['form-rendered', false, false, 'Man form da phuc hoi', 'Noi dung form da phuc hoi', false, false, ['stash', 'form-render']]);
   check(so, 'dong FBM phuc hoi trang thai an hien ban dau cua cac dai ngoai shell',
-    [search.hidden, undo.hidden, warning.hidden], [false, true, false]);
+    [search.hidden, undo.hidden, warning.hidden],
+    [false, true, false]);
 
   const restoredBody = content.textContent;
-  hop.fbmSyncPaint({ running: true, phase: 'pull_customer', counts: { completed: 1 } });
+  hop.fbmSyncPaint(statusGas(stateDangChay()));
   check(so, 'status den muon sau khi dong khong ve de len man form da phuc hoi', content.textContent, restoredBody);
 
   hop.FBM_SYNC_CLIENT.active = true;
-  hop.FBM_SYNC_CLIENT.lastStatus = { phase: 'idle' };
+  hop.FBM_SYNC_CLIENT.lastStatus = statusGas({ phase: 'idle' });
   let remountStatus = null;
   hop.fbmSyncPaint = (status) => { remountStatus = status; };
   await hop.syncPanelToggle();
-  check(so, 'cờ active lệch với DOM vẫn cho phép icon Đồng bộ tự gắn lại shell', remountStatus, hop.FBM_SYNC_CLIENT.lastStatus);
-  const openErrorPaint = hop.fbmSyncPaintError, openErrors = [], openCallServer = hop.callServer;
-  hop.fbmSyncPaintError = (error, fallback, action) => { openErrors.push([error.message, action]); };
-  hop.callServer = () => Promise.reject(new Error('GAS hỏng'));
+  check(so, 'cờ active lệch với DOM vẫn cho phép icon Đồng bộ tự gắn lại shell',
+    remountStatus,
+    hop.FBM_SYNC_CLIENT.lastStatus);
+}
+
+async function testMoManLoi(so) {
+  // Gói mở màn hỏng: lỗi hiện ở dòng báo của màn đồng bộ một lần và ghi Log, không nuốt.
+  const { hop } = taoBoTest();
+  const calls = [];
+  hop.callServer = (name, args) => {
+    calls.push([name, name === 'fbmLogSyncError' ? [args[0], args[2]] : null]);
+    return name === 'fbmGetSyncStatus' ? Promise.reject(new Error('GAS hỏng')) : Promise.resolve({ ok: true });
+  };
   hop.FBM_SYNC_CLIENT.active = false;
-  const openFailed = await hop.syncPanelToggle();
-  hop.fbmSyncPaintError = openErrorPaint; hop.callServer = openCallServer;
-  check(so, 'Gói mở màn lỗi thì báo lỗi một lần trên màn đồng bộ, không nuốt lỗi', [openFailed, openErrors], [null, [['GAS hỏng', 'sidebar_open']]]);
+  const kq = await hop.syncPanelToggle();
+  check(so, 'Gói mở màn lỗi thì báo một lần ở dòng báo và ghi Log một lần, không nuốt lỗi',
+    [kq, dongBao(hop), calls.filter((c) => c[0] === 'fbmLogSyncError').map((c) => c[1])], [null, ['fbmClient:GAS hỏng'], [['GAS hỏng', 'sidebar_open']]]);
 
   // Lượt tay mở rồi mà Sidebar đóng trước khi đánh thức Extension: mở lại màn thấy lượt còn chờ nhận thì đánh thức lại.
-  const wakes = [], wakeRpc = hop.fbmSyncExtensionRpc, wakeCallServer = hop.callServer;
-  hop.fbmSyncExtensionRpc = (action, fields) => { wakes.push([action, fields]); return Promise.resolve({ ok: true, accepted: true }); };
-  hop.callServer = (name) => Promise.resolve(name === 'fbmGetSyncStatus' ? { ok: true, status: { phase: 'session', running: true, runId: 'L9', awaitingPickup: true, masterEnabled: true, counts: {} }, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: {}, login: { configured: false } } : { ok: true });
-  hop.FBM_SYNC_CLIENT.active = false;
-  await hop.syncPanelToggle();
-  hop.fbmSyncExtensionRpc = wakeRpc; hop.callServer = wakeCallServer;
-  check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS', wakes, [['CRM_FBM_RUN_NOW', { retryMs: [], trigger: 'run_now' }]]);
+  const wake = taoBoTest(), wakes = [];
+  wake.hop.fbmSyncExtensionRpc = (action, fields) => { wakes.push([action, fields]); return Promise.resolve({ ok: true, accepted: true }); };
+  const dangCho = statusGas(stateDangChay({ activeRequestId: hangGas().PICKUP_PREFIX + 'r-1' }));
+  wake.hop.callServer = (name) => Promise.resolve(name === 'fbmGetSyncStatus' ? { ok: true, status: dangCho, identity: { status: 'UNBOUND', binding: { userId: 'u-1' } }, settings: {}, login: { configured: false } } : { ok: true });
+  wake.hop.FBM_SYNC_CLIENT.active = false;
+  await wake.hop.syncPanelToggle();
+  check(so, 'Mở màn thấy lượt tay còn chờ Extension nhận thì đánh thức Extension hỏi GAS',
+    [dangCho.awaitingPickup, wakes],
+    [true, [['CRM_FBM_RUN_NOW', { retryMs: [], trigger: 'run_now' }]]]);
 }
 
-async function testOwnRunId(so) {
-  // Chỉ phiên Sidebar tự khởi chạy mới được báo kèm mã phiên; lượt mới bắt đầu thì quên mã cũ để lỗi trước khi GAS cấp mã không dừng nhầm phiên nền.
-  const { hop } = taoBoTest();
-  const runIdCalls = [];
-  hop.setTimeout = setTimeout; hop.clearTimeout = clearTimeout;
-  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
-  hop.callServer = (name, args) => { runIdCalls.push({ name, args }); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: true, runId: 'run-7', relayRetryMs: [5000], status: { runId: 'run-7', phase: 'running', running: true } } : {}); };
-  hop.fbmSyncSetRunning(true);
-  const luot = hop.fbmSyncDrive('start', { kind: 'pull' }, 'đồng bộ');
-  await new Promise((resolve) => setTimeout(resolve, 5));
-  hop.fbmSyncStatusReceived({ status: { runId: 'run-7', phase: 'done' }, done: true });
-  await luot;
-  const maSoHuu = hop.FBM_SYNC_CLIENT.ownRunId;
-  await hop.fbmSyncLogClientError(new Error('Extension không trả response'), '', 'sync_run', hop.FBM_SYNC_CLIENT.ownRunId);
-  await hop.fbmSyncLogClientError(new Error('Lỗi lưu cài đặt'), '', 'connection_save');
-  hop.fbmSyncSetRunning(true);
-  const maSauKhiBatDauLai = hop.FBM_SYNC_CLIENT.ownRunId;
-  hop.fbmSyncSetRunning(false);
-  check(so, 'Sidebar báo lỗi phiên của chính mình kèm mã phiên, lỗi thao tác khác không kèm mã; lượt mới bắt đầu thì quên mã cũ',
-    [maSoHuu, runIdCalls.filter((c) => c.name === 'fbmLogSyncError').map((c) => c.args[2] + '|' + c.args[3]), maSauKhiBatDauLai],
-    ['run-7', ['sync_run|run-7', 'connection_save|'], '']);
-}
-
-async function testErrorPathFailures(so) {
-  // Đường báo lỗi của Sidebar hỏng (ghi Log) thì lý do phải hiện trên Sidebar, không nuốt.
-  const { hop } = taoBoTest();
-  const painted = [];
-  hop.fbmSyncPaint = (status) => { painted.push(status.message); };
-  hop.callServer = (name, args) => (name === 'fbmLogSyncError' && args[2] === 'log_down' ? Promise.reject(new Error('GAS không nhận Log')) : Promise.resolve({}));
-  const logResult = await hop.fbmSyncLogClientError(new Error('Lỗi gốc'), '', 'log_down');
-  check(so, 'ghi Log lỗi Sidebar hỏng thì lý do hiện trên Sidebar, kết quả mang mã', [logResult.code, painted.length === 1 && painted[0].indexOf('Lỗi gốc') >= 0 && painted[0].indexOf('GAS không nhận Log') >= 0], ['GAS_LOG_FAILED', true]);
-}
-
-async function testNoSelfCancel(so) {
-  // Lượt thuộc GAS: lỗi phía trình duyệt không làm Sidebar tự gửi lệnh Dừng; đóng màn đồng bộ thì đồng hồ chờ không hỏi GAS.
-  const { hop } = taoBoTest();
-  const calls = [], timers = [];
-  hop.setTimeout = (fn, ms) => { timers.push({ fn, ms, cleared: false }); return timers.length; };
-  hop.clearTimeout = (id) => { if (timers[id - 1]) { timers[id - 1].cleared = true; } };
-  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
-  hop.callServer = (name) => { calls.push(name); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: true, runId: 'run-9', relayRetryMs: [], status: { runId: 'run-9', phase: 'pull_customer', running: true } } : {}); };
-  hop.FBM_SYNC_CLIENT.active = true;
-  hop.FBM_SYNC_CLIENT.statusReady = true;
-  const luot = hop.fbmSyncRun('read');
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
-  hop.fbmSyncStatusReceived({ failure: { code: 'GAS_CALL_FAILED', message: 'GAS trả 404' } });
-  await luot;
-  check(so, 'lỗi Extension báo lên khi có chỗ chờ: Sidebar báo lỗi và ghi Log, không gửi lệnh Dừng cho GAS', [calls.indexOf('fbmCancelSync'), calls.indexOf('fbmLogSyncError') >= 0, typeof hop.fbmSyncCancelAfterError], [-1, true, 'undefined']);
-
-  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-10', resolve() {}, reject() {}, timer: null };
-  hop.fbmSyncRunWaitArm();
-  const daDat = timers.length;
-  hop.syncScreenClose();
-  hop.fbmSyncStatusReceived({ status: { runId: 'run-10', phase: 'pull_customer', running: true } });
-  check(so, 'đóng màn đồng bộ: đồng hồ chờ bị hủy, status relay về sau không đặt đồng hồ mới, chỗ chờ vẫn giữ', [timers[daDat - 1].cleared, timers.length === daDat, hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId], [true, true, 'run-10']);
-  let ketNoi = null;
-  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-20', resolve(value) { ketNoi = value; }, reject() {}, timer: null };
-  hop.fbmSyncStatusReceived({ status: { runId: 'run-99', phase: 'pull_customer', running: true }, done: true });
-  hop.fbmSyncStatusReceived({ status: { runId: 'run-21', follows: 'run-20', phase: 'pull_customer', running: true } });
-  const sauNoi = [hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId, hop.FBM_SYNC_CLIENT.ownRunId, ketNoi];
-  hop.fbmSyncStatusReceived({ status: { runId: 'run-21', phase: 'done' }, done: true });
-  check(so, 'GAS mở lượt nối tiếp (follows là mã lượt đang chờ) thì chỗ chờ chuyển sang lượt mới và kết thúc khi lượt mới xong; status lượt khác không nối thì bỏ qua',
-    [sauNoi, ketNoi && ketNoi.status.runId, hop.FBM_SYNC_CLIENT.runWaiter], [['run-21', 'run-21', null], 'run-21', null]);
-}
-
-async function testStuckStopsWaiting(so) {
-  // GAS báo lượt kẹt qua status: Sidebar thôi chờ ngay với chữ của GAS, không gửi lệnh Dừng, không đặt đồng hồ mới.
-  const { hop } = taoBoTest();
-  const calls = [], timers = [];
-  hop.setTimeout = (fn, ms) => { timers.push({ fn, ms, cleared: false }); return timers.length; };
-  hop.clearTimeout = (id) => { if (timers[id - 1]) { timers[id - 1].cleared = true; } };
-  const kep = { runId: 'run-11', phase: 'pull_customer', running: true, stuck: true, stuckCode: 'SYNC_STALE_RUN', stuckMessage: 'Lượt đồng bộ đang kẹt: thử.' };
-  hop.callServer = (name) => { calls.push(name); return Promise.resolve(name === 'fbmGetSyncStatus' ? { status: kep } : {}); };
-  hop.FBM_SYNC_CLIENT.active = true;
-  let ketQua = null;
-  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-11', resolve(value) { ketQua = value; }, reject() {}, timer: null };
-  hop.fbmSyncRunWaitArm();
-  const daDat = timers.length;
-  timers[daDat - 1].fn();
-  await new Promise((resolve) => setImmediate(resolve));
-  check(so, 'status báo lượt kẹt: chỗ chờ kết thúc với mã và chữ của GAS, không gửi lệnh Dừng, không đặt đồng hồ mới', [
-    ketQua && ketQua.ok, ketQua && ketQua.code, ketQua && ketQua.error, calls.indexOf('fbmCancelSync'), hop.FBM_SYNC_CLIENT.runWaiter, timers.length === daDat
-  ], [false, 'SYNC_STALE_RUN', 'Lượt đồng bộ đang kẹt: thử.', -1, null, true]);
-}
-
-async function chay(so) {
-  await testSharedShellLifecycle(so);
-  await testOwnRunId(so);
-  await testErrorPathFailures(so);
-  await testNoSelfCancel(so);
-  await testStuckStopsWaiting(so);
-  section('FBM sync — Sidebar UI smoke');
-  let bo;
-  try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
-  const { hop, dom, content } = bo;
-  const info = dom.document.getElementById('sidebar-info');
-
-  const idle = { phase: 'idle', label: 'Sẵn sàng', mode: 'read', counts: {}, masterEnabled: true };
-  const active = { running: true, phase: 'pull_customer', runId: 'r1', cursor: { kind: 'customer_grid' }, label: 'Đang đọc khách hàng', mode: 'read', counts: {} };
-  const preflightError = { phase: 'error', runId: 'r2', cursor: {}, lastFailureCode: 'SYNC_PREFLIGHT_FAILED', label: 'Có lỗi', counts: {} };
-  const pushError = { phase: 'error', runId: 'r3', cursor: { kind: 'push_wait' }, lastFailureCode: 'FBM_VERIFY_FAILED', label: 'Có lỗi', counts: {} };
-
-  const shellHeader = hop.fbmSyncShellHeaderBlocks(idle);
-  check(so, 'menu nội bộ bỏ Tổng quan và đặt Chạy đồng bộ lên đầu', [hop.FBM_SYNC_UI_SCHEMA.screens.map((item) => item.id), hop.FBM_SYNC_UI_SCHEMA.screens.some((item) => item.id === 'overview')], [['run', 'account', 'results', 'settings'], false]);
-  check(so, 'header Đồng bộ dùng hai HeaderGroup chung với header Sidebar/form', [shellHeader.length, shellHeader[0].className, shellHeader[0].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].className, shellHeader[1].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].elements[0].disabled, hop.fbmSyncShellTitle()], [2, 'shin-header-group shin-header-group-start', 'icon:fbm-sync-back|text:fbm-sync-module-title', 'shin-header-group shin-header-group-end', 'standaloneControl:fbm-sync-master-switch|icon:fbm-sync-module-menu', false, 'Chạy đồng bộ']);
-  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form', [shellHeader[0].elements[1].className.indexOf('shin-header-title') >= 0], [true]);
+async function testHeaderVaMenu(so) {
+  const { hop, content } = taoBoTest();
+  const nghi = statusGas({ phase: 'idle' });
+  const shellHeader = hop.fbmSyncShellHeaderBlocks(nghi);
+  check(so, 'menu nội bộ bỏ Tổng quan và đặt Chạy đồng bộ lên đầu',
+    [hop.FBM_SYNC_UI_SCHEMA.screens.map((item) => item.id), hop.FBM_SYNC_UI_SCHEMA.screens.some((item) => item.id === 'overview')],
+    [['run', 'account', 'results', 'settings'], false]);
+  check(so, 'header Đồng bộ dùng hai HeaderGroup chung với header Sidebar/form',
+    [shellHeader.length, shellHeader[0].className, shellHeader[0].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].className, shellHeader[1].elements.map((node) => node.role + ':' + (node.id || '')).join('|'), shellHeader[1].elements[0].disabled, hop.fbmSyncShellTitle()],
+    [2, 'shin-header-group shin-header-group-start', 'icon:fbm-sync-back|text:fbm-sync-module-title', 'shin-header-group shin-header-group-end', 'standaloneControl:fbm-sync-master-switch|icon:fbm-sync-module-menu', false, 'Chạy đồng bộ']);
+  check(so, 'header Đồng bộ dùng cùng khung và tiêu đề với header Sidebar/form',
+    [shellHeader[0].elements[1].className.indexOf('shin-header-title') >= 0],
+    [true]);
 
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
   hop.FBM_SYNC_CLIENT.statusReady = false;
   hop.fbmSyncRenderInitial();
-  check(so, 'mở FBM vẽ ngay khung Chạy đồng bộ trước snapshot GAS', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0, !!hop.RENDER_INDEX.nodes['fbm-sync-run-root']], ['run', true, true]);
-  check(so, 'khung ban đầu khóa nút chạy để không dùng trạng thái cũ', [hop.fbmSyncRunActionBlock({}).disabled, hop.fbmSyncRunActionBlock({}).label], [true, 'Đang tải trạng thái...']);
-  hop.FBM_SYNC_CLIENT.statusReady = true;
-  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Chạy đồng bộ sau loading' }));
-  check(so, 'Chạy đồng bộ dựng lại được sau loading mà không dùng node cũ', [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0], ['run', true]);
-  check(so, 'Run render không hiện pipeline khi chưa chạy', render(hop, content, hop.fbmSyncRenderRun, idle).querySelector('.shin-sync-pipeline'), null);
-  const idleProgressTrack = hop.fbmSyncProgressBlocks(idle, {}).elements[1];
-  const idleProgress = idleProgressTrack.elements[0];
-  check(so, 'Progress idle rỗng hoàn toàn, không tô fill giả', [hop.fbmSyncProgressData(idle, {}).active, idleProgress.spatialConfig.width, idleProgress.className], [false, '0%', 'shin-loading-fill']);
-  check(so, 'Progress idle áº©n track nhÆ°ng váº«n giá»¯ node', idleProgressTrack.className, 'shin-loading-track is-idle');
-  const appendRun = hop.fbmSyncAppendBox;
-  let runBlocks;
-  hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { runBlocks = elements; return content; };
-  hop.fbmSyncRenderRun(content, idle);
-  hop.fbmSyncAppendBox = appendRun;
-  const runCard = runBlocks[0], runActionRegion = runCard.elements.filter((node) => node && node.id === 'fbm-sync-run-action-region')[0];
-  check(so, 'Các action Run đi qua ActionStack lõi có hai Row con và nhịp dọc dùng chung', [runActionRegion.elements[0].role, runActionRegion.elements[0].className, runActionRegion.elements[0].elements.length, runActionRegion.elements[0].elements[0].className, runActionRegion.elements[0].elements[1].className], ['box', 'shin-row-group shin-action-stack', 2, 'shin-single-action-row', 'shin-single-action-row']);
-  const runDetailsRegion = runBlocks.filter((node) => node && node.id === 'fbm-sync-run-details-region')[0];
-  const pipelineNode = hop.fbmSyncPipelineBlock(active, 'pipeline-test');
-  check(so, 'Pipeline và trạng thái phiên nằm trong RowGroup để giữ khoảng cách dọc', [runDetailsRegion.role, runDetailsRegion.className, pipelineNode.role, pipelineNode.elements[1].role, hop.fbmSyncProgressBlocks(active, {}).role], ['box', 'shin-row-group', 'box', 'row', 'box']);
-  check(so, 'Run render giữ pipeline khi preflight thất bại để người dùng thấy chặng dừng', !!render(hop, content, hop.fbmSyncRenderRun, preflightError).querySelector('.shin-sync-pipeline'), true);
-  check(so, 'Run render hiện pipeline khi đang xử lý', !!render(hop, content, hop.fbmSyncRenderRun, active).querySelector('.shin-sync-pipeline'), true);
-  check(so, 'Run render giữ pipeline để chẩn đoán lỗi sau request', !!render(hop, content, hop.fbmSyncRenderRun, pushError).querySelector('.shin-sync-pipeline'), true);
-  const clientTimeout = { phase: 'error', label: 'Có lỗi', message: 'Máy chủ không phản hồi hàm fbmStartSync sau 30000 ms.', lastError: 'Máy chủ không phản hồi hàm fbmStartSync sau 30000 ms.', counts: {} };
-  check(so, 'Run render hiện lỗi Sidebar tự phát hiện dù chưa có runId (hết hạn chờ fbmStartSync)', render(hop, content, hop.fbmSyncRenderRun, clientTimeout).textContent.indexOf('không phản hồi hàm fbmStartSync') >= 0, true);
-  const pausedTransport = { phase: 'paused', runId: 'r4', lastError: 'Cầu nối FBM không phản hồi.', label: 'Tạm dừng', counts: {} };
-  const pausedRun = render(hop, content, hop.fbmSyncRenderRun, pausedTransport);
-  check(so, 'Run render giữ pipeline và lỗi khi phiên tạm dừng', [!!pausedRun.querySelector('.shin-sync-pipeline'), pausedRun.textContent.indexOf('Pipeline đã tạm dừng') >= 0], [true, true]);
-  // Dừng lượt tay: GAS đã báo hết chạy nhưng cờ RAM còn bật (Extension không gửi tin xong lượt cho lượt bị dừng); hai ô chọn phải mở ngay theo status, cả trên đường vẽ lại một phần.
-  const oChon = (node) => ['fbm-sync-mode', 'fbm-sync-pack'].map((id) => { const el = node.querySelector('#' + id); return !!el && el.disabled === true; });
-  hop.FBM_SYNC_CLIENT.running = true;
-  hop.FBM_SYNC_CLIENT.mode = 'read';
-  const dangChay = render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, active, { origin: 'manual' }));
-  check(so, 'lượt tay đang chạy theo status GAS: khóa cả Loại đồng bộ và Mức quét', oChon(dangChay), [true, true]);
-  hop.fbmSyncPatchRun(content, idle);
-  check(so, 'GAS báo đã dừng mà cờ RAM còn bật: vẽ lại một phần mở cả hai ô chọn', oChon(content), [false, false]);
-  check(so, 'GAS báo đã dừng mà cờ RAM còn bật: vẽ cả màn mở cả hai ô chọn', oChon(render(hop, content, hop.fbmSyncRenderRun, idle)), [false, false]);
-  check(so, 'lượt nền đang chạy không khóa ô chọn (bấm chạy thì Sidebar hỏi dừng nền)', oChon(render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, active, { origin: 'background' }))), [false, false]);
-  hop.FBM_SYNC_CLIENT.running = false;
+  check(so, 'mở FBM vẽ ngay khung Chạy đồng bộ trước snapshot GAS',
+    [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0, !!hop.RENDER_INDEX.nodes['fbm-sync-run-root']],
+    ['run', true, true]);
+  check(so, 'khung ban đầu khóa nút chạy để không dùng trạng thái cũ',
+    [hop.fbmSyncRunActionBlock({}).disabled, hop.fbmSyncRunActionBlock({}).label],
+    [true, 'Đang tải trạng thái...']);
+  hop.fbmSyncPaint(nghi);
+  check(so, 'Chạy đồng bộ dựng lại được sau loading mà không dùng node cũ',
+    [content.getAttribute('data-fbm-sync-screen'), content.textContent.indexOf('Chọn loại đồng bộ') >= 0],
+    ['run', true]);
+}
 
-  const statusButton = dom.document.createElement('button');
-  statusButton.id = 'fbm-sync-module-menu';
-  statusButton.className = 'shin-sync-status-running';
-  statusButton.classList = {
-    add: (name) => { statusButton.className = (statusButton.className + ' ' + name).trim(); },
-    remove: (name) => { statusButton.className = statusButton.className.split(/\s+/).filter((item) => item && item !== name).join(' '); }
-  };
-  dom.root.appendChild(statusButton);
-  hop.fbmSyncPaintHeaderState({ running: true, phase: 'checking_session', masterEnabled: false });
-  check(so, 'icon Đồng bộ không quay khi công tắc tổng tắt', [statusButton.className.indexOf('shin-sync-status-running') >= 0, statusButton.getAttribute('aria-label')], [false, 'Đồng bộ FBM']);
-
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'REBIND_REQUIRED', binding: { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' } };
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'saved-ref', enabled: true, public: { usernameHint: 'other-user' } };
-  hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
-  check(so, 'cảnh báo username lệch nằm dưới header trên mọi màn hình khi module bật', [info.hidden, !!info.querySelector('#fbm-sync-account-warning-region')], [false, true]);
-  ['run', 'account', 'results', 'settings'].forEach((screen) => { hop.FBM_SYNC_CLIENT.subscreen = screen; hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true })); check(so, 'cảnh báo username lệch giữ nguyên khi chuyển màn ' + screen, info.hidden, false); });
-  hop.FBM_SYNC_CLIENT.loginStatus.public.usernameHint = 'an***';
-  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
-  check(so, 'username đã che không tạo cảnh báo lệch giả', info.hidden, true);
-  hop.FBM_SYNC_CLIENT.loginStatus.public.usernameHint = 'other-user';
-  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: false }));
+function testVungBaoDauMan(so) {
+  const { hop, dom, content } = taoBoTest();
+  const info = dom.document.getElementById('sidebar-info');
+  hop.FBM_SYNC_CLIENT.active = true;
+  const lech = { login: { configured: true, public: { usernameHint: 'other-user' } }, binding: { username: 'anhlt' } };
+  const mau = statusGas({ phase: 'idle' }, lech);
+  hop.fbmSyncRenderShell(mau);
+  check(so, 'GAS báo username lệch thì vùng báo đầu màn hiện câu lệch',
+    [mau.usernameMismatch, info.hidden, info.textContent.indexOf(hop.FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchBanner) >= 0],
+    [true, false, true]);
+  ['run', 'account', 'results', 'settings'].forEach((man) => {
+    hop.FBM_SYNC_CLIENT.subscreen = man;
+    hop.fbmSyncRenderShell(mau);
+    check(so, 'cảnh báo username lệch giữ nguyên khi chuyển màn ' + man, info.hidden, false);
+  });
+  hop.fbmSyncRenderShell(statusGas({ phase: 'idle' }, Object.assign({}, lech, { login: { configured: true, public: { usernameHint: 'an***' } } })));
+  check(so, 'username đã che thì GAS không báo lệch và vùng báo ẩn', info.hidden, true);
+  hop.fbmSyncRenderShell(statusGas({ phase: 'idle' }, Object.assign({}, lech, { enabled: false })));
   check(so, 'module tắt thì không hiện cảnh báo username lệch', info.hidden, true);
-  hop.fbmSyncRenderShell(Object.assign({}, idle, { masterEnabled: true }));
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  if (false) {
-  const connectionCard = content.querySelector('#fbm-sync-connection-card-region');
-  const identityCard = content.querySelector('#fbm-sync-identity-section-region');
-  const loginCard = content.querySelector('#fbm-sync-login-section-region');
-  const identityEditButton = connectionCard.querySelector('.shin-config-edit');
-  const loginEditButton = identityEditButton;
-  check(so, 'Account render đủ ô liên kết, có bút sửa và khóa ô nhập khi đang xem', [dom.document.getElementById('fbm-identity-spreadsheet') !== null, dom.document.getElementById('fbm-identity-user') !== null, dom.document.getElementById('fbm-identity-account') !== null, identityCard.querySelector('[data-sync-config-action="edit"]') !== null, dom.document.getElementById('fbm-identity-spreadsheet').disabled], [true, true, true, true, true]);
-  const identityActionRegion = identityCard.querySelector('#fbm-sync-identity-actions-region');
-  const loginActionRegion = loginCard.querySelector('#fbm-sync-login-actions-region');
-  check(so, 'Nút Sửa dùng một surface connection, còn hai phần con giữ nhóm action bằng ActionStack', [identityActionRegion.className, loginActionRegion.className, identityActionRegion.children.length, loginActionRegion.children.length, identityActionRegion.children[0].className, loginActionRegion.children[0].className, identityEditButton.className, loginEditButton.className, identityEditButton.getAttribute('data-sync-config-key'), loginEditButton.getAttribute('data-sync-config-key')], ['shin-box shin-row-group shin-action-stack', 'shin-box', 1, 1, 'shin-box shin-row-group', 'shin-box shin-action-stack', 'shin-button shin-config-edit', 'shin-button shin-config-edit', 'connection', 'connection']);
-  const viewIdentityActions = identityCard.querySelector('#fbm-sync-identity-actions-region');
-  const viewIdentityCheck = viewIdentityActions.querySelector('#fbm-sync-check-identity');
-  check(so, 'Chế độ xem vẫn có nút Kiểm tra liên kết dùng binding đã lưu', [viewIdentityCheck && viewIdentityCheck.id, viewIdentityCheck && viewIdentityCheck.textContent, viewIdentityCheck && viewIdentityCheck.disabled, identityEditButton !== null], ['fbm-sync-check-identity', 'Kiểm tra liên kết', false, true]);
-  check(so, 'Account dùng ô mật khẩu và khóa khi chưa bấm sửa', [dom.document.getElementById('fbm-login-password').type, dom.document.getElementById('fbm-login-password').value, dom.document.getElementById('fbm-login-password').disabled], ['password', '', true]);
-  const appendAccount = hop.fbmSyncAppendBox;
-  let accountBlocks;
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'saved-ref', public: { usernameHint: 'an***' } };
-  hop.fbmSyncConfigFinishEdit('login');
-  hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
-  hop.fbmSyncRenderAccount(content, idle);
-  hop.fbmSyncAppendBox = appendAccount;
-  const savedConnectionCard = accountBlocks[0].elements[0];
-  const savedLoginCard = savedConnectionCard.elements.filter((node) => node && node.id === 'fbm-sync-login-section-region')[0];
-  const savedLoginFields = savedLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Credential đã lưu hiện username, mật khẩu **** và hai ô chỉ xem', [savedConnectionCard.titleActions[0].icon, savedLoginFields[0].elements[1].disabled, savedLoginFields[0].elements[1].value, savedLoginFields[1].elements[1].disabled, savedLoginFields[1].elements[1].value], ['pencil', true, 'anhlt', true, '****']);
-  const savedLoginActions = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-actions-region')[0].elements[0];
-  check(so, 'Chế độ xem vẫn có nút Đăng nhập thử dùng credential đã lưu', [savedLoginActions.elements[0].id, savedLoginActions.elements[0].label, savedLoginActions.elements[0].disabled], ['fbm-sync-login-test', 'Đăng nhập thử', false]);
-  const loginPolicyNavigation = savedLoginCard.elements.filter((node) => node && node.id === 'fbm-sync-login-policy-navigation-region')[0];
-  check(so, 'Account có nút mở đúng khối cài đặt đăng nhập tự động', [loginPolicyNavigation.elements[0].className, loginPolicyNavigation.elements[0].elements[0].id, loginPolicyNavigation.elements[0].elements[0].label], ['shin-single-action-row', 'fbm-sync-open-login-policy', 'Cài đặt đăng nhập tự động']);
-  hop.fbmSyncConfigStartEdit('login');
-  hop.FBM_SYNC_CLIENT.loginDraft.username = 'anhlt';
-  hop.fbmSyncAppendBox = (_panel, _className, _id, elements) => { accountBlocks = elements; return content; };
-  hop.fbmSyncRenderAccount(content, idle);
-  hop.fbmSyncAppendBox = appendAccount;
-  const editConnectionCard = accountBlocks[0].elements[0];
-  const editLoginCard = editConnectionCard.elements.filter((node) => node && node.id === 'fbm-sync-login-section-region')[0];
-  const editLoginFields = editLoginCard.elements.filter((node) => node && node.role === 'box' && node.className === 'shin-form-field');
-  check(so, 'Bấm sửa mở lại username, để trống ô mật khẩu và giữ action ở outer card', [editConnectionCard.titleActions[0].icon, editConnectionCard.titleActions[0].className, editConnectionCard.titleActions[1].icon, editConnectionCard.titleActions[1].className, editLoginFields[0].elements[1].disabled, editLoginFields[0].elements[1].value, editLoginFields[1].elements[1].disabled, editLoginFields[1].elements[1].value], ['close', 'shin-config-cancel', 'check', 'shin-config-save', false, 'anhlt', false, '']);
-  hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
-  hop.fbmSyncConfigStartEdit('login');
-  const loginActionRow = hop.fbmSyncLoginActionBlocks()[0];
-  check(so, 'Nút đăng nhập thử dùng RowGroup và không nhân bản nút lưu connection', [loginActionRow.role, loginActionRow.className, loginActionRow.elements.length, loginActionRow.elements[0].role], ['box', 'shin-row-group', 1, 'button']);
-  hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_account: { customerPrefix: 'ALT', customerCodeLength: '8' } });
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Account hien cau hinh ma khach FBM tu GAS, khong con o moc ngay Activity', [dom.document.getElementById('fbm-account-customer-prefix').value, dom.document.getElementById('fbm-account-customer-length').value, dom.document.getElementById('fbm-account-activity-since'), content.textContent.indexOf('Mốc ngày Activity') >= 0], ['ALT', '8', null, false]);
-  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = { customerPrefix: false, customerCodeLength: true };
-  const invalidAccountFields = hop.fbmSyncAccountSettingsBlocks().filter((node) => node && node.role === 'box' && node.className.indexOf('shin-form-field') >= 0);
-  check(so, 'Cau hinh ma khach FBM dung StandaloneField va to do o thieu', [invalidAccountFields.length, invalidAccountFields[0].className, invalidAccountFields[1].className], [2, 'shin-form-field', 'shin-form-field is-invalid']);
-  hop.FBM_SYNC_CLIENT.accountSettingsInvalid = {};
-  hop.fbmSyncConfigStartEdit('identity');
-  const identityBlock = hop.fbmSyncIdentityBlock(idle);
-  const identityActions = identityBlock.elements.filter((node) => node && node.id === 'fbm-sync-identity-actions-region')[0];
-  check(so, 'Ba nút liên kết tài khoản dùng RowGroup lõi và biến thể action dọc', [identityActions.className, identityActions.elements.length, identityActions.elements[0].role], ['shin-row-group shin-action-stack', 3, 'button']);
 
-  hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: 'sheet', userId: '', username: 'anhlt', accountName: '' };
-  hop.FBM_SYNC_CLIENT.identityInvalid = { spreadsheet: false, user: true, username: false, account: true };
-  const invalidIdentityFields = hop.fbmSyncIdentityFormBlocks();
-  hop.FBM_SYNC_CLIENT.accountNotices.identity = { kind: 'error', message: 'Vui lòng bổ sung các ô màu đỏ hoặc xóa cả bốn ô để hủy liên kết.' };
-  const invalidIdentityNotice = hop.fbmSyncAccountNoticeBlocks('identity');
-  check(so, 'Liên kết thiếu trường chỉ tô đỏ đúng các ô thiếu bằng StandaloneField chuẩn', [invalidIdentityFields[0].className, invalidIdentityFields[1].className, invalidIdentityFields[2].className, invalidIdentityFields[3].className], ['shin-form-field', 'shin-form-field is-invalid', 'shin-form-field', 'shin-form-field is-invalid']);
-  check(so, 'Thông báo liên kết thiếu trường ngắn gọn và hướng vào ô màu đỏ', invalidIdentityNotice[0].text, 'Vui lòng bổ sung các ô màu đỏ hoặc xóa cả bốn ô để hủy liên kết.');
-
-  hop.FBM_SYNC_CLIENT.identityLastAction = 'probe';
-  hop.fbmSyncApplyIdentityProbeDraft({ metadata: { identityProbe: { spreadsheetId: 'sheet-probe', userId: '2037', username: 'anhlt', accountName: 'ANHLT' } } });
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  check(so, 'Identity probe tự điền bản nháp vào đủ bốn ô mà chưa tự lưu', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value, hop.FBM_SYNC_CLIENT.identityStatus.status], ['sheet-probe', '2037', 'anhlt', 'ANHLT', 'REBIND_REQUIRED']);
-  hop.FBM_SYNC_CLIENT.accountNotices.identity = { kind: 'success', message: 'Đã lấy thông tin thành công và điền vào form.' };
-  check(so, 'Tự điền thành công chỉ hiện một notice, không lặp dòng kết quả bên dưới', hop.fbmSyncIdentityResultBlocks({ phase: 'done', metadata: { identityProbe: { spreadsheetId: 'sheet-probe' } } }).length, 0);
-  hop.FBM_SYNC_CLIENT.identityProbeSignature = '';
-  hop.FBM_SYNC_CLIENT.subscreen = 'account';
-  dom.document.activeElement = dom.document.getElementById('fbm-identity-user');
-  hop.fbmSyncPaint({ phase: 'done', counts: {}, metadata: { identityProbe: { spreadsheetId: 'sheet-focused', userId: '3001', username: 'focused-user', accountName: 'Focused Account' } } });
-  check(so, 'Identity probe vẫn hiện kết quả khi ô liên kết còn focus', [dom.document.getElementById('fbm-identity-spreadsheet').value, dom.document.getElementById('fbm-identity-user').value, dom.document.getElementById('fbm-identity-username').value, dom.document.getElementById('fbm-identity-account').value], ['sheet-focused', '3001', 'focused-user', 'Focused Account']);
-  hop.fbmSyncConfigFinishEdit('identity');
-  hop.FBM_SYNC_CLIENT.accountNotices = { login: { kind: 'error', message: 'Extension không trả lời yêu cầu FBM.' } };
-  render(hop, content, hop.fbmSyncRenderAccount, { phase: 'error', message: 'Extension không trả lời yêu cầu FBM.', counts: {} });
-  check(so, 'Account hiện lỗi cầu nối trong đúng card đăng nhập', [content.textContent.indexOf('Extension không trả lời yêu cầu FBM.') >= 0, content.textContent.indexOf('Đăng nhập tự động') < content.textContent.indexOf('Extension không trả lời yêu cầu FBM.')], [true, true]);
-  hop.FBM_SYNC_CLIENT.accountNotices = {
-    identity: { kind: 'success', message: 'Kiểm tra liên kết hoàn tất: 2/2 Customer hợp lệ.' },
-    login: { kind: 'success', message: 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' }
-  };
-  hop.FBM_SYNC_CLIENT.identityLastAction = 'check';
-  render(hop, content, hop.fbmSyncRenderAccount, { phase: 'done', counts: {}, metadata: { identityCheck: { total: 2, matched: 2, missing: 0 } } });
-  check(so, 'Account giữ thông báo thành công của đăng nhập thử và kiểm tra liên kết', [content.textContent.indexOf('Đăng nhập thử thành công') >= 0, content.textContent.indexOf('Kiểm tra liên kết hoàn tất: 2/2') >= 0, content.textContent.indexOf('Customer hợp lệ: 2/2') >= 0], [true, true, true]);
-
-  }
-    const connection = content.querySelector('#fbm-sync-connection-card-region');
-    const identitySection = content.querySelector('#fbm-sync-identity-section-region');
-    const loginSection = content.querySelector('#fbm-sync-login-section-region');
-    check(so, 'Account gom mot card ket noi va hai vung con', [!!connection, !!identitySection, !!loginSection], [true, true, true]);
-    const connectionEdit = connection.querySelector('[data-sync-config-key="connection"]');
-    check(so, 'Mot edit surface dieu khien ca hai vung', [!!connectionEdit, identitySection.querySelector('[data-sync-config-key="identity"]'), loginSection.querySelector('[data-sync-config-key="login"]')], [true, null, null]);
-    check(so, 'Credential chưa từng lưu ở chế độ xem hiển thị Chưa lưu', [dom.document.getElementById('fbm-login-password').disabled, dom.document.getElementById('fbm-login-password').value], [true, 'Chưa lưu']);
-    const backgroundAction = connection.querySelector('#fbm-sync-open-background-settings');
-    check(so, 'Account không còn link cài đặt đồng bộ nền', backgroundAction, null);
-    hop.FBM_SYNC_CLIENT.subscreen = 'run';
-    render(hop, content, hop.fbmSyncRenderRun, idle);
-    const runBackgroundAction = content.querySelector('#fbm-sync-open-background-settings');
-    check(so, 'Nút cài đặt đồng bộ nền nằm ở Chạy đồng bộ và đi qua hàng action chung', [runBackgroundAction && runBackgroundAction.parentNode.className, runBackgroundAction && runBackgroundAction.textContent], ['shin-row shin-single-action-row', 'Cài đặt đồng bộ nền']);
-    hop.FBM_SYNC_CLIENT.subscreen = 'account';
-    render(hop, content, hop.fbmSyncRenderAccount, idle);
-    hop.fbmSyncConfigStartEdit('connection');
-    render(hop, content, hop.fbmSyncRenderAccount, idle);
-    const connectionSave = content.querySelector('[data-sync-config-action="save"]');
-    check(so, 'Surface kết nối khi sửa vẫn có đúng icon lưu ở card cha', [!!connectionSave, connectionSave && connectionSave.getAttribute('data-sync-config-key'), connectionSave && connectionSave.getAttribute('title')], [true, 'connection', 'Lưu thay đổi']);
-    const loginSaveButton = content.querySelector('#fbm-sync-login-save');
-    check(so, 'Khi sửa vẫn có nút chữ Lưu thông tin trong vùng Đăng nhập tự động', [!!loginSaveButton, loginSaveButton && loginSaveButton.textContent, loginSaveButton && loginSaveButton.getAttribute('data-sync-config-key')], [true, 'Lưu thông tin', 'connection']);
-    hop.fbmSyncConfigFinishEdit('connection');
-  let relayConfigurations = 0;
-  hop.fbmSyncConfigureRelay = () => { relayConfigurations += 1; return Promise.resolve(null); };
-  await hop.fbmSyncPrepareRelayForSidebarOpen();
-  await hop.fbmSyncPrepareRelayForSidebarOpen();
-  check(so, 'một vòng đời Sidebar chỉ gửi relay config một lần', relayConfigurations, 1);
-
-  hop.FBM_SYNC_CLIENT.subscreen = 'account';
-  const accountPassword = dom.document.getElementById('fbm-login-password');
-  accountPassword.value = 'mat-khau-dang-go';
-  const clickedLoginTest = dom.document.createElement('button');
-  dom.document.activeElement = clickedLoginTest;
-  hop.fbmSyncPaint(idle);
-  check(so, 'repaint sau khi bấm nút vẫn giữ mật khẩu chưa lưu', dom.document.getElementById('fbm-login-password').value, 'mat-khau-dang-go');
-
+  const chet = statusGas(stateDangChay({ activeRequestId: '', deadlineAt: 0, updatedAt: 1 }));
+  hop.fbmSyncRenderShell(chet);
+  check(so, 'lượt chết: vùng báo hiện đúng chữ cảnh báo của GAS, không chữ nào do Sidebar soạn',
+    [chet.warnings.length, info.textContent.indexOf(chet.warnings[0].text) >= 0],
+    [1, true]);
+  const chan = statusGas({ phase: 'done', metadata: { identityBlocks: [{ fbmCustomerCode: 'ALT00010', reason: 'trùng mã' }] } });
+  hop.fbmSyncRenderShell(chan);
+  check(so, 'khách bị chặn khi kéo về hiện đúng câu issue GAS dựng',
+    [chan.issues.length, info.textContent.indexOf(chan.issues[0].text) >= 0],
+    [1, true]);
+  hop.fbmSyncRenderShell(statusGas({ phase: 'idle' }));
+  check(so, 'không có gì để báo thì vùng báo ẩn', info.hidden, true);
   hop.FBM_SYNC_CLIENT.subscreen = 'run';
-  hop.FBM_SYNC_CLIENT.running = false;
-  hop.fbmSyncPaint(idle);
-  const modeSelect = dom.document.getElementById('fbm-sync-mode');
-  modeSelect.focus();
-  hop.fbmSyncPaint(Object.assign({}, idle, { label: 'Snapshot nền đến trong lúc chọn loại đồng bộ' }));
-  check(so, 'dropdown loai dong bo giu nguyen node va focus khi snapshot nen den, khong can hoan ve ca man', [dom.document.getElementById('fbm-sync-mode') === modeSelect, dom.document.activeElement === modeSelect, hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [true, true, null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
-  modeSelect.setAttribute('aria-expanded', 'true');
-  check(so, 'popup menu dang mo cung duoc coi la control dang thao tac de tri hoan snapshot', hop.fbmSyncInteractiveControlIsEditing(content), true);
-  modeSelect.setAttribute('aria-expanded', 'false');
-  modeSelect.blur();
-  hop.fbmSyncFlushDeferredPaint();
-  check(so, 'snapshot nen khong doi trang thai moi sau khi dropdown dong', [hop.FBM_SYNC_CLIENT.deferredPaint, hop.FBM_SYNC_CLIENT.lastStatus.label], [null, 'Snapshot nền đến trong lúc chọn loại đồng bộ']);
-  hop.fbmSyncPaint(active);
-  const runFirstNode = content.children[0];
-  check(so, 'Thẻ Trạng thái phiên tách kết quả lượt thành từng dòng, số có dấu chấm nghìn, có số không thấy bên FBM theo khách và giao dịch; dòng đẩy chỉ ở chiều có đẩy', [
-    hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: true }, { completed: 1445, succeeded: 3, pushed: 1, missingCustomer: 0, missingActivity: 2 }),
-    hop.fbmSyncStatusResultLines({ runId: 'r1', canPush: false }, { completed: 5 }).map((line) => line.split(':')[0]),
-    hop.fbmSyncStatusResultLines({ runId: '' }, { completed: 5 })
-  ], [
-    ['Đọc từ FBM: 1.445', 'Ghi vào Sheet: 3', 'Đẩy lên FBM: 1', 'Không thấy bên FBM: 0 khách, 2 giao dịch', 'Đã chuyển cho người khác: 0 khách, 0 giao dịch', 'Xung đột: 0', 'Lỗi: 0', 'Bỏ qua: 0'],
-    ['Đọc từ FBM', 'Ghi vào Sheet', 'Không thấy bên FBM', 'Đã chuyển cho người khác', 'Xung đột', 'Lỗi', 'Bỏ qua'],
-    []
-  ]);
-  check(so, 'Thẻ Trạng thái phiên hiện thông tin lượt từng dòng; dòng Đang xử lý chỉ có khi lượt còn chạy', [
-    hop.fbmSyncStatusInfoLines({ phase: 'done', direction: 'Hai chiều', scanPack: 'quick', session: { customer: true, activity: false }, entityLabel: 'Tổng hợp' }),
-    hop.fbmSyncStatusInfoLines({ running: true, phase: 'pull_activity', direction: 'FBM → ShinCRM', scanPack: '', entityLabel: 'Giao dịch', current: 'CUS-000001' })
-  ], [
-    ['Chiều chạy: Hai chiều', 'Mức quét: Quét nhanh', 'Phiên FBM: khách hàng đã xác nhận, giao dịch chưa có'],
-    ['Chiều chạy: FBM → ShinCRM', 'Đang xử lý: Giao dịch CUS-000001']
-  ]);
-  const patchedLiveStatus = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, active, { label: 'Đang đối soát', counts: { completed: 4, succeeded: 3 } }), 'run');
-  check(so, 'trạng thái đang chạy được cập nhật tại chỗ, không dựng lại màn hình', [patchedLiveStatus, content.children[0] === runFirstNode, content.textContent.indexOf('Đang đối soát') >= 0], [true, true, true]);
-  const previousFinished = { phase: 'done', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đã hoàn tất', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'done' }, { id: 'category', label: 'Category', state: 'done' }, { id: 'customer', label: 'Đọc Customer', state: 'done' }, { id: 'activity', label: 'Đọc Activity', state: 'done' }, { id: 'reconcile', label: 'Đối soát', state: 'done' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'done' }] } };
-  const nextRunChecking = { running: true, phase: 'checking_session', mode: 'read', counts: {}, pipeline: { kind: 'read', title: 'Pipeline đang chạy', steps: [{ id: 'session', label: 'Kiểm tra phiên FBM', state: 'current' }, { id: 'category', label: 'Category', state: 'pending' }, { id: 'customer', label: 'Đọc Customer', state: 'pending' }, { id: 'activity', label: 'Đọc Activity', state: 'pending' }, { id: 'reconcile', label: 'Đối soát', state: 'pending' }, { id: 'sheet', label: 'Cập nhật Sheet', state: 'pending' }] } };
-  render(hop, content, hop.fbmSyncRenderRun, previousFinished);
-  const previousPipeline = content.querySelector('.shin-sync-pipeline');
-  const nextRunPatched = hop.fbmSyncPatchLiveStatus(content, nextRunChecking, 'run');
-  const nextMarkers = Array.from(content.querySelectorAll('.shin-sync-pipeline-marker')).map((node) => node.textContent);
-  check(so, 'lượt mới vá lại cả pipeline cũ đã hoàn tất, không để trạng thái kiểm tra đi với sáu dấu hoàn tất', [nextRunPatched, content.querySelector('.shin-sync-pipeline') === previousPipeline, content.querySelector('.shin-sync-pipeline-title').textContent, nextMarkers], [true, true, 'Pipeline đang chạy', ['●', '○', '○', '○', '○', '○']]);
-  render(hop, content, hop.fbmSyncRenderRun, Object.assign({}, nextRunChecking, { progress: { total: 10, done: 2 } }));
-  const progressPatched = hop.fbmSyncPatchLiveStatus(content, Object.assign({}, nextRunChecking, { progress: { total: 10, done: 7 } }), 'run');
-  check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm của snapshot cũ', [progressPatched, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('#fbm-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('#fbm-sync-progress-fill').style.width], [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
+  hop.fbmSyncPaint(statusGas({ phase: 'idle' }));
+  check(so, 'vẽ lại bằng status sạch thì thân màn vẫn là màn Chạy',
+    content.getAttribute('data-fbm-sync-screen'),
+    'run');
+}
 
-  hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
-  const conflictStatus = { phase: 'conflict', counts: { conflict: 1 }, metadata: { conflictCount: 1 } };
-  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', fbmId: 'ALT00010', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
-  render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
-  const resultTabButtons = Array.from(content.querySelectorAll('.shin-sync-tab-trigger'));
-  const resultTabLabels = resultTabButtons.map((node) => node.querySelector('.shin-btn-label').textContent);
-  const resultBody = content.querySelector('#fbm-sync-results-body-region');
-  check(so, 'Results summary render năm tab chỉ có tên và mô tả nằm riêng bên dưới', [demTheoThuocTinh(content, 'data-sync-results-tab'), resultTabLabels, content.querySelectorAll('.shin-sync-tab-description').length, content.querySelector('#fbm-sync-results-tab-description-region').textContent, resultBody.className.indexOf('shin-row-group') >= 0, resultBody.className.indexOf('shin-section') >= 0, resultBody.querySelectorAll('.shin-section').length, dom.document.getElementById('fbm-sync-open-conflicts') !== null], [5, ['Tổng quan', 'Xung đột', 'Lỗi', 'Log', 'Nghiệm thu'], 1, 'Tóm tắt kết quả phiên', true, false, 0, true]);
-  hop.FBM_SYNC_CLIENT.resultsTab = 'conflict';
-  render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
-  check(so, 'Màn hình xung đột có hai phía và ô tự nhập', [demTheoThuocTinh(content, 'data-fbm-conflict-pick'), demTheoThuocTinh(content, 'data-fbm-conflict-value')], [2, 2]);
-
-  // G9.1: mỗi trường xung đột là một khối dọc, người dùng phải chọn phía cho mọi trường rồi mới lưu được; thiếu thì tô đỏ như thiếu trường bắt buộc.
-  const pickCalls = [];
-  const savedResolve = hop.fbmSyncResolveConflict;
-  hop.fbmSyncResolveConflict = (entity, id, choice, merged) => { pickCalls.push([entity, id, choice, merged === undefined ? null : merged]); return Promise.resolve(null); };
-  hop.fbmSyncShowConflict({ entity: 'customer', id: 'CUS-2', code: 'KH-02', name: 'Công ty A', remaining: 3, fields: [{ field: 'phone', label: 'Điện thoại', editable: true, left: '0901', right: '' }, { field: 'industry', label: 'Ngành', editable: false, left: 'Gỗ', right: 'Thép' }] });
-  render(hop, content, hop.fbmSyncRenderResults, conflictStatus);
-  const byId = (id) => dom.document.getElementById(id);
-  check(so, 'G9.1: màn xung đột hiện mã · tên, nhãn trường theo Schema, chữ (trống) cho phía rỗng và menu chọn tất cả có ba lệnh', [content.textContent.indexOf('KH-02 · Công ty A') >= 0, content.textContent.indexOf('Điện thoại') >= 0, content.textContent.indexOf('Ngành') >= 0, byId('fbm-sync-conflict-value-0-fbm').getAttribute('placeholder'), JSON.parse(byId('fbm-sync-conflict-bulk').getAttribute('data-standalone-options').replace(/&quot;/g, '"')).map((option) => option.label)], [true, true, true, '(trống)', ['Lựa chọn', 'Chọn tất cả theo FBM', 'Chọn tất cả theo ShinCRM', 'Bỏ chọn tất cả']]);
-  const saveButton = byId('fbm-sync-conflict-save');
-  hop.fbmSyncSaveConflict(saveButton);
-  check(so, 'G9.1: bấm Lưu khi chưa chọn trường nào thì tô đỏ cả hai trường, hiện "Còn 2 trường chưa chọn giá trị." và không gọi GAS', [byId('fbm-sync-conflict-field-0').classList.contains('is-invalid'), byId('fbm-sync-conflict-field-1').classList.contains('is-invalid'), byId('fbm-sync-conflict-missing').hidden, byId('fbm-sync-conflict-missing').textContent, pickCalls.length, saveButton.disabled], [true, true, false, 'Còn 2 trường chưa chọn giá trị.', 0, false]);
-  const phoneShin = byId('fbm-sync-conflict-pick-0-shin');
-  hop.fbmSyncConflictPick(phoneShin);
-  hop.fbmSyncSaveConflict(saveButton);
-  check(so, 'G9.1: chọn một trường thì trường đó hết đỏ, trường còn lại vẫn đỏ và vẫn không gọi GAS', [byId('fbm-sync-conflict-field-0').classList.contains('is-invalid'), byId('fbm-sync-conflict-field-1').classList.contains('is-invalid'), byId('fbm-sync-conflict-missing').textContent, pickCalls.length], [false, true, 'Còn 1 trường chưa chọn giá trị.', 0]);
-  check(so, 'G9.1: phía được chọn rõ và sửa được, phía kia mờ và chỉ đọc', [byId('fbm-sync-conflict-value-0-shin').classList.contains('is-selected'), byId('fbm-sync-conflict-value-0-shin').readOnly, byId('fbm-sync-conflict-value-0-fbm').classList.contains('is-dimmed'), byId('fbm-sync-conflict-value-0-fbm').readOnly], [true, false, true, true]);
-  const bulkMenu = byId('fbm-sync-conflict-bulk');
-  hop.renderControlValue('fbm-sync-conflict-bulk', 'all_fbm'); hop.fbmSyncConflictPick(bulkMenu);
-  check(so, 'G9.1: menu "Chọn tất cả theo FBM" chọn phía FBM cho mọi trường, quyết định là PA1 (fbm) không kèm merged, không báo sẽ đẩy lên FBM, rồi menu trở lại nhãn "Lựa chọn"', [hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict), byId('fbm-sync-conflict-push-note').hidden, hop.fbmSyncControlValue('fbm-sync-conflict-bulk')], [{ missing: [], choice: 'fbm', merged: null, pushes: false }, true, '']);
-  check(so, 'G9.1: trường danh mục (editable false) được chọn vẫn chỉ đọc, không cho tự nhập', byId('fbm-sync-conflict-value-1-fbm').readOnly, true);
-  hop.fbmSyncConflictPick(byId('fbm-sync-conflict-pick-1-shin'));
-  check(so, 'G9.1: chọn trộn FBM và ShinCRM là PA3 (manual), merged ghi lựa chọn từng trường và báo sẽ đẩy lên FBM', [hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict), byId('fbm-sync-conflict-push-note').hidden], [{ missing: [], choice: 'manual', merged: { phone: { choice: 'fbm' }, industry: { choice: 'shin' } }, pushes: true }, false]);
-  hop.fbmSyncConflictPick(phoneShin);
-  const phoneShinBox = byId('fbm-sync-conflict-value-0-shin');
-  phoneShinBox.value = '0909'; hop.fbmSyncConflictEdit(phoneShinBox);
-  hop.fbmSyncConflictPick(byId('fbm-sync-conflict-pick-0-fbm')); hop.fbmSyncConflictPick(phoneShin);
-  check(so, 'G9.1: sửa ô đang chọn hiện nhãn "đã sửa", đổi sang phía kia rồi quay lại vẫn giữ bản sửa, quyết định là manual mang giá trị tự nhập', [byId('fbm-sync-conflict-edited-0-shin').hidden, hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict)], [false, { missing: [], choice: 'manual', merged: { phone: { choice: 'manual', value: '0909' }, industry: { choice: 'shin' } }, pushes: true }]);
-  hop.fbmSyncSaveConflict(saveButton);
-  check(so, 'G9.1: đủ lựa chọn thì Lưu gửi GAS đúng entity, id, choice và merged rồi khóa nút chờ kết quả', [pickCalls, saveButton.disabled], [[['customer', 'CUS-2', 'manual', { phone: { choice: 'manual', value: '0909' }, industry: { choice: 'shin' } }]], true]);
-  hop.renderControlValue('fbm-sync-conflict-bulk', 'clear'); hop.fbmSyncConflictPick(bulkMenu);
-  check(so, 'G9.1: "Bỏ chọn tất cả" xóa mọi lựa chọn, hai trường quay về chưa chọn', hop.fbmSyncConflictDecision(hop.FBM_SYNC_CLIENT.conflict).missing, ['phone', 'industry']);
-  hop.fbmSyncResolveConflict = savedResolve;
-
-  const logRows = Array.from({ length: 21 }, (_, index) => ({ stage: 'stage-' + index, operation: 'op-' + index }));
-  hop.FBM_SYNC_CLIENT.resultsTab = 'log'; hop.FBM_SYNC_CLIENT.resultPages = { log: 0 };
-  render(hop, content, hop.fbmSyncRenderResults, { phase: 'done', metadata: { traceTail: logRows }, counts: {} });
-  check(so, 'Results Log có phân trang và giới hạn 20 dòng', [demTheoThuocTinh(content, 'data-sync-page'), content.textContent.indexOf('Trang 1/2') >= 0], [2, true]);
-  hop.FBM_SYNC_CLIENT.resultsTab = 'errors';
-  render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: { pushFailureDetails: { 'customer:C1': { reason: 'FBM lỗi' } } }, counts: {} });
-  check(so, 'Results Lỗi hiển thị chi tiết bản ghi lỗi', content.textContent.indexOf('customer:C1') >= 0, true);
-  hop.FBM_SYNC_CLIENT.resultsTab = 'summary';
-  const issueResult = render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: {
-    preflightIssues: [{ blocking: true, code: 'PREFLIGHT_X', message: 'Thiếu liên kết' }],
-    categoryBlocks: [{ source: 'Customer', code: 'CAT_MISSING', reason: 'Thiếu mapping' }],
-    activityBulkMissing: [{ id: 'ACT-1', fbmId: 'F-1' }],
-    pushFailures: { 'customer:C1': true },
-    pushFailureDetails: { 'customer:C1': { reason: 'FBM lỗi', code: 'HTTP_ERROR', status: 500 } }
-  }, counts: {} });
-  check(so, 'Results Tổng hợp hiển thị đầy đủ Category, Activity missing, preflight và HTTP', [issueResult.textContent.indexOf('CAT_MISSING') >= 0, issueResult.textContent.indexOf('ACT-1') >= 0, issueResult.textContent.indexOf('PREFLIGHT_X') >= 0, issueResult.textContent.indexOf('HTTP 500') >= 0], [true, true, true, true]);
-  const preflightOnly = render(hop, content, hop.fbmSyncRenderResults, { phase: 'error', metadata: { preflightIssues: [{ blocking: false, code: 'WARN_ONLY', message: 'Cảnh báo' }] }, counts: {} });
-  check(so, 'Results không hiện tiêu đề chi tiết bản ghi khi chỉ có cảnh báo preflight', preflightOnly.textContent.indexOf('Chi tiết bản ghi') >= 0, false);
-
-  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat();
-  const growBefore = hop.inputsGrowAll; let growCalls = 0;
-  hop.inputsGrowAll = () => { growCalls += 1; return 0; };
-  render(hop, content, hop.fbmSyncRenderSettings, idle);
-  hop.inputsGrowAll = growBefore;
-  check(so, 'Màn Cài đặt Đồng bộ vẽ xong thì kéo lại chiều cao ô nhiều dòng, để danh sách khách chỉ định hiện đủ dòng ngay sau khi lưu mà không cần gõ phím', growCalls > 0, true);
-  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_background: { heartbeatMinutes: 5, customerFullMinutes: 60, activityFullEnabled: false, activityFullMinutes: 30, detailEnabled: true, detailMinutes: 60, detailCustomersPerRun: 50 } });
-  const backgroundBlocks = hop.fbmSyncSettingsBackgroundBlocks();
-  const backgroundToggleIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-switch'));
-  const directionIndex = backgroundBlocks.findIndex((node) => node && node.elements && node.elements.some((child) => child && child.id === 'fbm-sync-background-direction'));
-  const firstScheduleRow = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-schedule-row') >= 0);
-  const detailBlock = backgroundBlocks.find((node) => node && String(node.className || '').indexOf('shin-sync-detail-controls') >= 0);
-  check(so, 'background layout order and detail groups', [backgroundToggleIndex < directionIndex, backgroundBlocks[backgroundToggleIndex].role, backgroundBlocks[directionIndex].className.indexOf('shin-sync-direction-row') >= 0, firstScheduleRow.role, firstScheduleRow.elements[1].className, detailBlock.role, detailBlock.elements.length, detailBlock.elements[0].className], [true, 'row', true, 'row', 'shin-kv-label', 'box', 2, 'shin-row-group shin-sync-detail-field']);
-  const backgroundTexts = JSON.stringify(backgroundBlocks), detailIndex = backgroundBlocks.indexOf(detailBlock);
-  check(so, 'Lịch đồng bộ nền: dòng giải thích công tắc tiến trình nằm dưới nhóm số khách Vòng xoay, ngay trên nút lưu; dòng giải thích Vòng xoay không còn trần 50', [
-    String(backgroundBlocks[detailIndex + 1] && backgroundBlocks[detailIndex + 1].text || ''), backgroundTexts.indexOf('đến 50') < 0 && backgroundTexts.indexOf('quá 50') < 0, backgroundTexts.indexOf('không giới hạn trên') >= 0
-  ], [hop.FBM_SYNC_SETTINGS_SCHEMA.background.processesHelp, true, true]);
-  const moduleBlocks = hop.fbmSyncSettingsModuleBlocks({ approvalThreshold: 10, requestGapMinSeconds: 1, requestGapMaxSeconds: 3 }, true);
-  const gapBlock = moduleBlocks.find((node) => node && node.elements && node.elements[1] && String(node.elements[1].className || '').indexOf('shin-sync-detail-inputs') >= 0);
-  const gapInputs = gapBlock ? gapBlock.elements[1].elements.map((field) => field.elements[1]) : [];
-  check(so, 'Khoảng cách request FBM nằm ở cài đặt chung, không còn ở lịch nền', [!!gapBlock, gapInputs.map((input) => input.id), gapInputs.map((input) => String(input.value)), JSON.stringify(backgroundBlocks).indexOf('delay') >= 0], [true, ['fbm-sync-setting-request-gap-min', 'fbm-sync-setting-request-gap-max'], ['1', '3'], false]);
-  const loginPolicyBlocks = hop.fbmSyncSettingsLoginBlocks({ enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
-  const loginPolicyChildren = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-children');
-  const retryGroup = loginPolicyChildren.elements[1];
-  const loginParent = loginPolicyBlocks.find((node) => node && node.id === 'fbm-sync-login-policy-parent-row');
-  check(so, 'login policy groups retry interval under retry toggle', [loginParent.role, loginPolicyChildren.role, retryGroup.className, retryGroup.elements.length, retryGroup.elements[0].role, retryGroup.elements[0].elements[1].id, retryGroup.elements[1].className, retryGroup.elements[1].elements[1].id], ['row', 'box', 'shin-row-group shin-sync-login-policy-retry-group', 2, 'row', 'fbm-sync-policy-retry', 'shin-form-field', 'fbm-sync-login-retry-minutes']);
-  check(so, 'Settings render được relay và tham số phiên', dom.document.getElementById('fbm-sync-setting-approval-threshold').value === '10' && content.textContent.indexOf('Kết nối Extension') >= 0, true);
-  hop.FBM_SYNC_CLIENT.syncSettings = goiCaiDat({ fbm_run: { approvalThreshold: 10, scopeLimited: true, scopeCodes: ['ALT00010', 'CUS-020061'], requestGapMinSeconds: 0, requestGapMaxSeconds: 0 } });
-  render(hop, content, hop.fbmSyncRenderSettings, idle);
-  const scopeBox = dom.document.getElementById('fbm-sync-setting-scope-codes');
-  check(so, 'Cài đặt chung có một ô danh sách khách chỉ định, mỗi dòng một mã, không còn hai ô mã thử theo chiều',
-    [scopeBox && scopeBox.tagName.toLowerCase(), scopeBox && scopeBox.textContent, !!dom.document.getElementById('fbm-sync-setting-scope-limited'), !!dom.document.getElementById('fbm-sync-setting-test-fbm-codes'), !!dom.document.getElementById('fbm-sync-setting-test-shin-codes')],
-    ['textarea', 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', true, false, false]);
-  scopeBox.value = scopeBox.textContent;
-  const scopeBanner = JSON.stringify(hop.fbmSyncRunScopeBlocks());
-  check(so, 'Màn Chạy hiện băng cảnh báo phạm vi giới hạn kèm đúng danh sách khách chỉ định', [scopeBanner.indexOf('warning') >= 0, scopeBanner.indexOf('ALT00010, CUS-020061') >= 0], [true, true]);
-  const packSchema = hop.FBM_SYNC_RUN_SCHEMA.pack, packView = (mode, pack) => {
-    hop.FBM_SYNC_CLIENT.mode = mode; hop.FBM_SYNC_CLIENT.pack = pack;
-    render(hop, content, hop.fbmSyncRenderRun, idle);
-    const shown = content.textContent.indexOf(packSchema.label) >= 0;
-    return [shown, shown ? content.textContent.indexOf(packSchema.options.find((option) => option.value === (pack || 'quick')).hint) >= 0 : false];
-  };
-  check(so, 'Mức quét hiện ở Lấy và Hai chiều với dòng mô tả đúng gói đang chọn, ẩn ở Đẩy và Kiểm tra an toàn', [packView('read', 'quick'), packView('write', 'deep'), packView('read', 'all'), packView('push', 'deep')[0], packView('check', 'deep')[0]], [[true, true], [true, true], [true, true], false, false]);
-  check(so, 'Mức quét có đúng ba gói theo thứ tự, mặc định Quét nhanh', [packSchema.options.map((option) => option.label), hop.fbmSyncRunPack('read').length > 0, packSchema.defaultValue], [['Quét nhanh', 'Quét kỹ', 'Quét toàn bộ'], true, 'quick']);
-  const packStarts = [], packDrive = hop.fbmSyncDrive, packPaint = hop.fbmSyncPaint;
-  hop.fbmSyncDrive = (command, payload) => { packStarts.push([payload.mode, payload.pack]); return Promise.resolve({ ok: true, status: { phase: 'done', counts: {} } }); };
-  hop.fbmSyncPaint = () => {};
-  hop.FBM_SYNC_CLIENT.pack = 'deep';
-  await hop.fbmSyncRunStart('write'); await hop.fbmSyncRunStart('push');
-  hop.fbmSyncDrive = packDrive; hop.fbmSyncPaint = packPaint; hop.FBM_SYNC_CLIENT.mode = 'read'; hop.FBM_SYNC_CLIENT.pack = 'quick';
-  check(so, 'Bắt đầu đồng bộ gửi Mức quét đã chọn cho Hai chiều, gửi rỗng cho Đẩy', packStarts, [['write', 'deep'], ['push', '']]);
-  dom.document.getElementById('fbm-sync-setting-request-gap-min').value = '1';
-  dom.document.getElementById('fbm-sync-setting-request-gap-max').value = '2.5';
-  const gapSaves = [], gapCallServer = hop.callServer, gapStatusOnce = hop.fbmSyncStatusOnce;
-  const scopeLines = [{ code: 'ALT00010', kind: 'fbm', status: 'matched', customerId: 'CUS-020061', fbmCode: 'ALT00010' }, { code: 'ALT00099', kind: 'fbm', status: 'fbm_new', customerId: '', fbmCode: 'ALT00099' }];
-  const settingsCalls = [];
-  hop.callServer = (name, args) => { settingsCalls.push([name, Object.keys(args[0]).sort(), args[1]]); if (name === 'fbmSaveSettings') { gapSaves.push(args[0]); } return Promise.resolve({ ok: true, settings: goiCaiDat({ fbm_run: Object.assign({}, args[0].fbm_run, { requestGapMinSeconds: 1, requestGapMaxSeconds: 2.5 }) }), scopeLines: scopeLines, status: { phase: 'idle', masterEnabled: true, counts: {} } }); };
-  hop.fbmSyncStatusOnce = () => Promise.reject(new Error('Lưu cài đặt chung không được hỏi lại trạng thái.'));
-  const savedNotices = [], noticeSetter = hop.fbmSyncSetSettingsNotice;
-  hop.fbmSyncSetSettingsNotice = (card, kind, text) => { savedNotices.push([card, kind, text]); };
-  await hop.fbmSyncSaveSyncSettings(null);
-  hop.callServer = gapCallServer; hop.fbmSyncStatusOnce = gapStatusOnce; hop.fbmSyncSetSettingsNotice = noticeSetter;
-  check(so, 'Lưu cài đặt chung gửi nguyên danh sách khách chỉ định cùng công tắc phạm vi, rồi hiện kết quả đổi mã GAS trả về, mỗi mã một dòng',
-    [gapSaves[0] && gapSaves[0].fbm_run.scopeLimited, gapSaves[0] && gapSaves[0].fbm_run.scopeCodes, savedNotices.map((item) => item.slice(0, 2)), /\nALT00010 → CUS-020061\nALT00099: mã FBM chưa có trên Sheet/.test(savedNotices[0] && savedNotices[0][2])],
-    [true, 'ALT00010' + String.fromCharCode(10) + 'CUS-020061', [['module', 'success']], true]);
-  check(so, 'Lưu cài đặt chung là đúng một lời gọi GAS gửi gói { fbm_master, fbm_run } cùng cờ confirmLow tắt', settingsCalls, [['fbmSaveSettings', ['fbm_master', 'fbm_run'], false]]);
-  check(so, 'Lưu cài đặt chung gửi nguyên chuỗi trong ô và công tắc tổng cùng gói', [gapSaves[0].fbm_run.approvalThreshold, gapSaves[0].fbm_master.enabled], ['10', true]);
-  check(so, 'Dòng mã FBM mang cảnh báo độ dài hiện thêm độ dài đã cài sau câu mã chưa có trên Sheet',
-    /ALT0010: mã FBM chưa có trên Sheet.*\(8 ký tự\)/.test(hop.fbmSyncSettingsScopeLinesText([{ code: 'ALT0010', kind: 'fbm', status: 'fbm_new', lengthExpected: 8 }])), true);
-  check(so, 'Lưu cài đặt chung gửi kèm khoảng cách request FBM người dùng vừa nhập', [gapSaves.length, gapSaves[0] && gapSaves[0].fbm_run.requestGapMinSeconds, gapSaves[0] && gapSaves[0].fbm_run.requestGapMaxSeconds], [1, '1', '2.5']);
-
-  hop.FBM_SYNC_CLIENT.subscreen = 'account';
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: false, enabled: true };
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  hop.fbmSyncConfigStartEdit('login');
-  dom.document.getElementById('fbm-login-username').value = '';
-  dom.document.getElementById('fbm-login-password').value = '';
-  const paints = [];
-  hop.fbmSyncPaint = (status) => paints.push(status);
-  hop.FBM_SYNC_CLIENT.lastStatus = { phase: 'idle', counts: {} };
-  hop.callServer = () => Promise.reject(new Error('GAS_TEST_FAILURE'));
-  const cancelRpc = [], realRpc = hop.fbmSyncExtensionRpc;
-  hop.fbmSyncExtensionRpc = (action, fields, purpose) => { cancelRpc.push([action, fields, purpose]); return Promise.resolve({}); };
-  await hop.fbmSyncCancel();
-  hop.fbmSyncExtensionRpc = realRpc;
-  check(so, 'Bấm Dừng báo ngay Extension dừng lô đang chạy qua cổng RPC duy nhất của Sidebar (nonce và phiên Extension do cổng đó gắn)', cancelRpc.map((item) => [item[0], item[1]]), [['CRM_FBM_CANCEL', {}]]);
-  hop.fbmSyncRetryPushFailures().catch(() => {});
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  check(so, 'Cancel thất bại vẫn hiện lỗi trên UI', paints.some((item) => String(item.message).indexOf('GAS_TEST_FAILURE') >= 0), true);
-
-  hop.FBM_SYNC_CLIENT.running = true;
-  hop.FBM_SYNC_CLIENT.cancelRequested = false;
-  const cancelPaint = hop.fbmSyncPaint;
-  hop.fbmSyncPaint = () => {};
-  let cancellingDuringCall = null, waitedResult = null; hop.clearTimeout = clearTimeout;
-  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-dang-chay', resolve: (value) => { waitedResult = value; }, reject: () => {}, timer: null };
-  hop.callServer = (name) => { if (name === 'fbmCancelSync') { cancellingDuringCall = hop.FBM_SYNC_CLIENT.cancelRequested; return Promise.resolve({ ok: true, status: { running: false, phase: 'paused', runId: '', message: 'Đã dừng phiên đồng bộ.' } }); } return Promise.resolve({}); };
-  await hop.fbmSyncCancel();
-  check(so, 'Dừng khi lượt tay đang chạy: hiện "Đang dừng…" trong lúc gọi GAS, GAS trả xong thì kết thúc chỗ chờ lượt bằng status đã dừng, không chờ response lô đang bay', [cancellingDuringCall, hop.FBM_SYNC_CLIENT.runWaiter, waitedResult && waitedResult.ok, waitedResult && waitedResult.status.phase, hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [true, null, true, 'paused', false, false]);
-  const stopPaints = [], stopDrive = hop.fbmSyncDrive;
-  hop.fbmSyncPaint = (status) => { stopPaints.push({ phase: status && (status.status || status).phase, cancelling: hop.FBM_SYNC_CLIENT.cancelRequested }); };
-  hop.fbmSyncDrive = () => { hop.FBM_SYNC_CLIENT.cancelRequested = true; return Promise.resolve({ ok: true, status: { phase: 'paused', counts: {} } }); };
-  await hop.fbmSyncRunStart('read');
-  hop.fbmSyncDrive = stopDrive;
-  const lastStopPaint = stopPaints[stopPaints.length - 1] || {};
-  check(so, 'response cuối sau Cancel chuyển client về trạng thái đã dừng', [hop.FBM_SYNC_CLIENT.running, hop.FBM_SYNC_CLIENT.cancelRequested], [false, false]);
-  check(so, 'Dừng xong thì lần vẽ cuối đã hạ cờ đang dừng, nút không kẹt ở "Đang dừng…" chờ lần hỏi trạng thái sau', [lastStopPaint.phase, lastStopPaint.cancelling], ['paused', false]);
-
-  // FBM-044: GAS báo kho state hỏng thì màn Chạy hiện lý do, lời giải thích và nút đặt lại; status thường không có nút.
-  hop.FBM_SYNC_CLIENT.running = false;
-  const stuckStatus = { ok: false, code: 'SYNC_STATE_STUCK', resetOffered: true, runId: '', phase: 'error', message: 'Màn đồng bộ đang kẹt: state hỏng', counts: {} };
-  render(hop, content, hop.fbmSyncRenderRun, stuckStatus);
-  const resetButton = dom.document.getElementById('fbm-sync-reset-state');
-  const coNutDatLai = (node) => node.id === 'fbm-sync-reset-state' || (node.children || []).some(coNutDatLai);
-  const stuckHasButton = coNutDatLai(content);
-  render(hop, content, hop.fbmSyncRenderRun, { phase: 'error', runId: 'r1', message: 'lỗi thường', counts: {} });
-  check(so, 'FBM-044: status kẹt hiện nút "Đặt lại phiên đồng bộ", status lỗi thường không hiện', [stuckHasButton, resetButton && resetButton.textContent, coNutDatLai(content)], [true, 'Đặt lại phiên đồng bộ', false]);
-  const resetCalls = [];
-  hop.callServer = (name) => { resetCalls.push(name); return Promise.resolve({ ok: true, phase: 'idle', counts: {} }); };
-  hop.uiDecisionOpen = () => Promise.resolve(false);
-  await hop.fbmSyncResetState();
-  hop.uiDecisionOpen = () => Promise.resolve(true);
-  await hop.fbmSyncResetState();
-  check(so, 'FBM-044: bấm Quay lại ở hộp xác nhận không gọi GAS; bấm Đặt lại mới gọi fbmResetSyncState', resetCalls, ['fbmResetSyncState']);
-  // FBM-057: nút hủy phiên cũ chỉ hiện khi GAS mở, và chỉ gọi GAS sau khi người dùng xác nhận.
-  const coNutHuyPhien = (node) => node.id === 'fbm-sync-force-login' || (node.children || []).some(coNutHuyPhien);
-  render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', forceLoginOffered: true, message: 'FBM từ chối đăng nhập', counts: {} });
-  const forceShown = coNutHuyPhien(content);
-  render(hop, content, hop.fbmSyncRenderRun, { phase: 'paused', runId: 'r2', lastFailureCode: 'AUTO_LOGIN_FAILED', message: 'FBM từ chối đăng nhập', counts: {} });
-  const forceCalls = [], rpcForce = hop.fbmSyncExtensionRpc;
-  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
-  hop.callServer = (name) => { forceCalls.push(name); return Promise.resolve({ ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'không mở' }); };
-  hop.uiDecisionOpen = () => Promise.resolve(false);
-  await hop.fbmSyncForceLogin();
-  hop.uiDecisionOpen = () => Promise.resolve(true);
-  await hop.fbmSyncForceLogin();
-  hop.fbmSyncExtensionRpc = rpcForce;
-  check(so, 'FBM-057: nút "Hủy phiên cũ và đăng nhập" chỉ hiện khi GAS mở; bấm Quay lại không gọi GAS, xác nhận mới gọi fbmDriveCommand; GAS từ chối thì lỗi được ghi Log', [forceShown, coNutHuyPhien(content), forceCalls], [true, false, ['fbmDriveCommand', 'fbmLogSyncError']]);
-  const forceRuns = [], forceDrives = [], realRun = hop.fbmSyncRun, realDrive = hop.fbmSyncDrive;
-  hop.fbmSyncDrive = (command, payload) => { forceDrives.push([command, payload.kind]); return Promise.resolve({ ok: true, code: 'LOGIN_OK', status: { phase: 'done', message: 'Đã hủy phiên cũ' } }); };
-  hop.fbmSyncRun = (mode) => { forceRuns.push(mode); return Promise.resolve(null); };
-  hop.FBM_SYNC_CLIENT.mode = 'read';
-  await hop.fbmSyncForceLogin();
-  hop.fbmSyncRun = realRun; hop.fbmSyncDrive = realDrive;
-  check(so, 'FBM-057: hủy phiên cũ và đăng nhập xong thì Sidebar không tự mở lượt đồng bộ (GAS quyết có mở lại lượt bị chặn hay không)', [forceDrives, forceRuns], [[['start', 'login_force']], []]);
-  // FBM-017: lỗi giữa phiên vẽ lỗi lên snapshot GAS gần nhất, không dựng bộ đếm 0 và không làm mất pipeline.
-  const errorPaints = [], savedCallServer = hop.callServer, savedDrive = hop.fbmSyncDrive;
-  hop.fbmSyncPaint = (status) => { const snapshot = status.status || status; hop.FBM_SYNC_CLIENT.lastStatus = snapshot; errorPaints.push(snapshot); };
-  const gasSnapshot = { runId: 'run-017', running: true, phase: 'push', entityLabel: 'Khách hàng', counts: { total: 5, completed: 2, succeeded: 2, error: 0, conflict: 0, skipped: 0 }, pipeline: { steps: [{ id: 'push', status: 'running' }] } };
-  hop.FBM_SYNC_CLIENT.lastStatus = gasSnapshot;
-  hop.fbmSyncDrive = () => Promise.reject(new Error('Mất kết nối tới GAS'));
-  hop.callServer = (name) => (name === 'fbmGetSyncStatus' ? Promise.reject(new Error('Mất kết nối tới GAS')) : Promise.resolve({ ok: true }));
-  await hop.fbmSyncStatusOnce().catch(() => null);
-  const lastErrorPaint = errorPaints[errorPaints.length - 1] || {};
-  check(so, 'FBM-017: lỗi giữa phiên giữ runId, pipeline và bộ đếm thật của GAS, chỉ đổi sang trạng thái lỗi kèm lý do',
-    [lastErrorPaint.phase, lastErrorPaint.message, lastErrorPaint.runId, lastErrorPaint.counts, lastErrorPaint.pipeline && lastErrorPaint.pipeline.steps.length],
-    ['error', 'Mất kết nối tới GAS', 'run-017', gasSnapshot.counts, 1]);
-  hop.fbmSyncDrive = savedDrive; hop.callServer = savedCallServer;
-  const duyetChay = [], duyetDrive = [], realRunD = hop.fbmSyncRun, realDriveD = hop.fbmSyncDrive;
-  hop.fbmSyncRun = (mode, extra) => { duyetChay.push([mode, extra, hop.FBM_SYNC_CLIENT.mode]); return Promise.resolve(null); };
-  await hop.fbmSyncApprovePush('abcd1234-2');
-  hop.fbmSyncRun = realRunD;
-  hop.fbmSyncDrive = (command, payload) => { duyetDrive.push([command, payload.kind, payload.mode, payload.approvedFingerprint]); return Promise.resolve({ ok: true, status: { phase: 'done' } }); };
-  await hop.fbmSyncRunStart('push', { approvedFingerprint: 'abcd1234-2' });
-  hop.fbmSyncDrive = realDriveD;
-  check(so, 'K6: bấm Chấp thuận mở ngay lượt tay chiều Đẩy mang dấu tập đang hiện (không có lệnh duyệt riêng); lệnh start gửi dấu xuống GAS', [duyetChay, duyetDrive], [[['push', { approvedFingerprint: 'abcd1234-2' }, 'push']], [['start', 'sync', 'push', 'abcd1234-2']]]);
-  hop.fbmSyncPaint = () => {};
-  hop.FBM_SYNC_CLIENT.cancelRequested = true;
-  const stoppingAction = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_customer', masterEnabled: true, enabled: true });
-  check(so, 'Sidebar khóa nút và báo đang dừng trong lúc chờ response cuối', [stoppingAction.disabled, stoppingAction.label.indexOf('Đang dừng') >= 0], [true, true]);
-  hop.FBM_SYNC_CLIENT.cancelRequested = false;
-  const nutNen = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', origin: 'background', masterEnabled: true, enabled: true });
-  const nutTay = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', origin: 'manual', masterEnabled: true, enabled: true });
-  check(so, 'Nút chạy: lượt nền đang chạy vẫn là Bắt đầu đồng bộ (bấm thì hỏi), chỉ lượt tay mới có nút dừng', [nutNen.id, nutNen.label, nutNen.disabled, nutTay.id], ['fbm-sync-start', 'Bắt đầu đồng bộ', false, 'fbm-sync-cancel']);
-  // Bấm chạy tay khi lượt nền đang chạy: GAS trả SYNC_BACKGROUND_RUNNING, Sidebar hỏi người dùng; chỉ khi chọn dừng mới gọi lệnh dừng nền.
-  const savedRpcNen = hop.fbmSyncExtensionRpc, savedChoose = hop.uiDecisionChoose, savedCall = hop.callServer;
-  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
-  const nenStatus = { running: true, phase: 'pull_activity', label: 'Đang đọc giao dịch', startedAt: new Date(2026, 9, 19, 15, 3).getTime(), masterEnabled: true, enabled: true };
-  let dungChua = false;
-  const chayNen = async (choice) => {
-    const ghi = { popup: null, goi: [], start: 0, nutKhiDung: null, rpc: [] };
-    hop.fbmSyncExtensionRpc = (action) => { ghi.rpc.push(action); return Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true }); };
-    hop.uiDecisionChoose = (opts) => { ghi.popup = opts; return Promise.resolve(choice); };
-    hop.callServer = (name) => { if (name === 'fbmDriveCommand') { ghi.start += 1; return Promise.resolve(ghi.start === 1 ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : { ok: false, code: 'TEST_STOP' }); } ghi.goi.push(name); ghi.nutKhiDung = hop.fbmSyncRunActionBlock({ running: true, phase: 'pull_activity', masterEnabled: true, enabled: true }).label; return Promise.resolve(dungChua ? { ok: true, code: 'SYNC_STOP_PENDING', status: { phase: 'pull_activity', running: true } } : { ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'paused', running: false } }); };
-    ghi.ket = await hop.fbmSyncRunStart('read');
-    ghi.sau = [hop.FBM_SYNC_CLIENT.backgroundStopping, hop.FBM_SYNC_CLIENT.running];
-    return ghi;
-  };
-  const xNen = await chayNen('cancel'), dungNen = await chayNen('stop'), choNen = await chayNen('wait');
-  dungChua = true; const dungHong = await chayNen('stop').catch((error) => ({ loi: error.message })); dungChua = false;
-  hop.uiDecisionChoose = savedChoose; hop.callServer = savedCall;
-  check(so, 'Chạy tay gặp lượt nền: popup nêu bước đang chạy và giờ bắt đầu, hai nút dừng ngay / để nền chạy tiếp', [xNen.popup.title, xNen.popup.lines, xNen.popup.choices.map((c) => c.id + ':' + c.label)], ['Đồng bộ nền đang chạy', ['Bước đang chạy: Đang đọc giao dịch.', 'Bắt đầu lúc 2026-10-19 15:03.'], ['stop:Dừng đồng bộ nền và chạy đồng bộ ngay', 'wait:Để đồng bộ nền chạy tiếp, tôi sẽ chạy đồng bộ sau']]);
-  check(so, 'Nút X của popup nền: không gọi dừng nền, không chờ, không gọi lại lệnh gốc; nút chạy mở lại', [xNen.goi, xNen.cho, xNen.start, xNen.ket.code, xNen.sau], [[], null, 1, 'SYNC_BACKGROUND_SKIPPED', [false, false]]);
-  // Nút X ở mọi thao tác: màn về như vừa mở (không dòng báo, không cờ thao tác, tab Xung đột về Tóm tắt), vẽ bằng status thật GAS trả, không gọi GAS thêm.
-  const savedPaintX = hop.fbmSyncPaint, savedChooseX = hop.uiDecisionChoose, savedCallX = hop.callServer;
-  const xBam = async (lenh, chuanBi, bam) => {
-    const ghi = { goi: [], ve: [] };
-    hop.fbmSyncPaint = (status) => { ghi.ve.push(status); };
-    hop.uiDecisionChoose = () => Promise.resolve('cancel');
-    hop.callServer = (name) => { ghi.goi.push(name); return Promise.resolve(name === 'fbmDriveCommand' ? { ok: false, code: 'SYNC_BACKGROUND_RUNNING', status: nenStatus } : null); };
-    chuanBi();
-    ghi.ket = await bam();
-    const c = hop.FBM_SYNC_CLIENT;
-    ghi.sau = [c.running, c.mode, c.identityAction, c.identityLastAction, c.resultsTab, c.conflictNote, c.accountNotices.identity, c.accountNotices.login];
-    ghi.veCuoi = ghi.ve[ghi.ve.length - 1] === nenStatus;
-    return ghi;
-  };
-  const sachX = [false, 'read', '', '', 'summary', '', null, null];
-  const xLienKet = await xBam('fbmStartIdentityCheck', () => { hop.FBM_SYNC_CLIENT.accountNotices = { identity: { kind: 'success', message: 'cũ' }, accountSettings: null, login: { kind: 'info', message: 'cũ' } }; hop.fbmSyncSetRunning(true); }, () => hop.fbmSyncCheckIdentityStart({ spreadsheetId: 's', userId: 'u', username: 'n', accountName: 'a' }));
-  const xTuDien = await xBam('fbmStartIdentityProbe', () => { hop.FBM_SYNC_CLIENT.running = false; }, () => hop.fbmSyncAutoFill());
-  const xXungDot = await xBam('fbmOpenConflict', () => { hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.conflictOpening = false; hop.FBM_SYNC_CLIENT.lastStatus = { metadata: { conflictCount: 2 } }; hop.FBM_SYNC_CLIENT.resultsTab = 'conflict'; }, () => hop.fbmSyncConflictTabLoad());
-  hop.fbmSyncPaint = savedPaintX; hop.uiDecisionChoose = savedChooseX; hop.callServer = savedCallX; hop.fbmSyncExtensionRpc = savedRpcNen;
-  check(so, 'Nút X: màn quay về như vừa mở và vẽ bằng status thật GAS, chỉ một lần gọi lệnh gốc (kiểm liên kết, tự điền, tab Xung đột)',
-    [xLienKet.goi, xLienKet.sau, xLienKet.veCuoi, xTuDien.goi, xTuDien.sau, xTuDien.veCuoi, xXungDot.goi, xXungDot.sau, xXungDot.veCuoi, hop.FBM_SYNC_CLIENT.conflictOpening],
-    [['fbmDriveCommand'], sachX, true, ['fbmDriveCommand'], sachX, true, ['fbmDriveCommand'], sachX, true, false]);
-  check(so, 'Chọn dừng nền: gọi đúng một lệnh dừng nền (nút khóa và báo đang dừng), thấy running:false thì gọi lệnh gốc ngay không chờ không dò; xong thì mở lại', [dungNen.goi, dungNen.nutKhiDung, dungNen.start, dungNen.ket.code, dungNen.sau], [['fbmStopBackground'], 'Đang dừng đồng bộ nền...', 2, 'TEST_STOP', [false, false]]);
-  check(so, 'Chọn để nền chạy tiếp: không gọi dừng nền, không gọi lại lệnh gốc, màn về như vừa mở', [choNen.goi, choNen.start, choNen.ket.code], [[], 1, 'SYNC_BACKGROUND_SKIPPED']);
-  check(so, 'Dừng nền khi lát nền đang giữ khóa (SYNC_STOP_PENDING): vẫn gọi lại lệnh gốc ngay (GAS đóng lượt nền khi mở lượt), Extension được báo cắt lô ở cả hai trường hợp', [dungHong.goi, dungHong.start, dungHong.rpc.indexOf('CRM_FBM_CANCEL') >= 0, dungNen.rpc.indexOf('CRM_FBM_CANCEL') >= 0], [['fbmStopBackground'], 2, true, true]);
-
-  const savedCallStatus = hop.callServer, savedPaintStatus = hop.fbmSyncPaint;
-  hop.callServer = () => Promise.resolve({ ok: true, status: { phase: 'idle', runId: '', updatedAt: Date.now() + 1000 } });
-  hop.fbmSyncPaint = () => undefined;
-  const docThat = await hop.fbmSyncStatusOnce();
-  hop.callServer = savedCallStatus; hop.fbmSyncPaint = savedPaintStatus;
-  check(so, 'Đọc trạng thái luôn trả status GAS kể cả khi đã vẽ', [docThat && docThat.phase, docThat && docThat.runId], ['idle', '']);
-
-  // Thẻ xung đột: còn số đếm mà RAM chưa có bản ghi thì nói lý do, không báo "không có xung đột".
-  const theXungDot = () => JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 2 } }));
-  hop.FBM_SYNC_CLIENT.conflict = null;
-  hop.FBM_SYNC_CLIENT.conflictNote = 'Không mở được bản ghi xung đột: lỗi thử';
-  const theLoi = theXungDot();
-  hop.FBM_SYNC_CLIENT.conflictNote = '';
-  const theRong = JSON.stringify(hop.fbmSyncConflictContentBlocks({ metadata: { conflictCount: 0 } }));
-  check(so, 'Thẻ xung đột còn số đếm mà chưa mở được bản ghi hiện đúng lý do (đang mở, lỗi mở); hết xung đột mới báo không có', [theLoi.indexOf('lỗi thử') >= 0, theRong.indexOf('Không có xung đột') >= 0], [true, true]);
-  hop.fbmSyncPaint = cancelPaint;
-
-  const loginButton = dom.document.createElement('button');
-  dom.document.getElementById('fbm-login-username').value = 'anhlt';
-  const nhapSaiCalls = [], paintsTruoc = paints.length, callServerTruoc = hop.callServer;
-  hop.callServer = (name, args) => { nhapSaiCalls.push(name); return callServerTruoc(name, args); };
-  await hop.fbmSyncSaveLoginConfig(loginButton);
-  const thongBaoLuu = Object.assign({}, hop.FBM_SYNC_CLIENT.accountNotices.login);
-  const testButton = dom.document.createElement('button');
-  await hop.fbmSyncTestLogin(testButton);
-  const thongBaoThu = Object.assign({}, hop.FBM_SYNC_CLIENT.accountNotices.login);
-  hop.callServer = callServerTruoc;
-  check(so, 'Lỗi nhập sai (thiếu mật khẩu, đăng nhập thử thiếu thông tin) chỉ hiện ở card đăng nhập: không ghi Log, không tô lỗi cả màn đồng bộ',
-    [thongBaoLuu.kind, String(thongBaoLuu.message).indexOf('username') >= 0, thongBaoThu.kind, nhapSaiCalls.indexOf('fbmLogSyncError'), paints.slice(paintsTruoc).some((item) => item.phase === 'error')],
-    ['error', true, 'error', -1, false]);
-
-  const loginPassword = dom.document.getElementById('fbm-login-password');
-  const loginUsername = dom.document.getElementById('fbm-login-username');
-  loginUsername.value = 'anhlt'; loginPassword.value = 'mat-khau-can-giu';
-  let encryptedCredentials = null;
-  hop.fbmSyncEncryptCredentials = (credentials) => { encryptedCredentials = credentials; return Promise.resolve({ credentialRef: 'test-ref' }); };
-  hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } });
-  hop.callServer = () => Promise.resolve({});
-  await hop.fbmSyncTestLogin(testButton);
-  check(so, 'Đăng nhập thử chế độ sửa dùng đúng username/mật khẩu trong form và không xóa mật khẩu', [encryptedCredentials.username, encryptedCredentials.password, loginPassword.value, hop.FBM_SYNC_CLIENT.accountNotices.login.kind, hop.FBM_SYNC_CLIENT.accountNotices.login.message], ['anhlt', 'mat-khau-can-giu', 'mat-khau-can-giu', 'success', 'Đã kiểm tra.']);
-
-  hop.fbmSyncConfigFinishEdit('login');
-  hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'saved-ref', public: { usernameHint: 'anhlt' } };
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  loginPassword.value = '****';
-  let viewLoginArgs = null;
-  hop.fbmSyncDrive = (command, payload) => { viewLoginArgs = [payload.credentialDraft, payload.identity]; return Promise.resolve({ ok: true, status: { phase: 'done', message: 'Đã kiểm tra.' } }); };
-  hop.callServer = () => Promise.resolve({});
-  const viewLoginButton = dom.document.getElementById('fbm-sync-login-test');
-  await hop.fbmSyncTestLogin(viewLoginButton);
-  check(so, 'Đăng nhập thử chế độ xem không gửi bản nháp (GAS dùng credential đã lưu), không cần nhập lại mật khẩu', [viewLoginArgs, hop.FBM_SYNC_CLIENT.accountNotices.login.kind], [[null, { spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'success']);
-
-  hop.FBM_SYNC_CLIENT.running = false;
-  hop.sheetLinkExtensionAlive = () => true;
-  const identityDone = { ok: true, status: { phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } } };
-  let editIdentityArgs = null;
-  hop.fbmSyncDrive = (command, payload) => { editIdentityArgs = [payload.identity]; return Promise.resolve(identityDone); };
-  hop.callServer = () => Promise.resolve({});
-  await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết chế độ xem dùng binding hiện tại và báo n/N', [editIdentityArgs, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message], [[{ spreadsheetId: 'sheet', userId: 'u', username: 'anhlt', accountName: 'A' }], 'warning', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.']);
-
-  hop.fbmSyncConfigFinishEdit('identity');
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
-  render(hop, content, hop.fbmSyncRenderAccount, idle);
-  let viewIdentityArgs = null;
-  hop.fbmSyncDrive = (command, payload) => { viewIdentityArgs = payload.identity; return Promise.resolve(identityDone); };
-  hop.callServer = () => Promise.resolve({});
-  await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết chế độ xem dùng binding đã lưu', viewIdentityArgs, { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' });
-  hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: { phase: 'paused', lastFailureCode: 'AUTO_LOGIN_THROTTLED', lastError: 'Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', metadata: {} } });
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
-  const pausedIdentityCalls = [];
-  hop.callServer = (name) => { pausedIdentityCalls.push(name); return Promise.resolve({}); };
-  await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết bị cổng đăng nhập chặn thì hiện đúng lý do GAS, không ghi thêm lỗi chung chung', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, hop.FBM_SYNC_CLIENT.accountNotices.identity.message, pausedIdentityCalls.indexOf('fbmLogSyncError') < 0], ['error', 'Kiểm tra liên kết không thành công: Lần tự đăng nhập FBM trước thất bại; đang chờ chu kỳ an toàn trước khi thử lại.', true]);
-  // ACK cũ (tab ẩn làm chậm nhịp ping) không được kết luận Extension vắng: ping ngay, ACK về thì chạy tiếp.
-  let bridgeAlive = false;
-  const lateAckCalls = [];
-  hop.sheetLinkExtensionAlive = () => bridgeAlive;
-  hop.sheetLinkMs = () => 5;
-  hop.sheetLinkHandshakePing = () => { bridgeAlive = true; hop.fbmSyncNotifyBridgeReady(); };
-  hop.fbmSyncDrive = (command, payload) => { lateAckCalls.push('drive:' + payload.kind); return Promise.resolve(identityDone); };
-  hop.callServer = (name) => { lateAckCalls.push(name); return Promise.resolve({}); };
-  await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết khi ACK Extension đã cũ thì ping lại và chạy tiếp khi Extension trả lời, không báo lỗi bắt tay', [lateAckCalls.indexOf('drive:identity_check') >= 0, hop.FBM_SYNC_CLIENT.accountNotices.identity.kind], [true, 'warning']);
-  bridgeAlive = false;
-  hop.sheetLinkHandshakePing = () => {};
-  const absentCalls = [];
-  hop.fbmSyncDrive = (command, payload) => { absentCalls.push('drive:' + payload.kind); return Promise.resolve(identityDone); };
-  hop.callServer = (name) => { absentCalls.push(name); return Promise.resolve({}); };
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
-  hop.fbmSyncWaitForBridge = () => Promise.resolve(false);
-  await hop.fbmSyncCheckIdentity();
-  check(so, 'Kiểm tra liên kết khi Extension vắng thật thì báo Sidebar, ghi Log và không gọi GAS khởi chạy', [hop.FBM_SYNC_CLIENT.accountNotices.identity.kind, absentCalls.indexOf('fbmLogSyncError') >= 0, absentCalls.indexOf('drive:identity_check') < 0, hop.FBM_SYNC_CLIENT.running], ['error', true, true, false]);
-  hop.sheetLinkExtensionAlive = () => true;
-
-
-  const chooseIdentity = hop.uiDecisionChoose;
-  hop.uiDecisionChoose = () => Promise.resolve('stop');
-  let resumedIdentityArgs = null, stoppingIdentityCall = true;
-  hop.FBM_SYNC_CLIENT.identityStatus = { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } };
-  hop.callServer = (name, args) => {
-    if (name === 'fbmGetSyncStatus') { return Promise.resolve({ ok: true, identity: { status: 'BOUND', binding: { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' } } }); }
-    if (name === 'fbmStopBackground') { return Promise.resolve({ ok: true, code: 'SYNC_BACKGROUND_STOPPED', status: { phase: 'idle', running: false } }); }
-    if (name === 'fbmDriveCommand') {
-      resumedIdentityArgs = args[1].identity;
-      if (stoppingIdentityCall) { stoppingIdentityCall = false; return Promise.resolve({ ok: false, code: 'SYNC_BACKGROUND_RUNNING' }); }
-      return Promise.resolve(identityDone);
-    }
-    return Promise.resolve({});
-  };
-  hop.fbmSyncDrive = realDrive;
-  const rpcIdentity = hop.fbmSyncExtensionRpc;
-  hop.fbmSyncExtensionRpc = (action) => Promise.resolve(action === 'CRM_FBM_MACHINE_ID' ? { machineId: 'may-A' } : { accepted: true });
-  await hop.fbmSyncCheckIdentity();
-  hop.fbmSyncExtensionRpc = rpcIdentity;
-  hop.uiDecisionChoose = chooseIdentity;
-  check(so, 'Kiểm tra liên kết sau khi dừng phiên nền vẫn giữ binding đã chọn', resumedIdentityArgs, { spreadsheetId: 'saved-sheet', userId: 'saved-user', username: 'saved-user', accountName: 'Saved User' });
-
-  const originHop = taoBoTest().hop;
-  let messageListener = null;
-  originHop.window.addEventListener = (type, fn) => { if (type === 'message') { messageListener = fn; } };
-  originHop.fbmSyncInstall();
-  originHop.SHEET_LINK_NONCE = 'nonce-origin';
-  originHop.FBM_SYNC_RELAY_SESSION = 'relay-1';
-  originHop.SHEET_LINK_EXTENSION_SESSION = 'relay-1';
-  originHop.clearTimeout = clearTimeout;
-  const relaySettled = [];
-  originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1'] = { reply: 'CRM_FBM_CONFIG_ACK', timer: null, resolve: () => relaySettled.push('resolve'), reject: () => relaySettled.push('reject') };
-  const ack = { action: 'CRM_FBM_CONFIG_ACK', nonce: originHop.SHEET_LINK_NONCE, sessionId: 'relay-1', id: 'ack-1', ok: true };
-  messageListener({ origin: 'https://evil.example', data: ack });
-  check(so, 'message từ origin lạ mang lệnh Extension đúng nonce không làm đổi FBM_SYNC_CLIENT', [relaySettled, !!originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1']], [[], true]);
-  messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: ack });
-  check(so, 'cùng message từ origin Google Sheets thì được nhận', [relaySettled, !!originHop.FBM_SYNC_CLIENT.rpcWaiters['ack-1']], [['resolve'], false]);
-  // Extension đang giữ Sheet khác: Sidebar phải hỏi người dùng; chỉ khi bấm chuyển mới gửi lại kèm switchFrom.
-  originHop.setTimeout = setTimeout;
-  const switchPosts = [], switchDialogs = [], switchLogs = [];
-  originHop.window.top = { postMessage: (message) => {
-    switchPosts.push(message.config);
-    const ok = message.config.switchFrom === 'sheet-cu';
-    messageListener({ origin: originHop.SHEET_LINK_ORIGIN, data: { action: 'CRM_FBM_CONFIG_ACK', nonce: originHop.SHEET_LINK_NONCE, sessionId: 'relay-1', id: message.id, ok: ok, code: ok ? 'RELAY_SPREADSHEET_SWITCHED' : 'RELAY_SPREADSHEET_SWITCH_REQUIRED', error: ok ? '' : 'Extension đang đồng bộ cho Sheet khác', currentSpreadsheetId: ok ? '' : 'sheet-cu' } });
-  } };
-  originHop.callServer = (name, args) => { switchLogs.push([name].concat(args || [])); return Promise.resolve({ ok: true }); };
-  const relayConfigThu = { url: 'https://script.google.com/macros/s/relay-moi/exec', key: 'k', spreadsheetId: 'sheet-moi', extension: {} };
-  let switchChoice = false;
-  originHop.window.uiDecisionOpen = (options) => { switchDialogs.push(options); return Promise.resolve(switchChoice); };
-  const giuSheetCu = await originHop.fbmSyncPostRelayConfigConfirmed(relayConfigThu).then(() => 'luu', (err) => err.code);
-  check(so, 'Extension đang giữ Sheet khác, người dùng bấm giữ: hộp hỏi nêu Sheet đang giữ, không gửi lại cấu hình, ghi Log lựa chọn', [giuSheetCu, switchPosts.length, switchDialogs.length, /sheet-cu/.test(switchDialogs[0] && switchDialogs[0].message), switchLogs], ['RELAY_SPREADSHEET_KEPT', 1, 1, true, [['fbmLogRelaySwitchDecision', 'keep', 'sheet-cu']]]);
-  switchPosts.length = 0; switchLogs.length = 0; switchChoice = true;
-  const chuyenSheet = await originHop.fbmSyncPostRelayConfigConfirmed(relayConfigThu);
-  check(so, 'Người dùng bấm chuyển: Sidebar ghi Log rồi gửi lại cấu hình kèm switchFrom đúng Sheet Extension đang giữ', [!!chuyenSheet, switchPosts.map((config) => config.switchFrom), switchLogs], [true, ['', 'sheet-cu'], [['fbmLogRelaySwitchDecision', 'switch', 'sheet-cu']]]);
-  const nav = dom.document.createElement('nav'); nav.id = 'fbm-sync-nav'; nav.className = 'shin-popup-list'; nav.hidden = false; dom.root.appendChild(nav);
-  hop.fbmSyncInstall();
-  const inputField = dom.document.createElement('div'); inputField.id = 'fbm-identity-user-field'; inputField.className = 'shin-form-field is-invalid';
-  const inputNode = dom.document.createElement('input'); inputNode.id = 'fbm-identity-user'; inputNode.value = ''; inputField.appendChild(inputNode); dom.root.appendChild(inputField);
-  hop.FBM_SYNC_CLIENT.identityInvalid = { user: true }; hop.FBM_SYNC_CLIENT.identityDraft = { spreadsheetId: '', userId: '', username: '', accountName: '' };
-  const originalRenderTarget = hop.fbmSyncRenderTarget; let identityInputRenders = 0; hop.fbmSyncRenderTarget = () => { identityInputRenders += 1; };
-  dom.document.activeElement = inputNode; inputNode.value = 'user-b'; dom.document.listeners.input({ target: inputNode });
-  hop.fbmSyncRenderTarget = originalRenderTarget;
-  check(so, 'Nhập ô nhận diện không dựng lại form, giữ nguyên focus và xóa lỗi đúng dòng', [dom.document.getElementById('fbm-identity-user') === inputNode, dom.document.activeElement === inputNode, hop.FBM_SYNC_CLIENT.identityDraft.userId, inputField.className, identityInputRenders], [true, true, 'user-b', 'shin-form-field', 0]);
-  const outside = { closest: () => null };
-  dom.document.listeners.click({ target: outside, preventDefault: () => {} });
-  check(so, 'Click ra ngoài đóng menu Đồng bộ', nav.hidden, true);
-
-  const makeTarget = (attribute, id) => ({ id: id || '', disabled: false, hasAttribute: (name) => name === attribute, getAttribute: (name) => name === 'aria-pressed' ? 'true' : '', closest: function () { return this; } });
-  let backgroundCalls = 0;
-  hop.callServer = () => { backgroundCalls += 1; return Promise.resolve({}); };
-  const backgroundButton = makeTarget('data-sync-background-draft');
-  dom.document.listeners.click({ target: backgroundButton, preventDefault: () => {} });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  check(so, 'switch lịch nền là draft, click không gọi GAS ngay', [backgroundButton.disabled, backgroundCalls], [false, 0]);
-
-  hop.fbmSyncRetryPushFailures = () => Promise.reject(new Error('RETRY_FAILURE'));
-  const retryButton = makeTarget('data-fbm-push-retry-all');
-  dom.document.listeners.click({ target: retryButton, preventDefault: () => {} });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  check(so, 'Lỗi mở lại bản ghi hiện rõ và không khóa nút', [retryButton.disabled, paints.some((item) => String(item.message).indexOf('RETRY_FAILURE') >= 0)], [false, true]);
-
-  const resolveCalls = [], resolveServer = hop.callServer, resolveOpen = hop.fbmSyncOpenConflict;
-  hop.fbmSyncOpenConflict = () => { resolveCalls.push(['reopen']); return Promise.resolve(null); };
-  hop.callServer = (name, args) => { resolveCalls.push([name, args]); return Promise.resolve(name === 'fbmConfirmConflict' ? { ok: false, code: 'CONFLICT_REOPEN', message: 'mở lại' } : {}); };
-  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', left: '0901', right: '0902' }, { field: 'ten_kh', left: 'A', right: 'B' }] };
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  check(so, 'Chốt xung đột gọi GAS một lần, gửi kèm giá trị FBM và giá trị ShinCRM các trường lệch như màn đang hiện, không nhờ Extension đọc lại FBM; GAS trả mở lại thì mở lại xung đột',
-    [resolveCalls.map((call) => call[0]), resolveCalls[0][1][4], resolveCalls[0][1][5]], [['fbmConfirmConflict', 'reopen'], { dien_thoai: '0902', ten_kh: 'B' }, { dien_thoai: '0901', ten_kh: 'A' }]);
-
-  // Màn xung đột dùng chung luật và popup với form khi Sheet đổi giữa chừng hoặc bản ghi bận.
-  const resolveConflictChoose = hop.recordConflictChoose, resolveBusyChoose = hop.recordBusyChoose, resolvePaint = hop.fbmSyncPaint;
-  const popups = [], replies = [];
-  let popupPick = 'mine';
-  hop.recordConflictChoose = (conflicts, words) => { popups.push(['conflict', conflicts, words]); return Promise.resolve(popupPick); };
-  hop.recordBusyChoose = (entity, busy, words) => { popups.push(['busy', busy, words]); return Promise.resolve('retry'); };
-  hop.fbmSyncPaint = () => {};
-  hop.callServer = (name, args) => { resolveCalls.push([name, JSON.parse(JSON.stringify(args))]); return Promise.resolve(replies.shift()); };
-  const sheetChanged = { ok: false, code: 'CONFLICT_SHEET_CHANGED', conflicts: [{ field: 'phone', label: 'Điện thoại', old: '0901', current: '0905', mine: '0902' }] };
-  const conflictItem = () => ({ entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'dien_thoai', localField: 'phone', left: '0903', right: '0902' }], snapshot: { openedHash: 'h1', old: { phone: '0901' } } });
-
-  resolveCalls.length = 0; popups.length = 0; popupPick = 'mine';
-  replies.push(sheetChanged, { ok: true, remaining: 1 });
-  hop.FBM_SYNC_CLIENT.conflict = conflictItem();
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  check(so, 'Sheet đổi ô đang quyết: hỏi bằng popup chung của form với bộ chữ màn xung đột; chọn giữ lựa chọn thì gửi lại giá trị ShinCRM đang hiện (không phải giá trị Sheet), giá trị Sheet chỉ làm mốc mới',
-    [popups.map((p) => p[0]), popups[0][2] === hop.FBM_SYNC_CONFLICT_WORDS, resolveCalls.map((c) => c[0]), resolveCalls[1][1][6].old.phone, resolveCalls[1][1][5].dien_thoai, resolveCalls[1][1][2]],
-    [['conflict'], true, ['fbmConfirmConflict', 'fbmConfirmConflict', 'reopen'], '0905', '0903', 'shin']);
-
-  resolveCalls.length = 0; popups.length = 0; popupPick = 'cancel';
-  replies.push(sheetChanged);
-  hop.FBM_SYNC_CLIENT.conflict = conflictItem(); hop.FBM_SYNC_CLIENT.conflictChoices = { dien_thoai: 'shin' }; hop.FBM_SYNC_CLIENT.conflictSheetChanged = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  const cancelState = [resolveCalls.length, hop.FBM_SYNC_CLIENT.conflict.fields[0].left, hop.FBM_SYNC_CLIENT.conflict.snapshot.old.phone, hop.FBM_SYNC_CLIENT.conflictSheetChanged.dien_thoai, Object.keys(hop.FBM_SYNC_CLIENT.conflictInvalid).length];
-  replies.push({ ok: true, remaining: 1 });
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  check(so, 'Sheet đổi ô đang quyết, chọn Quay lại: không gửi, ô giữ giá trị đang hiện, mốc giữ giá trị Sheet đã thấy, trường được tô đỏ nhưng không tính là chưa chọn; Lưu lại thì gửi giá trị đang hiện với mốc đó',
-    [cancelState, resolveCalls[1][1][5].dien_thoai, resolveCalls[1][1][6].old.phone],
-    [[1, '0903', '0905', true, 0], '0903', '0905']);
-  hop.FBM_SYNC_CLIENT.conflictSheetChanged = { dien_thoai: true }; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
-  hop.fbmSyncConflictUnmark('dien_thoai');
-  check(so, 'Chọn hoặc sửa trường bị tô đỏ vì Sheet đổi thì hết đỏ', hop.fbmSyncConflictMarked({ field: 'dien_thoai' }), false);
-
-  resolveCalls.length = 0; popups.length = 0; popupPick = 'sheet';
-  replies.push(sheetChanged);
-  hop.FBM_SYNC_CLIENT.conflict = conflictItem(); hop.FBM_SYNC_CLIENT.conflictChoices = { dien_thoai: 'fbm' }; hop.FBM_SYNC_CLIENT.conflictDraft = { dien_thoai: { shin: 'nháp' } };
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'fbm', null);
-  check(so, 'Sheet đổi ô đang quyết, chọn dùng giá trị Sheet: không gửi lại, phía ShinCRM hiện giá trị Sheet và được chọn, màn vẫn mở',
-    [resolveCalls.map((c) => c[0]), hop.FBM_SYNC_CLIENT.conflict.fields[0].left, hop.FBM_SYNC_CLIENT.conflictChoices.dien_thoai, hop.FBM_SYNC_CLIENT.conflictDraft.dien_thoai.shin, hop.FBM_SYNC_CLIENT.conflict.snapshot.old.phone],
-    [['fbmConfirmConflict'], '0905', 'shin', undefined, '0905']);
-  replies.push({ ok: true, remaining: 1 });
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'shin', null);
-  check(so, 'Sau khi dùng giá trị Sheet, Lưu gửi giá trị ShinCRM là giá trị Sheet', resolveCalls[1][1][5].dien_thoai, '0905');
-
-  resolveCalls.length = 0; popups.length = 0;
-  replies.push({ ok: false, code: 'CONFLICT_RECORD_BUSY', entity: 'customer', busy: { id: 'CUS-1', by: 'khac', reason: 'Đang đẩy.' } }, { ok: true, remaining: 1 });
-  hop.FBM_SYNC_CLIENT.conflict = conflictItem();
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'fbm', null);
-  check(so, 'Bản ghi bận: hỏi bằng popup bận chung, chọn Thử lại thì gửi lại đúng lệnh chốt',
-    [popups.map((p) => p[0]), popups[0][1].reason, resolveCalls.map((c) => c[0])], [['busy'], 'Đang đẩy.', ['fbmConfirmConflict', 'fbmConfirmConflict', 'reopen']]);
-
-  resolveCalls.length = 0;
-  replies.push({ ok: false, code: 'CONFLICT_NOT_FOUND', message: 'không còn' });
-  hop.FBM_SYNC_CLIENT.conflict = conflictItem();
-  await hop.fbmSyncResolveConflict('customer', 'CUS-1', 'fbm', null);
-  check(so, 'Dòng không còn ở trạng thái xung đột chờ quyết: báo rồi chuyển sang xung đột kế tiếp', resolveCalls.map((c) => c[0]), ['fbmConfirmConflict', 'reopen']);
-  hop.recordConflictChoose = resolveConflictChoose; hop.recordBusyChoose = resolveBusyChoose; hop.fbmSyncPaint = resolvePaint;
-  hop.callServer = resolveServer; hop.fbmSyncOpenConflict = resolveOpen;
-
-  hop.fbmSyncResolveConflict = () => Promise.reject(new Error('CONFLICT_FAILURE'));
-  hop.FBM_SYNC_CLIENT.conflict = { entity: 'customer', id: 'CUS-1', remaining: 1, fields: [{ field: 'phone', left: '0901', right: '0902' }] };
-  hop.FBM_SYNC_CLIENT.conflictChoices = { phone: 'fbm' }; hop.FBM_SYNC_CLIENT.conflictDraft = {}; hop.FBM_SYNC_CLIENT.conflictInvalid = {};
-  const conflictButton = makeTarget('', 'fbm-sync-conflict-save');
-  dom.document.listeners.click({ target: conflictButton, preventDefault: () => {} });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  check(so, 'Lỗi xử lý xung đột hiện rõ và không khóa nút', [conflictButton.disabled, paints.some((item) => String(item.message).indexOf('CONFLICT_FAILURE') >= 0)], [false, true]);
-  const errorLogs = [];
-  hop.callServer = (name) => name === 'fbmLogSyncError' ? (errorLogs.push(name), Promise.resolve({ ok: true })) : Promise.reject(new Error('NETWORK_DOWN'));
-  await hop.fbmSyncLoadIdentityStatus();
-  hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
-  check(so, 'Lỗi mạng và lỗi bridge đều hiện Sidebar và gọi ghi Sheet Log', [errorLogs.length, paints.some((item) => item.phase === 'error' && String(item.message).indexOf('NETWORK_DOWN') >= 0), paints.some((item) => item.phase === 'error' && String(item.message).indexOf('EXTENSION_DOWN') >= 0)], [2, true, true]);
-  hop.fbmSyncPaintError(new Error('EXTENSION_DOWN'), 'Bridge failed');
-  check(so, 'Hai lỗi cùng message ở hai thời điểm đều ghi Log, không dedupe vĩnh viễn', errorLogs.length, 3);
-  const loopPaints = [], driveThat = hop.fbmSyncDrive;
-  hop.FBM_SYNC_CLIENT.running = true;
-  hop.fbmSyncPaint = (status) => { loopPaints.push(status); };
-  hop.callServer = () => Promise.resolve({ ok: true });
-  hop.fbmSyncDrive = () => Promise.resolve({ ok: false, code: 'FBM_TAB_NOT_FOUND', error: 'Không thấy tab FBM' });
-  await hop.fbmSyncRunStart('read');
-  hop.fbmSyncDrive = driveThat;
-  check(so, 'Sidebar không kết thúc im lặng khi GAS từ chối mở lượt (kết quả lỗi không có runId)', [hop.FBM_SYNC_CLIENT.running, loopPaints.some((item) => item && item.phase === 'error' && String(item.message).indexOf('Không thấy tab FBM') >= 0)], [false, true]);
+async function chay(so) {
+  section('FBM sync — Sidebar: khung và vùng báo đầu màn');
+  let bo;
+  try { bo = taoBoTest(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
+  await testVongDoiMoDong(so);
+  await testMoManLoi(so);
+  await testHeaderVaMenu(so);
+  testVungBaoDauMan(so);
 }
 
 module.exports = { chay, taoBoTest };

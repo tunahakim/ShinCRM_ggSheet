@@ -1,25 +1,7 @@
 /** Kiểm hợp đồng component: Sync phải dùng lõi UI chung, chỉ giữ lớp đặc thù cho pipeline. */
 const { docTep } = require('../../lib/load-gas');
 const { section, check } = require('../../lib/assert');
-
-const SYNC_FILES = [
-  'client/schema/sync/screens/run.html',
-  'client/schema/sync/screens/account.html',
-  'client/schema/sync/screens/results.html',
-  'client/schema/sync/screens/settings.html',
-  'client/schema/sync/screens/index.html',
-  'client/sync/fbmSyncUiSchema.html',
-  'client/sync/fbmSyncConfigEditor.html',
-  'client/sync/fbmSyncShell.html',
-  'client/sync/fbmSyncStatusScreen.html',
-  'client/sync/fbmSyncSettingsScreen.html',
-  'client/sync/fbmSyncAuditScreen.html',
-  'client/sync/fbmSync.html',
-  'client/sync/screens/account.html',
-  'client/sync/screens/run.html',
-  'client/sync/screens/results.html',
-  'client/sync/screens/settings.html'
-];
+const { nguonDongBo } = require('../../lib/sidebar/tep-dong-bo');
 
 const LEGACY_GENERIC_CLASSES = [
   'shin-sync-form-field',
@@ -59,15 +41,11 @@ const REMOVED_SYNC_SHELL_PATTERNS = [
 
 function chay(so) {
   section('FBM sync — component dùng chung');
-  const source = Object.fromEntries(SYNC_FILES.map((file) => [file, docTep(file)]));
-  const all = Object.values(source).join('\n');
+  const { source, all } = nguonDongBo();
   const common = docTep('client/ui/uiBuilder.html');
   const engine = docTep('client/ui/renderEngine.html');
   const frame = docTep('client/style/frame.html');
   const styles = docTep('client/style/components.html');
-  const cardCss = styles.slice(styles.indexOf('.shin-card {'), styles.indexOf('/*\n * Hàng tiêu đề nằm ngoài thẻ ruột'));
-  const cardHeadCss = styles.slice(styles.indexOf('.shin-card-head {'), styles.indexOf('.shin-card-title {'));
-  const cardBodyCss = styles.slice(styles.indexOf('.shin-card-body {'), styles.indexOf('/* --- Trường và nhãn'));
   const cardActionsCss = styles.slice(styles.indexOf('.shin-card-actions {'), styles.indexOf('/*\n * Nút trong hàng tiêu đề card'));
   const sidebar = docTep('client/Sidebar.html');
   const popup = docTep('client/ui/popupList.html');
@@ -175,69 +153,6 @@ function chay(so) {
   check(so, 'lớp generic notice/form/toggle/value/pagination nằm ở components chung',
     ['shin-form-field', 'shin-toggle-row', 'shin-toggle-control', 'shin-notice', 'shin-kv-label', 'shin-pagination', 'shin-section', 'shin-content-disabled', 'shin-loading'].every((name) => styles.indexOf(name) >= 0),
     true);
-  check(so, 'Card và RowGroup dùng gap dọc, component con không cộng margin lần hai',
-    [cardCss.indexOf('padding: var(--shin-card-pad);') >= 0, cardHeadCss.indexOf('padding:') === -1,
-      cardBodyCss.indexOf('padding:') === -1, styles.indexOf('.shin-box.shin-row-group {') >= 0,
-      styles.indexOf('.shin-card-body > * { margin: 0; }') >= 0,
-      styles.indexOf('.shin-row-group > * + *') === -1,
-      styles.indexOf('.shin-form-field > * + *') === -1],
-    [true, true, true, true, true, true, true]);
-  check(so, 'Nhóm action dùng RowGroup lõi và vẫn giữ owner riêng',
-    [styles.indexOf('align-items: stretch;') >= 0, styles.indexOf('align-self: stretch;') >= 0, styles.indexOf('width: 100%;') >= 0,
-      styles.indexOf('.shin-box.shin-action-stack') >= 0,
-      styles.indexOf('gap: var(--shin-gap-2);') >= 0,
-      styles.indexOf('.shin-row-group > * { margin: 0; }') >= 0],
-    [true, true, true, true, true, true]);
-  check(so, 'Nút action dài được xếp dọc trong Sidebar hẹp',
-    [styles.indexOf('.shin-single-action-row { justify-content: center; flex-wrap: wrap; }') >= 0,
-      styles.indexOf('width: min(220px, 100%); max-width: 100%; min-width: 0;') >= 0,
-      styles.indexOf('white-space: normal; overflow-wrap: anywhere;') >= 0,
-      styles.indexOf('.shin-single-action-row > .shin-button { white-space: normal; text-align: center; overflow-wrap: anywhere; }') >= 0,
-      styles.indexOf('.shin-single-action-row > .shin-button .shin-btn-label { min-width: 0; overflow-wrap: anywhere; white-space: normal; }') >= 0,
-      styles.indexOf('.shin-single-action-row > * + *') === -1],
-    [true, true, true, true, true, true]);
-  check(so, 'ActionStack căn giữa ở đúng độ ưu tiên của component lõi',
-    [styles.indexOf('.shin-box.shin-action-stack { align-items: center; }') >= 0,
-      !/(^|\n)\.shin-action-stack \{ align-items: center; \}/.test(styles)],
-    [true, true]);
-  check(so, 'Box rỗng giữ vùng callback nhưng không tạo khoảng cách giả trong Card',
-    styles.indexOf('.shin-box:empty { display: none; }') >= 0,
-    true);
-  check(so, 'Section sở hữu khoảng giữa các Card bằng gap',
-    [styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
-      styles.indexOf('.shin-section > * + *') === -1,
-      styles.indexOf('.shin-card {') >= 0],
-    [true, true, true]);
-  check(so, 'các vùng cột chung dùng gap làm owner spacing',
-    [frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('gap: var(--shin-gap-2);', frame.indexOf('#sidebar-body {')) >= 0,
-      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2);') >= 0,
-      source['client/sync/fbmSyncShell.html'].indexOf("uiSyncClass('shell', 'navItem')") >= 0],
-    [true, true, true]);
-  check(so, 'ActionStack lõi tự sở hữu nhịp, không cần fallback margin',
-    [common.indexOf('function ActionStack(') >= 0, styles.indexOf('.shin-box > .shin-single-action-row + .shin-single-action-row') === -1,
-      source['client/sync/fbmSyncUiSchema.html'].indexOf('actionStack: function') >= 0],
-    [true, true, true]);
-  check(so, 'các vùng cuộn giữ trục hai mép bằng gutter ổn định, section không cộng lề lệch',
-    [frame.indexOf('.shin-scroll-region {') >= 0 && frame.indexOf('overflow-y: auto;') >= 0 && frame.indexOf('scrollbar-gutter: stable both-edges;') >= 0,
-      sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
-      sidebar.indexOf('id="sidebar-body" class="shin-scroll-region"') >= 0,
-      frame.indexOf('#sidebar-body {') >= 0 && frame.indexOf('padding: 0 0 var(--shin-gap-4);') >= 0,
-      styles.indexOf('.shin-section { display: flex; flex-direction: column; gap: var(--shin-gap-2); min-width: 0; padding: 0 0 var(--shin-gap-4); }') >= 0],
-    [true, true, true, true, true]);
-  check(so, 'Sync dùng Notice lõi thay vì tự lặp bảng ánh xạ lớp thông báo',
-    [common.indexOf('function Notice(') >= 0, all.indexOf('noticeClasses') >= 0, all.indexOf('noticeClass =') >= 0],
-    [true, false, false]);
-  check(so, 'frame chung không còn chứa style component Sync legacy',
-    ['shin-sync-form-field', 'shin-sync-form-actions', 'shin-sync-muted', 'shin-sync-preview-row', 'shin-sync-login-row'].filter((name) => frame.indexOf(name) >= 0),
-    []);
-  check(so, 'shared layout contracts',
-    [frame.indexOf('#sidebar-root {') >= 0 && frame.indexOf('background: var(--shin-bg-sunken);') > frame.indexOf('#sidebar-root {'),
-      frame.indexOf('#sidebar-info {') >= 0 && frame.indexOf('margin-bottom: var(--shin-gap-2);') > frame.indexOf('#sidebar-info {'),
-      styles.indexOf('.shin-loading-track.is-idle { visibility: hidden; background: transparent; }') >= 0],
-    [true, true, true]);
-  check(so, 'RowGroup dùng gap và reset margin con trực tiếp',
-    [styles.indexOf('.shin-box.shin-row-group {') >= 0, styles.indexOf('gap: var(--shin-gap-2);', styles.indexOf('.shin-box.shin-row-group {')) > styles.indexOf('.shin-box.shin-row-group {'), styles.indexOf('.shin-row-group > * { margin: 0; }') >= 0],
-    [true, true, true]);
 }
 
 module.exports = { chay };
