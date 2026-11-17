@@ -749,7 +749,10 @@ function fbmSyncRunWaitArm() {
   if (!FBM_SYNC_CLIENT.active) { return; }
   waiter.timer = setTimeout(function () {
     if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
+    // Status hỏi được qua cổng vẽ như tin relay: lượt kết thúc theo đường này mà không vẽ thì màn giữ status cũ (mất nút Hủy phiên cũ, lượt kẹt vẫn như đang chạy).
+    var ticket = fbmSyncStatusTicket();
     callServer('fbmGetSyncStatus').then(function (bundle) {
+      fbmSyncStatusApply(bundle && bundle.status, ticket);
       var status = bundle && bundle.status || {};
       if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
       fbmSyncRunWaitFollow(waiter, status);
@@ -1429,7 +1432,7 @@ function fbmSyncTestLogin(button) {
     fbmSyncSetAccountNotice('login', 'success', String(snapshot.message));
     return result;
   }).catch(function (error) {
-    // Lượt GAS kết thúc lỗi: câu báo là của GAS và status (kèm `actions.forceLogin` mở nút hủy phiên cũ) đã vẽ qua relay; chỉ đặt câu vào thẻ. Lỗi chưa tới GAS thì báo và ghi Log, giữ status GAS gần nhất.
+    // Lượt GAS kết thúc lỗi: câu báo là của GAS và status (kèm `actions.forceLogin` mở nút hủy phiên cũ) đã vẽ ở chỗ chờ lượt (`fbmSyncDrive` vẽ mọi status nó nhận, qua relay hay lần hỏi GAS); chỉ đặt câu vào thẻ. Lỗi chưa tới GAS thì báo và ghi Log, giữ status GAS gần nhất.
     if (error && error.status && error.status.phase) { fbmSyncSetAccountNotice('login', 'error', String(error.message)); return null; }
     return fbmSyncReportError(error, 'Đăng nhập thử không thành công.', 'login_test');
   }).finally(function () { if (button) { button.disabled = false; } });
