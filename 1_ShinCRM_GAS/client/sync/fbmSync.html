@@ -771,6 +771,7 @@ function fbmSyncRunWaitArm() {
     callServer('fbmGetSyncStatus').then(function (bundle) {
       var status = bundle && bundle.status || {};
       if (FBM_SYNC_CLIENT.runWaiter !== waiter) { return; }
+      fbmSyncRunWaitFollow(waiter, status);
       if (status.running && String(status.runId || '') === waiter.runId && status.stuck) {
         fbmSyncRunWaitEnd({ ok: false, code: String(status.stuckCode || 'SYNC_STALE_RUN'), error: String(status.stuckMessage || ''), status: status, conflict: null });
         return;
@@ -785,6 +786,10 @@ function fbmSyncRunWaitArm() {
       if (FBM_SYNC_CLIENT.runWaiter === waiter) { fbmSyncRunWaitEnd(null, error); }
     });
   }, FBM_SYNC_RUN_SILENCE_MS);
+}
+/** GAS mở lượt nối tiếp lượt đang chờ (quét lại sau bước đếm, đồng bộ mở lại sau Hủy phiên cũ) thì ghi `follows` là mã lượt cũ: chỗ chờ chuyển sang lượt mới, không kết thúc giữa chừng. */
+function fbmSyncRunWaitFollow(waiter, status) {
+  if (status && String(status.follows || '') === waiter.runId && String(status.runId || '')) { waiter.runId = String(status.runId); FBM_SYNC_CLIENT.ownRunId = waiter.runId; }
 }
 function fbmSyncRunWaitEnd(result, error) {
   var waiter = FBM_SYNC_CLIENT.runWaiter;
@@ -818,6 +823,7 @@ function fbmSyncStatusReceived(data) {
   noticeSet('fbmExtension', null);
   if (data.status) { fbmSyncStatusApply(data.status, fbmSyncStatusTicket()); }
   if (!waiter) { return; }
+  fbmSyncRunWaitFollow(waiter, data.status);
   if (data.status && String(data.status.runId || '') !== waiter.runId) { return; }
   if (!data.done) { fbmSyncRunWaitArm(); return; }
   fbmSyncRunWaitEnd({ ok: data.ok !== false, code: String(data.code || ''), error: String(data.error || ''), status: data.status || FBM_SYNC_CLIENT.lastStatus || {}, conflict: data.conflict || null });
@@ -1559,7 +1565,7 @@ function fbmSyncResetState() {
     return fbmSyncPaintError(error, 'Không đặt lại được phiên đồng bộ.', 'state_reset');
   });
 }
-/** Hủy phiên FBM cũ chỉ sau khi người dùng xác nhận; GAS quyết có được làm không và tự đối chiếu đúng tài khoản đã liên kết. Đăng nhập xong thì chạy lại đúng loại đồng bộ đang chọn, vì lượt cũ đã dừng hẳn khi đăng nhập hỏng. */
+/** Hủy phiên FBM cũ chỉ sau khi người dùng xác nhận; GAS quyết có được làm không, tự đối chiếu đúng tài khoản đã liên kết và quyết có mở lại lượt đồng bộ bị chặn hay không (lượt mở lại nối tiếp trong cùng lần chờ qua `follows`). Sidebar không tự mở lượt sau khi đăng nhập. */
 function fbmSyncForceLogin() {
   var schema = FBM_SYNC_RUN_SCHEMA.forceLogin;
   if (FBM_SYNC_CLIENT.running) { return Promise.resolve(null); }
@@ -1570,7 +1576,7 @@ function fbmSyncForceLogin() {
       var snapshot = result && result.status || {};
       if (!result || result.ok === false) { throw fbmSyncDriveFailure(result, schema.failed); }
       fbmSyncPaint(snapshot);
-      return fbmSyncRun(FBM_SYNC_CLIENT.mode);
+      return result;
     });
   }).catch(function (error) {
     return fbmSyncPaintError(error, schema.failed, 'force_login');
