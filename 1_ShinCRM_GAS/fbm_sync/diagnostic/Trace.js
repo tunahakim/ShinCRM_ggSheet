@@ -271,15 +271,23 @@ FbmSync.businessFinishOpenSteps = function (state, phase, result) {
  */
 /** Ô lượt đọc hoặc ghi gần nhất của lời gọi (RAM, không đọc kho), chưa có thì ô trống; mốc trace của cửa vào lấy từ đây. */
 FbmSync.callStateSeen = function () { return FbmSync._logContextState || {}; };
+/** Ghi nhận ô lượt vừa đọc hoặc ghi; gặp lượt đang chạy thì nhớ nó là lượt của lời gọi này (mã và nhãn), để dòng ghi sau khi lượt đóng trong cùng lời gọi vẫn mang nhãn đó. `null` (đầu mỗi lời gọi) xóa cả hai: không giữ nhãn lượt cũ sang lời gọi khác. */
 FbmSync.logContextNote = function (state) {
   FbmSync._logContextState = state || null;
+  if (!state) { FbmSync._logCallRun = null; } else if (FbmSync.runInProgress(state)) { FbmSync._logCallRun = { runId: String(state.runId), label: state.runLabel || FbmSync.runLabelOf(state) }; }
   if (!FbmSync._logContextRegistered) { logRegisterContext('fbm_sync', FbmSync.logContextText); FbmSync._logContextRegistered = true; }
 };
-/** Dòng của lượt (lượt đang chạy, hoặc `cycleId` đúng mã lượt vừa đóng) lấy nhãn chốt lúc mở (`runLabel`); ngoài lượt thì theo kênh gọi: relay là Nền, còn lại là Tay. */
+/**
+ * Nhãn của dòng: dòng thuộc lượt (mang mã lượt, lượt đang chạy, hoặc lượt lời gọi này đã làm kể cả vừa đóng) lấy nhãn chốt lúc mở (`runLabel`). Chỉ lời gọi không làm cho lượt nào mới theo nơi gọi: Extension (relay) là Nền, Sidebar là Tay.
+ * Cạm bẫy: không đoán theo nơi gọi cho dòng của lượt, vì lượt tay cũng nộp câu trả lời FBM qua relay (dòng cuối lượt Đăng nhập thử từng ghi "Nền").
+ */
 FbmSync.logContextText = function (entry) {
-  var state = FbmSync._logContextState, cycleId = String(entry && entry.cycleId || '');
+  var state = FbmSync._logContextState, run = FbmSync._logCallRun, cycleId = String(entry && entry.cycleId || '');
   if (!state) { return ''; }
-  if (FbmSync.runInProgress(state) || (cycleId && cycleId === String(state.runId || ''))) { return state.runLabel || FbmSync.runLabelOf(state); }
+  if (cycleId && cycleId === String(state.runId || '')) { return state.runLabel || FbmSync.runLabelOf(state); }
+  if (run && cycleId === run.runId) { return run.label; }
+  if (FbmSync.runInProgress(state)) { return state.runLabel || FbmSync.runLabelOf(state); }
+  if (run) { return run.label; }
   var relay = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'relay');
   return relay ? 'Nền' : 'Tay';
 };

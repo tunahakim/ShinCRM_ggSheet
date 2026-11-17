@@ -187,6 +187,7 @@ FbmSync.stateWrite = function (state) {
   }
   store.state = state;
   store.dirty = true;
+  FbmSync.logContextNote(state);
   return state;
 };
 /** Thay hẳn ô lượt (mở lượt mới): trong lát bản mới thành bản của lát, bản cũ ai còn giữ mà ghi lại thì bị `stateWrite` chặn. */
@@ -195,6 +196,8 @@ FbmSync.stateReplace = function (state) {
   if (!store) { return FbmSync.stateStore(state); }
   store.state = state;
   store.dirty = true;
+  // Nhãn lượt mới có hiệu lực ngay lúc mở: dòng Log của lượt ghi trong cùng lát không được lấy nhãn ô lượt cũ.
+  FbmSync.logContextNote(state);
   return state;
 };
 /**
@@ -275,7 +278,7 @@ FbmSync.STATE_MINIMAL_NOTE = ' (Không lưu được đầy đủ trạng thái 
 /** Bản state đóng phiên chỉ gồm phase, lý do và (nếu vừa) cursor/khóa ghi; preview, session, sổ bước bị bỏ vì chính chúng làm phình state. Trả bản đã ghi kèm `cursorKept`, hoặc `null` khi không ghi được bản nào (lỗi gốc vẫn được ném ở `stateStore`). */
 FbmSync.stateWriteMinimal = function (full, failure) {
   var cut = function (text) { return String(text || '').slice(0, FbmSync.STATE_MINIMAL_TEXT_LIMIT); };
-  var base = { version: full.version, runId: full.runId, origin: full.origin, mode: full.mode, scan: full.scan, phase: full.phase, entity: full.entity, startedAt: full.startedAt, updatedAt: full.updatedAt, retryable: false, lastFailureCode: String(full.lastFailureCode || failure.code || ''), lastError: cut(full.lastError), message: cut(full.message || full.lastError) + FbmSync.STATE_MINIMAL_NOTE, metadata: { conflictCount: Number(full.metadata && full.metadata.conflictCount || 0) } };
+  var base = { version: full.version, runId: full.runId, origin: full.origin, runLabel: full.runLabel, mode: full.mode, scan: full.scan, phase: full.phase, entity: full.entity, startedAt: full.startedAt, updatedAt: full.updatedAt, retryable: false, lastFailureCode: String(full.lastFailureCode || failure.code || ''), lastError: cut(full.lastError), message: cut(full.message || full.lastError) + FbmSync.STATE_MINIMAL_NOTE, metadata: { conflictCount: Number(full.metadata && full.metadata.conflictCount || 0) } };
   var tiers = [Object.assign({}, base, { cursor: full.cursor || {} }), base];
   for (var i = 0; i < tiers.length; i += 1) {
     try { FbmSync.documentPropertySet(FbmSync.STATE_KEY, JSON.stringify(tiers[i]), 'state_minimal'); } catch (tierError) {

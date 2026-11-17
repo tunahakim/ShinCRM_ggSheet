@@ -157,7 +157,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     var message = force ? 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' + (resume && !reopen ? ' Bấm Đồng bộ lại để duyệt và đẩy dữ liệu.' : '') : 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.';
     FbmSync.runClose(state, 'done', { message: message });
     FbmSync.stateWrite(state);
-    if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, reason: message, detail: { runId: String(state.runId || '') } }); }
+    if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: message, detail: { runId: String(state.runId || '') } }); }
     if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }, state); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, message: message };
   }

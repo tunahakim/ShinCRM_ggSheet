@@ -38,7 +38,7 @@ FbmSync.logStatus = function (state, action) {
   var outcome = phase === 'error' || state.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
   var writer = outcome === LOG_ERROR || phase === 'done' ? logEvent : logTrace;
   writer({
-    source: 'fbm_sync', action: action || 'slice', outcome: outcome,
+    source: 'fbm_sync', action: action || 'slice', outcome: outcome, cycleId: String(state.runId || ''),
     entity: state.entity || '', recordId: state.current || '',
     reason: state.message || FbmSync.statusLabel(phase) || phase,
     detail: { runId: String(state.runId || ''), phase: phase, cursor: String(state.cursor && state.cursor.kind || ''), direction: FbmSync.syncDirection(state), entityLabel: FbmSync.syncEntityLabel(state.entity, phase), counts: state.counts || {}, lastError: state.lastError || '' }
