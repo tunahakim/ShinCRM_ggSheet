@@ -295,7 +295,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\Fingerprint.js  Chuẩn hóa giá trị và ngày, dấu vân bản ghi, so ba dấu vân.
     ├── reconcile\Conflict.js     Hai lệnh xung đột (mở, chốt), bước kết của chặng mở và cửa ghi chốt `conflictSettle`.
     ├── reconcile\ConflictStage.js Chặng `conflict_refresh` theo hợp đồng chung: response mở bản ghi FBM thành DTO xem xung đột.
-    ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
+    ├── reconcile\Identity.js     Liên kết tài khoản FBM của file, đối chiếu danh tính đang chạy và bảng kiểm ID Customer.
+    ├── reconcile\RecordMap.js    Ánh xạ bản ghi FBM sang schema nội bộ: nối định danh khách (ID, mã khách, MST), dựng record kèm dấu vân, nối Activity vào khách cha, giữ trường chỉ thuộc ShinCRM.
     ├── reconcile\ConnectionSave.js  Lưu kết nối tài khoản FBM: kiểm liên kết và form đăng nhập, GAS quyết giữ/lưu/xóa credential, ghi ba kho một lần.
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Cổng danh mục của lần gọi (map từ Category, mã bị chặn của phiên) và phép kiểm ô danh mục cho cả hai chiều.
@@ -353,6 +354,7 @@ tests\
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── chuoi-dang-nhap.js    Chuỗi đăng nhập thật ba phía cho test K8: GAS hộp cát ↔ worker thật ↔ executor thật trong tab FBM giả ghi lại mọi request nhận được.
 │   │   ├── trang-login.js        Câu trả lời mặc định của FBM giả cho từng bước trang Login và cách nộp lần lượt các bước đó (`quaTrangLogin`).
+│   │   ├── tu-dang-nhap.js       Khung các ca tự đăng nhập: dựng hộp cổng và hộp Giữ phiên (liên kết, credential giả), nộp response nền, hỏi cổng, vá dấu lần thử.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
 │   │   ├── buoc-day.js           Lối gọi chặng đẩy cho ca kiểm đúng như khung lát gọi (bản sao ô lượt, patch, chốt lượt).
@@ -428,7 +430,14 @@ tests\
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.
     ├── fbmSync.js                Điều phối các nhóm kiểm thử đồng bộ FBM; không chứa logic nghiệp vụ của từng nhóm.
-    ├── fbmSync\AutoLogin.js     Kiểm envelope đăng nhập, throttle và phục hồi cursor.
+    ├── fbmSync\AutoLoginChuKy.js  Kiểm cổng tự đăng nhập: chu kỳ chờ chỉ dành cho chạy nền, lượt bấm tay, tắt tự thử lại, cursor quay về.
+    ├── fbmSync\AutoLoginGiuPhien.jsKiểm Giữ phiên khi phiên chết: probe, đăng nhập qua các bước trang Login, xác minh tài khoản, chạy tiếp chuỗi nền.
+    ├── fbmSync\AutoLoginProbe.js  Kiểm probe User đầu lượt, marker phiên lệch và sai tài khoản sau đăng nhập.
+    ├── fbmSync\AutoLoginFailClosed.jsKiểm cổng phiên đóng lỗi an toàn: tự đăng nhập tắt, request ghi không gửi lại, không có tab FBM, chính sách tự đăng nhập.
+    ├── fbmSync\AutoLoginThatBai.jsKiểm Giữ phiên khi đăng nhập thất bại: không lặp ngay, throttle theo chu kỳ, FBM 401 chỉ probe lại.
+    ├── fbmSync\AutoLoginThu.js    Kiểm đăng nhập thử và Hủy phiên cũ: credential đã lưu, danh tính bản nháp, nút hủy phiên cũ và Log.
+    ├── fbmSync\AutoLoginKhoaCho.jsKiểm khóa chờ sau tự đăng nhập hỏng: FBM chặn vì còn phiên cũ, gỡ khóa, nối lại lượt nền, trang FBM lệch.
+    ├── fbmSync\AutoLoginSauXoa.js Kiểm Giữ phiên sau lượt bị xóa phiên: lọc quyền theo grid User, trang FBM lệch hoặc thiếu danh tính.
     ├── fbmSync\LoginReply.js    Kiểm bảng đọc câu trả lời Login của FBM (`d`): lượt bị từ chối đóng lỗi, sai mật khẩu hoặc câu trả lời chưa gặp thì ngừng tự đăng nhập, dòng Log ghi trước khi lượt đóng.
     ├── fbmSync\ForceLoginResume.js    Kiểm Hủy phiên cũ rồi chạy tiếp: GAS mở lại lượt đồng bộ tay không đẩy bị chặn, lượt đẩy/nền/Đăng nhập thử chỉ đăng nhập
     ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
@@ -566,5 +575,7 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.
 2_ShinCRM_Extension/content_scripts/model/bind_watcher.js Nghe kênh đẩy /bind của Sheets trong MAIN world, xếp mỗi khung thành tín hiệu hoặc nhịp sống.
-2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Fetch trong tab FBM.
+2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js Đọc body response FBM có trần cỡ (giải nén gzip), giữ cột theo lệnh của GAS và cắt lưới thành gói; nạp trước executor.
+2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js Nhận request GAS, thay token, fetch trong tab FBM và giữ việc quét trong RAM của tab.
+2_ShinCRM_Extension/background/credential_vault.js Kho khóa đăng nhập của service worker (nạp bằng `importScripts`): giữ bản mã credential, điền ô đăng nhập, dọn khóa thừa.
 ```
