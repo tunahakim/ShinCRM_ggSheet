@@ -83,7 +83,7 @@ function sendRequestToWorker(message, done, attempt) {
  * Nếu bản cũ còn đáp bắt tay thì Sidebar nhận hai phiên luân phiên và gửi cấu hình relay vào bản cũ ("Extension context invalidated"), nên bản cũ phải tự im lặng hẳn.
  */
 function bridgeContextAlive() {
-  try { return typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id); } catch (contextError) { return false; }
+  return typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id);
 }
 function bridgeRetire() {
   window.removeEventListener('message', bridgeOnMessage);

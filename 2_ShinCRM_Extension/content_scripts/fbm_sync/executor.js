@@ -17,13 +17,14 @@
   function captureTransportValues(request, responseBody, sourceName) {
     var transport = request && request.transport || request && request.meta && request.meta.transport || {}, captures = Array.isArray(transport.captures) ? transport.captures : [], values = {};
     captures.forEach(function (capture) {
-      var item = capture || {}, kind = sourceName || item.source, sources = kind === 'page_html'
+      var item = capture || {}, source = sourceName || item.source, sources = source === 'page_html'
         ? [document.documentElement ? document.documentElement.innerHTML : '', document.documentElement ? document.documentElement.textContent || '' : '']
         : [String(responseBody || '')], pattern = String(item.pattern || ''), flags = String(item.flags || ''), match;
       if (!pattern) { return; }
       for (var index = 0; index < sources.length; index += 1) {
         if (!sources[index]) { continue; }
-        try { match = String(sources[index]).match(new RegExp(pattern, flags)); } catch (ignore) { return; }
+        // Mẫu GAS cấp sai thì `new RegExp` ném: lỗi về GAS qua câu trả lời lỗi, không bỏ qua giá trị cần thay.
+        match = String(sources[index]).match(new RegExp(pattern, flags));
         if (match) {
           values[String(item.name || 'value')] = match[Number(item.group || 1)];
           return;
@@ -139,7 +140,7 @@
       });
     }).catch(function (err) {
       traceEvent(trace, 'fetch_finished', req, { error: String(err && err.message || err) });
-      try { err.trace = trace; } catch (ignore) {}
+      if (err && typeof err === 'object' && Object.isExtensible(err)) { err.trace = trace; }
       if (err && err.name === 'AbortError') {
         var timeout = new Error('FBM không phản hồi sau ' + Math.round(fetchMs / 1000) + ' giây.');
         timeout.code = 'FBM_FETCH_TIMEOUT'; timeout.trace = trace;
@@ -155,9 +156,7 @@
     execute(message.request).then(function (result) { sendResponse({ result: result }); }, function (err) { sendResponse({ error: String(err && err.message || err), code: String(err && err.code || 'FBM_TRANSPORT_UNAVAILABLE'), trace: err && err.trace || [] }); });
     return true;
   }
-  try {
-    if (globalThis.__SHINCRM_FBM_LISTENER__) { chrome.runtime.onMessage.removeListener(globalThis.__SHINCRM_FBM_LISTENER__); }
-  } catch (ignore) {}
+  if (globalThis.__SHINCRM_FBM_LISTENER__) { chrome.runtime.onMessage.removeListener(globalThis.__SHINCRM_FBM_LISTENER__); }
   globalThis.__SHINCRM_FBM_LISTENER__ = onFbmMessage;
   chrome.runtime.onMessage.addListener(onFbmMessage);
 })();

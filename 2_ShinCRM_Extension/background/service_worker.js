@@ -496,7 +496,7 @@ function getRelayConfig() {
 function normalizeRelayUrl(value) {
   var raw = String(value || '').trim(), markdown = raw.match(/^\[[^\]]+\]\((https:\/\/[^)]+)\)$/i), parsed;
   if (markdown) { raw = markdown[1]; }
-  try { parsed = new URL(raw); } catch (ignore) { return ''; }
+  parsed = URL.parse(raw); if (!parsed) { return ''; }
   if (!/^https:\/\/(?:script\.google\.com|script\.googleusercontent\.com)$/i.test(parsed.origin)) { return ''; }
   if (!/^\/macros\/s\/[^/]+\/exec\/?$/i.test(parsed.pathname)) { return ''; }
   return parsed.toString().replace(/\/$/, '');

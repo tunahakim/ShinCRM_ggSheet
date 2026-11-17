@@ -25,7 +25,7 @@
           return bytes;
         }
         total += step.value.length;
-        if (total > limit) { try { reader.cancel(); } catch (ignore) {} throw responseTooLarge(limit); }
+        if (total > limit) { reader.cancel(); throw responseTooLarge(limit); }
         parts.push(step.value);
         return pump();
       });

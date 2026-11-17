@@ -86,7 +86,8 @@ const RULES = [
   },
   {
     id: 'silentError', title: 'không có lỗi im lặng (catch rỗng, .catch nuốt lỗi)', scope: ['gas', 'client', 'ext'], allow: [],
-    find: (file, src) => matchAll(src, /(?<![.\w])catch\s*(?:\([^)]*\))?\s*\{\s*\}/)
+    // `catch` thân rỗng hoặc chỉ trả giá trị rỗng (null, {}, [], '', false, undefined) đều là che lỗi.
+    find: (file, src) => matchAll(src, new RegExp('(?<![.\\w])catch\\s*(?:\\([^)]*\\))?\\s*' + SWALLOW_BODY))
       .concat(matchAll(src, new RegExp('\\.catch\\s*\\(\\s*(?:' + SWALLOW_FN + '|' + SWALLOW_ARROW + ')\\s*\\)')))
       .sort((a, b) => a.line - b.line)
   },
@@ -112,11 +113,15 @@ const RULES = [
   },
   {
     id: 'kindBranch', title: 'Extension không rẽ nhánh theo loại việc', scope: ['ext'], allow: [],
-    find: (file, src) => matchAll(src, /\bkind\s*[!=]==?(?!=)/)
+    // So `kind` ở vế nào cũng vậy, kể cả bọc `String(...)`, và `switch` theo `kind`.
+    find: (file, src) => matchAll(src, /\bkind\s*\)?\s*[!=]==?(?!=)|[!=]==?\s*(?:String\s*\()?[\w$.]*\bkind\b(?!\s*[:(])|\bswitch\s*\([^)]*\bkind\b/)
   },
   {
     id: 'hardcodedNumber', title: 'không con số nghiệp vụ cứng sau || và ??', scope: ['client', 'ext'], allow: [],
+    // Số sau `||`/`??`, và hằng đặt tên mang đơn vị nghiệp vụ (phút, ngày, ngưỡng, giới hạn) gán số khác 0. Hằng mili giây là nhịp kỹ thuật của kênh truyền (chờ cầu, hạn fetch), không phải ngưỡng nghiệp vụ nên không bắt.
     find: (file, src) => matchAll(src, /(?:\|\||\?\?)\s*-?\d[\d._]*/, (match) => !/^(?:\|\||\?\?)\s*0$/.test(match[0].trim()) && !/^(?:\|\||\?\?)\s*0\.0*$/.test(match[0].trim()))
+      .concat(matchAll(src, /\b(?:const|var|let)\s+[A-Z0-9_]*(?:MINUTES|DAYS|THRESHOLD|LIMIT)[A-Z0-9_]*\s*=\s*-?[1-9][\d._]*|\b\w*(?:Minutes|Days|Threshold|Limit)\s*[:=]\s*-?[1-9][\d._]*/))
+      .sort((a, b) => a.line - b.line)
   },
   {
     id: 'logEvent', title: 'logEvent chỉ ở người điều phối lát', scope: ['gas'], allow: LOG_WRITERS,
@@ -158,10 +163,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
-  silentError: {
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 2,
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 1
-  },
+  silentError: {},
   typeofFunction: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 52,
     '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 10,
@@ -195,7 +197,7 @@ const EXCEPTIONS = {
   popup: {},
   kindBranch: {
     '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js': 3,
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 6
+    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 5
   },
   hardcodedNumber: {
     '2_ShinCRM_Extension/background/service_worker.js': 4,
@@ -285,15 +287,18 @@ function chay(so) {
   check(so, 'catch có ghi log và ném lại không bị bắt', hits('silentError', 'f.js', 'try { a(); } catch (e) { logEvent(e); throw e; }'), 0);
   check(so, 'catch rỗng nằm trong comment bị bỏ qua', hits('silentError', 'f.js', '// try { a(); } catch (e) {}\n/* catch (e) {} */'), 0);
   check(so, '.catch nuốt lỗi bằng null, hàm rỗng hay mảng rỗng đều bị bắt', hits('silentError', 'f.js', 'p.catch(() => null); p.catch(function () {}); p.catch(() => {}); p.catch((e) => []); p.catch(function (e) { return false; });'), 5);
+  check(so, 'catch chỉ trả giá trị rỗng hoặc return trống bị bắt', hits('silentError', 'f.js', "try { a(); } catch (e) { return null; } try { b(); } catch (e) { return; } try { c(); } catch { return ''; }"), 3);
   check(so, '.catch có xử lý thật không bị bắt', hits('silentError', 'f.js', 'p.catch((e) => { report(e); return null; });'), 0);
   check(so, '`//` trong chuỗi không bị coi là comment', hits('typeofFunction', 'f.js', 'var u = "http://x"; if (typeof y === "function") { go(); }'), 1);
   check(so, 'typeof so với function bằng cả hai kiểu nháy và toán tử lỏng đều bị bắt', hits('typeofFunction', 'f.js', "typeof X === \"function\"; typeof a.b !== 'function'; typeof c == 'function'; typeof d != \"function\";"), 4);
   check(so, 'typeof so với kiểu khác không bị bắt', hits('typeofFunction', 'f.js', "typeof X === 'undefined'"), 0);
   check(so, 'rẽ nhánh theo kind trong Extension bị bắt', hits('kindBranch', 'f.js', "if (job.kind === 'scan') { go(); }"), 1);
+  check(so, 'so kind bọc String, so ngược vế và switch theo kind đều bị bắt', hits('kindBranch', 'f.js', "if (String(meta.kind) === 'x') {} if ('y' !== job.kind) {} switch (req.meta.kind) {}"), 3);
   check(so, 'gán kind không bị bắt như rẽ nhánh', hits('kindBranch', 'f.js', "var job = { kind: 'scan' }; job.kind = 'x';"), 0);
   check(so, 'danh sách phase thứ hai ngoài State.js bị bắt, một phase lẻ thì không', [hits('phaseList', 'f.js', "var a = ['done', 'error'];"), hits('phaseList', 'f.js', "var a = ['done', 'other'];")], [1, 0]);
   check(so, 'ghi DocumentProperties trực tiếp bị bắt', hits('propertyWrite', 'f.js', 'props.setProperty(k, v); props.deleteProperty(k);'), 2);
   check(so, 'popup trần và window.* bị bắt, phương thức của đối tượng khác thì không', hits('popup', 'f.js', "alert('x'); window.confirm('y'); ui.alert('z'); function alert() {}"), 2);
+  check(so, 'hằng đặt tên mang đơn vị nghiệp vụ bị bắt, hằng mili giây kỹ thuật và số 0 thì không', hits('hardcodedNumber', 'f.js', 'var POLL_MINUTES = 5; var cfg = { approvalThreshold: 10, retryLimit: 3 }; var BRIDGE_MS = 5000; var x = { pollMinutes: 0 };'), 3);
   check(so, 'số cứng sau || và ?? bị bắt, số 0 thì không', hits('hardcodedNumber', 'f.js', 'var a = x || 5; var b = y ?? 30000; var c = z || 0;'), 2);
   check(so, 'ghi baseline bằng khóa literal và phép gán bị bắt, đọc, so sánh và khai báo schema thì không', hits('baselineWrite', 'f.js', "w.push({ fbmHash: h }); r.fbmHash = h; if (r.fbmHash === h) {} var x = r.fbmHash || ''; var s = { fbmHash: { code: 'A' } };"), 2);
   check(so, 'stateWrite bị bắt, khai báo hàm thì không', hits('stateReadWrite', 'f.js', 'FbmSync.stateWrite({}); var s = stateRead(); function stateWrite(x) {}'), 2);
