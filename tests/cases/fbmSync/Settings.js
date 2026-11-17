@@ -8,7 +8,7 @@ const { dungHop, TEP_NEN } = require('../../lib/dung-hop');
 const { trongLanGoi } = require('../../lib/gas/lan-goi');
 const { docLog } = require('../../lib/gas/doc-log');
 
-const TEP_LENH_CAI_DAT = ['fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
+const TEP_LENH_CAI_DAT = ['fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
 const KHACH_SHEET = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
 
 /** Hộp có cổng cài đặt và phần cài đặt FBM thật; các việc đi kèm (dừng lượt, trạng thái) được thay bằng bản ghi lại thứ tự gọi. */
@@ -102,6 +102,33 @@ function kiemLenhLuu(so) {
     [true, false, ['runStop:master']]);
 }
 
+/** Tắt một tiến trình nền thì sổ tiến trình bỏ số lần lỗi và giờ thử lại của nó, giữ giờ chạy xong và mốc; bật lại thì lần lỗi kế chờ từ mức đầu. Đặt lại lịch nền về mặc định cũng theo luật đó. */
+function kiemTatTienTrinh(so) {
+  const { nen, F, luu } = dungCaiDatFbm();
+  const T = 1794900000000, so0 = () => trongLanGoi(nen.hop, () => F.processBookRead());
+  trongLanGoi(nen.hop, () => {
+    let book = F.processBookRead();
+    book = F.processBookMark(book, 'detail', 'done', T).book;
+    book = F.processBookMark(book, 'detail', 'failed', T + 1000).book;
+    book = F.processBookMark(F.processBookMark(book, 'detail', 'failed', T + 2000).book, 'customerFull', 'failed', T + 3000).book;
+    book.detail.cursor = 20075; book.customerFull.baseline = 1335; F.processBookWrite(book);
+  });
+  const truoc = so0();
+  luu({ fbm_background: { detailEnabled: true } });
+  const batGiu = so0();
+  luu({ fbm_background: { detailEnabled: false } });
+  const tat = so0();
+  luu({ fbm_background: { detailEnabled: true } });
+  const batLai = trongLanGoi(nen.hop, () => F.processBookMark(F.processBookRead(), 'detail', 'failed', T + 9000));
+  check(so, 'tắt Vòng xoay đang lỗi 2 lần: failures và retryAt về 0, doneAt và con trỏ giữ; tiến trình khác không đổi; bật lại rồi lỗi thì chờ mức đầu',
+    [truoc.detail.failures, batGiu.detail.failures, [tat.detail.doneAt, tat.detail.failures, tat.detail.retryAt, tat.detail.cursor], [tat.customerFull.failures, tat.customerFull.baseline], [batLai.failures, batLai.minutes]],
+    [2, 2, [T, 0, 0, 20075], [1, 1335], [1, F.retryDelay(1)]]);
+  trongLanGoi(nen.hop, () => F.processBookWrite(F.processBookMark(F.processBookRead(), 'activityFull', 'failed', T).book));
+  luu({ fbm_background: { activityFullEnabled: true } });
+  trongLanGoi(nen.hop, () => F.settingsResetCommand({ section: 'fbm_background' }));
+  check(so, 'đặt lịch nền về mặc định (Lấy toàn bộ giao dịch mặc định tắt): lịch thử lại của tiến trình đó bị xóa', so0().activityFull.failures, 0);
+}
+
 function kiemNguongMayIm(so) {
   const { F } = dungCaiDatFbm();
   check(so, 'ngưỡng máy nền im đi theo nhịp hỏi GAS: 2 nhịp cộng 15 phút, không dưới 15 phút',
@@ -164,6 +191,7 @@ function kiemChuyenMotLan(so) {
 function chay(so) {
   section('FBM sync - cài đặt qua cổng chung');
   kiemLenhLuu(so);
+  kiemTatTienTrinh(so);
   kiemNguongMayIm(so);
   kiemKhoaHong(so);
   kiemChuyenMotLan(so);
