@@ -114,6 +114,27 @@ FbmSync.statusInputRead = function () {
 };
 /** Status cho Sidebar; chỉ cửa lệnh (`ControlPort.js`) gọi, mỗi kết quả một lần. */
 FbmSync.statusView = function () { return FbmSync.statusViewBuild(FbmSync.statusInputRead()); };
+/** `tone` của đèn trạng thái trên icon đồng bộ: một chỗ quyết cho status đầy đủ và bản nhẹ lúc mở Sidebar. Lượt kẹt là lỗi vì không còn ai chở lượt thì không có tin nào làm icon thôi xoay. */
+FbmSync.toneOf = function (state, enabled, now) {
+  var phase = String(state.phase || 'idle');
+  if (enabled !== true) { return 'off'; }
+  if (FbmSync.staleRunCheck(state, now)) { return 'error'; }
+  if (FbmSync.ACTIVE_PHASES.indexOf(phase) >= 0) { return 'running'; }
+  return phase === 'paused' || phase === 'conflict' ? 'paused' : phase === 'error' ? 'error' : 'idle';
+};
+/** Bản nhẹ lúc mở Sidebar: chỉ `tone` và `updatedAt` để Sidebar bỏ được bản cũ hơn tin relay về trước. Kho state hỏng thì `tone` lỗi và một dòng Log như `statusReadSafe`, không làm hỏng lượt nạp lõi. */
+FbmSync.toneView = function () {
+  try {
+    var state = FbmSync.stateRead();
+    return { tone: FbmSync.toneOf(state, settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled') === true, Date.now()), updatedAt: Number(state.updatedAt || 0) };
+  } catch (error) {
+    if (!FbmSync.stateStorageError(error)) { throw error; }
+    FbmSync.storageFailureLog(error, FbmSync.stateStuckView(error));
+    return { tone: 'error', updatedAt: 0 };
+  }
+};
+var CORE_LOAD_PROVIDERS = typeof CORE_LOAD_PROVIDERS !== 'undefined' ? CORE_LOAD_PROVIDERS : {};
+CORE_LOAD_PROVIDERS.fbm_sync = function () { return { tone: FbmSync.toneView() }; };
 /** Username so được: có chữ và không phải bản che dấu `*`. */
 FbmSync.usernameComparable = function (value) { var text = String(value || '').trim(); return !!text && text.indexOf('*') < 0; };
 /** Kết quả kiểm liên kết thành câu cho màn Tài khoản; chỉ có khi lượt là kiểm liên kết. */
@@ -145,7 +166,7 @@ FbmSync.statusViewBuild = function (input) {
   pipeline.visible = true;
   return {
     ok: true, enabled: enabled, backgroundEnabled: background, running: running,
-    tone: !enabled ? 'off' : running ? 'running' : phase === 'paused' || phase === 'conflict' ? 'paused' : phase === 'error' ? 'error' : 'idle',
+    tone: FbmSync.toneOf(state, enabled, now),
     actions: { run: stopping ? (origin === 'background' ? 'stoppingBackground' : 'stopping') : manual ? 'cancel' : 'start', runDisabled: !enabled || stopping, busy: manual, reset: false, forceLogin: state.loginForceOffered === true && !running, approve: !!pendingApproval && !running },
     progress: { active: running, total: total, done: done, determinate: total > 0, percent: total > 0 ? Math.min(100, Math.round(done * 100 / total)) : 0, waiting: running && String(cursor.kind || '') === 'push_wait' },
     pendingApproval: pendingApproval,

@@ -224,6 +224,14 @@ function reloadCurrentSheet() {
  *
  * `blocked` mang tên lý do chứ không phải `true`, để sau này còn lý do chặn thứ hai thì client không phải đoán.
  */
+/** Module ngoài lõi tự đăng ký phần nó cần gửi kèm lượt nạp lõi (lõi không biết tên module nào); mỗi khóa là một module, giá trị là hàm trả dữ liệu của module đó. */
+var CORE_LOAD_PROVIDERS = typeof CORE_LOAD_PROVIDERS !== 'undefined' ? CORE_LOAD_PROVIDERS : {};
+function coreLoadModules() {
+  var data = {};
+  Object.keys(CORE_LOAD_PROVIDERS).forEach(function (owner) { data[owner] = CORE_LOAD_PROVIDERS[owner](); });
+  return data;
+}
+
 function loadCore(options) {
   var opts = options || {};
   var execute = function () {
@@ -290,6 +298,7 @@ function loadCore(options) {
       reload: reloadStateRead(),
       warnings: warnings,
       notices: noticeList(),
+      modules: coreLoadModules(),
       // Dòng thời gian mở Sidebar là dòng vết: tắt vết thì `logClientTiming` không ghi gì, nên Sidebar không gọi.
       timingTrace: logTraceCoversSource(LOAD_SOURCE),
       ms: ms
