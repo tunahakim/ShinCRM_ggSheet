@@ -29,8 +29,8 @@
 
   var lastSid = '';
 
-  function post(kind, facts) {
-    var message = { source: SOURCE, action: ACTION, kind: kind };
+  function post(bindSignal, facts) {
+    var message = { source: SOURCE, action: ACTION, bindSignal: bindSignal };
     Object.keys(facts || {}).forEach(function (key) { message[key] = facts[key]; });
     try { window.postMessage(message, location.origin); } catch (postError) {}
   }

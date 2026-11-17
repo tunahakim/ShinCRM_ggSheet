@@ -95,9 +95,11 @@
     }
     var req = request, trace = [];
     traceEvent(trace, 'executor_started', req);
-    if (req.meta && req.meta.command === 'pageKeyStore') { return Promise.resolve(storePageKey(req, trace)); }
-    if (req.meta && req.meta.kind === 'scan_chunk') { return Promise.resolve().then(function () { return scanChunkResult(req.meta.job && req.meta.job.chunkIndex, trace, req); }); }
-    if (req.meta && req.meta.kind === 'scan_job') { scanJob = null; }
+    // Rẽ nhánh theo lệnh vật lý GAS ghi trong phong bì (`meta.command`), không theo loại việc (`meta.kind`).
+    var command = String(req.meta && req.meta.command || ''), scanning = command === 'scanJob';
+    if (command === 'pageKeyStore') { return Promise.resolve(storePageKey(req, trace)); }
+    if (command === 'scanChunk') { return Promise.resolve().then(function () { return scanChunkResult(req.meta.job && req.meta.job.chunkIndex, trace, req); }); }
+    if (scanning) { scanJob = null; }
     var sent = applyTransportReplacements(req, requestBody(req));
     var transportInstructions = req.transport || req.meta && req.meta.transport || {};
     var replacements = Array.isArray(transportInstructions.replacements) ? transportInstructions.replacements : [];
@@ -113,15 +115,15 @@
     var timer = setTimeout(function () { controller.abort(); }, fetchMs);
     traceEvent(trace, 'fetch_started', req);
     return fetch(String(req.url || ''), { method: req.method || 'POST', headers: req.headers || { 'content-type': 'application/json; charset=UTF-8' }, body: sent, credentials: 'include', cache: 'no-store', signal: controller.signal }).then(function (response) {
-      var scanLimit = req.meta && req.meta.kind === 'scan_job' && req.meta.job ? req.meta.job.maxResponseBytes : 0;
+      var scanLimit = scanning && req.meta.job ? req.meta.job.maxResponseBytes : 0;
       return shape.readResponseText(response, scanLimit).then(function (body) {
         var captured = captureTransport(req, body);
         traceEvent(trace, 'fetch_finished', req, { httpStatus: response.status, responseLength: body.length });
         var data = null;
         // Response không phải grid (lỗi HTTP, trang đăng nhập, Bugs của FBM) đi nguyên về GAS để cổng phiên phân loại như request thường.
-        if (req.meta && req.meta.kind === 'scan_job' && response.ok) { try { data = shape.gridData(body); } catch (notGrid) { data = null; } }
+        if (scanning && response.ok) { try { data = shape.gridData(body); } catch (notGrid) { data = null; } }
         // Response không phải grid mà lớn hơn một gói thì không gửi nguyên về GAS (vượt trần đường truyền); trang đăng nhập hay Bugs của FBM vốn nhỏ nên vẫn đi nguyên.
-        if (req.meta && req.meta.kind === 'scan_job' && !data && body.length > Number(req.meta.job && req.meta.job.chunkMaxBytes || 0)) {
+        if (scanning && !data && body.length > Number(req.meta.job && req.meta.job.chunkMaxBytes || 0)) {
           var unparseable = new Error('Response FBM của việc quét không đọc được dạng bảng (' + Math.round(body.length / 1048576) + ' MB).');
           unparseable.code = 'FBM_SCAN_UNPARSEABLE';
           throw unparseable;

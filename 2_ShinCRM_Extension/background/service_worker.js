@@ -156,7 +156,7 @@ function openFbmPageIfAsked(tab, request, deadlineAt, note) {
 /** Executor nạp từ cùng gói Extension nên mang đúng số bản trong manifest; ping trả số khác là bản cũ còn sót trong tab, phải nạp lại. */
 var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
-var FBM_CONTRACT_VERSION = '72bc9995058e';
+var FBM_CONTRACT_VERSION = '7365fcc02c03';
 
 function addWorkerTrace(reply, request, stage, extra) {
   var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
@@ -177,7 +177,8 @@ function scheduleGasPoll(extensionConfig) {
   try {
     if (chrome.alarms && chrome.alarms.create) {
       var minutes = Math.round(Number(extensionConfig && extensionConfig.pollMinutes));
-      if (!(minutes >= 1 && minutes <= 60)) { alarmFailure('ALARM_MINUTES_INVALID', new Error('Nhịp hỏi GAS không hợp lệ: ' + String(extensionConfig && extensionConfig.pollMinutes))); return; }
+      // Khoảng và mặc định của nhịp do GAS sở hữu (cài đặt `fbm_extension`); ở đây chỉ chặn giá trị chuông không đặt được.
+      if (!(minutes >= 1)) { alarmFailure('ALARM_MINUTES_INVALID', new Error('Nhịp hỏi GAS không hợp lệ: ' + String(extensionConfig && extensionConfig.pollMinutes))); return; }
       if (gasPollAlarmKnown && gasPollAlarmMinutes === minutes) { return; }
       var create = function () {
         gasPollAlarmKnown = true;
@@ -486,7 +487,7 @@ function getRelayConfig() {
       var url = normalizeRelayUrl(config && config.fbmWebAppUrl);
       var key = config && String(config.fbmSyncKey || '').trim();
       var spreadsheetId = config && String(config.fbmSpreadsheetId || '').trim();
-      var extension = { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(config && config.fbmPollMinutes || 5)))), runOnStartup: config && config.fbmRunOnStartup !== false };
+      var extension = { pollMinutes: Number(config && config.fbmPollMinutes), runOnStartup: config && config.fbmRunOnStartup !== false };
       resolve(url && key ? { url: url, key: key, spreadsheetId: spreadsheetId, extension: extension, generation: generation } : null);
     });
   });
@@ -514,7 +515,7 @@ function relayConfigMatches(saved, config) {
   return normalizeRelayUrl(saved.fbmWebAppUrl) === normalizeRelayUrl(config.url) &&
     String(saved.fbmSyncKey || '') === String(config.key || '') &&
     String(saved.fbmSpreadsheetId || '') === String(config.spreadsheetId || '') &&
-    Number(saved.fbmPollMinutes || 5) === Number(config.extension.pollMinutes || 5) &&
+    Number(saved.fbmPollMinutes) === config.extension.pollMinutes &&
     (saved.fbmRunOnStartup !== false) === (config.extension.runOnStartup !== false);
 }
 
@@ -526,8 +527,10 @@ function configureRelay(config) {
   var value = config || {}, url = normalizeRelayUrl(value.url), key = String(value.key || '').trim(), spreadsheetId = String(value.spreadsheetId || '').trim();
   if (!url || !key || !spreadsheetId) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu URL Web App hợp lệ, khóa hoặc Spreadsheet ID.' }); }
   if (relayConfigureFlight) { return relayConfigureFlight; }
-  var extension = value.extension && typeof value.extension === 'object' ? value.extension : {};
-  var normalized = { url: url, key: key, spreadsheetId: spreadsheetId, extension: { pollMinutes: Math.max(1, Math.min(60, Math.round(Number(extension.pollMinutes || 5)))), runOnStartup: extension.runOnStartup !== false } };
+  var extension = value.extension && typeof value.extension === 'object' ? value.extension : {}, pollMinutes = Math.round(Number(extension.pollMinutes));
+  // GAS gửi nhịp đã kiểm theo cài đặt của nó; Extension không giữ bản sao mặc định hay khoảng, thiếu nhịp thì từ chối thay vì tự điền.
+  if (!(pollMinutes >= 1)) { return Promise.resolve({ ok: false, code: 'RELAY_CONFIG_INVALID', error: 'Cấu hình relay thiếu nhịp hỏi GAS hợp lệ.' }); }
+  var normalized = { url: url, key: key, spreadsheetId: spreadsheetId, extension: { pollMinutes: pollMinutes, runOnStartup: extension.runOnStartup !== false } };
   relayConfigureFlight = relayConfigSaved().then(function (saved) {
     var currentSpreadsheetId = String(saved.fbmSpreadsheetId || '').trim(), switching = !!currentSpreadsheetId && currentSpreadsheetId !== spreadsheetId;
     if (switching && String(value.switchFrom || '').trim() !== currentSpreadsheetId) {

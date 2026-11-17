@@ -11,7 +11,7 @@ function napWatcher() {
   FakeXHR.prototype.addEventListener = function (name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); };
   FakeXHR.prototype.fire = function (name) { (this.listeners[name] || []).forEach((fn) => fn()); };
   FakeXHR.prototype.day = function (frame) { this.responseText += frame; this.readyState = 3; this.fire('progress'); };
-  const window = { XMLHttpRequest: FakeXHR, addEventListener: () => {}, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
+  const window = { XMLHttpRequest: FakeXHR, addEventListener: () => {}, postMessage: (data, origin) => { posted.push({ bindSignal: data.bindSignal, source: data.source, action: data.action, origin }); facts.push({ bindSignal: data.bindSignal, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
   const hop = napExtension('bindWatcher', { location: { origin: 'https://docs.google.com' }, window: window });
   return { FakeXHR, posted, facts, hop };
 }
@@ -30,10 +30,10 @@ async function chay(so) {
 
   const xhr = moKenh(w);
   check(so, 'mở kênh GET /bind báo open đúng nguồn, gửi về chính origin trang',
-    w.posted, [{ kind: 'open', source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', origin: 'https://docs.google.com' }]);
+    w.posted, [{ bindSignal: 'open', source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', origin: 'https://docs.google.com' }]);
   check(so, 'vẫn gọi send gốc', xhr.sent, true);
 
-  const ca = (frame) => { w.posted.length = 0; xhr.day(frame); return w.posted.map((item) => item.kind); };
+  const ca = (frame) => { w.posted.length = 0; xhr.day(frame); return w.posted.map((item) => item.bindSignal); };
   check(so, 'khung noop là nhịp sống', ca('12\n[[5,["noop"]]]\n'), ['alive']);
   check(so, 'loại 10 (con trỏ người khác) là nhịp sống', ca('40\n[[6,[[10,1760000000000,"abc",[1,2]]]]]\n'), ['alive']);
   check(so, 'loại 14 (hiện diện) là nhịp sống', ca('40\n[[7,[[14,1760000000001,"abc",{}]]]]\n'), ['alive']);
@@ -76,12 +76,12 @@ async function chay(so) {
   dau.day('12\n[[1,["noop"]]]\n');
   dau.day('60\n[[2,[[0,1760000000002,{"c":[["A1","x"]]}]]]]\n');
   check(so, 'kênh đầu tiên: sameSession false; khung đầu và khung mang "c" có đánh dấu firstChunk/hasChange đúng',
-    n.facts, [{ kind: 'open', sameSession: false, firstChunk: undefined, hasChange: undefined }, { kind: 'alive', sameSession: undefined, firstChunk: true, hasChange: false }, { kind: 'signal', sameSession: undefined, firstChunk: false, hasChange: true }]);
+    n.facts, [{ bindSignal: 'open', sameSession: false, firstChunk: undefined, hasChange: undefined }, { bindSignal: 'alive', sameSession: undefined, firstChunk: true, hasChange: false }, { bindSignal: 'signal', sameSession: undefined, firstChunk: false, hasChange: true }]);
   n.facts.length = 0;
   const noiLai = moKenh(n, 'GET', '/spreadsheets/d/abc/bind?VER=8&SID=AAA&RID=rpc&TYPE=xmlhttp');
   noiLai.day('40\n[[3,[[1,1760000000003,"abc"]]]]\n');
   check(so, 'kênh mới cùng SID dù kênh cũ chưa kết thúc: báo sameSession true; khung đầu loại 1 là tín hiệu mang firstChunk, không mang thay đổi',
-    n.facts, [{ kind: 'open', sameSession: true, firstChunk: undefined, hasChange: undefined }, { kind: 'signal', sameSession: undefined, firstChunk: true, hasChange: false }]);
+    n.facts, [{ bindSignal: 'open', sameSession: true, firstChunk: undefined, hasChange: undefined }, { bindSignal: 'signal', sameSession: undefined, firstChunk: true, hasChange: false }]);
   n.facts.length = 0;
   moKenh(n, 'GET', '/spreadsheets/d/abc/bind?VER=8&SID=BBB&RID=rpc&TYPE=xmlhttp');
   moKenh(n);

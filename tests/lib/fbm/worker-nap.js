@@ -16,7 +16,7 @@ const nghi = (ms) => new Promise((resolve) => setTimeout(resolve, ms || 0));
  * Service worker thật với Chrome giả. `opt.gas(body, lan)` là GAS: trả object JSON, hoặc ném lỗi để giả mạng hỏng. `opt.tab` mô tả tab FBM: `ping` (trả lời ping hay không), `pingAfterReload`, `reloadCompletes`, `inject` (hàm thay `executeScript`), `result(request)` (kết quả executor), hoặc `execute(message)` trả Promise câu trả lời của executor thật trong tab.
  */
 function workerNap(opt) {
-  const st = { bodies: [], executes: [], statuses: [], fbmQueries: 0, reloads: 0, injects: 0, worker: null, storage: Object.assign({ fbmWebAppUrl: RELAY_URL, fbmSyncKey: 'relay-key', fbmSpreadsheetId: SHEET }, opt.storage || {}), listeners: [], trails: [], permissionAsks: [] };
+  const st = { bodies: [], executes: [], statuses: [], fbmQueries: 0, reloads: 0, injects: 0, worker: null, storage: Object.assign({ fbmWebAppUrl: RELAY_URL, fbmSyncKey: 'relay-key', fbmSpreadsheetId: SHEET, fbmPollMinutes: 5 }, opt.storage || {}), listeners: [], trails: [], permissionAsks: [] };
   const tab = Object.assign({ id: 5, status: 'complete', autoDiscardable: false }, opt.tab && opt.tab.info || {});
   const tabOpt = opt.tab || {};
   const pingAnswers = () => tabOpt.ping !== false && (tabOpt.ping === true || tabOpt.ping === undefined) ? true : (tabOpt.pingAfterReload && st.reloads > 0);

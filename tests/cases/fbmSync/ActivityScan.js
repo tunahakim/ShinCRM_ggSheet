@@ -43,7 +43,7 @@ function executorWith(fetchImpl) {
   napExtension('executor', null, context);
   return (request) => new Promise((resolve) => listener({ type: 'FBM_EXECUTE_V2', request }, null, resolve));
 }
-const scanReq = (job) => ({ id: 'R-1', url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccountTask' }, meta: { kind: 'scan_job', fetchMs: 5000, job: Object.assign({ jobId: 'J-1', fields: ['id', 'details'], idField: 'id', keepIds: null, chunkTargetBytes: 4096, chunkMaxBytes: 8192, maxResponseBytes: 10000 }, job) } });
+const scanReq = (job) => ({ id: 'R-1', url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccountTask' }, meta: { command: 'scanJob', fetchMs: 5000, job: Object.assign({ jobId: 'J-1', fields: ['id', 'details'], idField: 'id', keepIds: null, chunkTargetBytes: 4096, chunkMaxBytes: 8192, maxResponseBytes: 10000 }, job) } });
 
 async function chay(so) {
   section('FBM sync — lấy toàn bộ giao dịch bằng việc quét giữ id, chia cửa sổ ngày');

@@ -40,12 +40,13 @@ FbmSync.scanJobRequest = function (state, cfg, scope) {
   var cursor = state.cursor || {}, budget = FbmSync.BUDGET;
   FbmSync.requestCfg(cfg, 'scanJobRequest');
   if (Number(cursor.chunkCount || 0) > 0) {
-    return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
+    return { url: FbmSync.FBM_BASE_URL + FbmSync.ENDPOINTS.grid, body: {}, meta: { kind: 'scan_chunk', command: 'scanChunk', entity: cursor.entity, job: { jobId: cursor.jobId, chunkIndex: Number(cursor.next || 0) } } };
   }
   var activity = cursor.entity === 'activity';
   // Trang khách sau trang đầu không có tiêu đề: cắt theo tên cột gốc trang đầu đã lưu. Cột giữ lại đi qua `meta.keep` do `gridRequest` dựng như mọi request đọc lưới.
   var request = activity ? FbmSync.activityScanRequest(cursor, cfg) : FbmSync.customerListRequest(cursor, { sourceFields: (state.metadata || {}).customerFields, scope: scope }, cfg);
-  request.meta.kind = 'scan_job'; request.meta.entity = cursor.entity;
+  // `kind` là nhãn của GAS (ngân sách, vết); Extension chỉ đọc `command`: lệnh vật lý trong phong bì.
+  request.meta.kind = 'scan_job'; request.meta.command = 'scanJob'; request.meta.entity = cursor.entity;
   // Giao dịch chỉ giữ id đã có trên Sheet: lưới giao dịch không có cột khách nên dòng lạ không ghép được khách cha. Extension tìm id theo vị trí trong dòng đã cắt.
   request.meta.job = { jobId: cursor.jobId, idIndex: FbmSync.scanFields(cursor.entity).indexOf(FbmSync.SCAN_ID_FIELDS[cursor.entity]), keepIds: activity ? FbmSync.activityKeepIds(FbmSync.readLocal('activity')) : null, chunkTargetBytes: budget.chunkTargetBytes, chunkMaxBytes: budget.chunkMaxBytes, maxResponseBytes: budget.scanMaxResponseBytes };
   return request;

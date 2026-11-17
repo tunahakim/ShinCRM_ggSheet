@@ -195,12 +195,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
   popup: {},
-  kindBranch: {
-    '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js': 3,
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 5
-  },
+  kindBranch: {},
   hardcodedNumber: {
-    '2_ShinCRM_Extension/background/service_worker.js': 4,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 1
   },
   logEvent: {

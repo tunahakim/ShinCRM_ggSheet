@@ -142,7 +142,7 @@ async function chay(so) {
   const kenhSidebar = nguonTin();
   let dongHo = 1000000;
   kenh.Date = { now: () => dongHo };
-  const tinKenh = (kind, nguon) => kenh._onBindEvent({ source: nguon || kenh.window, origin: kenh.location.origin, data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', kind } });
+  const tinKenh = (bindSignal, nguon) => kenh._onBindEvent({ source: nguon || kenh.window, origin: kenh.location.origin, data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', bindSignal } });
   tinKenh('signal');
   check(so, 'tín hiệu kênh đến trước bắt tay thì không gửi đi đâu', kenhSidebar.sent.length, 0);
   kenh._onMessage({ origin: 'https://abc-123.googleusercontent.com', source: kenhSidebar.source, data: { action: 'CRM_HANDSHAKE', nonce: 'nonce-kenh', channelAliveMs: 20000 } });
@@ -159,8 +159,8 @@ async function chay(so) {
     [['CRM_RELOAD', 'channel', false, true], ['CRM_RELOAD', 'channel', false, true], ['CRM_RELOAD', 'channel-open', false, true]]);
   kenhSidebar.sent.length = 0;
   tinKenh('signal', {});
-  kenh._onBindEvent({ source: kenh.window, origin: 'https://evil.example', data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', kind: 'signal' } });
-  kenh._onBindEvent({ source: kenh.window, origin: kenh.location.origin, data: { source: 'KHAC', action: 'CRM_BIND_EVENT', kind: 'signal' } });
+  kenh._onBindEvent({ source: kenh.window, origin: 'https://evil.example', data: { source: 'SHINCRM_EXTENSION', action: 'CRM_BIND_EVENT', bindSignal: 'signal' } });
+  kenh._onBindEvent({ source: kenh.window, origin: kenh.location.origin, data: { source: 'KHAC', action: 'CRM_BIND_EVENT', bindSignal: 'signal' } });
   check(so, 'tin không phải từ chính trang Sheets hoặc sai nguồn thì bỏ qua', kenhSidebar.sent.length, 0);
 
   const readPlan = { Customer: [{ token: 'id', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
@@ -517,15 +517,18 @@ async function chay(so) {
   sentItems.length = 0;
   const loHetHan = await workerContext.sendToFbmTab(77, loEnvelope(['0'], { timeoutMs: 0 }));
   check(so, 'envelope hết hạn (hoặc GAS không cấp hạn) thì Extension báo lỗi transport hết hạn ngay, không gửi FBM', [loHetHan.code, sentItems.length], ['FBM_TRANSPORT_TIMEOUT', 0]);
-  const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
-  const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
+  const thieuNhip = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test' });
+  check(so, 'cấu hình relay thiếu nhịp hỏi GAS: Extension từ chối, không tự điền mặc định, không lưu gì', [thieuNhip.code, relayStorage.fbmWebAppUrl, relayStorage.fbmPollMinutes], ['RELAY_CONFIG_INVALID', undefined, undefined]);
+  const nhipNam = { pollMinutes: 5, runOnStartup: true };
+  const localRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: nhipNam });
+  const unchangedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: nhipNam });
   const changedRelay = await workerContext.configureRelay({ url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', extension: { pollMinutes: 6, runOnStartup: true } });
   check(so, 'cau hinh relay chi luu local va khong phat sinh /exec probe', [localRelay.code, unchangedRelay.code, changedRelay.code, relayFetches, relayStorage.fbmWebAppUrl, relayAlarms, relayAlarm.periodInMinutes, typeof workerMessageListener], ['RELAY_CONFIG_SAVED', 'RELAY_CONFIG_UNCHANGED', 'RELAY_CONFIG_SAVED', 0, 'https://script.google.com/macros/s/relay-test/exec', 2, 6, 'function']);
 
   // Extension giữ đúng một Sheet: Sidebar của Sheet khác chỉ thay được khi người dùng đã xác nhận (mang `switchFrom` đúng Sheet đang giữ).
   const configCu = await workerContext.getRelayConfig();
   relayStorage.fbmChainTrail = { stage: 'fbm_tab_sent' };
-  const sheetMoi = { url: 'https://script.google.com/macros/s/relay-moi/exec', key: 'relay-key-moi', spreadsheetId: 'sheet-moi' };
+  const sheetMoi = { url: 'https://script.google.com/macros/s/relay-moi/exec', key: 'relay-key-moi', spreadsheetId: 'sheet-moi', extension: nhipNam };
   const chuaHoi = await workerContext.configureRelay(sheetMoi);
   check(so, 'Sidebar của Sheet khác gửi cấu hình khi chưa hỏi người dùng: Extension không lưu, trả mã yêu cầu xác nhận kèm Sheet đang giữ', [chuaHoi.ok, chuaHoi.code, chuaHoi.currentSpreadsheetId, relayStorage.fbmSpreadsheetId, relayStorage.fbmWebAppUrl], [false, 'RELAY_SPREADSHEET_SWITCH_REQUIRED', 'sheet-test', 'sheet-test', 'https://script.google.com/macros/s/relay-test/exec']);
   const hoiSai = await workerContext.configureRelay(Object.assign({ switchFrom: 'sheet-nao-do' }, sheetMoi));
@@ -648,7 +651,7 @@ async function chay(so) {
         permissions: { contains: () => Promise.resolve(!behaviour.blocked) },
         runtime: { getManifest: () => ({ version: '22.2' }), lastError: null, onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} } },
         alarms: { create() {}, get(name, done) { done(null); }, clear: () => Promise.resolve(true), onAlarm: { addListener() {} } },
-        storage: { local: { get(keys, done) { done(behaviour.relayStored ? { fbmWebAppUrl: relayConfig.url, fbmSyncKey: relayConfig.key, fbmSpreadsheetId: relayConfig.spreadsheetId } : {}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '') + (value.fbmChainTrail.httpStatus ? '@' + value.fbmChainTrail.httpStatus : '')); } if (done) { done(); } } } }
+        storage: { local: { get(keys, done) { done(behaviour.relayStored ? { fbmWebAppUrl: relayConfig.url, fbmSyncKey: relayConfig.key, fbmSpreadsheetId: relayConfig.spreadsheetId, fbmPollMinutes: 5 } : {}); }, set(value, done) { if (value.fbmChainTrail) { state.trails.push(value.fbmChainTrail.stage + (value.fbmChainTrail.code ? ':' + value.fbmChainTrail.code : '') + (value.fbmChainTrail.httpStatus ? '@' + value.fbmChainTrail.httpStatus : '')); } if (done) { done(); } } } }
       },
       // Lần gọi GAS đầu trả request của ca, các lần sau trả `request: null` (GAS hết việc); `relayReply` thay cho lần gọi sau đầu (relay hỏng).
       fetch(url, options) { const index = state.bodies.length; state.bodies.push(JSON.parse(options.body)); if ((index > 0 || behaviour.relayReplyFirst) && behaviour.relayReply) { return Promise.resolve(behaviour.relayReply); } const reply = index === 0 && behaviour.request ? { ok: true, request: behaviour.request } : { ok: true, request: null }; return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve(JSON.stringify(reply)); } }); }

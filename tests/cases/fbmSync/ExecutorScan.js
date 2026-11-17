@@ -2,12 +2,12 @@
 const { section, check } = require('../../lib/assert');
 const { tabGia, luoiFbm } = require('../../lib/fbm/tab-fbm-gia');
 
-/** Request `scan_job` dựng tay để kiểm executor riêng, không qua GAS. */
+/** Request lệnh `scanJob` dựng tay để kiểm executor riêng, không qua GAS. */
 function scanRequest(id, job) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ kind: 'scan_job', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idIndex: 0, keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
+  return { id, url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccount' }, meta: Object.assign({ command: 'scanJob', fetchMs: 5000, keep: { fields: ['stt_rec_kh', 'ma_kh', 'ten_kh'] }, job: Object.assign({ jobId: 'J-1', idIndex: 0, keepIds: null, chunkTargetBytes: 512 * 1024, chunkMaxBytes: 768 * 1024 }, job) }) };
 }
 function chunkRequest(id, jobId, chunkIndex) {
-  return { id, url: 'https://fbm.test/AppService/Grid', body: {}, meta: { kind: 'scan_chunk', fetchMs: 5000, job: { jobId, chunkIndex } } };
+  return { id, url: 'https://fbm.test/AppService/Grid', body: {}, meta: { command: 'scanChunk', fetchMs: 5000, job: { jobId, chunkIndex } } };
 }
 const bytes = (value) => Buffer.byteLength(JSON.stringify(value), 'utf8');
 

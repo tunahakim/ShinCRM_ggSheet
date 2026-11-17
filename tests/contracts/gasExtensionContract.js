@@ -21,8 +21,8 @@ const CONTRACT = {
     requestGap: ['minMs', 'maxMs'],
     // Lô request đọc độc lập (`meta.kind = 'batch'`): Extension chạy lần lượt, dừng khi tổng thân vượt `batch.maxBytes`.
     batch: ['maxBytes'],
-    // Việc quét: `scan_job` gọi FBM một lần, giữ cột theo `keep`, cắt gói và giữ trong RAM tab; `scan_chunk` trả gói theo số thứ tự, không gọi FBM.
-    scanKinds: ['scan_job', 'scan_chunk'],
+    // Việc quét, theo lệnh `meta.command` (Extension không đọc `meta.kind`): `scanJob` gọi FBM một lần, giữ cột theo `keep`, cắt gói và giữ trong RAM tab; `scanChunk` trả gói theo số thứ tự, không gọi FBM.
+    scanCommands: ['scanJob', 'scanChunk'],
     job: ['jobId', 'idIndex', 'keepIds', 'chunkTargetBytes', 'chunkMaxBytes', 'maxResponseBytes', 'chunkIndex'],
     item: ['id', 'url', 'method', 'headers', 'body', 'bodyText', 'meta'],
     itemMeta: ['kind', 'trace', 'keep']

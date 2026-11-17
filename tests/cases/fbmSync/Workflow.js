@@ -146,7 +146,8 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
   const storage = {
     fbmWebAppUrl: 'https://script.google.com/macros/s/workflow-relay/exec',
     fbmSyncKey: 'workflow-key',
-    fbmSpreadsheetId: 'sheet-workflow'
+    fbmSpreadsheetId: 'sheet-workflow',
+    fbmPollMinutes: 5
   };
   const relayCalls = [];
   let fbmTabQueries = 0;

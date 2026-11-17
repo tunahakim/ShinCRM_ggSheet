@@ -211,15 +211,15 @@ function bridgeOnBindEvent(event) {
   if (!bridgeContextAlive()) { bridgeRetire(); return; }
   if (!sidebarWindow || !sidebarOrigin || !sidebarNonce) { return; }
   var message = {};
-  if (data.kind === 'alive') {
+  if (data.bindSignal === 'alive') {
     var now = Date.now();
     if (channelAliveMs > 0 && now - channelAliveSentAt < channelAliveMs) { return; }
     channelAliveSentAt = now;
     message.action = 'CRM_CHANNEL_ALIVE';
   } else {
     message.action = 'CRM_RELOAD';
-    message.signal = data.kind === 'open' ? 'channel-open' : 'channel';
-    if (data.kind === 'open') { message.sameSession = data.sameSession === true; }
+    message.signal = data.bindSignal === 'open' ? 'channel-open' : 'channel';
+    if (data.bindSignal === 'open') { message.sameSession = data.sameSession === true; }
     else { message.firstChunk = data.firstChunk === true; message.hasChange = data.hasChange === true; }
   }
   bridgePost(message, 'BRIDGE_BIND_POST_FAILED');
