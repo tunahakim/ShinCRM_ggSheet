@@ -191,13 +191,8 @@ function sheetLinkExtensionAlive(now) {
 }
 
 function sheetLinkHandshakePing() {
-  if (window.top !== window) {
-    try {
-      window.top.postMessage(sheetLinkHandshakeMessage(), SHEET_LINK_ORIGIN);
-    } catch (err) {
-      // Extension chưa cài hoặc trang chưa sẵn sàng — không sao, ping lại ở nhịp sau.
-    }
-  }
+  // Extension chưa cài thì trình duyệt bỏ tin chứ không ném; vắng mặt được kết luận bằng hạn ACK (`sheetLinkExtensionAlive`).
+  if (window.top !== window) { window.top.postMessage(sheetLinkHandshakeMessage(), SHEET_LINK_ORIGIN); }
   if (typeof selectionPollHeartbeat === 'function') { selectionPollHeartbeat(); }
   if (typeof changeSignalWatchdog === 'function') { changeSignalWatchdog(); }
 }

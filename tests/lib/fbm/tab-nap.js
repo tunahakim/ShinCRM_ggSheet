@@ -16,7 +16,8 @@ function bridgeNap(spreadsheetId) {
   const posts = [];
   const source = { postMessage(data, origin) { if (hop.postThrows) { throw new Error('Blocked a frame with origin'); } posts.push({ data, origin }); } };
   const origin = 'https://n-abc-0lu-script.googleusercontent.com';
-  const sidebar = (data) => windowListeners[0]({ origin, source, data });
+  // `tu` thay nguồn hoặc origin của tin để kiểm chặn khung lạ.
+  const sidebar = (data, tu) => windowListeners[0](Object.assign({ origin, source, data }, tu || {}));
   const fromWorker = (message) => { let reply; runtimeListeners.forEach((fn) => fn(message, null, (value) => { reply = value; })); return reply; };
   return { hop, posts, toWorker, sidebar, fromWorker, origin };
 }

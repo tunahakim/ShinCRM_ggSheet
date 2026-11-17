@@ -11,6 +11,7 @@ const NHOM = [
   require("./fbmSync/RelayResubmit"),
   require("./fbmSync/RelayLoop"),
   require("./fbmSync/IframeBridge"),
+  require("./fbmSync/WorkerFailure"),
   require("./fbmSync/ExecutorReplyPick"),
   require("./fbmSync/SiteAccess"),
   require("./fbmSync/TransportCore"),

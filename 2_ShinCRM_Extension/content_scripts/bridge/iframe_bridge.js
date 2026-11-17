@@ -35,6 +35,8 @@ var sidebarOrigin = '';
 var sidebarNonce = '';
 var extensionSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 var CRM_READ_PLAN = null;
+var readPlanProblem = '';
+var bridgeUnsentFailure = null;
 // Khoảng gộp nhịp sống của kênh `/bind`, do Sidebar gửi trong bắt tay (`SETTINGS` của GAS); chưa nhận thì chuyển mọi nhịp.
 var channelAliveMs = 0;
 var channelAliveSentAt = 0;
@@ -52,9 +54,15 @@ function isReadPlan(value) {
   });
 }
 
+/** Bắt tay trước khi Sidebar nạp xong lõi chưa mang read plan: không có gì để nhận. Plan sai dạng hoặc của Sheet khác là lỗi thật, báo một lần mỗi mã vì bắt tay lặp mỗi giây. */
 function acceptReadPlan(data) {
-  if (!isReadPlan(data.readPlan)) { return; }
-  if (data.spreadsheetId && String(data.spreadsheetId) !== String(readSpreadsheetId())) { return; }
+  if (data.readPlan === null || data.readPlan === undefined) { return; }
+  var problem = !isReadPlan(data.readPlan) ? 'BRIDGE_READ_PLAN_INVALID' : (data.spreadsheetId && String(data.spreadsheetId) !== String(readSpreadsheetId()) ? 'BRIDGE_READ_PLAN_SHEET_MISMATCH' : '');
+  if (problem) {
+    if (readPlanProblem !== problem) { readPlanProblem = problem; bridgeFailureReport(problem, 'Sidebar gửi read plan không dùng được cho trang Sheet này.'); }
+    return;
+  }
+  readPlanProblem = '';
   // Sidebar gửi kèm read plan ở mọi nhịp bắt tay; chỉ plan mới mới cần đọc lại ô, nếu không Extension bắn lại context mỗi giây.
   if (JSON.stringify(data.readPlan) === JSON.stringify(CRM_READ_PLAN)) { return; }
   CRM_READ_PLAN = data.readPlan;
@@ -155,9 +163,17 @@ function bridgePost(message, code) {
     return false;
   }
 }
+/** Worker chưa nhận được tin lỗi (vừa thức dậy, đang nạp lại) thì giữ tin và gửi lại ở lần bắt tay sau, không bỏ. */
 function bridgeFailureReport(code, error) {
   if (!bridgeContextAlive()) { return; }
-  sendRequestToWorker({ type: 'FBM_BRIDGE_FAILURE', code: code, message: String(error && error.message || error || '') }, function () {});
+  var failure = { type: 'FBM_BRIDGE_FAILURE', code: code, message: String(error && error.message || error || '') };
+  sendRequestToWorker(failure, function (sendError) { if (sendError) { bridgeUnsentFailure = failure; } });
+}
+function bridgeFailureResend() {
+  if (!bridgeUnsentFailure) { return; }
+  var failure = bridgeUnsentFailure;
+  bridgeUnsentFailure = null;
+  bridgeFailureReport(failure.code, failure.message);
 }
 
 /** Worker chuyển trạng thái lượt (`CRM_FBM_STATUS`) tới mọi tab Sheets; chỉ tab đúng Spreadsheet mới chuyển tiếp vào Sidebar của nó. */
@@ -192,6 +208,7 @@ function bridgeOnMessage(event) {
   sidebarOrigin = event.origin;
   sidebarNonce = nonce;
   acceptReadPlan(data);
+  bridgeFailureResend();
   if (Number(data.channelAliveMs) > 0) { channelAliveMs = Number(data.channelAliveMs); }
   if (newChannel && typeof lastContextKey !== 'undefined') { lastContextKey = ''; }
 

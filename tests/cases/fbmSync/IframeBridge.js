@@ -57,9 +57,43 @@ async function cauNoi(so) {
     ['CRM_FBM_MACHINE_ID_RESULT', false, 'EXTENSION_CONTEXT_INVALIDATED']);
 }
 
+/** Ba chỗ chặn khung lạ và hai đường lỗi không được im: read plan dùng không được, tin lỗi chưa tới worker. */
+async function chanVaBaoLoi(so) {
+  const b = bridgeNap(SHEET);
+  const khungLa = { postMessage() { throw new Error('không được gửi cho khung lạ'); } };
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-la' }, { origin: 'https://evil.example' });
+  check(so, 'Bắt tay từ origin ngoài allowlist: không mở kênh, không đáp', [b.posts.length, b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: {}, done: true })], [0, { delivered: false }]);
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1' });
+  const session = b.hop.extensionSessionId, truoc = b.toWorker.length;
+  b.sidebar({ action: 'CRM_FBM_MACHINE_ID', id: 'q1', nonce: 'n-1', sessionId: session }, { source: khungLa });
+  b.sidebar({ action: 'CRM_FBM_MACHINE_ID', id: 'q2', nonce: 'n-1', sessionId: session }, { origin: 'https://evil.example' });
+  check(so, 'Lệnh mang đúng nonce và phiên nhưng từ window khác hoặc origin lạ không tới worker', b.toWorker.length, truoc);
+
+  const kePlan = { Customer: [{ token: 'Customer:@CUS_MA_KH', headerAddress: 'A1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'A{row}' }] };
+  const baoLoi = () => b.toWorker.filter((tin) => tin.type === 'FBM_BRIDGE_FAILURE').map((tin) => tin.code);
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1', readPlan: null });
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1', readPlan: { Customer: [{ token: 1 }] } });
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1', readPlan: { Customer: [{ token: 1 }] } });
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1', readPlan: kePlan, spreadsheetId: 'sheet-khac' });
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-1', readPlan: kePlan, spreadsheetId: SHEET });
+  check(so, 'Bắt tay chưa có read plan không báo gì; plan sai dạng và plan của Sheet khác báo worker đúng mã, mỗi mã một lần dù bắt tay lặp; plan đúng thì nhận', [baoLoi(), b.hop.CRM_READ_PLAN], [['BRIDGE_READ_PLAN_INVALID', 'BRIDGE_READ_PLAN_SHEET_MISMATCH'], kePlan]);
+
+  const goc = b.hop.chrome.runtime.sendMessage;
+  b.hop.chrome.runtime.sendMessage = (message, done) => { b.hop.chrome.runtime.lastError = { message: 'Could not establish connection.' }; done(undefined); b.hop.chrome.runtime.lastError = null; };
+  b.hop.postThrows = true;
+  b.fromWorker({ type: 'CRM_FBM_STATUS', spreadsheetId: SHEET, status: {}, done: true });
+  b.hop.postThrows = false;
+  b.hop.chrome.runtime.sendMessage = goc;
+  const daGui = b.toWorker.length;
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-2' });
+  b.sidebar({ action: 'CRM_HANDSHAKE', nonce: 'n-2' });
+  check(so, 'Tin lỗi cầu nối chưa tới worker thì giữ lại, gửi đúng một lần ở lần bắt tay sau', b.toWorker.slice(daGui).map((tin) => [tin.type, tin.code]), [['FBM_BRIDGE_FAILURE', 'BRIDGE_STATUS_POST_FAILED']]);
+}
+
 async function chay(so) {
   section('FBM sync — cầu nối iframe của Extension');
   await cauNoi(so);
+  await chanVaBaoLoi(so);
 }
 
 module.exports = { chay };

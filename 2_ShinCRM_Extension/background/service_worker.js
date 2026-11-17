@@ -184,12 +184,14 @@ function scheduleGasPoll(extensionConfig) {
         gasPollAlarmKnown = true;
         gasPollAlarmMinutes = minutes;
         var result = chrome.alarms.create(GAS_POLL_ALARM, { periodInMinutes: minutes });
-        if (result && typeof result.catch === 'function') { result.catch(function (err) { alarmFailure('ALARM_CREATE_FAILED', err); }); }
+        // Tạo hỏng thì bỏ dấu "đã đặt", để lần đặt sau (cùng nhịp) thử lại thay vì tưởng chuông đã có.
+        if (result && typeof result.catch === 'function') { result.catch(function (err) { gasPollAlarmKnown = false; alarmFailure('ALARM_CREATE_FAILED', err); }); }
       };
       if (typeof chrome.alarms.get !== 'function') { create(); return; }
       chrome.alarms.get(GAS_POLL_ALARM, function (alarm) { if (!alarm || Number(alarm.periodInMinutes || 0) !== minutes) { create(); } else { gasPollAlarmKnown = true; gasPollAlarmMinutes = minutes; } });
     }
   } catch (err) {
+    gasPollAlarmKnown = false;
     alarmFailure('ALARM_CREATE_FAILED', err);
   }
 }

@@ -89,6 +89,16 @@ async function chay(so) {
   check(so, 'FBM-034: khóa sai hoặc JSON hỏng bị từ chối mà không ghi Log (người lạ không đẩy trôi được Log thật) và câu trả về không trích nội dung gửi lên',
     [intruder.error, badJson.error, JSON.stringify(badJson).indexOf('relay-test-key') < 0, relayLog.lines.length, relayLog.flushes],
     ['unauthorized', 'invalid_json', true, 3, 4]);
+
+  // Khóa relay sinh ở một chỗ (`relayKeyEnsure`): lấy lại cấu hình giữ khóa cũ, đổi khóa thì khóa cũ hết dùng được; Sheet chưa có khóa thì không ai gọi được.
+  relay.FbmSync.controlDispatch = () => ({ ok: true, code: 'RELAY_TEST_DONE', request: null, status: {} });
+  relay.Utilities = { getUuid: () => 'khoa-xoay-moi' };
+  const giuKhoa = relay.FbmSync.relayKeyEnsure(false), xoay = relay.FbmSync.relayKeyEnsure(true);
+  const sauXoay = [relayPost({ key: 'relay-test-key', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} }).error, relayPost({ key: 'khoa-xoay-moi', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: { machineId: 'may-A' } }).code];
+  delete relayDocStore.FBM_RELAY_KEY_V1;
+  const chuaCoKhoa = relayPost({ key: '', contract, spreadsheetId: 'sheet-relay-test', command: 'heartbeat', payload: {} }).error;
+  check(so, 'Khóa relay: lấy cấu hình giữ khóa cũ, đổi khóa thì khóa cũ bị từ chối và khóa mới chạy, Sheet chưa có khóa thì từ chối cả thân khóa rỗng',
+    [giuKhoa, xoay, sauXoay, chuaCoKhoa], ['relay-test-key', 'khoa-xoay-moi', ['unauthorized', 'RELAY_TEST_DONE'], 'unauthorized']);
 }
 
 module.exports = { chay };

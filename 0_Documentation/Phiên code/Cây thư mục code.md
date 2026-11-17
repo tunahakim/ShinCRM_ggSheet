@@ -518,7 +518,8 @@ tests\
     │   ├── Heartbeat.js            Kiểm lần hỏi GAS của Extension theo bảng quyết nhịp nền: công tắc tắt, máy không được giao tắt chuông, chỉ kiểm, lượt bận, lượt bỏ dở kèm hộp đen, tự nhận máy nền, sổ tiến trình khi lượt nền đóng.
     │   ├── RunGuards.js            Kiểm rào ô lượt dùng chung: câu hộp đen Extension, nhãn lượt trong Log theo tiến trình nền, RUN_LEFT_OPEN, dừng lượt nền và response đến muộn, pha "đang chạy".
     │   ├── RelayLoop.js            Kiểm vòng chở lát của Extension, cửa gọi GAS (thử lại, ô lỗi hộp đen), phép kiểm miền FBM.
-    │   ├── IframeBridge.js         Kiểm cầu nối iframe: bắt tay Sidebar, chuyển lệnh sang worker, chuyển trạng thái lượt về Sidebar.
+    │   ├── IframeBridge.js         Kiểm cầu nối iframe: bắt tay Sidebar, chuyển lệnh sang worker, chuyển trạng thái lượt về Sidebar, chặn khung lạ, báo read plan hỏng.
+    │   ├── WorkerFailure.js        Kiểm đường lỗi của service worker: chuông hỏi GAS, phục hồi cầu nối tab Sheets, lịch thử lại học từ GAS, hỏi GAS lúc mở trình duyệt.
     │   ├── ExecutorReplyPick.js    Kiểm `replyPick` của executor trên mẫu lưới khách thật.
     │   ├── SiteAccess.js           Kiểm Extension chỉ hỏi Chrome quyền trang khi nạp script vào tab FBM hoặc gọi GAS đã hỏng, và báo mã riêng nêu tên trang bị chặn.
     │   ├── TransportCore.js        Kiểm `transport/TransportCore.js`: bảng lỗi đường truyền `transportRecoverPlan` cho mỗi mã lỗi một kế hoạch (chia cửa sổ, chạy lại việc quét, tải lại trang, mở tab, dừng), không đọc hay ghi kho.
