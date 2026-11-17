@@ -30,7 +30,8 @@ function workerNap(opt) {
           if (url.indexOf('https://fbo.com.vn:8888/') === 0) { st.fbmQueries += 1; return Promise.resolve(opt.noFbmTab ? [] : [tab]); }
           return Promise.resolve([{ id: 90 }]);
         },
-        update(tabId, options, done) { setImmediate(() => done(Object.assign({}, tab, options))); },
+        // Chrome báo `complete` sau khi đổi trang xong; thiếu tín hiệu này thì Extension chờ hết hạn envelope rồi đi nhánh mở trang hỏng.
+        update(tabId, options, done) { setImmediate(() => { done(Object.assign({}, tab, options)); setTimeout(() => st.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); }); },
         reload(tabId, options, done) {
           st.reloads += 1;
           setImmediate(() => { done(); if (tabOpt.reloadCompletes) { setTimeout(() => st.listeners.forEach((fn) => fn(tabId, { status: 'complete' }, { id: tabId, status: 'complete' })), 5); } });
