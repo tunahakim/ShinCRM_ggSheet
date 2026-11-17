@@ -90,15 +90,6 @@ function capCuaBanGhi(hopCat) {
     const kho = taoKhoThuocTinh({});
     hopCat.PropertiesService = { getDocumentProperties: () => kho };
   }
-  // Kho thật luôn có `deleteProperty` (sổ bận rỗng thì xóa khóa); kho giả của test cũ thiếu thì xóa bằng cách ghi chuỗi rỗng, nghĩa như chưa có.
-  const layKho = hopCat.PropertiesService.getDocumentProperties;
-  if (typeof layKho === 'function') {
-    hopCat.PropertiesService.getDocumentProperties = function () {
-      const kho = layKho.apply(this, arguments);
-      if (kho && typeof kho.deleteProperty !== 'function' && typeof kho.setProperty === 'function') { kho.deleteProperty = (k) => kho.setProperty(k, ''); }
-      return kho;
-    };
-  }
   if (!hopCat.LockService || typeof hopCat.LockService.getDocumentLock !== 'function' || !hopCat.SpreadsheetApp) {
     // Hộp thiếu khóa tài liệu hoặc Sheet giả (bản thật cần cả hai để chốt ghi): như bản thật trừ phần Google: vào lớp ngoài cùng thì bỏ bản đọc, ra lớp ngoài cùng thì gửi kho phần ghi chờ trong khóa.
     vm.runInContext('documentLockRun = function (work) { var outer = DOCUMENT_STORE.docLockDepth === 0; if (outer) { documentStoreRefresh(); } DOCUMENT_STORE.docLockDepth += 1; try { return work(); } finally { DOCUMENT_STORE.docLockDepth -= 1; if (outer) { documentStoreFlush(DOCUMENT_STORE_DIRTY_DOC); if (!documentStoreActive()) { documentStoreClear(); } } } };', hopCat);
