@@ -4,6 +4,7 @@ var FBM_SYNC_SETTINGS_SCHEMA = {
   id: 'settings',
   label: 'Cài đặt phiên',
   rootId: 'fbm-sync-settings-root',
+  relayRotate: { confirmTitle: 'Đổi khóa relay?', confirmMessage: 'Extension sẽ phải nhận và lưu khóa mới.', cancelLabel: 'Quay lại', confirmLabel: 'Đổi khóa' },
   regions: { module: 'fbm-sync-module-card-region', relay: 'fbm-sync-relay-card-region', extension: 'fbm-sync-extension-card-region', background: 'fbm-sync-background-card-region', machine: 'fbm-sync-machine-card-region', machineNotice: 'fbm-sync-settings-machine-notice-region', machineState: 'fbm-sync-machine-state-region', loginPolicy: 'fbm-sync-login-policy-card-region', relayNotice: 'fbm-sync-settings-relay-notice-region', relayState: 'fbm-sync-relay-state-region', extensionNotice: 'fbm-sync-settings-extension-notice-region', moduleNotice: 'fbm-sync-settings-module-notice-region', backgroundNotice: 'fbm-sync-settings-background-notice-region', loginNotice: 'fbm-sync-settings-login-notice-region', loginPolicyStatus: 'fbm-sync-login-policy-status-region', loginPolicyParent: 'fbm-sync-login-policy-parent-row', loginPolicyChildren: 'fbm-sync-login-policy-children' },
   cards: {
     module: 'Bật tắt module đồng bộ FBM', relay: 'Kết nối Extension', extension: 'Nhịp hỏi GAS của Extension',

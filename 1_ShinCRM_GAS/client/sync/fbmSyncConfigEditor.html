@@ -127,7 +127,7 @@ function fbmSyncConfigButton(key, labels, options) {
     id: opts.id || fbmSyncConfigActionId(key, 'button'),
     label: label,
     className: className,
-    disabled: !!opts.disabled || (!!FBM_SYNC_CLIENT.running && key !== 'relay') || fbmSyncConfigSectionCorrupt(key),
+    disabled: !!opts.disabled || (fbmSyncBusy() && key !== 'relay') || fbmSyncConfigSectionCorrupt(key),
     data: { 'sync-config-action': editing ? schema.actionSave : schema.actionEdit, 'sync-config-key': key }
   });
 }
@@ -196,13 +196,13 @@ function fbmSyncConfigDraftValue(key, path, fallback) {
 
 function fbmSyncConfigMasterEnabled() {
   var status = FBM_SYNC_CLIENT.lastStatus || {};
-  return status.masterEnabled !== false && status.enabled !== false;
+  return status.enabled !== false;
 }
 
 /** Một cổng duy nhất quyết định control thân có được thao tác hay không. */
 function fbmSyncConfigControlDisabled(key, path) {
   var schema = FBM_SYNC_CONFIG_UI_SCHEMA[key] || {}, editing = fbmSyncConfigIsEditing(key), dependency = schema.dependencies && schema.dependencies[path];
-  if (!editing || FBM_SYNC_CLIENT.running) { return true; }
+  if (!editing || fbmSyncBusy()) { return true; }
   if (key === 'background' && !fbmSyncConfigMasterEnabled()) { return true; }
   if (schema.parentPath && path !== schema.parentPath && fbmSyncConfigDraftValue(key, schema.parentPath, true) !== true) { return true; }
   if (dependency && fbmSyncConfigDraftValue(key, dependency, true) !== true) { return true; }
@@ -214,9 +214,13 @@ function fbmSyncLoginUsernameValue(login) {
   var value = login || FBM_SYNC_CLIENT.loginStatus || {}, publicValue = value.public || {};
   return String(publicValue.usernameHint || value.usernameHint || value.username || '');
 }
+/** Username đăng nhập đã lưu không đọc được (trống hoặc bị che): GAS quyết ở `status.usernameDisplay.unavailable`, Sidebar chỉ đọc. */
+function fbmSyncSavedUsernameUnavailable() {
+  return (((FBM_SYNC_CLIENT.lastStatus || {}).usernameDisplay) || {}).unavailable === true;
+}
 function fbmSyncLoginUsernameDisplayValue(login) {
   var value = login || FBM_SYNC_CLIENT.loginStatus || {};
-  if (value.usernameMetadataUnavailable === true) {
+  if (fbmSyncSavedUsernameUnavailable()) {
     return FBM_SYNC_ACCOUNT_SCHEMA.login.username.unavailableValue;
   }
   return fbmSyncLoginUsernameValue(value);
@@ -231,23 +235,6 @@ function fbmSyncConnectionUsernamesDiffer(binding, login) {
   var left = String(binding && binding.username || '').trim();
   var right = String(fbmSyncLoginUsernameValue(login) || '').trim();
   return fbmSyncUsernameComparable(left) && fbmSyncUsernameComparable(right) && left !== right;
-}
-
-function fbmSyncConnectionDraftUsernames() {
-  var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-  var login = FBM_SYNC_CLIENT.loginStatus || {};
-  if (fbmSyncConfigIsEditing('connection') && typeof document !== 'undefined') {
-    var identityInput = document.getElementById('fbm-identity-username');
-    var loginInput = document.getElementById('fbm-login-username');
-    if (identityInput) { binding = Object.assign({}, binding, { username: identityInput.value }); }
-    if (loginInput) { login = Object.assign({}, login, { public: Object.assign({}, login.public || {}, { usernameHint: loginInput.value }) }); }
-  }
-  return { binding: binding, login: login };
-}
-
-function fbmSyncConnectionHasUsernameMismatch() {
-  var values = fbmSyncConnectionDraftUsernames();
-  return fbmSyncConnectionUsernamesDiffer(values.binding, values.login);
 }
 
 function fbmSyncConfigSetDraftValue(key, path, value) {
@@ -273,7 +260,7 @@ function fbmSyncConfigStartEdit(key) {
   var draft;
   if (key === 'connection') {
     var binding = FBM_SYNC_CLIENT.identityStatus && FBM_SYNC_CLIENT.identityStatus.binding || {};
-    draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: login.usernameMetadataUnavailable === true ? '' : String(fbmSyncLoginUsernameValue(login) || '') };
+    draft = { identity: { spreadsheetId: String((FBM_SYNC_CLIENT.identityDraft || {}).spreadsheetId || binding.spreadsheetId || ''), userId: String((FBM_SYNC_CLIENT.identityDraft || {}).userId || binding.userId || ''), username: String((FBM_SYNC_CLIENT.identityDraft || {}).username || binding.username || ''), accountName: String((FBM_SYNC_CLIENT.identityDraft || {}).accountName || binding.accountName || '') }, loginUsername: fbmSyncSavedUsernameUnavailable() ? '' : String(fbmSyncLoginUsernameValue(login) || '') };
     FBM_SYNC_CLIENT.identityDraft = fbmSyncConfigClone(draft.identity);
     FBM_SYNC_CLIENT.loginDraft = { username: draft.loginUsername };
     FBM_SYNC_CLIENT.loginPasswordMode = login.configured === true ? 'saved' : 'draft';
@@ -435,7 +422,7 @@ function fbmSyncConfigHandleAction(target) {
   if (!action || FBM_SYNC_CONFIG_KEYS.indexOf(key) < 0) { return false; }
   if (action === 'edit') {
     if (key === 'loginPolicy' && !((FBM_SYNC_CLIENT.loginStatus || {}).configured === true)) {
-      var decision = typeof window !== 'undefined' && typeof window.uiDecisionOpen === 'function' ? window.uiDecisionOpen({ title: 'Chưa có thông tin đăng nhập tự động', message: 'Hãy nhập username và mật khẩu ở khối Đăng nhập tự động trước khi sửa chính sách.', cancelLabel: 'Quay lại', confirmLabel: 'Đi tới Đăng nhập tự động' }) : Promise.resolve(typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm('Hãy nhập username và mật khẩu ở khối Đăng nhập tự động trước khi sửa chính sách.'));
+      var decision = uiDecisionOpen({ title: 'Chưa có thông tin đăng nhập tự động', message: 'Hãy nhập username và mật khẩu ở khối Đăng nhập tự động trước khi sửa chính sách.', cancelLabel: 'Quay lại', confirmLabel: 'Đi tới Đăng nhập tự động' });
       decision.then(function (go) {
         if (!go) { return; }
         fbmSyncSetScreen('account');

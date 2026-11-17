@@ -28,8 +28,8 @@ function actionErrorNotice(message, logState) {
 function actionErrorReport(err) {
   if (typeof console !== 'undefined' && console.error) { console.error(err); }
   var message = err && err.message ? err.message : String(err);
-  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.active === true && typeof fbmSyncPaintError === 'function') {
-    fbmSyncPaintError(err, message, 'sidebar_action');
+  if (typeof FBM_SYNC_CLIENT !== 'undefined' && FBM_SYNC_CLIENT && FBM_SYNC_CLIENT.active === true && typeof fbmSyncReportError === 'function') {
+    fbmSyncReportError(err, message, 'sidebar_action');
     return null;
   }
   var luot = ACTION_ERROR_SEQ += 1;

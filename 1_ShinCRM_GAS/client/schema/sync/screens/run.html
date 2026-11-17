@@ -30,9 +30,7 @@ var FBM_SYNC_RUN_SCHEMA = {
   cardTitle: 'Chọn loại đồng bộ',
   action: {
     ids: { start: 'fbm-sync-start', cancel: 'fbm-sync-cancel' },
-    start: 'Bắt đầu đồng bộ',
-    cancel: 'Dừng đồng bộ',
-    backgroundStopping: 'Đang dừng đồng bộ nền...',
+    labels: { start: 'Bắt đầu đồng bộ', cancel: 'Dừng đồng bộ', stopping: 'Đang dừng…', stoppingBackground: 'Đang dừng đồng bộ nền...' },
     loading: 'Đang tải trạng thái...',
     backgroundSettings: 'Cài đặt đồng bộ nền',
     backgroundSettingsId: 'fbm-sync-open-background-settings'
@@ -55,30 +53,8 @@ var FBM_SYNC_RUN_SCHEMA = {
     cancelLabel: 'Quay lại',
     failed: 'Không hủy được phiên cũ để đăng nhập.'
   },
-  scope: { on: 'Phạm vi đang giới hạn, chỉ chạy cho khách chỉ định: ', empty: 'Phạm vi đang giới hạn nhưng danh sách khách chỉ định trống nên lượt đồng bộ sẽ bị chặn. Vào Cài đặt phiên để thêm mã hoặc bỏ giới hạn.' },
   machine: { settings: 'Mở cài đặt máy chạy nền', settingsId: 'fbm-sync-open-machine-settings' },
   approval: { id: 'fbm-sync-approve', label: 'Chấp thuận', text: function (count) { return count + ' bản ghi ShinCRM chờ chấp thuận trước khi đẩy lên FBM. Chấp thuận thì đồng bộ chiều Đẩy chạy ngay và đẩy đúng các bản ghi này; có người sửa thêm trên Sheet thì không đẩy gì và hỏi lại.'; } },
-  phaseTitles: { done: 'Pipeline đã hoàn tất', error: 'Pipeline dừng vì lỗi', paused: 'Pipeline đã tạm dừng', running: 'Pipeline đang chạy' },
-  pipeline: {
-    title: 'Pipeline đang chạy',
-    marker: { done: '✓', error: '!', current: '●', pending: '○' },
-    pull: [
-      { id: 'session', label: 'Kiểm tra phiên FBM' },
-      { id: 'category', label: 'Category' },
-      { id: 'customer', label: 'Đọc Customer' },
-      { id: 'activity', label: 'Đọc Activity' },
-      { id: 'reconcile', label: 'Đối soát' }
-    ],
-    push: [
-      { id: 'session', label: 'Kiểm tra phiên FBM' },
-      { id: 'category', label: 'Category' },
-      { id: 'record', label: 'Kiểm tra bản ghi' },
-      { id: 'form', label: 'Mở form FBM' },
-      { id: 'write', label: 'Ghi FBM' },
-      { id: 'verify', label: 'Đọc xác nhận' },
-      { id: 'baseline', label: 'Cập nhật baseline' }
-    ],
-    sheet: { id: 'sheet', label: 'Cập nhật Sheet' }
-  }
+  pipeline: { marker: { done: '✓', error: '!', current: '●', pending: '○' } }
 };
 </script>

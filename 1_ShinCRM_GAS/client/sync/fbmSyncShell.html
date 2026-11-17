@@ -70,7 +70,9 @@
 </style>
 <script>
 function fbmSyncStatusReady() { return FBM_SYNC_CLIENT.statusReady === true; }
-function fbmSyncShellEnabled(status) { return !(status && (status.masterEnabled === false || status.enabled === false)); }
+function fbmSyncShellEnabled(status) { return !(status && status.enabled === false); }
+/** Lượt tay đang chạy theo `actions.busy` của GAS: mọi nút sửa và chạy khác khóa theo nó. Không có tham số thì đọc status đang hiện. */
+function fbmSyncBusy(status) { var value = status || FBM_SYNC_CLIENT.lastStatus || {}; return !!(value.actions && value.actions.busy === true); }
 function fbmSyncShellTitle() {
   var item = (FBM_SYNC_UI_SCHEMA.screens || []).filter(function (screen) { return screen.id === FBM_SYNC_CLIENT.subscreen; })[0];
   return item ? item.label : FBM_SYNC_UI_SCHEMA.shell.fallbackTitle;
@@ -95,10 +97,22 @@ function fbmSyncShellNavBlock() {
     return Button({ label: item.label, className: uiClassJoin(uiSyncClass('shell', 'navItem'), item.id === FBM_SYNC_CLIENT.subscreen ? uiSyncClass('shell', 'activeItem') : ''), data: { 'sync-screen': item.id } });
   }) });
 }
+/** Vùng báo đầu mọi màn FBM: dòng báo của màn (`fbmClient`, `fbmExtension` trong kho `noticeSet`, vì dòng đáy Sidebar ẩn khi màn FBM giữ khung), cảnh báo và vấn đề GAS dựng (`warnings`, `issues`), lệch username (`usernameMismatch`). */
 function fbmSyncShellWarningBlocks(status) {
-  var schema = FBM_SYNC_UI_SCHEMA.shell;
-  if (!fbmSyncShellEnabled(status) || typeof fbmSyncConnectionHasUsernameMismatch !== 'function' || !fbmSyncConnectionHasUsernameMismatch()) { return []; }
-  return [Notice({ kind: 'warning', text: FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchBanner })];
+  var schema = FBM_SYNC_UI_SCHEMA.shell, blocks = [];
+  schema.noticeKeys.forEach(function (key) {
+    var notice = typeof NOTICES !== 'undefined' && NOTICES[key];
+    (notice && notice.blocks || []).forEach(function (block) { blocks.push(Notice({ kind: block.variant, text: block.lines.join(' ') })); });
+  });
+  if (blocks.length) { blocks.push(FBM_SYNC_RUN_UI.layout.actionRow(Button({ id: schema.ids.noticeDismiss, label: schema.noticeDismiss, className: uiResolveActionClass('edit', 'button') }))); }
+  ((status && status.warnings) || []).concat((status && status.issues) || []).forEach(function (item) { blocks.push(Notice({ kind: item.level, text: item.text })); });
+  if (fbmSyncShellEnabled(status) && status && status.usernameMismatch === true) { blocks.push(Notice({ kind: 'warning', text: FBM_SYNC_ACCOUNT_SCHEMA.connection.usernameMismatchBanner })); }
+  return blocks;
+}
+/** Người dùng bỏ dòng báo của màn FBM. */
+function fbmSyncShellNoticeDismiss() {
+  FBM_SYNC_UI_SCHEMA.shell.noticeKeys.forEach(function (key) { noticeSet(key, null); });
+  fbmSyncRenderShellWarning(FBM_SYNC_CLIENT.lastStatus || {});
 }
 function fbmSyncRenderShellWarning(status) {
   var schema = FBM_SYNC_UI_SCHEMA.shell, info = document.getElementById(schema.ids.info), blocks = fbmSyncShellWarningBlocks(status);
@@ -160,24 +174,21 @@ function fbmSyncSetScreen(screenId) {
   FBM_SYNC_CLIENT.subscreen = ids.indexOf(screenId) >= 0 ? screenId : 'run';
   if (FBM_SYNC_CLIENT.lastStatus) { fbmSyncPaint(FBM_SYNC_CLIENT.lastStatus); }
 }
+/** Đổi công tắc tổng: không vẽ trước kết quả; công tắc khóa trên DOM tới khi GAS trả status mới, lỗi thì công tắc giữ như status GAS lần trước. */
 function fbmSyncToggleMaster() {
   if (FBM_SYNC_CLIENT.masterToggleFlight) { return FBM_SYNC_CLIENT.masterToggleFlight; }
-  var current = FBM_SYNC_CLIENT.lastStatus || {}, enabled = !(current.masterEnabled === false || current.enabled === false), next = Object.assign({}, current, { masterEnabled: !enabled, enabled: !enabled });
-  fbmSyncPaint(next);
-  var ticket = fbmSyncStatusTicket();
+  var enabled = fbmSyncShellEnabled(FBM_SYNC_CLIENT.lastStatus || {}), ticket = fbmSyncStatusTicket();
+  fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.master, { disabled: true });
   return FBM_SYNC_CLIENT.masterToggleFlight = callServer('fbmSetMasterSwitch', [!enabled]).then(function (result) {
     if (!result || result.ok === false) { throw new Error(result && (result.message || result.code) || 'Không đổi được công tắc đồng bộ.'); }
     fbmSyncExtensionWakeConfig();
     return fbmSyncStatusFromResult(result, ticket);
   }).catch(function (error) {
-    var rollback = Object.assign({}, FBM_SYNC_CLIENT.lastStatus || current, { masterEnabled: enabled, enabled: enabled });
-    if (typeof fbmSyncPaintError === 'function') { fbmSyncPaintError(error, 'Không đổi được công tắc đồng bộ.'); }
-    fbmSyncPaint(rollback);
-    return null;
-  }).finally(function () { FBM_SYNC_CLIENT.masterToggleFlight = null; });
+    return fbmSyncReportError(error, 'Không đổi được công tắc đồng bộ.', 'master_switch');
+  }).finally(function () { FBM_SYNC_CLIENT.masterToggleFlight = null; fbmSyncSetTargetState(FBM_SYNC_UI_SCHEMA.shell.ids.master, { disabled: false }); });
 }
 function fbmSyncApplyMasterDisabled(status) {
-  var ready = fbmSyncStatusReady(), disabled = !ready || !!(status && (status.masterEnabled === false || status.enabled === false));
+  var ready = fbmSyncStatusReady(), disabled = !ready || !!(status && status.enabled === false);
   var schema = FBM_SYNC_UI_SCHEMA.shell;
   fbmSyncSetTargetState(schema.ids.master, { disabled: false });
   fbmSyncSetTargetState(schema.ids.menu, { disabled: !ready });

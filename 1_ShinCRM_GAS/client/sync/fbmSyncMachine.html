@@ -31,7 +31,7 @@ function fbmSyncExtensionWakeConfig() {
   return fbmSyncLocalMachineLoad().then(function (local) {
     if (!local.machineId) { return null; }
     return fbmSyncExtensionWake([], 'config');
-  }).catch(function (error) { fbmSyncLogClientError(error, 'Không đánh thức được Extension nhận cài đặt mới.', 'extension_wake'); });
+  }).catch(function (error) { fbmSyncReportError(error, 'Không đánh thức được Extension nhận cài đặt mới.', 'extension_wake'); });
 }
 /** Lệnh giao hoặc gỡ máy chạy nền: khóa hai nút trong lúc chờ GAS, báo kết quả ở khối máy nền, vẽ status GAS trả. */
 function fbmSyncBackgroundMachineCommand(serverName, args, doneText) {
@@ -45,7 +45,7 @@ function fbmSyncBackgroundMachineCommand(serverName, args, doneText) {
     return fbmSyncExtensionWakeConfig();
   }).catch(function (error) {
     fbmSyncSetSettingsNotice('machine', 'error', schema.failed + ': ' + String(error && error.message || error));
-    fbmSyncPaintError(error, schema.failed + '.', 'background_machine');
+    fbmSyncReportError(error, schema.failed + '.', 'background_machine');
   }).then(function () {
     FBM_SYNC_CLIENT.machineBusy = false;
     fbmSyncSettingsMachineRepaint();

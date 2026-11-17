@@ -14,7 +14,7 @@ function fbmSyncIdentityFormBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {}, draft = FBM_SYNC_CLIENT.identityDraft || {}, editing = fbmSyncConfigIsEditing('connection');
   return FBM_SYNC_ACCOUNT_SCHEMA.identity.fields.map(function (field) {
     var invalid = !!(FBM_SYNC_CLIENT.identityInvalid || {})[field.key], value = draft[field.draftKey] !== undefined ? draft[field.draftKey] : binding[field.draftKey], controlId = FBM_SYNC_ACCOUNT_SCHEMA.identity.fieldPrefix + field.key;
-    return StandaloneField(field.label, { id: controlId, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.identity.inputType, value: value || '', placeholder: field.placeholder, disabled: !editing || !!FBM_SYNC_CLIENT.running, ariaLabel: field.label }, { id: controlId + '-field', className: invalid ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' });
+    return StandaloneField(field.label, { id: controlId, kind: 'input', inputType: FBM_SYNC_ACCOUNT_SCHEMA.identity.inputType, value: value || '', placeholder: field.placeholder, disabled: !editing || fbmSyncBusy(), ariaLabel: field.label }, { id: controlId + '-field', className: invalid ? FBM_SYNC_ACCOUNT_UI.classes.invalid : '' });
   });
 }
 function fbmSyncClearIdentityInvalidField(key) {
@@ -25,7 +25,7 @@ function fbmSyncClearIdentityInvalidField(key) {
   return typeof fbmSyncSetTargetState === 'function' && fbmSyncSetTargetState(fieldId, { removeClass: [FBM_SYNC_ACCOUNT_UI.classes.invalid] });
 }
 function fbmSyncIdentityActionBlocks() {
-  var active = !!FBM_SYNC_CLIENT.running, action = FBM_SYNC_CLIENT.identityAction, editing = fbmSyncConfigIsEditing('connection');
+  var active = fbmSyncBusy(), action = FBM_SYNC_CLIENT.identityAction, editing = fbmSyncConfigIsEditing('connection');
   var schema = FBM_SYNC_ACCOUNT_SCHEMA.identity;
   return [Button({ id: schema.actionIds.check, label: action === 'check' ? schema.actionLabels.checking : schema.actionLabels.check, className: uiResolveActionClass('save', 'button'), disabled: active || (!editing && !fbmSyncIdentityActionReady()) }), Button({ id: schema.actionIds.probe, label: action === 'probe' ? schema.actionLabels.probing : schema.actionLabels.probe, className: uiResolveActionClass('save', 'button'), disabled: active || !editing })];
 }
@@ -52,7 +52,7 @@ function fbmSyncIdentityResultBlocks(status) {
   return blocks;
 }
 function fbmSyncIdentityBlock(status) {
-  var active = !!FBM_SYNC_CLIENT.running;
+  var active = fbmSyncBusy();
   var schema = FBM_SYNC_ACCOUNT_SCHEMA, messages = schema.identity.messages;
   return FBM_SYNC_ACCOUNT_UI.layout.identity({ summary: fbmSyncIdentitySummaryBlocks(), form: fbmSyncIdentityFormBlocks(), actions: fbmSyncIdentityActionBlocks(), actionStatus: FBM_SYNC_CLIENT.identityAction ? [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.actionStatus, text: FBM_SYNC_CLIENT.identityAction === 'check' ? messages.actionCheck : messages.actionProbe })] : [], notice: fbmSyncAccountNoticeBlocks('identity'), result: fbmSyncIdentityResultBlocks(status) });
 }
