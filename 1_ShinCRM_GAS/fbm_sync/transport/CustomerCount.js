@@ -94,7 +94,7 @@ FbmSync.customerCountEnd = function (state, end) {
     FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + end.total + ' khách' + (end.changed ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: end.total });
   }
   // Lệch mốc: tiến trình nền của lượt chưa xong mà chuyển sang lượt Quét nhanh, nên trao tên tiến trình cho lượt đó thay vì để `runClose` ghi xong.
-  var carry = { process: state.process, pollAt: state.pollAt };
+  var carry = { process: state.process, pollAt: state.pollAt, follows: state.runId };
   if (end.changed) { state.process = ''; }
   FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
@@ -102,7 +102,7 @@ FbmSync.customerCountEnd = function (state, end) {
   return FbmSync.recountStart(tail.mode || state.mode, state.origin, carry);
 };
 
-/** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
+/** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`, `follows` là mã lượt vừa đóng để Sidebar đang chờ lượt đó chờ tiếp lượt này); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
 FbmSync.recountStart = function (mode, origin, carry) {
   var started = FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false }, carry));
   if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); started.status = FbmSync.statusView(); }

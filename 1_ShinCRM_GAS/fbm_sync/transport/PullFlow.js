@@ -40,6 +40,7 @@ FbmSync.startRun = function (options) {
     mode: opt.mode,
     scan: plan.scan,
     scanPack: plan.scanPack,
+    follows: opt.follows,
     process: opt.process,
     pollAt: opt.pollAt
   });

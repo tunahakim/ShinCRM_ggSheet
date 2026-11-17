@@ -31,7 +31,7 @@ FbmSync.runOpen = function (spec) {
     runId: Number(now).toString(36), entity: String(opt.entity || ''), phase: opt.phase || 'checking_session', cursor: opt.cursor || {}, message: String(opt.message || ''),
     counts: Object.assign(FbmSync.countsDefault(), { total: Number(opt.total) || 0 }),
     metadata: Object.assign(FbmSync.stateDefault().metadata, { conflictCount: Number(old.metadata && old.metadata.conflictCount || 0), conflictLogged: Number(old.metadata && old.metadata.conflictLogged || 0) }),
-    process: String(opt.process || ''), pollAt: Number(opt.pollAt || 0), origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'), scanPack: String(opt.scanPack || ''),
+    process: String(opt.process || ''), pollAt: Number(opt.pollAt || 0), origin: opt.origin === 'background' ? 'background' : 'manual', mode: FbmSync.modeOf(opt.mode), scan: String(opt.scan || 'full'), scanPack: String(opt.scanPack || ''), follows: String(opt.follows || ''),
     startedAt: Number(now), updatedAt: Number(now)
   });
   state.runLabel = FbmSync.runLabelOf(state, opt.kindLabel);

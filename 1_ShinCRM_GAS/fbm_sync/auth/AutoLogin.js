@@ -55,7 +55,7 @@ FbmSync.loginOpen = function (purpose, input) {
   if (busy) { return busy; }
   if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_requested', outcome: LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { runId: String(state.runId || '') } }); }
   var expected = value.identity && typeof value.identity === 'object' ? FbmSync.identityNormalize(value.identity) : FbmSync.boundIdentity();
-  var cursor = FbmSync.loginCursorOpen({ purpose: force ? 'force' : 'test', draft: draft ? { credentialRef: credential.credentialRef, ciphertext: credential.ciphertext, public: credential.public } : null, expectedIdentity: expected });
+  var cursor = FbmSync.loginCursorOpen({ purpose: force ? 'force' : 'test', resume: force ? state.loginForceResume || null : null, draft: draft ? { credentialRef: credential.credentialRef, ciphertext: credential.ciphertext, public: credential.public } : null, expectedIdentity: expected });
   // Đăng nhập là một lượt riêng (nhãn Tay · Đăng nhập thử / Hủy phiên cũ): mã lượt mới để Extension nhận đúng lượt và dòng Log không lẫn với lượt trước.
   FbmSync.runOpen({ origin: 'manual', phase: 'checking_session', kindLabel: force ? 'Hủy phiên cũ' : 'Đăng nhập thử', cursor: cursor, message: force ? 'Đang hủy phiên cũ, đăng nhập và xác minh tài khoản FBM...' : 'Đang đăng nhập thử và xác minh tài khoản FBM...' });
   return { ok: true, request: FbmSync.sliceIssue(FbmSync.loginStepRequest(cursor, credential)), status: FbmSync.statusView() };

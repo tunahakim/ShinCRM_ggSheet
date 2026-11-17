@@ -131,6 +131,7 @@ FbmSync.loginEnd = function (state, end) {
   if (storedCredential && (halt || auto)) { FbmSync.stagePatchApply(state, { loginAttempt: FbmSync.loginAttemptMark(FbmSync.loginAttemptRead(), { kind: 'failure', message: failure, halt: halt }, Date.now(), retryMinutes) }); }
   if (end.mismatch && auto) { FbmSync.autoLoginTurnOff(); }
   state.loginForceOffered = end.reason === 'oldSession' && cursor.purpose !== 'force';
+  state.loginForceResume = state.loginForceOffered ? FbmSync.loginForceResumeOf(state, cursor) : null;
   var message = end.mismatch
     ? (auto ? 'Đăng nhập thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận; tự động đăng nhập đã được tắt.' : 'Đăng nhập thử thành công nhưng tài khoản FBM không khớp liên kết đã xác nhận.')
     : FbmSync.loginFailMessage(cursor, failure, reply, retryMinutes);
@@ -144,14 +145,21 @@ FbmSync.loginEnd = function (state, end) {
   return result;
 };
 
+/** Lượt đồng bộ FBM vừa chặn vì còn phiên cũ (thuần): chỉ lượt đồng bộ tay tự đăng nhập giữa chừng mới có lượt để mở lại sau "Hủy phiên cũ"; lượt nền tự chạy lại theo lịch, Đăng nhập thử và kiểm tra liên kết không có gì để chạy tiếp. Trả `{ mode, pack }` hoặc `null`. */
+FbmSync.loginForceResumeOf = function (state, cursor) {
+  return cursor.purpose !== 'auto' || state.origin !== 'manual' || FbmSync.START_SCAN_KINDS.indexOf(String(state.scan || '')) >= 0 ? null : { mode: FbmSync.modeOf(state.mode), pack: String(state.scanPack || '') };
+};
+/** Đăng nhập thành công. Hủy phiên cũ xong mà lượt bị chặn là lượt đồng bộ tay không đẩy thì mở lại đúng loại đó qua `FbmSync.start` (`follows` để Sidebar chờ tiếp lượt mới); lượt đẩy không mở lại vì phải duyệt lại trên dữ liệu lúc đó. */
 FbmSync.loginSucceed = function (state, cursor, end) {
   state.lastFailureCode = ''; state.lastError = ''; state.retryable = false;
   if (cursor.purpose !== 'auto') {
-    var force = cursor.purpose === 'force';
-    FbmSync.runClose(state, 'done', { message: force ? 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' : 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.' });
+    var force = cursor.purpose === 'force', resume = force ? cursor.resume || null : null, reopen = !!resume && !FbmSync.canWriteFbm(resume.mode);
+    var message = force ? 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' + (resume && !reopen ? ' Bấm Đồng bộ lại để duyệt và đẩy dữ liệu.' : '') : 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.';
+    FbmSync.runClose(state, 'done', { message: message });
     FbmSync.stateWrite(state);
-    if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, reason: state.message, detail: { runId: String(state.runId || '') } }); }
-    return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, status: FbmSync.statusView(), message: state.message };
+    if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, reason: message, detail: { runId: String(state.runId || '') } }); }
+    if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }); }
+    return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, status: FbmSync.statusView(), message: message };
   }
   FbmSync.businessStepFinish(state, 'auto_login', 'ok', {});
   var back = cursor.afterLogin || {};
