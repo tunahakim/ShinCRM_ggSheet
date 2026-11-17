@@ -49,6 +49,9 @@ function chay(so) {
   g.luu({ binding: LIEN_KET_B, credential: banMa('cred-b-123456', 'USERB') });
   const xoa = g.luu({ binding: LIEN_KET_B, credential: { username: '' } });
   check(so, 'ô username trống thì xóa credential, giữ liên kết, trả mã khóa', [xoa.ok, g.F.bindingRead().userId, g.F.credentialRead().configured, xoa.keyRefRemove], [true, 'user-b', false, 'cred-b-123456']);
+  const vao = g.F.sessionInputs({ cursor: { kind: 'session', resume: { cursor: { kind: 'customer_grid' } } } }, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}' });
+  const cong = g.F.autoLoginGate(Object.assign({ attempt: vao.attempt, now: Date.now() }, vao.login));
+  check(so, 'xóa credential rồi lượt nền gặp hết phiên: không tự đăng nhập, credential vẫn trống', [cong.ok, cong.code, g.F.credentialRead().configured, g.data.FBM_CREDENTIAL_V1], [false, 'AUTO_LOGIN_NOT_CONFIGURED', false, '{}']);
   g.luu({ binding: LIEN_KET_B, credential: banMa('cred-b-777777', 'USERB') });
   const go = g.luu({ binding: {} });
   check(so, 'gỡ liên kết thì xóa cả credential, ghi dấu tài khoản vừa gỡ', [go.code, g.F.bindingRead().spreadsheetId || '', g.F.connectionRead().clearedFrom.userId, g.F.credentialRead().configured, go.keyRefRemove], ['IDENTITY_BINDING_CLEARED', '', 'user-b', false, 'cred-b-777777']);

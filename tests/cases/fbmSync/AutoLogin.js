@@ -349,6 +349,12 @@ async function chay(so) {
   const afterCycleDead = hoiNen(heartbeat);
   const afterCycleLogin = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });
   check(so, 'Khóa đã gỡ mà người dùng đăng xuất: cấp lệnh đăng nhập ngay; lý do đường truyền ghi từ lúc gửi nên hỏng giữa đường vẫn có lý do', [afterCycleDead.request && afterCycleDead.request.meta.kind, afterCycleLogin.ok, afterCycleLogin.request && afterCycleLogin.request.meta.kind, heartbeat.FbmSync.autoLoginBlockMessage('AUTO_LOGIN_THROTTLED', null, heartbeat.FbmSync.loginAttemptRead().lastError).indexOf('Lý do lần trước: ' + heartbeat.FbmSync.LOGIN_REPLIES.transport.text) >= 0], ['session_probe', true, 'login_step', true]);
+  // Lượt nền hết phiên → loginRun → đăng nhập xong thì nối lại đúng chỗ quay về của chính lượt đó (cùng mã lượt, cùng cursor nghiệp vụ).
+  const nenTruoc = heartbeat.FbmSync.stateRead(), nenQuayVe = nenTruoc.cursor.afterLogin.cursor.kind;
+  const nenTrang = quaTrang((reply) => noiNen(heartbeat, reply), afterCycleLogin.request);
+  const nenAuth = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: nenTrang.request.id }] } });
+  const nenXong = noiNen(heartbeat, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: nenAuth.request.id }] } });
+  check(so, 'B11.11: lượt nền hết phiên tự đăng nhập xong thì nối lại đúng cursor đã giữ, cùng lượt nền, request kế là request của cursor đó', [nenXong.ok, heartbeat.FbmSync.stateRead().runId === nenTruoc.runId, heartbeat.FbmSync.stateRead().origin, heartbeat.FbmSync.stateRead().cursor.kind, nenXong.request && nenXong.request.meta.kind], [true, true, 'background', nenQuayVe, 'customer_count']);
   // Sau đăng nhập, liên kết (ở đây là bản nháp của đăng nhập thử) cũng phải khớp cả trang FBM vừa mở.
   const loginPageCursor = { purpose: 'test', step: 'identity', expectedIdentity: { spreadsheetId: 'sheet-test', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } };
   const loginPageWrong = nopBuoc(heartbeat.FbmSync, loginPageCursor, { ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: { pageUserId: '2037', pageAccountName: 'Nguoi khac' } } });
