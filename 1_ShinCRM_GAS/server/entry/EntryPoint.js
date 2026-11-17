@@ -132,6 +132,11 @@ function probeEntryPoint() {
   }
 
   report.push('Có ném lại không? ' + daNem + ' (phải là true)');
+
+  // Lỗi cố ý đã mở thông báo trên Sidebar; chạy lại cùng việc cho thành công để đường tự gỡ thật dọn nó, không để thông báo giả treo mãi.
+  runEntryPoint('probeEntryPointLoi', 'core', function () { return 'chạy lại xong'; });
+  var conTreo = noticeList().some(function (notice) { return notice.topic === 'entry_failure' && notice.scope === 'probeEntryPointLoi'; });
+  report.push('Chạy lại thành công đã gỡ thông báo lỗi cố ý? ' + !conTreo + ' (phải là true)');
   report.push('Số lệnh ghi sheet Log tăng thêm: ' + (logGateWriteCount() - truoc) + ' (mỗi lượt gọi runEntryPoint nhả một lần)');
 
   report.forEach(function (line) { Logger.log(line); });
