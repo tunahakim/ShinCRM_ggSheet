@@ -302,7 +302,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\CategoryGate.js Cổng danh mục của lần gọi (map từ Category, mã bị chặn của phiên) và phép kiểm ô danh mục cho cả hai chiều.
     ├── reconcile\CategoryLookup.js Đối chiếu bảng tra danh mục FBM của phiên với Category; không ghi Sheet.
     ├── reconcile\SyncPermission.js Quyền đồng bộ một bản ghi: ô Cho phép đồng bộ FBM, Customer cha, người phụ trách giao dịch.
-    ├── report\Report.js          Trạng thái công khai cho Sidebar.
+    ├── report\Report.js          Ghi Log trạng thái lượt, gom vấn đề theo bản ghi, bản xem trước.
+    ├── report\StatusView.js      Status công khai cho Sidebar: đọc kho một lần, dựng thuần tone, nút, tiến độ, cảnh báo, câu hiển thị.
     ├── diagnostic\Trace.js       Trace hop độc lập, chỉ giữ metadata giới hạn trong DocumentProperties.
     ├── report\Preflight.js       Checker riêng của module FBM; gọi Core checker, kiểm cổng rẻ và cấu hình trước phiên.
     └── report\PreflightPush.js   Phần preflight của chặng đẩy: đếm đúng tập ứng viên chặng đẩy dựng, dòng bị chặn quyền, dấu vân lệch mốc.
@@ -482,6 +483,7 @@ tests\
     │   ├── ConnectionSave.js      Kiểm lưu kết nối: mã từ chối, một lần setProperties, giữ/lưu/xóa credential theo form, mã khóa cũ trả về.
     │   ├── WebAppRelay.js         Kiểm cổng Web App relay của GAS: khóa, Sheet, mã giao thức, danh sách lệnh relay, ghi địa chỉ Web App, Log qua runEntryPoint.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, luồng nhiều lát, chặn cấu hình đẩy, trigger hẹn giờ cũ còn sót.
+    │   ├── StatusView.js          Kiểm bộ dựng status cho Sidebar: tone, nút, tiến độ, cảnh báo, câu kiểm liên kết, phạm vi, username theo bảng ca; dựng thuần; cửa lệnh gắn status đủ trường.
     │   ├── PropertyBuffer.js      Kiểm bộ đệm DocumentProperties: thấy lượt khác ghi trong lúc chờ khóa, lỗi giữa chừng vẫn lưu phần đã ghi.
     │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
     │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng; harness chạy lượt tay và lần hỏi nền qua FBM giả.
