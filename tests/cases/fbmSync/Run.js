@@ -11,7 +11,7 @@ function hopCoLuot(origin, them) {
   const khoa = { ban: false, tryLock() { return !this.ban; }, releaseLock() {} };
   const logs = [], ref = {};
   // Nhãn lượt lấy đúng lúc gọi logEvent như LogGate thật, để bắt dòng ghi sau khi lượt đã đóng.
-  const logEvent = (line) => logs.push(Object.assign({ luot: ref.F ? ref.F.logContextText() : '' }, line));
+  const logEvent = (line) => logs.push(Object.assign({ luot: ref.F ? ref.F.logContextText(line) : '' }, line));
   const { hop, documentProperties } = workflowGas({ LockService: { getScriptLock: () => khoa }, logEvent, LOG_WARN: 'warn' });
   ref.F = hop.FbmSync;
   const F = hop.FbmSync;
@@ -80,24 +80,33 @@ async function chay(so) {
     loi(() => hong.F.withOrchestrationLock(() => hong.F.runSlice(() => ({ ok: true, request: { id: 'x' } })))), hong.F.stateRead().phase
   ], ['DOCUMENT_PROPERTY_CORRUPT', 'error']);
 
-  // Nhãn lượt chốt lúc mở: dòng Log của lượt lấy nhãn trong ô lượt, không suy lại từ kênh hay chuỗi nền lúc ghi.
-  const tayNhan = hopCoLuot(), nenNhan = hopCoLuot('background');
-  tayNhan.F.logContextNote(tayNhan.F.stateRead());
-  const nhanTay = tayNhan.F.logContextText();
-  tayNhan.F.withOrchestrationLock(() => tayNhan.F.stateWrite(tayNhan.F.runClose(tayNhan.F.stateRead(), 'done')));
-  tayNhan.F.issueContext = { channel: 'relay' };
-  tayNhan.F.logContextNote(tayNhan.F.stateRead());
-  const nhanNgoai = tayNhan.F.logContextText();
-  const nhanDongLuot = tayNhan.F.logContextText({ cycleId: tayNhan.F.stateRead().runId });
-  tayNhan.F.issueContext = null;
+  // Nhãn lượt chốt lúc mở, một nhãn ghi đè mỗi lần kích hoạt: dòng của lượt lấy nhãn đó kể cả ghi sau khi lượt đóng trong cùng lời gọi; lời gọi không làm cho lượt nào mới theo nơi gọi.
+  const tayNhan = hopCoLuot(), nenNhan = hopCoLuot('background'), TF = tayNhan.F;
+  TF.logContextNote(null); TF.issueContext = { channel: 'sidebar' };
+  TF.withOrchestrationLock(() => TF.runSlice(() => { TF.runOpen({ origin: 'manual', kindLabel: 'Đăng nhập thử' }); return { ok: true, request: { id: 'x' } }; }, TF.stateRead()));
+  const nhanTay = TF.stateRead().runLabel;
+  TF.logContextNote(null); TF.issueContext = { channel: 'relay' };
+  const dongTay = TF.withOrchestrationLock(() => TF.runSlice(() => { TF.runClose(TF.stateRead(), 'done'); return { ok: true, request: null }; }, TF.stateRead()));
+  TF.logStatus(TF.stateRead(), 'slice');
+  const dongSlice = tayNhan.logs[tayNhan.logs.length - 1], maTay = TF.stateRead().runId;
+  TF.logContextNote(null); TF.logContextNote(TF.stateRead());
+  const nhanNgoaiRelay = TF.logContextText();
+  TF.issueContext = { channel: 'sidebar' };
+  const nhanNgoaiSidebar = TF.logContextText();
+  TF.logContextNote(null);
+  TF.withOrchestrationLock(() => TF.runSlice(() => { TF.runOpen({ origin: 'manual', kindLabel: 'Hủy phiên cũ' }); tayNhan.hop.logEvent({ action: 'login_force_requested' }); return { ok: true, request: null }; }, TF.stateRead()));
+  const dongEp = tayNhan.logs[tayNhan.logs.length - 1];
+  TF.issueContext = null;
   nenNhan.F.withOrchestrationLock(() => nenNhan.F.stateWrite(nenNhan.F.runClose(nenNhan.F.stateRead(), 'error')));
-  nenNhan.F.logContextNote(nenNhan.F.stateRead());
-  check(so, 'nhãn lượt: dòng mang mã lượt vừa đóng vẫn lấy nhãn của lượt, không đoán theo kênh gọi (lượt nền lưu ô lượt hỏng lúc chốt từng ghi "Tay")', [
-    nenNhan.F.logContextText({ cycleId: nenNhan.F.stateRead().runId }), nenNhan.F.logContextText(), nhanDongLuot
-  ], [nenNhan.F.stateRead().runLabel, 'Tay', tayNhan.F.stateRead().runLabel]);
-  check(so, 'nhãn lượt: lượt tay ghi "Tay", lượt nền ghi "Nền" ngay lúc mở; Log trong lượt dùng nhãn đó; ngoài lượt thì theo kênh gọi (relay là Nền)', [
-    tayNhan.F.stateRead().runLabel.split(' · ')[0], nenNhan.F.stateRead().runLabel.split(' · ')[0], nhanTay === tayNhan.F.stateRead().runLabel, nhanNgoai
-  ], ['Tay', 'Nền', true, 'Nền']);
+  const nhanNenDong = nenNhan.F.logContextText();
+  nenNhan.F.logContextNote(null); nenNhan.F.logContextNote(nenNhan.F.stateRead());
+  check(so, 'nhãn lượt: lượt tay đóng trong lời gọi đến qua relay, dòng slice ghi sau khi đóng vẫn mang nhãn Tay và mã lượt (từng ghi "Nền")', [
+    !!dongTay, dongSlice.luot, dongSlice.cycleId === maTay, nhanTay.split(' · ')[0]
+  ], [true, 'Tay · Đăng nhập thử', true, 'Tay']);
+  check(so, 'nhãn lượt: lượt Hủy phiên cũ mở trong lát có ngay nhãn của nó cho dòng ghi trong cùng lát (từng lấy nhãn ô lượt cũ)', dongEp.luot, 'Tay · Hủy phiên cũ');
+  check(so, 'nhãn lượt: lượt nền giữ nhãn Nền sau khi đóng trong cùng lời gọi; lời gọi mới không làm cho lượt nào thì theo nơi gọi (relay Nền, Sidebar Tay, không rõ thì Tay), không mang nhãn lượt cũ', [
+    nhanNenDong.split(' · ')[0], nenNhan.F.logContextText({ cycleId: nenNhan.F.stateRead().runId }), nenNhan.F.logContextText(), nhanNgoaiRelay, nhanNgoaiSidebar
+  ], ['Nền', nenNhan.F.stateRead().runLabel, 'Tay', 'Nền', 'Tay']);
 
   // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
   const runCu = tayNhan.F.stateRead().runId;
