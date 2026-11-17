@@ -10,9 +10,10 @@ function datUngVienDay(hopCat, danhSach) {
   const hop = (entity) => ds(entity).filter((c) => (c.entity || 'customer') === entity);
   // Bản ghi đã vào sổ lỗi đẩy thì không chọn lại, như phép xét thật khi dữ liệu chưa đổi.
   F.pushReview = (entity, record, customer, context) => {
-    if (context && context.pushFailures && context.pushFailures[entity + ':' + String(record && record.id)] !== undefined) { return null; }
+    const no = { verdict: { eligible: false, kind: '', reason: 'pushFailed' }, candidate: null };
+    if (context && context.pushFailures && context.pushFailures[entity + ':' + String(record && record.id)] !== undefined) { return no; }
     const found = hop(entity).find((c) => String(c.id) === String(record && record.id));
-    return found ? Object.assign({ raw: record }, found, { entity }) : null;
+    return found ? { verdict: { eligible: true, kind: found.kind, reason: '' }, candidate: Object.assign({ raw: record }, found, { entity }) } : { verdict: { eligible: false, kind: '', reason: 'unchanged' }, candidate: null };
   };
   const doc = F.readLocal;
   F.readLocal = (entity) => {

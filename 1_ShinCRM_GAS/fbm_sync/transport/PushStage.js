@@ -196,7 +196,7 @@ FbmSync.pushNext = function (state, settings, logs, threshold) {
     var item = list[cursor.at], entity = item.entity;
     var record = FbmSync.readLocalById(entity, item.id);
     var parent = record && entity === 'activity' && String(record.customerId || '').trim() ? FbmSync.readLocalById('customer', record.customerId) : null;
-    var candidate = record ? FbmSync.pushReview(entity, record, parent, context) : null;
+    var candidate = record ? FbmSync.pushReview(entity, record, parent, context).candidate : null;
     state.entity = entity;
     if (!candidate) { state.cursor = FbmSync.pushCursorNext(cursor, true); continue; }
     // Dòng đã đổi nội dung từ lúc qua cổng chấp thuận: không đẩy nội dung chưa ai duyệt, để lần quét lại hoặc lượt sau xét.

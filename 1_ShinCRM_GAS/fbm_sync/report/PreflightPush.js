@@ -2,17 +2,16 @@
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /**
- * Một lần duyệt mọi dòng bằng đúng phép xét của chặng đẩy (`pushEligible`, `pushReview`) trên cổng danh mục và dấu vân của `context`: ứng viên, dòng bị chặn đẩy và dấu vân cho tóm tắt hash đều từ cùng một lần xét, nên số preflight báo là đúng tập chặng đẩy dựng.
+ * Một lần duyệt mọi dòng bằng đúng phép xét của chặng đẩy (`pushReview`) trên cổng danh mục và dấu vân của `context`: ứng viên, dòng bị chặn đẩy và dấu vân cho tóm tắt hash đều từ cùng một lần xét, nên số preflight báo là đúng tập chặng đẩy dựng.
  * Trả `{ candidates, rows, noPermission, frozen, invalid }`; `rows[entity]` là `{ record, baseline, hash }` của mọi dòng (dấu vân chỉ tính cho dòng có mốc). Đọc lỗi đã ném ở `localScan`: coi như Sheet trống thì phiên chạy tiếp trên dữ liệu sai (FBM-022).
  */
 FbmSync.preflightPushReview = function (scan, context) {
   var result = { candidates: [], rows: {}, noPermission: { customer: 0, activity: 0 }, frozen: { customer: [], activity: [] }, invalid: { customer: [], activity: [] } };
   ['customer', 'activity'].forEach(function (entity) {
     result.rows[entity] = FbmSync.pushScanRows(entity, scan).map(function (row) {
-      var record = row.record, id = String(record.id || ''), baseline = String(record.fbmHash || '').trim(), verdict = FbmSync.pushEligible(entity, record, row.parent, context);
+      var record = row.record, id = String(record.id || ''), baseline = String(record.fbmHash || '').trim(), review = FbmSync.pushReview(entity, record, row.parent, context), verdict = review.verdict;
       if (verdict.eligible) {
-        var candidate = FbmSync.pushCandidateBuild(entity, record, row.parent, verdict, context);
-        if (candidate) { result.candidates.push(candidate); }
+        if (review.candidate) { result.candidates.push(review.candidate); }
       } else if (verdict.reason === 'permissionInvalid') {
         result.invalid[entity].push(id);
       } else if ((verdict.reason === 'noPermission' || verdict.reason === 'frozen') && FbmSync.pushChanged(record, context.hash(record, entity))) {

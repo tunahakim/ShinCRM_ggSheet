@@ -252,7 +252,7 @@ async function chay(so) {
     const scanBox = pushQueue(['A', 'B'].map(editCustomer).concat([Object.assign(editCustomer('C'), { fbmHash: '' }), Object.assign(editCustomer('D'), { phone: '' })]), [Object.assign({ id: 'ACT-1', customerId: 'CUS-A', fbmId: '9001', workDate: '2026-10-01', taskType: 'Gọi điện', content: 'Gọi', owner: 'Người khác', fbmSyncPermission: 'Cho phép', fbmHash: 'cũ' })]);
     const SF = scanBox.F, scan = SF.localScan(), context = SF.pushReviewContext(SF.stateRead(), scan);
     const byScan = SF.pushCandidatesAll(scan, context).map((c) => [c.entity, c.id, c.kind, c.hold ? c.hold.code : '']);
-    const byId = byScan.map((row) => { const record = SF.readLocalById(row[0], row[1]), parent = row[0] === 'activity' ? SF.readLocalById('customer', record.customerId) : null, c = SF.pushReview(row[0], record, parent, SF.pushReviewContext(SF.stateRead())); return [c.entity, c.id, c.kind, c.hold ? c.hold.code : '']; });
+    const byId = byScan.map((row) => { const record = SF.readLocalById(row[0], row[1]), parent = row[0] === 'activity' ? SF.readLocalById('customer', record.customerId) : null, c = SF.pushReview(row[0], record, parent, SF.pushReviewContext(SF.stateRead())).candidate; return [c.entity, c.id, c.kind, c.hold ? c.hold.code : '']; });
     check(so, 'C0: phép xét trên lần quét cả sheet và trên dòng đọc lại theo mã cho cùng kết quả (cùng mã, cùng loại, cùng lý do chờ sửa)', [byScan, byId], [byScan, byScan]);
   }
   {

@@ -49,12 +49,12 @@ FbmSync.pushChanged = function (record, currentHash) {
 };
 
 /**
- * Ứng viên của chặng đẩy: `pushEligible` cho qua thì dựng `{ kind, entity, id, record, raw }`, không thì `null`.
+ * Phép xét một dòng, chung cho chặng đẩy và preflight: `{ verdict, candidate }` (`verdict` của `pushEligible`; ứng viên khi được đẩy, không thì `null`).
  * Ứng viên mang `hold` là dòng chờ người sửa chưa mang trạng thái đó, việc của nó là ghi trạng thái và Log một lần. Đã mang đúng trạng thái thì không có việc, nên lần quét lại không chọn lại và phiên vẫn sạch; sửa dữ liệu hoặc Category thì dòng qua phép xét và được đẩy bất kể trạng thái cũ. Lệnh tạo chưa xác nhận không qua phép chờ sửa vì không dựng lệnh ghi.
  */
 FbmSync.pushReview = function (entity, record, customer, context) {
   var verdict = FbmSync.pushEligible(entity, record, customer, context);
-  return verdict.eligible ? FbmSync.pushCandidateBuild(entity, record, customer, verdict, context) : null;
+  return { verdict: verdict, candidate: verdict.eligible ? FbmSync.pushCandidateBuild(entity, record, customer, verdict, context) : null };
 };
 
 /** Dựng ứng viên từ dòng `pushEligible` đã cho qua (`verdict`); `null` khi dòng đã mang đúng trạng thái chờ sửa. */
@@ -91,7 +91,7 @@ FbmSync.pushScanRows = function (entity, scan) {
 
 /** Quét một thực thể trên bản đọc `scan` (đọc cả sheet một lần): mọi dòng có việc theo `pushReview`, theo thứ tự dòng. */
 FbmSync.pushCandidates = function (entity, scan, context) {
-  return FbmSync.pushScanRows(entity, scan).map(function (row) { return FbmSync.pushReview(entity, row.record, row.parent, context); }).filter(Boolean);
+  return FbmSync.pushScanRows(entity, scan).map(function (row) { return FbmSync.pushReview(entity, row.record, row.parent, context).candidate; }).filter(Boolean);
 };
 
 /**
