@@ -112,7 +112,7 @@ async function chay(so) {
 
   // Gặp khi nghiệm thu B4: dòng transport_failure ghi sau khi lượt đã đóng nên mất nhãn lượt.
   const hongDuong = hopCoLuot(), nhanHong = hongDuong.F.stateRead().runLabel;
-  hongDuong.F.transportFailureRun({ requestId: hongDuong.F.stateRead().activeRequestId, code: 'FBM_FETCH_TIMEOUT', message: 'Hết giờ.' });
+  hongDuong.F.transportFailureRun({ requestId: hongDuong.F.stateRead().activeRequestId, code: 'FBM_SITE_ACCESS_BLOCKED', message: 'Chrome chặn quyền truy cập trang FBM.' });
   const dongHong = hongDuong.logs.filter((line) => line.action === 'transport_failure')[0] || {};
   check(so, 'hỏng đường truyền giữa lượt: dòng transport_failure mang nhãn lượt, lượt đóng lỗi', [dongHong.luot, hongDuong.F.stateRead().phase], [nhanHong, 'error']);
 

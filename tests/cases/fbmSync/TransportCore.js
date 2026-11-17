@@ -25,10 +25,11 @@ async function chay(so) {
     ke({ cursor: {} }, 'FBM_SITE_ACCESS_BLOCKED', 'r-1', moTab), ke({ cursor: {} }, 'FBM_URL_OUTSIDE_SITE'), ke({}, 'MA_LA'), JSON.stringify(documentProperties.data) === truoc, 'metadata' in quetGd
   ], ['stop', 'stop', 'stop', true, false]);
   const doc = (replay, extra) => Object.assign({ cursor: { kind: 'grid' }, activeRequestReplay: replay }, extra || {});
-  check(so, 'transportRecoverPlan: đường truyền đứt sau khi gửi thì chỉ gửi lại request đã khai đọc thuần, một lần mỗi request; request ghi hoặc lượt cũ chưa có dấu thì dừng', [
+  check(so, 'transportRecoverPlan: đường truyền đứt hoặc FBM quá giờ sau khi gửi thì chỉ gửi lại request đã khai đọc thuần, một lần mỗi request; request ghi hoặc lượt cũ chưa có dấu thì dừng', [
     ke(doc(true), 'FBM_TRANSPORT_UNAVAILABLE'), ke(doc(false), 'FBM_TRANSPORT_UNAVAILABLE'), ke({ cursor: { kind: 'grid' } }, 'FBM_TRANSPORT_UNAVAILABLE'),
-    ke(doc(true, { metadata: daPhatLai.metadata }), 'FBM_TRANSPORT_UNAVAILABLE', 'r-2'), ke(doc(true), 'FBM_FETCH_TIMEOUT')
-  ], ['replay', 'stop', 'stop', 'stop', 'stop']);
+    ke(doc(true, { metadata: daPhatLai.metadata }), 'FBM_TRANSPORT_UNAVAILABLE', 'r-2'), ke(doc(true), 'FBM_FETCH_TIMEOUT'), ke(doc(false), 'FBM_FETCH_TIMEOUT'),
+    ke(doc(true, { metadata: daPhatLai.metadata }), 'FBM_FETCH_TIMEOUT', 'r-2')
+  ], ['replay', 'stop', 'stop', 'stop', 'replay', 'stop', 'stop']);
   const tran = { transportReplays: F.BUDGET.transportReplaysPerRun };
   check(so, 'transportRecoverPlan: lượt đã phát lại đủ trần BUDGET.transportReplaysPerRun (tính cả tải lại trang và mở tab) thì mọi kế hoạch phát lại thành replay_budget; kế hoạch dừng giữ nguyên', [
     F.BUDGET.transportReplaysPerRun, ke(doc(true, { metadata: tran }), 'FBM_TRANSPORT_UNAVAILABLE'), ke(doc(true, { metadata: tran }), 'FBM_TAB_NOT_READY'), ke(doc(true, { metadata: tran }), 'FBM_TAB_NOT_FOUND', 'r-1', moTab),
