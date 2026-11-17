@@ -1,5 +1,5 @@
 /**
- * Người điều phối các lệnh cài đặt của đồng bộ FBM (`save_settings`, `set_master`, `set_background`, `reset_settings`) và gói cài đặt cho màn đồng bộ. Mọi lần ghi đi qua `settingsSave`/`settingsReset` của cổng cài đặt chung; ở đây chỉ thêm các bước kiểm cần dữ liệu ngoài phần cài đặt (danh sách khách cho phạm vi, xác nhận chu kỳ dày) và việc đi kèm (dừng lượt khi tắt công tắc).
+ * Người điều phối các lệnh cài đặt của đồng bộ FBM (`save_settings`, `set_master`, `reset_settings`) và gói cài đặt cho màn đồng bộ. Mọi lần ghi đi qua `settingsSave`/`settingsReset` của cổng cài đặt chung; ở đây chỉ thêm các bước kiểm cần dữ liệu ngoài phần cài đặt (danh sách khách cho phạm vi, xác nhận chu kỳ dày) và việc đi kèm (dừng lượt khi tắt công tắc).
  *
  * Lưu nhiều phần trong một gói: phần nào không đạt thì cả gói không ghi, nên công tắc tổng gửi kèm tham số phiên sai không đổi được.
  */
@@ -92,15 +92,6 @@ FbmSync.masterSwitchCommand = function (enabled) {
   // Công tắc đã tắt nhưng lượt kẹt chưa đóng được vì GAS bận: báo, không coi như đã dừng.
   if (stop && stop.ok === false) { return Object.assign({ enabled: false }, stop); }
   return { ok: true, enabled: enabled === true, code: stop ? stop.code : '' };
-};
-
-/** Lệnh `set_background` (trong khóa): bật/tắt lịch nền qua cổng cài đặt. */
-FbmSync.backgroundSwitchCommand = function (enabled) {
-  var patches = {};
-  patches[FbmSync.SETTING_SECTIONS.background] = { enabled: enabled === true };
-  var saved = settingsSave(patches);
-  if (!saved.ok) { return FbmSync.settingsRejected(saved.problems, null); }
-  return { ok: true, enabled: enabled === true, settings: FbmSync.settingsView() };
 };
 
 /** Lệnh `reset_settings` (trong khóa): đặt một phần cài đặt FBM về mặc định, lối thoát khi khóa của phần đó hỏng. Ghi Log vì đây là xóa cài đặt người dùng đã đặt. */

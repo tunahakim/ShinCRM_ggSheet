@@ -51,7 +51,6 @@ const CA = [
   { lenh: 'save_settings', phan: 'loginPolicy', ten: 'lưu chính sách tự đăng nhập', payload: { patches: { fbm_login_policy: { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 30 } } } },
   { lenh: 'reset_settings', phan: 'run', ten: 'đặt tham số phiên về mặc định', payload: { section: 'fbm_run' } },
   { lenh: 'set_master', ten: 'set_master', payload: { enabled: true } },
-  { lenh: 'set_background', ten: 'set_background', payload: { enabled: false } },
   { lenh: 'save_identity_binding', ten: 'save_identity_binding', payload: { binding: {} } },
   { lenh: 'save_credential', ten: 'save_credential thiếu dữ liệu', payload: {} },
   { lenh: 'reset_state', ten: 'reset_state' },
@@ -65,6 +64,18 @@ const CA = [
   { lenh: 'trace_read', ten: 'trace_read' }
 ];
 
+/**
+ * Cờ của từng lệnh (`lock` chạy trong khóa điều phối, `slice` trong ranh giới lát, `reply` ghi Log khi bận bỏ kết quả, `relay` relay được gọi, `drives` cần mã máy, `view` gắn status). Đổi cờ là đổi hành vi khóa và ranh giới lát của lệnh, nên phải sửa cả bảng này có chủ đích.
+ */
+const CO_MONG_DOI = {
+  start: 'lock drives', continue: 'lock slice reply relay', heartbeat: 'lock relay',
+  assign_background_machine: 'lock', release_background_machine: 'lock', cancel: '', stop_background: '',
+  open_conflict: 'lock slice drives', confirm_conflict: 'lock', save_settings: 'lock', reset_settings: 'lock', set_master: '',
+  save_identity_binding: 'lock', save_credential: 'lock', reset_state: 'lock', retry_push_failures: 'lock', client_error: 'lock reply',
+  relay_config: 'lock noview', relay_rotate_key: 'lock noview', relay_switch_log: 'noview', status: 'noview', trace_read: 'noview'
+};
+const coCua = (spec) => ['lock', 'slice', 'reply', 'relay', 'drives'].filter((co) => spec[co] === true).concat(spec.view === false ? ['noview'] : []).join(' ');
+
 async function chay(so) {
   section('FBM sync — kết quả mọi lệnh qua cửa ra');
   const mau = workflowGas(HOP).hop.FbmSync;
@@ -72,8 +83,11 @@ async function chay(so) {
     .concat(Object.keys(mau.START_KINDS).filter((kind) => !CA.some((ca) => ca.lenh === 'start' && ca.payload.kind === kind)).map((kind) => 'start ' + kind))
     .concat(Object.keys(mau.SETTING_SECTIONS).filter((phan) => phan !== 'pullDefaults' && phan !== 'master' && !CA.some((ca) => ca.phan === phan)).map((phan) => 'cài đặt ' + phan));
   check(so, 'bảng ca phủ đủ mọi lệnh, mọi loại lượt của start và mọi mục cài đặt', thieu, []);
+  const coThat = {};
+  Object.keys(mau.COMMANDS).forEach((lenh) => { coThat[lenh] = coCua(mau.COMMANDS[lenh]); });
+  check(so, 'cờ lock, slice, reply, relay, drives, view của từng lệnh đúng bảng mong đợi', coThat, CO_MONG_DOI);
 
-  const lo = [], nem = [];
+  const lo = [], nem = [], sai = [];
   CA.forEach((ca) => {
     const { hop } = workflowGas(HOP);
     const F = hop.FbmSync, logs = [];
@@ -83,6 +97,12 @@ async function chay(so) {
       if (ca.chuan) { ca.chuan(F); }
       const payload = typeof ca.payload === 'function' ? ca.payload(F) : (ca.payload || {});
       F.statePatch({ session: Object.assign({}, F.stateRead().session, BI_MAT) });
+      // Ghi lúc phần ruột của lệnh bắt đầu: đang trong khóa, trong lát hay không, để so với cờ khai trong bảng lệnh.
+      let trongKhoa = 0, trongLat = 0;
+      const khoa = F.withOrchestrationLock, lat = F.runSlice, spec = F.COMMANDS[ca.lenh], chayGoc = spec.run;
+      F.withOrchestrationLock = (fn) => { trongKhoa += 1; try { return khoa(fn); } finally { trongKhoa -= 1; } };
+      F.runSlice = (fn, st) => { trongLat += 1; try { return lat(fn, st); } finally { trongLat -= 1; } };
+      spec.run = (input, st) => { if ((trongKhoa > 0) !== (spec.lock === true) || (trongLat > 0) !== (spec.slice === true)) { sai.push(ca.ten + ': khóa ' + (trongKhoa > 0) + ', lát ' + (trongLat > 0)); } return chayGoc(input, st); };
       logs.length = 0;
       const ketQua = Object.assign({}, F.controlDispatch(ca.lenh, payload, ca.kenh));
       delete ketQua.request;
@@ -93,6 +113,7 @@ async function chay(so) {
     }
   });
   check(so, 'không lệnh nào ném lỗi khi chạy qua cửa lệnh', nem, []);
+  check(so, 'phần ruột mỗi lệnh chạy trong khóa điều phối và trong lát đúng như cờ lock, slice khai trong bảng lệnh', sai, []);
   check(so, 'không lệnh nào để lọt bí mật phiên FBM ra ngoài phong bì request', lo, []);
 }
 

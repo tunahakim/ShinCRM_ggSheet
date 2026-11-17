@@ -24,7 +24,6 @@ FbmSync.COMMANDS = {
   save_settings: { lock: true, run: function (input) { return FbmSync.settingsSaveCommand(input); } },
   reset_settings: { lock: true, run: function (input) { return FbmSync.settingsResetCommand(input); } },
   set_master: { run: function (input) { return FbmSync.masterSwitchCommand(input.enabled === true); } },
-  set_background: { lock: true, run: function (input) { return FbmSync.backgroundSwitchCommand(input.enabled === true); } },
   save_identity_binding: { lock: true, run: function (input) { return FbmSync.connectionSave({ binding: input.binding || {} }); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
