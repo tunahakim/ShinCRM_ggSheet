@@ -174,6 +174,15 @@ async function chay(so) {
   check(so, 'bản ghi từng đẩy lỗi: cảnh báo nêu mã bản ghi, không chặn phiên',
     [oldFailure.length, oldFailure[0] && oldFailure[0].blocking, /ACT-LOI/.test(oldFailure[0] && oldFailure[0].message)],
     [1, false, true]);
+  // Không dựng được cổng Category thì chiều ghi bị chặn có mã và nêu nguyên nhân, không coi như cổng rỗng rồi cho đẩy.
+  const gateBefore = hop.FbmSync.readCategoryGate;
+  hop.FbmSync.readCategoryGate = () => { throw new Error('Category hỏng giữa chừng'); };
+  const gateFailed = hop.FbmSync.runPreflight({ mode: 'write' });
+  hop.FbmSync.readCategoryGate = gateBefore;
+  const gateIssue = gateFailed.blocking.filter((item) => item.code === 'FBM_CATEGORY_GATE_FAILED');
+  check(so, 'cổng Category không dựng được: preflight chặn bằng FBM_CATEGORY_GATE_FAILED nêu nguyên nhân, không có ứng viên đẩy',
+    [gateFailed.ok, gateIssue.length, /Category hỏng giữa chừng/.test(gateIssue[0] && gateIssue[0].message), gateFailed.candidateCount],
+    [false, 1, true, 0]);
   // Log xung đột chỉ khi số đổi so với lượt trước.
   const conflictLogs = [];
   hop.logEvent = (event) => conflictLogs.push(event);

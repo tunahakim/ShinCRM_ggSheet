@@ -171,6 +171,16 @@ async function testCauHinhKetNoi(so) {
     [1, 2, 1]);
 }
 
+/** Nút Hủy phiên cũ và đăng nhập ở màn Tài khoản chỉ hiện khi GAS mở (`forceLoginOffered` thành `actions.forceLogin`), Sidebar không tự quyết. */
+function testNutHuyPhienCu(so) {
+  const { hop } = taoBo();
+  const coNut = (status) => { hop.FBM_SYNC_CLIENT.lastStatus = status; return JSON.stringify(hop.fbmSyncLoginActionBlocks()).indexOf(hop.FBM_SYNC_RUN_SCHEMA.forceLogin.id) >= 0; };
+  const mo = statusGas({ phase: 'paused', loginForceOffered: true }), dong = statusGas({ phase: 'paused', loginForceOffered: false });
+  check(so, 'màn Tài khoản: GAS mở forceLoginOffered thì hiện nút Hủy phiên cũ và đăng nhập; không mở, chưa có status hoặc lượt đang chạy thì không hiện',
+    [mo.actions.forceLogin, coNut(mo), coNut(dong), coNut(null), coNut(statusGas({ phase: 'idle' })), coNut(statusGas({ runId: 'r-1', phase: 'pull_customer', origin: 'manual', activeRequestId: 'q-1', loginForceOffered: true }))],
+    [true, true, false, false, false, false]);
+}
+
 async function chay(so) {
   section('FBM sync — Sidebar: Tài khoản FBM, cầu nối Extension, cấu hình kết nối');
   try { taoSidebarDongBo(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
@@ -178,6 +188,7 @@ async function chay(so) {
   await testLayNhanDien(so);
   await testCauNoi(so);
   await testCauHinhKetNoi(so);
+  testNutHuyPhienCu(so);
 }
 
 module.exports = { chay };
