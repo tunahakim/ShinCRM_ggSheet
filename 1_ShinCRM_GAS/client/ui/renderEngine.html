@@ -550,6 +550,8 @@ function renderScreen(man, boiCanh) {
   renderRegionElement('info').hidden = !man.infoBar;
   renderRegionElement('footer').hidden = man.footer.length === 0;
   if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
+  // Đèn trạng thái đồng bộ trên icon ⟳ của thanh công cụ vừa dựng lại.
+  if (typeof fbmSyncToolbarPaint === 'function') { fbmSyncToolbarPaint(); }
 
   return html;
 }

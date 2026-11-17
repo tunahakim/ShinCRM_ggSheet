@@ -1,10 +1,13 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null };
+var FBM_SYNC_CLIENT = { installed: false, conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null, tone: { tone: '', updatedAt: 0 } };
 /** Hạn chờ Extension trả lời một lệnh qua cầu nối (mã máy, nhận lượt, mã hóa, lưu cấu hình); các lệnh này không gọi FBM nên trả lời gần như ngay. */
 var FBM_SYNC_EXTENSION_RPC_MS = 5000;
 /** Extension im lâu hơn mức này trong lượt tay thì Sidebar hỏi GAS một lần xem lượt còn chạy không, để lượt không treo khi Chrome tắt worker giữa chừng. */
 var FBM_SYNC_RUN_SILENCE_MS = 60000;
+/** Icon ⟳ trên thanh công cụ chính là đèn trạng thái lượt; chữ nhắc gốc lấy từ schema màn xem. Lớp màu theo `tone` GAS dựng, qua bản đồ lớp chung `uiSyncClass`. */
+var FBM_SYNC_TOOLBAR_ID = 'fbm-sync-menu';
+var FBM_SYNC_TONE_LOOK = { running: { cls: 'statusRunning', aria: ' — đang chạy' }, paused: { cls: 'statusPaused', aria: ' — tạm dừng' }, error: { cls: 'statusError', aria: ' — có lỗi' } };
 /** Tên việc của người dùng trong popup "Đồng bộ nền đang chạy". */
 var FBM_SYNC_BACKGROUND_TASKS = { run: 'chạy đồng bộ', identity: 'kiểm tra liên kết', conflict: 'mở xung đột', login: 'đăng nhập thử' };
 
@@ -378,32 +381,27 @@ function fbmSyncFlushDeferredPaint() {
 }
 /** Vẽ snapshot status, không suy diễn nghiệp vụ ở client. */
 function fbmSyncPaint(status) {
+  // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
+  status = status && (status.status || status);
+  // Đèn trên icon ⟳ và đồng hồ hỏi GAS sống cả khi màn đồng bộ đóng: đây là chỗ mọi status đi qua, nên đặt trước dòng chặn màn đóng.
+  if (status) { fbmSyncToneTake(status.tone, status.updatedAt); fbmSyncWatchArm(status); }
   if (!FBM_SYNC_CLIENT.active) { return; }
   var panel = document.getElementById('sidebar-body');
   if (!panel || !status) { return; }
-  // GAS orchestration returns { ok, request, status }; the panel only paints the inner snapshot.
-  status = status.status || status;
   FBM_SYNC_CLIENT.lastStatus = status;
-  fbmSyncWatchArm(status);
   fbmSyncMachineNotice(status);
   fbmSyncApplyIdentityProbeDraft(status);
   if (String(panel.getAttribute('data-fbm-sync-screen') || '') === String(FBM_SYNC_CLIENT.subscreen || '') && fbmSyncPatchScreen(panel, status)) {
     if (typeof fbmSyncRenderShell === 'function') { fbmSyncRenderShell(status); }
-    fbmSyncPaintHeaderState(status);
     if (typeof fbmSyncApplyMasterDisabled === 'function') { fbmSyncApplyMasterDisabled(status); }
     return;
   }
-  if (fbmSyncAccountIsEditing()) {
-    fbmSyncPaintHeaderState(status);
-    return;
-  }
+  if (fbmSyncAccountIsEditing()) { return; }
   if (fbmSyncInteractiveControlIsEditing(panel)) {
     FBM_SYNC_CLIENT.deferredPaint = status;
-    fbmSyncPaintHeaderState(status);
     return;
   }
   var activeAccountDraft = fbmSyncCaptureActiveAccountDraft();
-  fbmSyncPaintHeaderState(status);
   var draftUsername = document.getElementById('fbm-login-username'); if (draftUsername) { FBM_SYNC_CLIENT.loginDraft.username = String(draftUsername.value || ''); }
   ['spreadsheet', 'user', 'username', 'account'].forEach(function (name) { var draft = document.getElementById('fbm-identity-' + name); if (draft) { FBM_SYNC_CLIENT.identityDraft[name === 'spreadsheet' ? 'spreadsheetId' : name === 'user' ? 'userId' : name === 'username' ? 'username' : 'accountName'] = String(draft.value || ''); } });
   fbmSyncSetTargetState('sidebar-body', { hidden: false });
@@ -430,14 +428,25 @@ function fbmSyncPatchScreen(panel, status) {
   if (screen === 'settings' && typeof fbmSyncPatchSettings === 'function') { return fbmSyncPatchSettings(panel, status); }
   return false;
 }
-/** Màu icon header theo `tone` GAS dựng; Sidebar không chép danh sách phase. */
-function fbmSyncPaintHeaderState(status) {
-  var button = document.getElementById('fbm-sync-module-menu');
-  if (!button || !status) { return; }
-  var look = { running: { cls: 'statusRunning', aria: ' — đang chạy' }, paused: { cls: 'statusPaused', aria: ' — tạm dừng' }, error: { cls: 'statusError', aria: ' — có lỗi' } }[String(status.tone || '')];
+/** Ô `tone` của đèn trên icon ⟳ có một chủ là hàm này: mọi status (relay, hỏi GAS, kết quả lệnh) và `tone` lúc nạp lõi đều ghi qua đây. Bản có `updatedAt` cũ hơn bản đang giữ bị bỏ, để tin về muộn không đè tin mới. */
+function fbmSyncToneTake(tone, updatedAt) {
+  var at = Number(updatedAt || 0);
+  if (at < FBM_SYNC_CLIENT.tone.updatedAt) { return; }
+  FBM_SYNC_CLIENT.tone = { tone: String(tone || ''), updatedAt: at };
+  fbmSyncToolbarPaint();
+}
+/** Tô icon ⟳ theo ô `tone`. Thanh công cụ dựng lại cả cụm mỗi lần vẽ màn nên `renderScreen` gọi lại hàm này sau mỗi lần dựng; màn đồng bộ đang mở thì icon không có mặt và hàm không làm gì. Nút ⋮ của màn đồng bộ chỉ mở menu, không mang trạng thái. */
+function fbmSyncToolbarPaint() {
+  var look = FBM_SYNC_TONE_LOOK[FBM_SYNC_CLIENT.tone.tone] || null, item = fbmSyncToolbarItem();
+  var label = String(item && item.tooltip || '') + (look ? look.aria : '');
   // Bộ vẽ thêm lớp trước rồi mới gỡ: lớp đang thêm không được nằm trong danh sách gỡ.
-  var tones = ['statusRunning', 'statusPaused', 'statusError'].filter(function (name) { return !look || name !== look.cls; });
-  fbmSyncSetTargetState('fbm-sync-module-menu', { removeClass: tones.map(function (name) { return uiSyncClass('shell', name); }), addClass: look ? [uiSyncClass('shell', look.cls)] : [], ariaLabel: 'Đồng bộ FBM' + (look ? look.aria : '') });
+  var others = Object.keys(FBM_SYNC_TONE_LOOK).map(function (tone) { return FBM_SYNC_TONE_LOOK[tone].cls; }).filter(function (cls) { return !look || cls !== look.cls; });
+  fbmSyncSetTargetState(FBM_SYNC_TOOLBAR_ID, { removeClass: others.map(function (cls) { return uiSyncClass('shell', cls); }), addClass: look ? [uiSyncClass('shell', look.cls)] : [], ariaLabel: label, title: label });
+}
+/** Mục icon ⟳ trong schema thanh công cụ màn xem: chữ nhắc gốc chỉ khai ở schema. */
+function fbmSyncToolbarItem() {
+  var header = typeof UI_SCHEMA !== 'undefined' && UI_SCHEMA.view && UI_SCHEMA.view.header || {};
+  return (header.start || []).concat(header.end || []).filter(function (item) { return item && item.id === FBM_SYNC_TOOLBAR_ID; })[0] || null;
 }
 /** Nhãn thanh tiến trình riêng của phiên từ `progress` GAS dựng (đếm theo khách của lượt); số bản ghi nhận/ghi nằm ở dòng đếm riêng. */
 function fbmSyncProgressData(status) {
@@ -645,7 +654,8 @@ function syncScreenClose() {
   FBM_SYNC_CLIENT.statusReady = false;
   FBM_SYNC_CLIENT.navOpen = false;
   fbmSyncRunWaitPause();
-  fbmSyncWatchArm(null);
+  // Màn đóng mà lượt còn chạy thì đồng hồ hỏi GAS vẫn giữ, để đèn trên icon ⟳ không đứng ở "đang chạy" khi tin relay không còn tới.
+  fbmSyncWatchArm(FBM_SYNC_CLIENT.lastStatus);
   fbmSyncSetTargetState('sidebar-root', { removeClass: [uiSyncClass('shell', 'active')] });
   fbmSyncSetTargetState('sidebar-body', { removeClass: [uiSyncClass('shell', 'disabled')] });
   var restored = fbmSyncRestoreReturnScreen();
@@ -717,17 +727,23 @@ function fbmSyncDrive(command, payload, task) {
 /** Đánh thức Extension hỏi GAS ngay; đánh thức thừa vô hại vì GAS trả lời theo ô lượt. `trigger` là lý do hỏi: `run_now` (mặc định, nhận lượt tay) hoặc `config` (cài đặt vừa đổi). */
 function fbmSyncExtensionWake(retryMs, trigger) { return fbmSyncExtensionRpc('CRM_FBM_RUN_NOW', { retryMs: retryMs, trigger: trigger || 'run_now' }, 'hỏi GAS nhận lượt'); }
 /**
- * Máy không chở lượt vẫn thấy tiến độ: màn đồng bộ đang mở, GAS báo có lượt đang chạy mà Sidebar này không chờ lượt nào (lượt nền, hoặc lượt tay máy khác chở) thì Extension máy này không gửi tin relay. Hỏi GAS sau mỗi `FBM_SYNC_RUN_SILENCE_MS` không có status mới; mỗi lần vẽ status (tin relay hay lần hỏi này) đặt lại đồng hồ. Lượt hết, màn đóng hoặc Sidebar chờ lượt tay của mình (đồng hồ của `fbmSyncRunWaitArm`) thì thôi.
+ * Tin relay không tới mà lượt còn chạy thì hỏi GAS: lượt do máy khác chở (Extension máy này không gửi tin), hoặc Extension chết giữa lượt (không còn ai chở, GAS chỉ nhận ra lượt kẹt khi được hỏi). Hỏi sau mỗi `FBM_SYNC_RUN_SILENCE_MS` không có status mới, cả khi màn đồng bộ đóng vì đèn trên icon ⟳ cần biết lượt đã xong hay kẹt; mỗi lần vẽ status đặt lại đồng hồ. Thôi khi `tone` không còn là đang chạy (lượt kẹt GAS cho `tone` lỗi), hoặc khi màn mở và Sidebar chờ lượt tay của mình (chỗ chờ có đồng hồ riêng `fbmSyncRunWaitArm`, chỉ đặt khi màn mở).
  */
 function fbmSyncWatchArm(status) {
   if (FBM_SYNC_CLIENT.watchTimer) { clearTimeout(FBM_SYNC_CLIENT.watchTimer); FBM_SYNC_CLIENT.watchTimer = null; }
-  if (!FBM_SYNC_CLIENT.active || FBM_SYNC_CLIENT.runWaiter || !status || status.running !== true) { return; }
+  if (fbmSyncWaiterTimed() || !status || status.tone !== 'running') { return; }
   FBM_SYNC_CLIENT.watchTimer = setTimeout(function () {
     FBM_SYNC_CLIENT.watchTimer = null;
-    if (FBM_SYNC_CLIENT.runWaiter) { return; }
-    var ticket = fbmSyncStatusTicket();
-    callServer('fbmGetSyncStatus').then(function (bundle) { fbmSyncStatusApply(bundle.status, ticket); }, function (error) { fbmSyncReportError(error, 'Không hỏi được GAS tiến độ lượt đang chạy.', 'status_watch'); });
+    if (fbmSyncWaiterTimed()) { return; }
+    fbmSyncStatusAsk('Không hỏi được GAS tiến độ lượt đang chạy.', 'status_watch');
   }, FBM_SYNC_RUN_SILENCE_MS);
+}
+/** Chỗ chờ lượt tay đang tự hỏi GAS bằng đồng hồ riêng (chỉ khi màn đồng bộ mở). */
+function fbmSyncWaiterTimed() { return !!(FBM_SYNC_CLIENT.active && FBM_SYNC_CLIENT.runWaiter); }
+/** Hỏi GAS trạng thái một lần khi tin relay không tới được (đồng hồ im lặng, Extension báo lỗi) rồi vẽ qua cửa nhận status; lỗi đi cửa báo lỗi chung. */
+function fbmSyncStatusAsk(failMessage, task) {
+  var ticket = fbmSyncStatusTicket();
+  return callServer('fbmGetSyncStatus').then(function (bundle) { return fbmSyncStatusApply(bundle.status, ticket); }, function (error) { return fbmSyncReportError(error, failMessage, task); });
 }
 /**
  * Chờ lượt `runId` hết chuỗi. Extension im quá `FBM_SYNC_RUN_SILENCE_MS` (Chrome tắt worker, tab Sheets mất cầu nối) thì hỏi GAS một lần: lượt đã đóng thì kết thúc theo status GAS; GAS báo lượt kẹt (`stuck`) thì thôi chờ và hiện chữ của GAS; còn chạy thì chờ tiếp; lượt vẫn chờ Extension nhận thì đánh thức lại.
@@ -799,6 +815,8 @@ function fbmSyncStatusReceived(data) {
   var waiter = FBM_SYNC_CLIENT.runWaiter;
   if (data.failure) {
     var failure = data.failure, error = Object.assign(new Error('Extension báo lỗi ' + String(failure.code || '') + (Number(failure.httpStatus || 0) ? ' (HTTP ' + failure.httpStatus + ')' : '') + ': ' + String(failure.message || '')), { code: String(failure.code || 'EXTENSION_FAILED') });
+    // Lượt còn sống hay đã kẹt là việc GAS quyết: hỏi GAS ngay một lần để đèn trên icon ⟳ không chờ đủ đồng hồ im lặng.
+    fbmSyncStatusAsk('Không hỏi được GAS trạng thái lượt sau lỗi của Extension.', 'status_after_failure');
     if (waiter) { fbmSyncRunWaitEnd(null, error); return; }
     noticeSet('fbmExtension', { line: error.message, blocks: [{ variant: 'error', title: 'Extension đồng bộ FBM báo lỗi', lines: [error.message] }] });
     fbmSyncLogClientError(error, error.message, 'extension_failure');

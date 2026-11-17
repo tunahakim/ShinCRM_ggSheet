@@ -65,6 +65,8 @@ async function sidebarBoot(options) {
     }
 
     var skipped = ingestCore(core);
+    // `tone` lúc mở Sidebar cho đèn trên icon ⟳; tin relay về sau thay nó.
+    if (core.modules && core.modules.fbm_sync && typeof fbmSyncToneTake === 'function') { fbmSyncToneTake(core.modules.fbm_sync.tone.tone, core.modules.fbm_sync.tone.updatedAt); }
     if (typeof SHEET_LINK_LAST_SEEN_REVISION !== 'undefined' && core.processedRevision !== undefined) {
       SHEET_LINK_LAST_SEEN_REVISION = Math.max(SHEET_LINK_LAST_SEEN_REVISION, Number(core.processedRevision) || 0);
     }
