@@ -3,6 +3,7 @@ const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
 const { datLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
+const { datState } = require('../../lib/fbm/dat-state');
 
 const PHUT = 60000;
 
@@ -12,7 +13,7 @@ function chuoiHarness(lich, options) {
   const clock = { now: Date.UTC(2026, 9, 15, 0, 0) };
   h.flow.hop.__now = () => clock.now;
   vm.runInContext('Date.now = function () { return __now(); };', h.flow.hop);
-  h.F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(h.F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   datLichNen(h.flow.hop, Object.assign({ enabled: true, direction: 'read' }, lich));
   const xong = [], ghiSo = h.F.processBookMark;
   h.F.processBookMark = function (book, kind, outcome) { if (outcome === 'done') { xong.push(kind); } return ghiSo.apply(this, arguments); };
@@ -78,7 +79,7 @@ async function chay(so) {
     if (!daChen && request.meta.kind === 'scan_job') { daChen = true; chen.F.controlDispatch('stop_background', {}); }
   } });
   const mocSauChen = chen.F.processBookRead().customerFull.doneAt;
-  chen.F.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, metadata: {} });
+  datState(chen.F, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, metadata: {} });
   const chayLai = await chen.hoi(1);
   check(so, 'Lượt nền bị lượt tay chen ngang: lượt nền dừng, không ghi giờ chạy xong của Quét nhanh; lần hỏi kế tiếp chạy lại Quét nhanh và ghi giờ chạy xong', [daChen, chenLan.xong, mocSauChen === mocTruoc, chayLai.xong, chen.F.processBookRead().customerFull.doneAt !== mocTruoc], [true, [], true, ['customerFull'], true]);
 
@@ -98,14 +99,14 @@ async function chay(so) {
   const ketThuc = [];
   for (const phase of ['paused', 'conflict']) {
     const dung = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
-    dung.F.statePatch({ runId: 'luot-truoc', phase, origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED' });
+    datState(dung.F, { runId: 'luot-truoc', phase, origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED' });
     ketThuc.push((await dung.hoi(60)).xong);
   }
   check(so, 'Lượt trước dừng ở "tạm dừng" hoặc "xung đột": lần hỏi sau vẫn chạy Quét nhanh đến hạn, không bị coi là lượt đang chạy', ketThuc, [['customerFull'], ['customerFull']]);
 
   // Lượt trước tự đăng nhập bị từ chối nên còn dấu "phiên hết hạn"; người dùng đã tự đăng nhập trên tab FBM. Chuỗi mới phải hỏi FBM trước, không gửi thẳng lệnh đăng nhập (09/06: không đăng nhập lại khi phiên còn hợp lệ).
   const tuDangNhap = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });
-  tuDangNhap.F.statePatch({ runId: 'luot-truoc', phase: 'paused', origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED', session: { expired: true } });
+  datState(tuDangNhap.F, { runId: 'luot-truoc', phase: 'paused', origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED', session: { expired: true } });
   tuDangNhap.trace.kinds.length = 0;
   const sauDangNhap = await tuDangNhap.hoi(10);
   check(so, 'Lượt trước còn dấu phiên hết hạn mà phiên FBM thật vẫn sống: chuỗi mới chạy Giữ phiên, không gửi lệnh đăng nhập', [sauDangNhap.xong, tuDangNhap.trace.kinds.indexOf('login') < 0], [['heartbeat'], true]);
@@ -131,7 +132,7 @@ async function chay(so) {
   // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
   const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
   vaSoNen(boDo.F, { customerFull: { baseline: 12, baselineScope: 'all' } });
-  boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
+  datState(boDo.F, { runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
   const sauBoDo = await boDo.hoi(1);
   check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);
 

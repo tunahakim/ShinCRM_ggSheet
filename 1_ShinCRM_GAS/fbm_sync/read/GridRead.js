@@ -219,11 +219,6 @@ FbmSync.customerPageItems = function (rows, total) {
   return { firstPageItem: FbmSync.customerPageItem(list[0]), lastPageItem: FbmSync.customerPageItem(list[list.length - 1]), lastRowCount: Number(total || 0) };
 };
 FbmSync.customerPageItem = function (row) { var value = row || {}; return FbmSync.fbmDayKey(value.ngay_gd) + FbmSync.fbmDayKey(value.datetime0) + String(value.xorder || '') + String(value.stt_rec_kh || ''); };
-/** Đọc lại mô tả trang đang đứng từ body request đã dựng, để cursor mang theo khi dựng lại request. */
-FbmSync.gridPageItemsOf = function (body) {
-  var value = body || {};
-  return { firstPageItem: String(value.firstPageItem || ''), lastPageItem: String(value.lastPageItem || ''), lastRowCount: Number(value.lastRowCount || 0) };
-};
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {
   var parsed = FbmSync.protocol.parse(response) || {};

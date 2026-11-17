@@ -1,6 +1,7 @@
 /** Kiểm `fbm_sync/state/Slice.js`: lát giữ một bản ô lượt, mọi hàm trong lát sửa cùng bản đó và cuối lát ghi xuống kho đúng một lần; bản khác đưa vào bị chặn trước khi đè. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datState } = require('../../lib/fbm/dat-state');
 
 const KHOA_O_LUOT = 'FBM_SYNC_STATE_V1';
 
@@ -16,7 +17,7 @@ function hopCoLuot() {
   const { hop, documentProperties } = workflowGas({});
   const F = hop.FbmSync;
   F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   F.runSlice(() => F.start({ mode: 'read', origin: 'manual', manual: true }, F.stateRead()));
   const kho = { soLanGhi: 0, hongLanGhi: false };
   const ghiThat = F.stateStore;

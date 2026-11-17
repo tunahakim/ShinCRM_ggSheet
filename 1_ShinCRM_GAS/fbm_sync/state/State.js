@@ -60,13 +60,9 @@ FbmSync.documentPropertySet = function (key, value, context) {
   failure.detail = detail;
   throw failure;
 };
-/** Đọc một property JSON dạng object của đồng bộ qua công cụ chung `documentPropertyJson` (cursor, hash chờ xác nhận, cấu hình: hỏng thì ném, không coi là trống — FBM-025, FBM-026). */
-FbmSync.documentPropertyJson = function (key, context) {
-  return documentPropertyJson(FbmSync.props(), key, context, 'object');
-};
 /** Đọc khóa gộp từ nhiều khóa cũ: khóa gộp chưa có mà còn khóa cũ thì ném mã chờ chuyển của hàm chuyển (`migrator`, mặc định `fbmStoresMigrate` với `FBM_STORES_MIGRATION_PENDING`), không đọc thành rỗng (rỗng thì lần ghi kế tiếp đè mất dữ liệu cũ). Hàm chuyển xóa khóa cũ. */
 FbmSync.mergedStoreRead = function (key, context, oldKeys, migrator) {
-  var stored = FbmSync.documentPropertyJson(key, context);
+  var stored = documentPropertyJson(FbmSync.props(), key, context, 'object');
   if (stored) { return stored; }
   var props = FbmSync.props(), left = oldKeys.filter(function (old) { return props.getProperty(old) !== null; });
   var by = migrator || { name: 'fbmStoresMigrate', code: 'FBM_STORES_MIGRATION_PENDING' };
@@ -96,7 +92,7 @@ FbmSync.stateDefault = function () {
  */
 FbmSync.PUSH_FAILURES_KEY = 'FBM_SYNC_PUSH_FAILURES_V1';
 FbmSync.pushFailuresRead = function () {
-  var stored = FbmSync.documentPropertyJson(FbmSync.PUSH_FAILURES_KEY, 'bản ghi đẩy lỗi') || {};
+  var stored = documentPropertyJson(FbmSync.props(), FbmSync.PUSH_FAILURES_KEY, 'bản ghi đẩy lỗi', 'object') || {};
   return { hashes: stored.hashes || {}, details: stored.details || {} };
 };
 /** Cổng ghi duy nhất của sổ lỗi đẩy. Cầu dao dừng chặng đẩy khi chạm `pushFailuresMax`, nên vượt trần là lỗi lập trình: ném `PUSH_FAILURES_OVER_CAP`, không cắt bớt im lặng (cắt là bỏ chặn gửi lại bản ghi lỗi). */
@@ -157,7 +153,7 @@ FbmSync.pushGateMark = function () {
   };
 };
 /** Cổng đã lưu, `null` khi chưa có; hỏng thì ném để người gọi ghi Log rồi quét. */
-FbmSync.pushGateRead = function () { return FbmSync.documentPropertyJson(FbmSync.PUSH_GATE_KEY, 'cổng chặng đẩy'); };
+FbmSync.pushGateRead = function () { return documentPropertyJson(FbmSync.props(), FbmSync.PUSH_GATE_KEY, 'cổng chặng đẩy', 'object'); };
 FbmSync.pushGateWrite = function (gate) {
   FbmSync.documentPropertySet(FbmSync.PUSH_GATE_KEY, JSON.stringify(gate), 'push_gate');
 };
@@ -212,7 +208,7 @@ FbmSync.sliceStoreClose = function () {
 /** Đọc ô lượt từ kho và tự bù field thiếu từ mặc định. */
 FbmSync.stateLoad = function () {
   var fallback = FbmSync.stateDefault();
-  var parsed = FbmSync.documentPropertyJson(FbmSync.STATE_KEY, 'state đồng bộ');
+  var parsed = documentPropertyJson(FbmSync.props(), FbmSync.STATE_KEY, 'state đồng bộ', 'object');
   if (!parsed) { return fallback; }
   var metadata = parsed.metadata || {};
   var read = Object.assign(fallback, parsed, { schemaVersion: Number(parsed.schemaVersion || 1), counts: Object.assign(fallback.counts, parsed.counts || {}), session: Object.assign(fallback.session, parsed.session || {}), metadata: Object.assign(fallback.metadata, metadata, { conflictCount: Number(metadata.conflictCount || 0), preflightIssues: Array.isArray(metadata.preflightIssues) ? metadata.preflightIssues : [], manualPending: metadata.manualPending || null }), progress: Object.assign(fallback.progress, parsed.progress || {}) });
@@ -301,8 +297,6 @@ FbmSync.stateErase = function () {
     throw failure;
   }
 };
-/** Ghi một phần state mà không làm mất field đang có. */
-FbmSync.statePatch = function (patch) { return FbmSync.stateWrite(Object.assign(FbmSync.stateRead(), patch || {})); };
 /** Tên bước của hộp đen Extension. Bước lạ (Extension bản khác) vẫn được ghi nhưng không dịch, để không đoán bừa. */
 FbmSync.EXTENSION_TRAIL_STAGES = {
   gas_request_received: 'đã nhận request từ GAS, chưa gửi sang tab FBM',

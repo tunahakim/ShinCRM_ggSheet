@@ -108,14 +108,6 @@ FbmSync.seenStoreMark = function (scope, localRecords, incomingRecords) {
   var previous = Number(props.getProperty(prefix + 'SHARDS') || 0);
   props.setProperty(prefix + 'SHARDS', String(Math.max(previous, maxShard + 1)));
 };
-FbmSync.seenStoreHas = function (scope, record) {
-  var index = FbmSync.seenStoreIndex(scope, record), prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), highWaterRaw = props.getProperty(prefix + 'HIGH_WATER'), highWater = Number(highWaterRaw || 0), hasBoundary = highWaterRaw !== null && highWaterRaw !== undefined && String(highWaterRaw) !== '';
-  // ID cũ hoặc lạ không đủ an toàn để đánh dấu; coi như đã thấy để không suy ra vắng mặt nhầm.
-  if (index < 0 || (hasBoundary && index > highWater)) { return true; }
-  var hexIndex = Math.floor(index / 4), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, shardIndex = Math.floor(hexIndex / shardLength), offset = hexIndex % shardLength;
-  var value = String(props.getProperty(prefix + shardIndex) || ''), nibble = parseInt(value.charAt(offset) || '0', 16) || 0;
-  return (nibble & (1 << (index % 4))) !== 0;
-};
 FbmSync.seenStoreReader = function (scope) {
   var prefix = FbmSync.seenStorePrefix(scope), props = FbmSync.props(), shardLength = FbmSync.SEEN_SHARD_HEX_LENGTH, cache = {}, highWaterRaw = props.getProperty(prefix + 'HIGH_WATER'), highWater = Number(highWaterRaw || 0), hasBoundary = highWaterRaw !== null && highWaterRaw !== undefined && String(highWaterRaw) !== '';
   return function (record) {

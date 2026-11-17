@@ -3,6 +3,7 @@ const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 const { tabGia, rawExecutor, guiLo, traLoiGhi, luoiFbm, dongFbm } = require('../../lib/fbm/tab-fbm-gia');
 const { napServer } = require('../../lib/load-gas');
+const { datState } = require('../../lib/fbm/dat-state');
 
 const USER_RESPONSE = JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
 const MAY_NEN = 'may-nen';
@@ -130,7 +131,7 @@ function scanHarness(options) {
   /** Chạy lượt tới khi GAS không cấp request; `hooks.beforeSend` giả mất tab, `hooks.edit` sửa response, `hooks.afterError` quyết định request kế khi GAS ném lỗi. */
   async function run(hooks) {
     const h = hooks || {};
-    F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+    datState(F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     let step = F.runSlice(() => F.start(Object.assign({ mode: 'read', origin: 'manual', manual: true, pack: h.pack }, h.startOptions || {}), F.stateRead()));
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const sent = await deliver(step.request, h);

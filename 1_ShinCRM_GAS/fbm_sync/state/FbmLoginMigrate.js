@@ -31,7 +31,7 @@ function fbmLoginMigrate() {
     var first = fbmStoresMigrateLocked(function () {
       fbmStoresMigrateIdle();
       var props = FbmSync.props(), lastRaw = props.getProperty(FbmSync.LOGIN_OLD_KEYS[1]);
-      var plan = fbmLoginMigratePlan(FbmSync.documentPropertyJson(FbmSync.LOGIN_CONFIG_KEY, 'khóa đăng nhập đời cũ') || undefined, lastRaw === null || lastRaw === '' ? undefined : lastRaw), expected = {};
+      var plan = fbmLoginMigratePlan(documentPropertyJson(FbmSync.props(), FbmSync.LOGIN_CONFIG_KEY, 'khóa đăng nhập đời cũ', 'object') || undefined, lastRaw === null || lastRaw === '' ? undefined : lastRaw), expected = {};
       if (plan.credential && props.getProperty(FbmSync.CREDENTIAL_KEY) === null) {
         FbmSync.credentialWrite(plan.credential);
         expected[FbmSync.CREDENTIAL_KEY] = props.getProperty(FbmSync.CREDENTIAL_KEY);

@@ -7,7 +7,7 @@ const { stripComments } = require('../../lib/strip-comments');
 const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
 
 // Cổng kho của chiều lấy về: hàm quyết gọi bất kỳ cổng nào thì ném, test đỏ.
-const CONG_KHO = ['readLocal', 'shardListRead', 'shardListWrite', 'readWaitRead', 'readWaitWrite', 'documentPropertyJson', 'seenStoreReader', 'seenStoreMark', 'readListNext', 'readListAdd', 'readListDone', 'readListDoneReader', 'pullAllowedReader', 'activityFreshIndex', 'gateLocalIndex', 'gateFlagWrite', 'recordChange', 'pullBatchApply', 'activityReadMark', 'stateRead', 'stateWrite', 'scope', 'scriptSettings', 'topOrderAll', 'readListEligibleReader'];
+const CONG_KHO = ['readLocal', 'shardListRead', 'shardListWrite', 'readWaitRead', 'readWaitWrite', 'seenStoreReader', 'seenStoreMark', 'readListNext', 'readListAdd', 'readListDone', 'readListDoneReader', 'pullAllowedReader', 'activityFreshIndex', 'gateLocalIndex', 'gateFlagWrite', 'recordChange', 'pullBatchApply', 'activityReadMark', 'stateRead', 'stateWrite', 'scope', 'scriptSettings', 'topOrderAll', 'readListEligibleReader'];
 // Mẫu gọi kho trong mã nguồn tệp hàm quyết.
 const GOI_KHO = new RegExp('\\b(' + CONG_KHO.join('|') + '|PropertiesService|SpreadsheetApp|props)\\s*\\(');
 

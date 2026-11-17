@@ -5,6 +5,7 @@ const { TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datPhan, docPhan, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { USER_BODY, quaTrang, noiNen, nopBuoc, congVao, hoiNen, dungHopGiuPhien, vaDauThu, batLogCong } = require('../../lib/fbm/tu-dang-nhap');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 async function chay(so) {
   section('FBM sync - auto-login: khóa chờ và nối lại lượt');
@@ -40,7 +41,7 @@ async function chay(so) {
   check(so, 'Đang khóa chờ, ngừng tự đăng nhập mà người dùng tự đăng nhập: probe xác minh gỡ hết khóa, đếm khách, lệch mốc thì mở Quét nhanh, không gửi lệnh đăng nhập',
     [afterCycle.request.meta.kind, afterCycleIdentity.request && afterCycleIdentity.request.meta.kind, afterCycleLive.ok, afterCycleLive.request && afterCycleLive.request.meta.kind, congVao(heartbeat.FbmSync).ok, unlocked.loginHalted, unlocked.lastError],
     ['session_probe', 'customer_count', true, 'session_probe', true, false, '']);
-  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, process: '' });
+  datState(heartbeat.FbmSync, { phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0, process: '' });
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const afterCycleDead = hoiNen(heartbeat);
   const afterCycleLogin = noiNen(heartbeat, { ok: true, status: 200, body: unauthBody, transport: { contract: MA_HOP_DONG, trace: [{ requestId: afterCycleDead.request.id }] } });

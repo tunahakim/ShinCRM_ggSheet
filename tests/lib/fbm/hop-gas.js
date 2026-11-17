@@ -73,10 +73,10 @@ function capDauDaySach(hopCat) {
 /** Khung lượt đồng bộ FBM (ô lượt, mở/đóng lượt, cờ dừng, khung lát): gần như mọi hộp đồng bộ đều nạp đủ bộ này, theo đúng thứ tự. Nhãn lượt ở `Run.js` đọc tên tiến trình nền của `Scheduler.js` nên sổ tiến trình nạp cùng khung. */
 const TEP_KHUNG_LUOT = ['fbm_sync/state/State.js', 'fbm_sync/state/WorkStores.js', 'fbm_sync/state/RequestWatch.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js'];
 
-/** Trước khi chạy một tệp: tệp đồng bộ cần bảng quyền; `Identity.js` đọc liên kết qua cửa JSON của kho trong `State.js` (bản thật luôn có). */
+/** Trước khi chạy một tệp: tệp đồng bộ cần bảng quyền; `Identity.js` đọc liên kết qua `mergedStoreRead` trong `State.js` (bản thật luôn có). */
 function capTruocTep(hopCat, duongDan, duongDans) {
   if (duongDan.indexOf('fbm_sync/') === 0) { capBangChoPhepDongBo(hopCat); }
-  if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.documentPropertyJson === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
+  if (duongDan === 'fbm_sync/reconcile/Identity.js' && !(hopCat.FbmSync && typeof hopCat.FbmSync.mergedStoreRead === 'function') && duongDans.indexOf('fbm_sync/state/State.js') < 0) {
     vm.runInContext(docTep('fbm_sync/state/State.js'), hopCat, { filename: 'fbm_sync/state/State.js' });
   }
   // Hàm dựng lưới cần cổng cài đặt dựng request (tách khỏi GridRead); hộp nạp GridRead mà không kê tệp đó thì nạp kèm.

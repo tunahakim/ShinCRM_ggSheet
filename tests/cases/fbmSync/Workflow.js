@@ -14,6 +14,7 @@ const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline
 const { taoBoTest } = require('./Sidebar');
 const { napExtension } = require('../../lib/ext/nap-extension');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 
@@ -401,7 +402,7 @@ async function chay(so) {
       datLichNen(GH, { customerFull: { enabled: true, minutes: '10' } });
       check(so, 'Lịch nền: lưu cài đặt không đụng giờ chạy xong; đổi chu kỳ có hiệu lực ngay tính từ lần chạy xong cũ',
         [sau60, G.processDue(T + 10 * PHUT, docLichNen(GH), G.processBookRead(), 0)], [[T, []], ['customerFull']]);
-      G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, process: 'customerFull', pollAt: Date.now() });
+      datState(G, { runId: 'conflict-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, process: 'customerFull', pollAt: Date.now() });
       vaSoNen(G, { customerFull: { doneAt: 1 } });
       G.stateWrite(G.runClose(G.stateRead(), 'conflict', { message: 'Có xung đột cần người dùng xử lý.' }));
       trongLat(G, () => G.backgroundTail({ ok: true, request: null }));
@@ -510,7 +511,7 @@ async function chay(so) {
   });
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
   compactLookupFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(compactLookupFlow.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   compactLookupFlow.hop.FbmSync.runSlice(() => compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' }, compactLookupFlow.hop.FbmSync.stateRead()));
   const compactContinue = (body, items) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
@@ -708,7 +709,7 @@ async function chay(so) {
   check(so, 'Lần hỏi của máy nền mở lượt nền của tiến trình đến hạn đầu tiên, ô lượt mang tên tiến trình', [pickedCustomer.ok, !!pickedCustomer.request, pickedRun.origin, pickedRun.process, pickedRun.pollAt > 0], [true, true, 'background', 'customerFull', true]);
   const busyAsk = hoiNen(SFB);
   check(so, 'Lần hỏi khi lượt nền còn request chờ trong hạn không mở lượt thứ hai, vẫn giữ chuông', [busyAsk.code, busyAsk.request, SFB.stateRead().runId === pickedRun.runId, !!(busyAsk.poll && busyAsk.poll.minutes)], ['SYNC_BUSY', null, true, true]);
-  scheduleFlow.hop.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, process: '' });
+  datState(scheduleFlow.hop.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, process: '' });
   vaSoNen(scheduleFlow.hop.FbmSync, { customerFull: { doneAt: now }, activityFull: { doneAt: now }, heartbeat: { doneAt: now } });
   const noDue = hoiNen(SFB);
   check(so, 'Không có tiến trình đến hạn thì không mở lượt, vẫn giữ chuông', [noDue.ok, noDue.code, noDue.request, !!(noDue.poll && noDue.poll.minutes)], [true, 'NO_PROCESS_DUE', null, true]);
@@ -765,9 +766,9 @@ async function chay(so) {
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
   waitFlow.hop.FbmSync.runSlice(() => waitFlow.hop.FbmSync.start({ mode: 'read' }, waitFlow.hop.FbmSync.stateRead()));
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
-  waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
+  datState(waitFlow.hop.FbmSync, { phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
   const gapGrid = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
-  waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(waitFlow.hop.FbmSync, { activeRequestId: '', deadlineAt: 0 });
   const gapChunk = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
   const gapBudget = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'Lượt chạy tay chụp khoảng cách giữa hai request FBM vào state đầu lượt và gửi kèm mọi envelope; đổi cài đặt giữa lượt chỉ áp lượt sau; hạn Extension cộng khoảng nghỉ dài nhất, trừ gói lấy từ RAM tab',
@@ -777,10 +778,10 @@ async function chay(so) {
   const gapTooLong = waitFlow.hop.settingsSave({ fbm_run: { requestGapMinSeconds: 0, requestGapMaxSeconds: gapBudget.requestGapMaxSeconds + 1 } });
   check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.ok, gapTooLong.ok], [false, false]);
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
-  waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
+  datState(waitFlow.hop.FbmSync, { scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
   const gapNone = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
-  waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(waitFlow.hop.FbmSync, { activeRequestId: '', deadlineAt: 0 });
   const truocCap = Date.now();
   const loEnvelope = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), { items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
@@ -791,12 +792,12 @@ async function chay(so) {
 
   const deadlineLogs = [];
   const deadlineFlow = workflowGas({ logEvent: (event) => deadlineLogs.push(event), LOG_ERROR: 'error' });
-  deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
+  datState(deadlineFlow.hop.FbmSync, { runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
   // FBM-031: hạn của request vừa nhận đã qua nhưng lời gọi GAS mới bắt đầu thì vẫn cấp request kế; trần tính từ lúc lời gọi bắt đầu.
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now());
   const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   check(so, 'trần thời gian GAS tính từ lúc lời gọi bắt đầu, không từ hạn request vừa nhận', [!!notBlockedByRequestDeadline, deadlineFlow.hop.FbmSync.stateRead().lastFailureCode], [true, '']);
-  deadlineFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
+  datState(deadlineFlow.hop.FbmSync, { phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now() - deadlineFlow.hop.FbmSync.BUDGET.gasSoftMs - 1);
   const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
@@ -818,7 +819,7 @@ async function chay(so) {
     setProperties(values, deleteAllOthers) { quotaThrow(); return quotaBase.setProperties(values, deleteAllOthers); }
   });
   const quotaFlow = workflowGas({ documentProperties: quotaProperties, logEvent: (event) => quotaLogs.push(event), LOG_ERROR: 'error' });
-  quotaFlow.hop.FbmSync.statePatch({ runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {} });
+  datState(quotaFlow.hop.FbmSync, { runId: 'quota-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 7, pageValue: ['2026-09-20', 'CUS-000007'] }, metadata: {} });
   quotaFull = true;
   const quotaResult = quotaFlow.hop.FbmSync.controlDispatch('cancel', {});
   const quotaLog = quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_WRITE_FAILED').slice(-1)[0] || quotaLogs.filter((item) => item.reason === 'FBM_DOCUMENT_PROPERTIES_QUOTA').slice(-1)[0] || {};
@@ -943,7 +944,7 @@ async function chay(so) {
     // `rounds` chạy lại cả lượt trên cùng Sheet; `loseTab` làm mọi lô giao dịch của lượt đầu đứt đường truyền, `loseTab: 1` chỉ lô đầu tiên.
     let lanMat = 0;
     for (let round = 0; round < (options && options.rounds || 1); round += 1) {
-    fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+    datState(fullFlow.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     fullStep = fullFlow.hop.FbmSync.runSlice(() => fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true }, fullFlow.hop.FbmSync.stateRead()));
     for (let hop = 0; fullStep && fullStep.request && hop < 60; hop += 1) {
       const request = fullStep.request;
@@ -1139,7 +1140,7 @@ async function chay(so) {
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
   readFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   readFlow.hop.FbmSync.pullPageApply = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [] });
-  readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(readFlow.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let readStep = readFlow.hop.FbmSync.runSlice(() => readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, readFlow.hop.FbmSync.stateRead()));
   const readKinds = [];
   for (let hop = 0; readStep && readStep.request && hop < 12; hop += 1) {
@@ -1172,7 +1173,7 @@ async function chay(so) {
     flow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
     flow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
     flow.hop.FbmSync.pullPageApply = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
-    flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+    datState(flow.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
     let step = flow.hop.FbmSync.runSlice(() => flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, flow.hop.FbmSync.stateRead())), last = step;
     for (let hop = 0; step && step.request && hop < 12; hop += 1) {
@@ -1201,7 +1202,7 @@ async function chay(so) {
 
   const stopAfterResponse = workflowGas();
   stopAfterResponse.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(stopAfterResponse.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const stopStarted = stopAfterResponse.hop.FbmSync.runSlice(() => stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, stopAfterResponse.hop.FbmSync.stateRead()));
   const stopNow = stopAfterResponse.hop.FbmSync.runStopCommand('any');
   const stopState = stopAfterResponse.hop.FbmSync.stateRead();
@@ -1215,7 +1216,7 @@ async function chay(so) {
 
   const masterOff = workflowGas();
   masterOff.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(masterOff.hop.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const masterStarted = masterOff.hop.FbmSync.runSlice(() => masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, masterOff.hop.FbmSync.stateRead()));
   datCongTac(masterOff.hop, false);
   const masterStopped = masterOff.hop.FbmSync.runSlice(() => masterOff.hop.FbmSync.continue({

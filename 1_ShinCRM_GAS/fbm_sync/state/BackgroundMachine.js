@@ -10,7 +10,7 @@ FbmSync.MACHINE_NAME_MAX = 60;
 
 /** Máy đang được giao; chưa giao thì `machineId` rỗng. Kho hỏng thì ném (không coi là chưa giao, vì "chưa giao" làm mọi máy dừng nền âm thầm). */
 FbmSync.backgroundMachineRead = function () {
-  var saved = FbmSync.documentPropertyJson(FbmSync.BACKGROUND_MACHINE_KEY, 'máy chạy nền') || {};
+  var saved = documentPropertyJson(FbmSync.props(), FbmSync.BACKGROUND_MACHINE_KEY, 'máy chạy nền', 'object') || {};
   return { machineId: String(saved.machineId || ''), name: String(saved.name || ''), assignedAt: Number(saved.assignedAt || 0), lastAskAt: Number(saved.lastAskAt || 0) };
 };
 /** Ghi máy được giao; máy không có mã là gỡ (xóa khóa). */

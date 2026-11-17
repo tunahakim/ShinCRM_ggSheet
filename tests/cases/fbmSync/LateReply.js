@@ -1,6 +1,7 @@
 /** Kiểm response của lệnh ghi FBM về muộn: khung lát bỏ nó, không áp kết quả đẩy, không ghi Sheet và không phát lại lệnh ghi (gửi lại có thể tạo trùng trên FBM). */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datState } = require('../../lib/fbm/dat-state');
 
 const MA_GHI = 'R-ghi-muon';
 
@@ -34,7 +35,7 @@ async function chay(so) {
 
   // Quá hạn an toàn mà response mới về: không biết FBM đã lưu hay chưa, nên đóng lượt chứ không áp kết quả hay gửi lại.
   const quaHan = hopChoGhi();
-  quaHan.F.statePatch({ deadlineAt: Date.now() - 1000 });
+  datState(quaHan.F, { deadlineAt: Date.now() - 1000 });
   quaHan.F.STALE_RUN_MS = -1;
   const tre = quaHan.F.runSlice(() => quaHan.F.continue(quaHan.traLoi));
   check(so, 'response lệnh ghi về sau hạn an toàn: lượt đóng SYNC_STALE_WRITE, không áp kết quả, không ghi Sheet, không phát lại lệnh ghi', [

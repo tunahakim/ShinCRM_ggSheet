@@ -3,6 +3,7 @@ const { section, check } = require('../../lib/assert');
 const { datPhan, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { quaTrang, noiNen, hoiNen, dungHopGiuPhien, vaDauThu, batLogCong } = require('../../lib/fbm/tu-dang-nhap');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 async function chay(so) {
   section('FBM sync - auto-login: đăng nhập thất bại và throttle');
@@ -14,7 +15,7 @@ async function chay(so) {
     return probe.request && probe.request.meta.kind === 'session_probe' ? noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: probe.request.id }] } }) : probe;
   };
   vaDauThu(heartbeat.FbmSync, { lastAttemptAt: Date.now() - 31 * 60 * 1000 });
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: true, cookie: '' } });
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   const failedLoginProbe = hoiNen(heartbeat);
   const failedLoginRequest = phienChet(failedLoginProbe);
@@ -36,7 +37,7 @@ async function chay(so) {
     ['session_probe', false, 'AUTO_LOGIN_THROTTLED', null]);
 
   vaDauThu(heartbeat.FbmSync, { lastAttemptAt: Date.now() - 31 * 60 * 1000, nextRetryAt: 0 });
-  heartbeat.FbmSync.statePatch({ runId: 'expired-401', phase: 'pull_customer', mode: 'read', entity: 'customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] }, activeRequestId: 'expired-401-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
+  datState(heartbeat.FbmSync, { runId: 'expired-401', phase: 'pull_customer', mode: 'read', entity: 'customer', cursor: { kind: 'customer_grid', type: 1, pageIndex: 3, pageValue: ['x'] }, activeRequestId: 'expired-401-request', deadlineAt: Date.now() + 1000, session: { expired: false } });
   const suspected401 = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: false, status: 401, body: '', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'expired-401-request' }] } }));
   const expired401 = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd', transport: { contract: MA_HOP_DONG, trace: [{ requestId: suspected401.request.id }] } }));
   check(so, 'FBM 401 chi probe lai va neu probe khong song thi dung, khong tu login tu loi nghiep vu',
@@ -44,7 +45,7 @@ async function chay(so) {
     [true, 'session_probe', false, 'SESSION_PROBE_UNCERTAIN', null]);
 
   datPhan(heartbeat, 'loginPolicy', { enabled: true, autoOpenTab: false, retryEnabled: true, retryMinutes: 30 });
-  heartbeat.FbmSync.statePatch({ runId: 'initial-probe-failure', phase: 'checking_session', mode: 'read', cursor: { kind: 'session', cause: 'issue', resume: { cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, phase: 'pull_customer', entity: 'customer' }, replay: false, probeRetried: false, pageReloaded: false }, activeRequestId: 'initial-probe-request', deadlineAt: Date.now() + 1000, session: { expired: false }, metadata: { autoLoginTried: false } });
+  datState(heartbeat.FbmSync, { runId: 'initial-probe-failure', phase: 'checking_session', mode: 'read', cursor: { kind: 'session', cause: 'issue', resume: { cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, phase: 'pull_customer', entity: 'customer' }, replay: false, probeRetried: false, pageReloaded: false }, activeRequestId: 'initial-probe-request', deadlineAt: Date.now() + 1000, session: { expired: false }, metadata: { autoLoginTried: false } });
   const initialProbeFailure = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: false, status: 500, body: '\ufffd\ufffd\ufffd', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'initial-probe-request' }] } }));
   check(so, 'probe dau luot khong song moi duoc phep khoi dong mot login',
     [initialProbeFailure.ok, initialProbeFailure.request.meta.kind, heartbeat.FbmSync.stateRead().cursor.kind],

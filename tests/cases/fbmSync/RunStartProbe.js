@@ -5,6 +5,7 @@ const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionCon
 const { keoLo } = require('../../lib/fbm/keo-ve');
 const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
 const { noiLat, trongLat } = require('../../lib/fbm/hop-dong-bo');
+const { datState } = require('../../lib/fbm/dat-state');
 
 /** Đưa lượt vừa mở tới bước kết của chặng xác thực Activity: phiên đã qua cổng (đã xác minh), rồi chạy đúng bước kết thật. */
 function xacThucXong(F) {
@@ -23,11 +24,11 @@ async function chay(so) {
     PropertiesService: taoPropertiesService({ doc: props.data, script: props.data })
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
-  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(orchestration.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const approvalProps = { data: {} };
   const approval = taoHopCat({ FbmSync: {}, PropertiesService: taoPropertiesService({ doc: approvalProps.data, script: approvalProps.data }) });
   napServer(approval, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/PreflightPush.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
-  approval.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(approval.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   // Phần kiểm tra rẻ chạy đầu lượt; phần đọc và hash cả hai Sheet chỉ chạy sau khi phiên FBM xác thực xong, nên FBM hỏng ở bước xác thực thì ShinCRM chưa tốn công tính.
   const localCalls = [];
   approval.FbmSync.preflightGates = () => ({ ok: true, issues: [], blocking: [], warnings: [], candidateCount: 0 });
@@ -57,17 +58,17 @@ async function chay(so) {
   ], [true, false, false, true, false, false, true, true, true]);
   let pullWriteCalls = 0;
   approval.FbmSync.pullPageApply = (_entity, records) => { pullWriteCalls += 1; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
-  approval.FbmSync.statePatch({ counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
+  datState(approval.FbmSync, { counts: { total: 0, completed: 0, succeeded: 0, error: 0, conflict: 0, skipped: 0 } });
   const readPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-1' }], 'read');
   const checkPull = keoLo(approval.FbmSync, 'customer', [{ id: 'C-2' }], 'check');
   check(so, 'read ghi Sheet con check chi preview', [readPull.written, checkPull.preview, pullWriteCalls], [1, true, 1]);
-  orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(orchestration.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'start bat dau bang probe User', started.request.meta.kind, 'session_probe');
   check(so, 'probe khong gui authorized cu', started.request.body.authorized, undefined);
   orchestration.FbmSync.currentSpreadsheetId = () => 'sheet-push-test';
   orchestration.FbmSync.identityStatus = () => ({ status: 'BOUND' });
-  orchestration.FbmSync.statePatch({ runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
+  datState(orchestration.FbmSync, { runId: 'business-failure-run', origin: 'manual', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: '', deadlineAt: 0, metadata: { sessionGate: {} }, session: { expired: false, sessionId: '', identityVerified: false, identitySessionId: '' } });
   const businessProbe = orchestration.FbmSync.sliceIssue(orchestration.FbmSync.stateRead(), { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { controller: 'zccrAccount' }, meta: { kind: 'grid' } });
   check(so, 'request nghiep vu chi duoc cap sau probe User dat', businessProbe.meta.kind, 'session_probe');
   const businessRequest = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}', transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: businessProbe.id }] } }));
@@ -76,7 +77,7 @@ async function chay(so) {
   check(so, 'loi request nghiep vu fail-closed khong tu retry', [retrySlice && retrySlice.ok, retrySlice && retrySlice.request, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode], [false, null, 'error', 'TRANSPORT_ERROR']);
   const blockedDuplicate = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'sau loi request chi cho phep nguoi dung chay lai tu dau bang probe', [blockedDuplicate.ok, blockedDuplicate.request && blockedDuplicate.request.meta.kind, orchestration.FbmSync.stateRead().phase], [true, 'session_probe', 'checking_session']);
-  orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(orchestration.FbmSync, { activeRequestId: '', deadlineAt: 0 });
   const resumed = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'start tiep tuc sau khi reservation cu da thu hoi bang probe moi', [resumed.ok, resumed.resumed, resumed.request.meta.kind], [true, true, 'session_probe']);
   const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);

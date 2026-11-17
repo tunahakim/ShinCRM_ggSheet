@@ -6,6 +6,7 @@ const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 const { datCongTac, datNen, datPhan, datLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
+const { datState } = require('../../lib/fbm/dat-state');
 
 /** Bảng loại thông báo thật, để thông báo đồng bộ phát ra chắc chắn dùng loại đã khai. */
 function loaiThongBao() {
@@ -82,7 +83,7 @@ function chay(so) {
     const { F, logs, hoi } = hopNen();
     hoi(MAY_A);
     const opened = F.stateRead();
-    F.statePatch({ deadlineAt: Date.now() - 60000 });
+    datState(F, { deadlineAt: Date.now() - 60000 });
     const trail = { stage: 'fbm_tab_replied', at: Date.now() - 120000, requestId: opened.activeRequestId };
     const after = hoi(MAY_A, 'alarm', { trail }), closed = F.stateRead();
     const findings = F.requestWatchTake(), unanswered = findings.find((line) => line.action === 'request_unanswered');
@@ -97,7 +98,7 @@ function chay(so) {
   {
     const { F, logs, hoi } = hopNen();
     hoi(MAY_A);
-    F.statePatch({ phase: 'push', cursor: { kind: 'push_wait' }, deadlineAt: Date.now() - 60000 });
+    datState(F, { phase: 'push', cursor: { kind: 'push_wait' }, deadlineAt: Date.now() - 60000 });
     hoi(MAY_A);
     check(so, 'lượt nền mất response lúc chờ ghi FBM: đóng SYNC_STALE_WRITE, không tự ghi lại',
       [F.stateRead().lastFailureCode, maCua(logs, 'stale_run')[0].detail.code],
@@ -167,7 +168,7 @@ function chay(so) {
       ['identity_user_grid', true, false]);
   }
   // Lượt nền đang chạy (ô lượt dựng tay) đóng qua đúng cổng đóng lượt: `runClose` ghi kết quả tiến trình vào sổ ngay lúc đóng, lần hỏi sau không ghi lại.
-  const moNen = (F, runId, process) => F.statePatch({ runId, origin: 'background', process, phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
+  const moNen = (F, runId, process) => datState(F, { runId, origin: 'background', process, phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
   {
     const { F, logs, hoi } = hopNen();
     moNen(F, 'run-nen-1', 'customerFull');

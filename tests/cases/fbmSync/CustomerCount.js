@@ -3,6 +3,7 @@ const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
 const { vaSoNen } = require('../../lib/fbm/cai-dat-thu');
+const { datState } = require('../../lib/fbm/dat-state');
 
 const dem = (h, kind) => h.trace.kinds.filter((item) => item === kind).length;
 
@@ -64,7 +65,7 @@ async function chay(so) {
 
   // Chặng nhận bản sao ô lượt: sửa thẳng bản sao không lọt vào ô lượt thật, chỉ patch được gộp.
   const sao = scanHarness({ customers: 12 });
-  sao.F.statePatch({ runId: 'r-sao', phase: 'pull_customer', cursor: { kind: 'customer_count' }, message: 'cũ' });
+  datState(sao.F, { runId: 'r-sao', phase: 'pull_customer', cursor: { kind: 'customer_count' }, message: 'cũ' });
   const traVe = trongLat(sao.F, () => sao.F.stageRun({ stage: (ctx) => { ctx.state.phase = 'done'; ctx.state.cursor.kind = 'xong'; return { patch: { message: 'mới' }, end: {} }; }, end: (state) => ({ phase: state.phase, kind: state.cursor.kind, message: state.message }) }, sao.F.stateRead(), JSON.stringify({ d: {} })));
   check(so, 'chặng sửa thẳng ô lượt nhận được thì ô lượt thật không đổi; chỉ patch được gộp', [traVe.phase, traVe.kind, traVe.message], ['pull_customer', 'customer_count', 'mới']);
 

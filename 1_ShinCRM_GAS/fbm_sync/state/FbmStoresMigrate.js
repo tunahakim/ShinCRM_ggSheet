@@ -40,7 +40,7 @@ function fbmStoresMigrateRead() {
   FbmSync.PROCESS_BOOK_OLD_KEYS.concat(FbmSync.CONNECTION_OLD_KEYS).forEach(function (key) {
     var raw = props.getProperty(key);
     if (raw === null || raw === undefined || raw === '') { return; }
-    stored[key] = /^FBM_SYNC_DONE_/.test(key) ? raw : FbmSync.documentPropertyJson(key, 'kho FBM đời cũ');
+    stored[key] = /^FBM_SYNC_DONE_/.test(key) ? raw : documentPropertyJson(FbmSync.props(), key, 'kho FBM đời cũ', 'object');
   });
   return stored;
 }

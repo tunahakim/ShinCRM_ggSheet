@@ -110,6 +110,7 @@ FbmSync.customerCountEnd = function (state, end) {
 /** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`, `follows` là mã lượt vừa đóng để Sidebar đang chờ lượt đó chờ tiếp lượt này); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
 FbmSync.recountStart = function (mode, origin, carry, state) {
   var started = FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false }, carry), state);
-  if (started && started.ok && started.request) { FbmSync.statePatch({ message: FbmSync.RECOUNT_MESSAGE }); }
+  // Ghi câu sau `start`: cổng phiên mở trong `start` đặt câu của nó, câu này phải đè lên để Sidebar thấy vì sao lượt mới bắt đầu.
+  if (started && started.ok && started.request) { var running = FbmSync.stateRead(); running.message = FbmSync.RECOUNT_MESSAGE; FbmSync.stateWrite(running); }
   return started;
 };

@@ -4,11 +4,12 @@ const { TRANG_FBM_THU } = require('../../lib/load-gas');
 const { vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { USER_BODY, quaTrang, noiNen, hoiNen, dungHopGiuPhien, vaDauThu } = require('../../lib/fbm/tu-dang-nhap');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 async function chay(so) {
   section('FBM sync - auto-login: Giữ phiên đăng nhập');
   const { hop: heartbeat } = dungHopGiuPhien();
-  heartbeat.FbmSync.statePatch({ session: { expired: true } });
+  datState(heartbeat.FbmSync, { session: { expired: true } });
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });
   // Dấu hết hạn còn từ lượt trước không đủ để đăng nhập (09/06), và phiên chưa xác minh thì Giữ phiên không được dựng request đếm khách (mã người dùng lấy từ phiên đã xác minh): mở bằng probe, probe báo chưa xác thực mới đi cổng đăng nhập.
   const staleCount = hoiNen(heartbeat);
@@ -45,14 +46,14 @@ async function chay(so) {
   ], [true, true, 'customerFull', true, false]);
   // Các ca sau chỉ xét Giữ phiên: bỏ Quét đầy đủ vừa mở khỏi chuỗi.
   vaSoNen(heartbeat.FbmSync, { customerFull: { doneAt: Date.now() } });
-  heartbeat.FbmSync.statePatch({ process: '' });
+  datState(heartbeat.FbmSync, { process: '' });
   // Lượt tay đã tự đăng nhập thì cờ "đã thử đăng nhập" còn sót sau khi lượt xong: dựng lại dấu đó cho ca kế.
   const leftoverState = heartbeat.FbmSync.stateRead();
   leftoverState.metadata.autoLoginTried = true;
   heartbeat.FbmSync.stateWrite(leftoverState);
 
   // Phiên chết lần nữa ở lần hỏi nền sau (gặp thật 2026-10-16: đăng nhập 00:17, 00:32 phiên lại chết): cờ "đã thử đăng nhập" của lượt trước không được chặn lần đăng nhập mới.
-  heartbeat.FbmSync.statePatch({ phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+  datState(heartbeat.FbmSync, { phase: 'done', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const loginLeftover = heartbeat.FbmSync.stateRead().metadata.autoLoginTried;
   vaDauThu(heartbeat.FbmSync, { lastAttemptAt: 0, nextRetryAt: 0 });
   vaSoNen(heartbeat.FbmSync, { heartbeat: { doneAt: 1 } });

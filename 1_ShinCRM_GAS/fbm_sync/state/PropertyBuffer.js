@@ -11,8 +11,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.propertyBuffer = { callDepth: 0, tracePending: [] };
 
-FbmSync.propertyBufferActive = function () { return documentStoreActive(); };
-
 /**
  * Mở một lần gọi cho khối chỉ đọc chạy ngoài `runEntryPoint` (preflight gọi từ hàm dò, test), để các lần `readLocal` dùng chung bản đọc Sheet: preflight gọi `readLocal` ở nhiều kiểm tra, mỗi lần đọc nghìn dòng mất vài giây và từng làm lượt khởi động vượt hạn chờ 30 giây của Sidebar.
  * Trong một lần gọi thì bản đọc đã có sẵn; mở lồng chỉ tăng độ sâu.

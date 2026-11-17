@@ -5,6 +5,7 @@
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
+const { datState } = require('../../lib/fbm/dat-state');
 
 /** Hộp cát đủ tệp cho mọi lệnh (lưu cài đặt chung đổi mã ra khách qua cổng mã, `trace_read` đọc sổ bước). */
 const HOP = { extraFiles: ['server/gate/IdGate.js', 'fbm_sync/diagnostic/Trace.js'], LOG_WARN: 'warn' };
@@ -26,7 +27,7 @@ const CA = [
   { lenh: 'start', ten: 'start identity_check', payload: { kind: 'identity_check', machineId: 'may-A' } },
   { lenh: 'start', ten: 'start identity_probe', payload: { kind: 'identity_probe', machineId: 'may-A' } },
   { lenh: 'start', ten: 'start login_test', payload: { kind: 'login_test', credentialRef: 'cred-test-1234', machineId: 'may-A' }, chuan: dangNhapDaLuu },
-  { lenh: 'start', ten: 'start login_force', payload: { kind: 'login_force', machineId: 'may-A' }, chuan: (F) => { dangNhapDaLuu(F); F.statePatch({ loginForceOffered: true }); } },
+  { lenh: 'start', ten: 'start login_force', payload: { kind: 'login_force', machineId: 'may-A' }, chuan: (F) => { dangNhapDaLuu(F); datState(F, { loginForceOffered: true }); } },
   { lenh: 'heartbeat', ten: 'heartbeat nhận lượt', kenh: 'relay', payload: { trigger: 'run_now', machineId: 'may-A' }, chuan: (F) => { F.controlDispatch('start', { kind: 'identity_probe', machineId: 'may-A' }); } },
   { lenh: 'heartbeat', ten: 'heartbeat chuông không có lượt', kenh: 'relay', payload: { trigger: 'alarm', machineId: 'may-A' } },
   { lenh: 'continue', ten: 'continue nộp response', kenh: 'relay', payload: (F) => { const request = luotDangCho(F); return { machineId: 'may-A', response: { ok: true, status: 200, body: '{"d":{}}', transport: { contract: F.protocol.contract }, trace: [{ stage: 'fbm_tab_replied', requestId: request.id }] } }; } },
@@ -96,7 +97,7 @@ async function chay(so) {
     try {
       if (ca.chuan) { ca.chuan(F); }
       const payload = typeof ca.payload === 'function' ? ca.payload(F) : (ca.payload || {});
-      F.statePatch({ session: Object.assign({}, F.stateRead().session, BI_MAT) });
+      datState(F, { session: Object.assign({}, F.stateRead().session, BI_MAT) });
       // Ghi lúc phần ruột của lệnh bắt đầu: đang trong khóa, trong lát hay không, để so với cờ khai trong bảng lệnh.
       let trongKhoa = 0, trongLat = 0;
       const khoa = F.withOrchestrationLock, lat = F.runSlice, spec = F.COMMANDS[ca.lenh], chayGoc = spec.run;

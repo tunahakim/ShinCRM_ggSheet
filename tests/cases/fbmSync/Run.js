@@ -1,6 +1,7 @@
 /** Kiểm `fbm_sync/state/Run.js`: lệnh Dừng ghi cờ không cần khóa điều phối, lát đang giữ khóa thấy cờ trước khi phát request kế, lệnh mở lượt và lát kế áp cờ còn chờ; mọi đường đóng lượt đi qua `runClose`. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { datState } = require('../../lib/fbm/dat-state');
 
 function loi(fn) {
   try { fn(); return null; } catch (error) { return String(error && error.code || ''); }
@@ -16,7 +17,7 @@ function hopCoLuot(origin, them) {
   ref.F = hop.FbmSync;
   const F = hop.FbmSync;
   F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = F.runSlice(() => F.start(Object.assign({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' }, them || {}), F.stateRead()));
   return { hop, F, khoa, logs, data: documentProperties.data, started };
 }
@@ -37,7 +38,7 @@ async function chay(so) {
   // Lượt kẹt không còn lát nào áp cờ: Dừng chờ khóa rồi tự đóng, không hứa "sẽ dừng" (nút sẽ kẹt ở "Đang dừng…").
   const dungKetHop = hopCoLuot();
   dungKetHop.F.STALE_RUN_MS = -1;
-  dungKetHop.F.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(dungKetHop.F, { activeRequestId: '', deadlineAt: 0 });
   const runDungKet = dungKetHop.F.stateRead().runId;
   const dungKet = dungKetHop.F.controlDispatch('cancel', {});
   check(so, 'lượt kẹt, khóa rảnh: Dừng đóng lượt ngay (SYNC_STOPPED), lượt tạm dừng, status không còn đang dừng', [
@@ -45,7 +46,7 @@ async function chay(so) {
   ], [true, 'SYNC_STOPPED', 'paused', true, false, 'start']);
   const dungKetBanHop = hopCoLuot();
   dungKetBanHop.F.STALE_RUN_MS = -1;
-  dungKetBanHop.F.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(dungKetBanHop.F, { activeRequestId: '', deadlineAt: 0 });
   const truocDungKetBan = dungKetBanHop.data.FBM_SYNC_STATE_V1;
   dungKetBanHop.khoa.ban = true;
   const dungKetBan = dungKetBanHop.F.controlDispatch('cancel', {});
@@ -135,7 +136,7 @@ async function chay(so) {
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);
   // Gặp khi nghiệm thu 2026-11-01: lượt tay mở ngay sau lượt nền Quét nhanh chỉ mang nhãn "Tay" vì ô lượt còn chuỗi nền cũ.
-  tayNhan.F.statePatch({ chain: { current: 'customerFull' } });
+  datState(tayNhan.F, { chain: { current: 'customerFull' } });
   check(so, 'lượt tay mở khi ô lượt còn chuỗi nền Quét nhanh vẫn ghi tên kiểu quét', tayNhan.F.runOpen({ origin: 'manual', scan: 'full' }).runLabel, 'Tay · Quét nhanh');
 
   // Gặp khi nghiệm thu B4: dòng transport_failure ghi sau khi lượt đã đóng nên mất nhãn lượt.

@@ -7,6 +7,7 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi } = require('../../lib/l
 const { clone, makeSync, pushQueue, editCustomer, pushOk, pushDrive } = require('../../lib/fbm/hang-day');
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
+const { datState } = require('../../lib/fbm/dat-state');
 /** Cổng danh mục rỗng: dấu vân bắt buộc có cổng, bản ghi mẫu không có giá trị danh mục cần đổi mã. */
 const NO_CATEGORY = { map: {} };
 
@@ -41,7 +42,7 @@ async function chay(so) {
   const originalNow = protocol.Date.now;
   protocol.Date.now = () => fixedNow;
   // Request nào cũng đi theo cursor đang lưu (cổng phiên xét dòng bảng của cursor); dùng dòng không có cổng để chỉ kiểm phần cấp mã.
-  protocol.FbmSync.statePatch({ cursor: { kind: 'identity_user_grid' } });
+  datState(protocol.FbmSync, { cursor: { kind: 'identity_user_grid' } });
   const first = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   const second = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   protocol.Date.now = originalNow;
@@ -384,7 +385,7 @@ async function chay(so) {
 
   const cfNewRun = CF.runOpen({ phase: 'checking_session' });
   cfNewRun.phase = 'done'; CF.stateWrite(cfNewRun);
-  CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(CF, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
   const cfBackground = CF.runSlice(() => CF.runConflictOpenCommand());
   const cfAfterBackground = CF.stateRead();
@@ -431,7 +432,7 @@ async function chay(so) {
   const cfShotNew = JSON.parse(JSON.stringify(cfOpenedNewer.conflict.snapshot));
   cfShotNew.old.companyName = cfChangedField.current;
   const cfNewSession = CF.runOpen({ phase: 'checking_session' }); cfNewSession.phase = 'done'; CF.stateWrite(cfNewSession);
-  CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(CF, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   giuBanGhi(cf.hop, 'khac', 'customer', 'CUS-000001', 'Tiến trình khác đang giữ.');
   const cfBusy = chotQuaCua('CUS-000001', 'fbm', cfOpenedNewer, cfShotNew);
   check(so, 'Bản ghi đang bị tiến trình khác giữ lúc chốt thì báo bận kèm lý do, không ghi gì',
@@ -478,7 +479,7 @@ async function chay(so) {
   sm.local.customer[0].companyName = 'Tên Shin 1';
   keoVe(SM, 'customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM 1'), NO_CATEGORY)]);
   const smDone = SM.runOpen({ phase: 'checking_session' }); smDone.phase = 'done'; SM.stateWrite(smDone);
-  SM.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(SM, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const smOpen = SM.runSlice(() => SM.runConflictOpenCommand());
   const smSame = SM.runSlice(((r) => () => SM.continue(r))(await gridResponse(smOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên Shin 1')])));
   check(so, 'FBM-053: đọc lại FBM thấy khớp ShinCRM mọi trường thì tự đóng xung đột (đã đồng bộ, baseline là hash FBM), không trả màn xung đột rỗng',
@@ -493,7 +494,7 @@ async function chay(so) {
   un.local.customer.forEach((row) => { row.companyName = 'Tên Shin ' + row.fbmCustomerCode.slice(-1); });
   keoVe(UN, 'customer', unIds.map((n) => UN.customerRecord(fbmRow('F-' + n, 'ALT0000' + n, 'Tên FBM ' + n), NO_CATEGORY)));
   const unDone = UN.runOpen({ phase: 'checking_session' }); unDone.phase = 'done'; UN.stateWrite(unDone);
-  UN.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(UN, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   un.logs.length = 0;
   const unOpen = UN.runSlice(() => UN.runConflictOpenCommand());
   const unMissing = UN.runSlice(((r) => () => UN.continue(r))(await gridResponse(unOpen.request.id, [])));
@@ -577,7 +578,7 @@ async function chay(so) {
   ac.local.activity[0].content = 'Nội dung Shin';
   const acPull = keoLo(AC, 'activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate, { sttRec: 'FBM-C1' })], 'read');
   const acDone = AC.stateRead(); acDone.phase = 'done'; AC.stateWrite(acDone);
-  AC.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(AC, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const acOpen = AC.runSlice(() => AC.runConflictOpenCommand());
   const acLatest = fbmActivity('Nội dung FBM', '/Date(1757473200000)/');
   const acOpened = AC.runSlice(((r) => () => AC.continue(r))(await activityGrid(acOpen.request && acOpen.request.id, [acLatest])));

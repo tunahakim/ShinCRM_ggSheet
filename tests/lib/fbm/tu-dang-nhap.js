@@ -8,6 +8,7 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../load-gas');
 const { quaTrangLogin } = require('./trang-login');
 
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('./dat-state');
 const quaTrang = (nop, first, doi) => quaTrangLogin(nop, first, MA_HOP_DONG, doi);
 const USER_BODY = '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}';
 const HET_HAN = { ok: true, status: 200, body: '{"d":{"Authorized":false,"Rows":[]}}' };
@@ -48,7 +49,7 @@ function batLogCong(hop) { const logs = []; hop.logEvent = (event) => logs.push(
 function noiNen(hop, response) { return hop.FbmSync.publicResult(hop.FbmSync.runSlice(() => hop.FbmSync.continue(response))); }
 /** Đặt ô lượt đăng nhập ở bước `cursor.step` rồi nộp response qua chặng chung (`CURSOR_TABLE.login`). */
 function nopBuoc(F, cursor, reply, patch) {
-  F.statePatch(Object.assign({ runId: 'login-' + Math.random().toString(36).slice(2), phase: 'checking_session', cursor: F.loginCursorOpen(cursor), activeRequestId: '', deadlineAt: 0 }, patch || {}));
+  datState(F, Object.assign({ runId: 'login-' + Math.random().toString(36).slice(2), phase: 'checking_session', cursor: F.loginCursorOpen(cursor), activeRequestId: '', deadlineAt: 0 }, patch || {}));
   return trongLat(F, () => F.stageRun(F.cursorTable('login'), F.stateRead(), reply));
 }
 /** Hỏi cổng tự đăng nhập bằng đúng đầu vào chặng phiên đọc khi phiên chết. */

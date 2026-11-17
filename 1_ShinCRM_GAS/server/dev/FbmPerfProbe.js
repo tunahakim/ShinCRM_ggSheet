@@ -11,12 +11,12 @@ var FBM_PERF_STORE_KEY = 'FBM_PERF_STORE';
 var FBM_PERF_TTL_SECONDS = 21600;
 /** Hàm của FbmSync được bọc; thêm tên ở đây khi cần chẻ nhỏ một ô còn lớn. */
 var FBM_PERF_FBM_FUNCTIONS = [
-  'stateRead', 'stateWrite', 'documentPropertySet', 'documentPropertyJson', 'stateWriteMinimal',
+  'stateRead', 'stateWrite', 'documentPropertySet', 'stateWriteMinimal',
   'traceEvent', 'traceImport', 'traceAppend', 'traceContext', 'traceRead',
   'statusView', 'staleRunClose', 'recordIssuesFlush', 'transportValue',
   'withOrchestrationLock', 'sliceIssue', 'cursorIssue', 'cursorRequest',
   'rowsToRecords', 'customerRecord', 'activityRecord', 'isTemporaryRecord', 'stateCategoryGate', 'readCategoryGate',
-  'pullBatchApply', 'pullPageApply', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'seenStoreHas', 'recordChange', 'previewRecords',
+  'pullBatchApply', 'pullPageApply', 'readLocal', 'seenStoreBegin', 'seenStoreMark', 'recordChange', 'previewRecords',
   'hash', 'threeWay', 'toFbmCodes',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanStage', 'readReasonOf', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',

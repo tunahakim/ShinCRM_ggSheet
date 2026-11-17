@@ -45,7 +45,7 @@ FbmSync.logStaleResponse = function (state, responseRequestId, action) {
 FbmSync.PREVIEW_KEY = 'FBM_SYNC_PREVIEW_V1';
 FbmSync.PREVIEW_LIMIT = 10;
 FbmSync.previewEmpty = function () { return { customers: [], activities: [], truncated: false }; };
-FbmSync.previewRead = function () { return Object.assign(FbmSync.previewEmpty(), FbmSync.documentPropertyJson(FbmSync.PREVIEW_KEY, 'bản xem trước') || {}); };
+FbmSync.previewRead = function () { return Object.assign(FbmSync.previewEmpty(), documentPropertyJson(FbmSync.props(), FbmSync.PREVIEW_KEY, 'bản xem trước', 'object') || {}); };
 FbmSync.previewClear = function () { FbmSync.documentPropertySet(FbmSync.PREVIEW_KEY, JSON.stringify(FbmSync.previewEmpty()), 'preview'); };
 
 /**

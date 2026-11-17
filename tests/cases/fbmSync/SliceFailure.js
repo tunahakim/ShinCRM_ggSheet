@@ -3,6 +3,7 @@ const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { hopBuoc: dungState } = require('../../lib/fbm/hop-buoc');
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
+const { datState } = require('../../lib/fbm/dat-state');
 
 function chay(so) {
   section('FBM sync - lát lỗi đóng lượt đúng bước');
@@ -31,7 +32,7 @@ function chay(so) {
   napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js');
   nenHb.nen.FbmSync.continue = () => { throw new Error('Lỗi lát nền'); };
   nenHb.nen.FbmSync.replyAdmit = () => null;
-  nenHb.nen.FbmSync.statePatch({ origin: 'background', process: 'heartbeat', cursor: { kind: 'customer_count' } });
+  datState(nenHb.nen.FbmSync, { origin: 'background', process: 'heartbeat', cursor: { kind: 'customer_count' } });
   let nemNen = '';
   try { nenHb.nen.FbmSync.controlDispatch('continue', { response: {} }, 'relay'); } catch (err) { nemNen = err.message; }
   check(so, 'exception ở đường nền (relay nộp kết quả nhịp Giữ phiên): lỗi gốc ném lại và phiên chuyển sang error',

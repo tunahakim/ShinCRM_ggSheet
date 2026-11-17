@@ -1,6 +1,7 @@
 /** Hủy phiên cũ rồi chạy tiếp: GAS nhớ lượt FBM vừa chặn vì còn phiên cũ và tự quyết sau khi đăng nhập ép thành công (lượt đồng bộ tay không đẩy thì mở lại đúng loại đó, nối mã lượt qua `follows`; lượt đẩy, lượt nền, Đăng nhập thử thì chỉ đăng nhập). Sidebar không tự mở lượt. */
 const { section, check } = require('../../lib/assert');
 const { workflowGas, trongLat } = require('../../lib/fbm/hop-dong-bo');
+const { datState } = require('../../lib/fbm/dat-state');
 
 function hopDangNhap() {
   const { hop } = workflowGas({ logEvent() {}, LOG_WARN: 'warn' });
@@ -10,7 +11,7 @@ function hopDangNhap() {
 }
 /** Lượt `luot` (nguồn, chiều, mức quét, gói) đang ở bước Login của mục đích `purpose`, FBM trả còn phiên cũ. */
 function biChan(F, luot, purpose) {
-  F.statePatch(Object.assign({ runId: 'chan-' + Math.random().toString(36).slice(2), phase: 'checking_session', activeRequestId: '', deadlineAt: 0, session: { expired: true },
+  datState(F, Object.assign({ runId: 'chan-' + Math.random().toString(36).slice(2), phase: 'checking_session', activeRequestId: '', deadlineAt: 0, session: { expired: true },
     cursor: F.loginCursorOpen({ purpose: purpose || 'auto', step: 'login', facts: { salt: 'ab12cd34', database: 'FHN_CRM_App', unit: 'CTY' }, afterLogin: { cursor: { kind: 'customer_grid' } } }) }, luot));
   return trongLat(F, () => F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: '{"d":"Duplicate"}' }));
 }

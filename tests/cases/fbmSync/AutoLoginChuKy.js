@@ -58,7 +58,7 @@ async function chay(so) {
     [resumed.request.meta.kind, hop.FbmSync.stateRead().cursor.kind, hop.FbmSync.stateRead().cursor.resume.cursor.pageIndex],
     ['session_probe', 'session', 2]);
   check(so, 'login test không coi Login.aspx là thành công',
-    hop.FbmSync.protocol.isSessionExpired({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }),
+    !hop.FbmSync.protocol.isLiveSessionResponse({ ok: true, status: 200, body: '<form action="Login.aspx"></form>' }),
     true);
 }
 

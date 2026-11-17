@@ -5,13 +5,14 @@ const { docPhan } = require('../../lib/fbm/cai-dat-thu');
 const { TRA_BUOC } = require('../../lib/fbm/trang-login');
 const { USER_BODY, quaTrang, nopBuoc, congVao, dungHopGiuPhien, batLogCong } = require('../../lib/fbm/tu-dang-nhap');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 async function chay(so) {
   section('FBM sync - auto-login: đăng nhập thử và hủy phiên cũ');
   const { hop: heartbeat } = dungHopGiuPhien();
   const gateLogs = batLogCong(heartbeat);
   const beforeTestConfig = Object.assign({}, heartbeat.FbmSync.credentialRead(), heartbeat.FbmSync.loginAttemptRead());
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const tuHong = gateLogs.length;
   const testRequest = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
   const testFirst = testRequest.request, testUnit = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: TRA_BUOC.page, transport: { contract: MA_HOP_DONG, trace: [{ requestId: testFirst.id }] } }));
@@ -28,14 +29,14 @@ async function chay(so) {
 
   // FBM không kiểm trường cookie trong body (đo 2026-10-06: đọc, xin quyền mở form và lưu ALT00010 đều thành công với mã rỗng). Login thành công mà không bắt
   // được mã phiên thì vẫn đi tiếp bước xác minh; request xác minh được cấp mã rỗng làm dự phòng thay vì token bắt buộc khiến Extension chặn FBM_TRANSPORT_CAPTURE_MISSING.
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const noCookieTest = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
   const noCookieLogin = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), noCookieTest.request);
   const noCookieReplacement = (noCookieLogin.request && noCookieLogin.request.meta && noCookieLogin.request.meta.transport && noCookieLogin.request.meta.transport.replacements || [])[0] || {};
   check(so, 'đăng nhập thử thành công mà không bắt được mã phiên vẫn đi tiếp xác minh, mã phiên là tùy chọn có dự phòng rỗng (FBM-037)',
     [noCookieLogin.ok, noCookieLogin.request && noCookieLogin.request.meta.kind, noCookieReplacement.required, noCookieReplacement.fallback],
     [true, 'authorize', false, '']);
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const mismatchTest = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
   const mismatchLogin = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), mismatchTest.request);
   const mismatchAuthorize = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: mismatchLogin.request.id }] } }));
@@ -44,7 +45,7 @@ async function chay(so) {
     [mismatchIdentity.code, docPhan(heartbeat, 'loginPolicy').enabled, heartbeat.FbmSync.stateRead().session.identityVerified],
     ['LOGIN_IDENTITY_MISMATCH', true, false]);
 
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
   const draftB = { spreadsheetId: 'sheet-test', userId: '2040', username: 'USERB', accountName: 'Tai khoan B' };
   const draftLogin = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', { identity: draftB }, heartbeat.FbmSync.stateRead()));
   const draftLoginAdapter = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), draftLogin.request);
@@ -81,7 +82,7 @@ async function chay(so) {
   check(so, 'thông báo chờ chu kỳ nêu giờ được thử lại, lý do lần trước và cách kiểm tra ngay',
     [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0, throttleText.indexOf('Đăng nhập thử') > 0],
     [true, true, true]);
-  heartbeat.FbmSync.statePatch({ phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
+  datState(heartbeat.FbmSync, { phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
   const tuEp = gateLogs.length;
   const forceAgain = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('force', {}, heartbeat.FbmSync.stateRead()));
   const forceLogin = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), forceAgain.request);
@@ -93,7 +94,7 @@ async function chay(so) {
   const denEp = gateLogs.length;
   // Mỗi lượt đăng nhập đúng một dòng kết thúc do luồng đăng nhập ghi; không còn dòng chụp `slice` lặp lại câu thông báo của lượt.
   const dongKet = (tu, den) => gateLogs.slice(tu, den).filter((e) => /^(login_test_ok|login_force_ok|login_failure|slice|start)$/.test(e.action)).map((e) => e.action);
-  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+  datState(heartbeat.FbmSync, { runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
   const tuThu = gateLogs.length, thuMo = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
   const thuDangNhap = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), thuMo.request);
   const thuXacNhan = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: thuDangNhap.request.id }] } }));

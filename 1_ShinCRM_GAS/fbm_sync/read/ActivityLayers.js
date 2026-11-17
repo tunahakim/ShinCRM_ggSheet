@@ -98,7 +98,7 @@ FbmSync.readListDoneReader = function () {
 };
 
 FbmSync.readWaitRead = function () {
-  return FbmSync.documentPropertyJson(FbmSync.READ_WAIT_KEY, 'danh sách giao dịch chờ đọc lại') || {};
+  return documentPropertyJson(FbmSync.props(), FbmSync.READ_WAIT_KEY, 'danh sách giao dịch chờ đọc lại', 'object') || {};
 };
 /**
  * Ghi hàng chờ đọc dở; rỗng thì xóa khóa. Quá trần `BUDGET.readWaitMaxBytes` thì ném `READ_WAIT_FULL` và không ghi gì: ghi cắt bớt là bỏ giao dịch chờ âm thầm, khách cha đọc sau sẽ không còn biết giao dịch nào đã chuyển sang mình.

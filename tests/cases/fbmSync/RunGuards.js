@@ -8,6 +8,7 @@ const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
 const { taoHopCat } = require('../../lib/load-gas');
 const { liet } = require('../../lib/quet/liet-tep');
 const { duLieuServer, napTheoSidebar } = require('../../lib/sidebar/nap-sidebar');
+const { datState } = require('../../lib/fbm/dat-state');
 
 /**
  * Tên lượt và tiến trình nền chỉ khai ở GAS; Sidebar nhận qua dữ liệu chèn lúc dựng khung. Kiểm ba đường lệch: dữ liệu chèn khác bảng GAS, schema menu Mức quét để lọt gói thiếu lời giải thích, và tệp client gõ tay lại mã hay tên.
@@ -59,7 +60,7 @@ function chay(so) {
     [nhan({ origin: 'manual', scan: 'full', scanPack: 'quick' }), nhan({ origin: 'manual', scan: 'full', scanPack: 'deep' }), nhan({ origin: 'manual', scan: 'full', scanPack: 'all' }), nhan({ origin: 'background', process: 'customerFull', scan: 'full' }), nhan({ origin: 'background', process: 'activityFull', scan: 'activity_bulk' }), nhan({ origin: 'manual', scan: 'identity_check' })],
     ['Tay · Quét nhanh', 'Tay · Quét kỹ', 'Tay · Quét toàn bộ', 'Nền · Quét nhanh', 'Nền · Lấy toàn bộ giao dịch', 'Tay · Kiểm tra liên kết']);
   // Gặp khi nghiệm thu B8: lượt Quét kỹ bấm tay ghi "Tay · Quét nhanh" vì gói quét được gán sau khi nhãn đã chốt.
-  F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   F.runSlice(() => F.start({ mode: 'read', origin: 'manual', manual: true, scan: 'full', pack: 'deep' }, F.stateRead()));
   check(so, 'Mở lượt tay Quét kỹ qua lệnh start: gói quét vào ô lượt cùng lúc mở lượt nên nhãn chốt là "Tay · Quét kỹ"', [F.stateRead().scanPack, F.stateRead().runLabel], ['deep', 'Tay · Quét kỹ']);
   check(so, 'Mọi dòng RUN_PLANS có tên; tên tiến trình nền lấy từ bảng dãy chặng', [
@@ -72,10 +73,10 @@ function chay(so) {
     [F.stateRead().origin, F.stateRead().process, F.logContextText()],
     ['background', 'detail', 'Nền · Vòng xoay giao dịch']);
 
-  F.statePatch({ runId: 'left-open-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'scan_job' }, activeRequestId: 'in-flight', deadlineAt: Date.now() + 60000 });
+  datState(F, { runId: 'left-open-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'scan_job' }, activeRequestId: 'in-flight', deadlineAt: Date.now() + 60000 });
   const inFlightReply = F.runSlice(() => ({ ok: true, request: null }));
   const inFlightPhase = F.stateRead().phase;
-  F.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  datState(F, { activeRequestId: '', deadlineAt: 0 });
   const leftOpenReply = F.runSlice(() => ({ ok: true, request: null })), leftOpenState = F.stateRead();
   check(so, 'Lát trả hết việc khi lượt còn ở pha đang chạy và không request nào chờ: đóng lượt ngay với RUN_LEFT_OPEN và Log ghi lỗi phía GAS; còn request đang chờ thì không đụng', [
     inFlightReply.ok, inFlightPhase, leftOpenReply.ok, leftOpenReply.code, leftOpenState.phase, leftOpenState.lastFailureCode, logs.filter((entry) => entry.action === 'run_left_open').length
@@ -102,11 +103,11 @@ function chay(so) {
     [late.ok, late.code, late.request, JSON.stringify(F.stateRead()) === beforeLate],
     [false, 'STALE_RESPONSE', null, true]);
 
-  const running = (phase) => { F.statePatch({ runId: 'status-run', phase }); return F.statusView().running; };
+  const running = (phase) => { datState(F, { runId: 'status-run', phase }); return F.statusView().running; };
   check(so, 'statusView().running lấy từ danh sách pha ở State.js, có waiting_session và không có awaiting_approval/paused',
     ['waiting_session', 'checking_session', 'push', 'awaiting_approval', 'paused', 'idle'].map(running),
     [true, true, true, false, false, false]);
-  F.statePatch({ runId: 'manual-run', origin: 'manual', process: '', phase: 'pull_customer' });
+  datState(F, { runId: 'manual-run', origin: 'manual', process: '', phase: 'pull_customer' });
   const stopManual = F.runStopCommand('background');
   check(so, 'lệnh dừng nền gặp lượt tay thì không đóng gì',
     [stopManual.code, F.stateRead().runId],

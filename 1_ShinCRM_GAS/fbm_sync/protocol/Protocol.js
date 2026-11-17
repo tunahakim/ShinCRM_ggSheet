@@ -93,8 +93,6 @@ FbmSync.protocol = {
     rows = data.Rows;
     return !Array.isArray(rows) || rows.length === 0;
   },
-  /** Tương thích tên cũ cho login adapter; không còn dò chữ Login.aspx trong body. */
-  isSessionExpired: function (response) { return !FbmSync.protocol.isLiveSessionResponse(response); },
   /** Heartbeat Customer phải trả đúng shape dữ liệu; response rỗng không được coi là phiên khỏe. */
   hasHeartbeatData: function (response) {
     var parsed = FbmSync.protocol.parse(response) || {}, data = parsed.d || parsed;

@@ -3,13 +3,14 @@ const { section, check } = require('../../lib/assert');
 const { vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { noiNen, hoiNen, dungHopGiuPhien } = require('../../lib/fbm/tu-dang-nhap');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
+const { datState } = require('../../lib/fbm/dat-state');
 
 async function chay(so) {
   section('FBM sync - auto-login: Giữ phiên sau xóa phiên và danh tính trang FBM');
   const { hop: afterWipe } = dungHopGiuPhien({ sheetId: 'sheet-wipe', binding: { userId: '7777', username: 'WIPE', accountName: 'Tai khoan wipe' }, credential: false });
   // Gặp thật 2026-10-20 00:04: lượt nền mở lượt mới (xóa phiên) rồi hỏng ở request đầu, Giữ phiên 5 phút sau ném "thiếu mã người dùng FBM" vì không qua bước kiểm tra phiên. Giữ phiên phải probe trước, rồi lọc quyền theo mã đọc từ grid User, không theo liên kết hay cookie.
   afterWipe.FbmSync.runOpen({ phase: 'error' });
-  afterWipe.FbmSync.statePatch({ session: Object.assign(afterWipe.FbmSync.stateRead().session, { cookie: '461099999855cFHN_CRM_App' }) });
+  datState(afterWipe.FbmSync, { session: Object.assign(afterWipe.FbmSync.stateRead().session, { cookie: '461099999855cFHN_CRM_App' }) });
   vaSoNen(afterWipe.FbmSync, { heartbeat: { doneAt: 1 } });
   const wipedSession = afterWipe.FbmSync.stateRead().session;
   const afterWipeHeartbeat = hoiNen(afterWipe);
