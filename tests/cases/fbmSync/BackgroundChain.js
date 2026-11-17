@@ -112,7 +112,7 @@ async function chay(so) {
 
   // Quét nhanh lỗi liên tục (tab FBM không phản hồi) và đứng trước Giữ phiên trong chuỗi: trước đây mọi chuỗi gãy ở Quét nhanh nên Giữ phiên không bao giờ chạy.
   const loi = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 5 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  vaSoNen(loi.F, { customerFull: { baseline: 12 } });
+  vaSoNen(loi.F, { customerFull: { baseline: 12, baselineScope: 'all' } });
   let hong = true;
   const hongTab = { fail: (request) => hong && request.meta.kind === 'scan_job' ? 'FBM_TAB_NOT_READY' : '' };
   const loiLan = [];
@@ -130,7 +130,7 @@ async function chay(so) {
 
   // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
   const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
-  vaSoNen(boDo.F, { customerFull: { baseline: 12 } });
+  vaSoNen(boDo.F, { customerFull: { baseline: 12, baselineScope: 'all' } });
   boDo.F.statePatch({ runId: 'luot-bo-do', phase: 'pull_customer', origin: 'background', cursor: { kind: 'customer_grid' }, activeRequestId: 'mat', deadlineAt: boDo.clock.now - 60000, lastProgressAt: boDo.clock.now - 10 * PHUT, process: 'customerFull', pollAt: boDo.clock.now - 10 * PHUT });
   const sauBoDo = await boDo.hoi(1);
   check(so, 'Lượt nền của Quét nhanh bị bỏ dở: lần hỏi sau dời lần thử lại của Quét nhanh và chạy ngay Giữ phiên', [sauBoDo.xong, boDo.logs.filter((event) => event.action === 'schedule_retry_later').map((event) => event.detail.kind)], [['heartbeat'], ['customerFull']]);

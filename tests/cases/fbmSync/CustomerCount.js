@@ -33,6 +33,20 @@ async function chay(so) {
     sauBulk.status.phase, sauLop1[0], dem(chuaMoc, 'scan_job'), dem(chuaMoc, 'customer_count'), chuaMoc.F.customerBaselineRead()
   ], ['done', 'customer_count', 1, 2, 12]);
 
+  // Mốc lấy ở phạm vi khác mà số khách tình cờ bằng nhau: không coi là khớp, vẫn quét phạm vi đang chạy rồi ghi mốc kèm dấu phạm vi mới.
+  const phamVi = scanHarness({ customers: 12 });
+  await phamVi.run({ pack: 'quick' });
+  const dauSauQuet = phamVi.F.processBookRead().customerFull.baselineScope;
+  vaSoNen(phamVi.F, { customerFull: { baseline: 12, baselineScope: 'in:' + phamVi.F.textHash('ALT00010') } });
+  phamVi.trace.kinds.length = 0;
+  const sauDoiPhamVi = await phamVi.run({ startOptions: { scan: 'activity_bulk' } });
+  check(so, 'mốc khách kèm dấu phạm vi lúc quét; mốc của phạm vi khác dù cùng số vẫn chạy Quét nhanh, ghi lý do đổi phạm vi và mốc mới mang dấu phạm vi đang chạy', [
+    dauSauQuet, sauDoiPhamVi.status.phase, dem(phamVi, 'scan_job'), dem(phamVi, 'customer_count'), phamVi.logs.some((item) => item.action === 'customer_count_changed' && /phạm vi khác/.test(item.reason)), phamVi.F.processBookRead().customerFull.baselineScope
+  ], ['all', 'done', 1, 2, true, 'all']);
+  check(so, 'dấu phạm vi: không giới hạn là all; giới hạn thì không phụ thuộc thứ tự mã và đổi khi danh sách mã đổi', [
+    phamVi.F.scopeMark(null), phamVi.F.scopeMark({ fbm: ['B', 'A'] }) === phamVi.F.scopeMark({ fbm: ['A', 'B'] }), phamVi.F.scopeMark({ fbm: ['A'] }) === phamVi.F.scopeMark({ fbm: ['A', 'B'] })
+  ], ['all', true, false]);
+
   // Request đếm chỉ cần tổng: không xin tiêu đề cột (nặng hơn cả response), Extension chỉ giữ tổng.
   const hinh = scanHarness({ customers: 12 });
   let demGui = null;

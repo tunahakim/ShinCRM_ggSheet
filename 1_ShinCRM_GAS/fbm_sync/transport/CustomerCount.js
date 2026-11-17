@@ -62,8 +62,11 @@ FbmSync.runTail = function (result) {
   return Object.assign({}, result, { ok: true, request: FbmSync.cursorIssue(state) });
 };
 
-/** Đầu vào của chặng đếm, đọc qua cổng chủ: số khách mốc. */
-FbmSync.customerCountInputs = function () { return { baseline: FbmSync.customerBaselineRead() }; };
+/** Đầu vào của chặng đếm, đọc qua cổng chủ: số khách mốc, dấu phạm vi lúc lấy mốc và dấu phạm vi của request đếm này. */
+FbmSync.customerCountInputs = function () {
+  var full = FbmSync.processBookRead().customerFull;
+  return { baseline: full.baseline, baselineScope: full.baselineScope, scope: FbmSync.scopeMark(FbmSync.scope()) };
+};
 
 /**
  * Chặng đếm khách (hợp đồng chung): đọc tổng khách FBM của response đếm, so với mốc truyền vào. Không đọc kho, không ghi gì.
@@ -78,8 +81,10 @@ FbmSync.customerCountStage = function (ctx) {
     invalid.code = 'FBM_CUSTOMER_COUNT_INVALID';
     throw invalid;
   }
-  var baseline = ctx.inputs.baseline, tail = ctx.state.metadata && ctx.state.metadata.countTail || {}, changed = FbmSync.customerCountChanged(total, baseline) && tail.recount !== false;
-  var patch = changed ? { logs: [{ action: 'customer_count_changed', outcome: LOG_OK, reason: baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }] } : {};
+  // Mốc lấy ở phạm vi khác (hoặc mốc cũ chưa có dấu) không so được dù số bằng nhau: coi như chưa có mốc.
+  var other = ctx.inputs.baseline !== null && ctx.inputs.baselineScope !== ctx.inputs.scope, baseline = other ? null : ctx.inputs.baseline;
+  var tail = ctx.state.metadata && ctx.state.metadata.countTail || {}, changed = FbmSync.customerCountChanged(total, baseline) && tail.recount !== false;
+  var patch = changed ? { logs: [{ action: 'customer_count_changed', outcome: LOG_OK, reason: other ? 'Số khách mốc lấy ở phạm vi khác phạm vi đang chạy; chạy Quét nhanh để lấy mốc mới.' : baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }] } : {};
   return { patch: patch, end: { total: total, baseline: baseline, changed: changed } };
 };
 

@@ -293,6 +293,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── write\FormValues.js       Trích giá trị từ response mở form FBM để dựng lệnh ghi tiếp theo.
     ├── write\SheetSave.js        Cửa ghi Sheet duy nhất của module đồng bộ; ghi thất bại thì ném lỗi.
     ├── reconcile\Fingerprint.js  Chuẩn hóa giá trị và ngày, dấu vân bản ghi, so ba dấu vân.
+    ├── reconcile\TextHash.js     Hàm băm chữ dùng chung cho dấu vân bản ghi và dấu phạm vi khách.
     ├── reconcile\Conflict.js     Hai lệnh xung đột (mở, chốt), bước kết của chặng mở và cửa ghi chốt `conflictSettle`.
     ├── reconcile\ConflictStage.js Chặng `conflict_refresh` theo hợp đồng chung: response mở bản ghi FBM thành DTO xem xung đột.
     ├── reconcile\Identity.js     Liên kết tài khoản FBM của file, đối chiếu danh tính đang chạy và bảng kiểm ID Customer.

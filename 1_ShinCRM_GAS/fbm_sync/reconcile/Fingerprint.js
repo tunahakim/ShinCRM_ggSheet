@@ -85,10 +85,7 @@ FbmSync.toFbmCodes = function (record, entity, categoryGate) {
 FbmSync.hash = function (record, entity, categoryGate) {
   var value = FbmSync.toFbmCodes(record, entity, categoryGate);
   var keys = Object.keys(value).sort();
-  var text = keys.map(function (key) { return key + '=' + FbmSync.normalize(value[key]); }).join('\u001f');
-  var hash = 2166136261;
-  for (var i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = (hash * 16777619) >>> 0; }
-  return ('00000000' + hash.toString(16)).slice(-8);
+  return FbmSync.textHash(keys.map(function (key) { return key + '=' + FbmSync.normalize(value[key]); }).join('\u001f'));
 };
 
 /** So ba dấu vân đã tính: mốc (rỗng vẫn có nghĩa, hai bên khác nhau là xung đột), ShinCRM, FBM. Chỉ nhận chữ, không tự tính dấu vân. */

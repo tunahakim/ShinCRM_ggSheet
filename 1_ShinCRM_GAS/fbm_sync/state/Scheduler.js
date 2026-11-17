@@ -1,7 +1,7 @@
 /** Sổ tiến trình nền và công cụ tính lịch (đến hạn, thử lại). Không biết gì về chặng hay ô lượt; người điều phối lần hỏi là `heartbeatRun` (`Heartbeat.js`). */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /**
- * Sổ tiến trình nền, một khóa: mỗi tiến trình `{ doneAt, failures, retryAt }`; `customerFull` thêm `baseline` (số khách mốc, `null` khi chưa có), `detail` thêm `cursor` (số CUS cuối của Vòng xoay, `-1` khi chưa có).
+ * Sổ tiến trình nền, một khóa: mỗi tiến trình `{ doneAt, failures, retryAt }`; `customerFull` thêm `baseline` (số khách mốc, `null` khi chưa có) và `baselineScope` (dấu phạm vi lúc lấy mốc, `scopeMark`; rỗng ở mốc cũ nên mốc cũ không so được), `detail` thêm `cursor` (số CUS cuối của Vòng xoay, `-1` khi chưa có).
  * - Đến hạn khi giờ hiện tại >= `doneAt` + chu kỳ; chưa từng chạy xong thì đến hạn ngay. Chỉ ghi `doneAt` khi tiến trình chạy hết lượt; lượt hỏng giữa chừng không ghi nên tiến trình vẫn quá hạn và lần hỏi sau chạy lại.
  * - Lỗi thì dời `retryAt` của riêng tiến trình đó (nhân đôi tới trần), nên tiến trình khác vẫn chạy thay vì bị một tiến trình lỗi liên tục chặn mãi.
  * - Số khách mốc và con trỏ Vòng xoay chỉ ghi khi lượt xong (`runBookCommit` của `runClose`), không ghi giữa lượt.
@@ -20,6 +20,7 @@ FbmSync.processBookShape = function (stored) {
   });
   var baseline = source.customerFull && source.customerFull.baseline, cursor = source.detail && source.detail.cursor;
   book.customerFull.baseline = typeof baseline === 'number' && isFinite(baseline) && baseline >= 0 ? baseline : null;
+  book.customerFull.baselineScope = book.customerFull.baseline === null ? '' : String((source.customerFull || {}).baselineScope || '');
   book.detail.cursor = typeof cursor === 'number' && isFinite(cursor) && cursor >= 0 ? Math.floor(cursor) : -1;
   book.identityStop = count(source.identityStop);
   return book;
@@ -88,7 +89,7 @@ FbmSync.identityStopActive = function (book, binding) {
 /** Sổ mới với mốc bền của lượt vừa xong (hàm thuần): `customerTotal` → số khách mốc, `rotationCursor` → vị trí Vòng xoay. Mốc không phải số thì giữ nguyên. */
 FbmSync.processBookMarks = function (book, marks) {
   var next = FbmSync.processBookShape(book), source = marks || {};
-  if (typeof source.customerTotal === 'number') { next.customerFull.baseline = source.customerTotal; }
+  if (typeof source.customerTotal === 'number') { next.customerFull.baseline = source.customerTotal; next.customerFull.baselineScope = String(source.customerScope || ''); }
   if (typeof source.rotationCursor === 'number') { next.detail.cursor = Math.floor(source.rotationCursor); }
   return next;
 };

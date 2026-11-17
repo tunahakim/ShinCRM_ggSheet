@@ -34,7 +34,7 @@ async function chay(so) {
     [heartbeat.FbmSync.stateRead().origin, !!autoLoginRequest.request && autoLoginManual],
     ['background', false]);
   // Gặp thật 2026-10-16 20:33: đăng nhập xong giữa Giữ phiên, response đếm khách về thì GAS trả "hết việc" mà lượt vẫn mở ở checking_session; Quét đầy đủ đến hạn không chạy, lần hỏi sau mới phát hiện lượt bỏ dở.
-  vaSoNen(heartbeat.FbmSync, { customerFull: { doneAt: 1, baseline: 1 } });
+  vaSoNen(heartbeat.FbmSync, { customerFull: { doneAt: 1, baseline: 1, baselineScope: heartbeat.FbmSync.scopeMark(heartbeat.FbmSync.scope()) } });
   const resumedLogs = [], savedResumedLog = heartbeat.logEvent;
   heartbeat.logEvent = (event) => resumedLogs.push(event);
   const resumedCount = noiNen(heartbeat, { ok: true, status: 200, body: '{"d":{"TotalRowCount":1,"Rows":[[1]],"ViewPage":{"Fields":[{"AliasName":"id"}]}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: userResponse.request.id }] } });

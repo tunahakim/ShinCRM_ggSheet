@@ -51,14 +51,15 @@ FbmSync.customerScanStage = function (ctx) {
     return { patch: patch, next: FbmSync.scanJobRequest(state, ctx.settings, input.scope) };
   }
   patch.cursor = cursor;
-  return FbmSync.customerScanFinish(state, scan, patch);
+  return FbmSync.customerScanFinish(state, scan, patch, input.scope);
 };
 
-/** Lát cuối của chặng: đủ số khách thì để tổng làm số khách mốc chờ `runClose`, ghi chú mã chỉ định FBM không trả, xét khách vắng. Thiếu số thì ném `FBM_SCAN_INCOMPLETE` khi chưa ghi gì. */
-FbmSync.customerScanFinish = function (state, scan, patch) {
+/** Lát cuối của chặng: đủ số khách thì để tổng và dấu phạm vi (`scope` của lát) làm số khách mốc chờ `runClose`, ghi chú mã chỉ định FBM không trả, xét khách vắng. Thiếu số thì ném `FBM_SCAN_INCOMPLETE` khi chưa ghi gì. */
+FbmSync.customerScanFinish = function (state, scan, patch, scope) {
   var problem = FbmSync.scanCompleteCheck(scan.seen, scan.total);
   if (problem) { var incomplete = new Error(problem); incomplete.code = 'FBM_SCAN_INCOMPLETE'; incomplete.logs = patch.logs; throw incomplete; }
   patch.metadata.customerTotal = scan.total;
+  patch.metadata.customerScope = FbmSync.scopeMark(scope);
   var note = FbmSync.scopeUnseenNote(scan.scopeUnseen);
   if (note) { patch.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat([note.issue]); patch.logs.push(note.log); }
   FbmSync.customerAbsentMark(state);

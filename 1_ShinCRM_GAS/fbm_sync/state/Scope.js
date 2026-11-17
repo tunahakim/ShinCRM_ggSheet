@@ -47,6 +47,10 @@ FbmSync.scopeResolve = function (codes, customers) {
   return { fbm: fbm, shin: shin, lines: lines };
 };
 
+/** Dấu của bộ lọc khách thật gửi FBM (thuần): `all` khi không giới hạn, ngược lại băm danh sách mã FBM đã sắp. Số khách mốc chỉ so được với lần đếm cùng dấu: đổi phạm vi mà số khách tình cờ bằng nhau thì vẫn phải quét phạm vi mới. */
+FbmSync.scopeMark = function (scope) {
+  return scope ? 'in:' + FbmSync.textHash(scope.fbm.slice().sort().join(',')) : 'all';
+};
 /** Phạm vi của lượt chạy: `null` khi không giới hạn (đọc và ghi toàn bộ), ngược lại `{ codes, fbm, shin, fbmNew, notFound }` (`fbmNew`: mã FBM chưa có trên Sheet); danh sách rỗng lọc ra rỗng chứ không rơi thành toàn bộ. */
 FbmSync.scope = function () {
   var settings = settingsValues(FbmSync.SETTING_SECTIONS.run);

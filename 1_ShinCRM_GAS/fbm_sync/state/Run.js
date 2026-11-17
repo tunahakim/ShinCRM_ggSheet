@@ -85,10 +85,10 @@ FbmSync.runClose = function (state, verdict, detail) {
 
 /**
  * Mốc bền mà chặng đọc chỉ để trong metadata của lượt; chỉ ghi khi lượt xong, vì ghi giữa lượt thì lượt hỏng vẫn đẩy mốc đi và phần chưa đọc bị bỏ qua:
- * - `customerTotal`: số khách mốc; ghi sớm thì lần đếm sau thấy khớp và bỏ quét.
+ * - `customerTotal`: số khách mốc; ghi sớm thì lần đếm sau thấy khớp và bỏ quét. `customerScope`: dấu phạm vi của số đó (`scopeMark`), đi cùng nó.
  * - `rotationCursor`: vị trí Vòng xoay; ghi sớm thì khách của lô hỏng không bao giờ được đọc lại trong vòng này.
  */
-FbmSync.RUN_CLOSE_MARKS = ['customerTotal', 'rotationCursor'];
+FbmSync.RUN_CLOSE_MARKS = ['customerTotal', 'customerScope', 'rotationCursor'];
 /**
  * Kết quả lượt nền vừa đóng với tiến trình của nó: `done` (xong, kể cả dừng ở xung đột vì phần đọc đã chạy hết), `failed` (lỗi, hoặc tạm dừng có mã), `dropped` (dừng không phải lỗi: người dùng dừng lượt nền để chạy lượt tay, tiến trình chạy lại ở lần hỏi sau). Lượt còn chạy hoặc không phải lượt nền của tiến trình nào thì `''`.
  */
@@ -115,7 +115,7 @@ FbmSync.IDENTITY_STOP_CODES = ['SESSION_IDENTITY_MISMATCH', 'LOGIN_IDENTITY_MISM
 FbmSync.runBookCommit = function (state, now) {
   var metadata = state.metadata || {}, marks = {}, found = 0, done = state.phase === 'done';
   FbmSync.RUN_CLOSE_MARKS.forEach(function (key) {
-    if (done && typeof metadata[key] === 'number') { marks[key] = metadata[key]; found += 1; }
+    if (done && (typeof metadata[key] === 'number' || typeof metadata[key] === 'string')) { marks[key] = metadata[key]; found += 1; }
     delete metadata[key];
   });
   // Còn bước đếm khách thì kết quả tiến trình ghi ở lần đóng của bước đếm, không ghi hai lần.
