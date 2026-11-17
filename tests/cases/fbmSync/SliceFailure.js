@@ -31,7 +31,7 @@ function chay(so) {
   napServer(nenHb.nen, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/control/ControlPort.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js');
   nenHb.nen.FbmSync.continue = () => { throw new Error('Lỗi lát nền'); };
   nenHb.nen.FbmSync.replyAdmit = () => null;
-  nenHb.nen.FbmSync.statePatch({ origin: 'background', process: 'keepalive', cursor: { kind: 'customer_count' } });
+  nenHb.nen.FbmSync.statePatch({ origin: 'background', process: 'heartbeat', cursor: { kind: 'customer_count' } });
   let nemNen = '';
   try { nenHb.nen.FbmSync.controlDispatch('continue', { source: 'relay', response: {} }); } catch (err) { nemNen = err.message; }
   check(so, 'exception ở đường nền (relay nộp kết quả nhịp Giữ phiên): lỗi gốc ném lại và phiên chuyển sang error',

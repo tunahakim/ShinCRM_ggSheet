@@ -399,13 +399,26 @@ async function chay(so) {
   ], ['', true, 'session_probe', true, 'customer_count', true, false]);
 
   // Liên kết phải khớp cả grid User lẫn trang FBM (mã trong payload cookie, tên đầy đủ trong khối menu); hai nơi so với liên kết, không so với nhau.
+  // Lưu lại liên kết sau giờ dừng (như người dùng thật kiểm FBM rồi bấm lưu): hết dừng nền D4 để vòng sau chạy được.
+  const relink = () => {
+    const stopAt = afterWipe.FbmSync.processBookRead().identityStop;
+    if (!afterWipe.FbmSync.identityStopActive(afterWipe.FbmSync.processBookRead(), afterWipe.FbmSync.bindingRead())) { return; }
+    while (Date.now() <= stopAt) { /* chờ qua mili-giây của giờ dừng */ }
+    const saved = afterWipe.FbmSync.connectionSave({ binding: afterWipe.FbmSync.bindingRead() });
+    if (!saved.ok) { throw new Error(saved.code); }
+  };
   const pageRound = (captures) => {
+    relink();
     afterWipe.FbmSync.runOpen({ phase: 'error' });
     vaSoNen(afterWipe.FbmSync, { heartbeat: { doneAt: 1 } });
     const opened = hoiNen(afterWipe);
     return { opened, reply: noiNen(afterWipe, { ok: true, status: 200, body: wipeProbeBody, transport: { contract: MA_HOP_DONG, captures, trace: [{ requestId: opened.request.id }] } }) };
   };
   const pageMismatch = pageRound({ pageUserId: '9999', pageAccountName: 'Tai khoan wipe' }).reply;
+  afterWipe.FbmSync.runOpen({ phase: 'error' });
+  vaSoNen(afterWipe.FbmSync, { heartbeat: { doneAt: 1 } });
+  const stoppedAsk = hoiNen(afterWipe);
+  check(so, 'D4: lượt nền lệch danh tính thì nền dừng hẳn (không thử lại theo lịch) tới khi lưu lại liên kết', [stoppedAsk.code, stoppedAsk.request], ['BACKGROUND_IDENTITY_STOPPED', null]);
   const nameMismatch = pageRound({ pageUserId: '7777', pageAccountName: 'Nguoi khac' }).reply;
   check(so, 'Trang FBM lệch liên kết (mã hoặc tên) dù grid User khớp: dừng SESSION_IDENTITY_MISMATCH, không dựng request đọc khách, phiên không được xác minh', [
     pageMismatch.ok, pageMismatch.code, pageMismatch.request, nameMismatch.code, nameMismatch.request, afterWipe.FbmSync.sessionIdentityIsVerified(afterWipe.FbmSync.stateRead())

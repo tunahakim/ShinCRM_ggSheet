@@ -28,7 +28,7 @@ function chay(so) {
     const ghi = [];
     const docGoc = F.processBookWrite;
     F.processBookWrite = (book) => { ghi.push(book); return docGoc(book); };
-    const dong = (done) => { const st = { metadata: { customerTotal: 77, rotationCursor: 4512.0 } }; F.runMarksCommit(st, done); return Object.keys(st.metadata).length; };
+    const dong = (done) => { const st = { phase: done ? 'done' : 'error', metadata: { customerTotal: 77, rotationCursor: 4512.0 } }; F.runBookCommit(st, 1000); return Object.keys(st.metadata).length; };
     const conLoi = dong(false), soLanLoi = ghi.length, conXong = dong(true);
     F.processBookWrite = docGoc;
     check(so, 'Mốc số khách và con trỏ Vòng xoay: lượt không xong không ghi sổ; lượt xong ghi cả hai trong một lần ghi sổ; cả hai lần đều xóa mốc tạm khỏi metadata',

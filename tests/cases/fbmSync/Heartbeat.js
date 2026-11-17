@@ -90,9 +90,9 @@ function chay(so) {
     check(so, 'lượt nền quá hạn không còn request chờ: đóng SYNC_ABANDONED_RUN, Log request không được trả lời mang hộp đen Extension, dòng stale_run không lặp hộp đen',
       [closed.runId === opened.runId, closed.phase, closed.lastFailureCode, !!unanswered && unanswered.detail.extensionTrail.stage, !!unanswered && /Hộp đen Extension/.test(unanswered.reason), stale.length, stale[0] && /Hộp đen/.test(stale[0].reason)],
       [true, 'error', 'SYNC_ABANDONED_RUN', 'fbm_tab_replied', true, 1, false]);
-    check(so, 'lượt nền bỏ dở là một lần lỗi của tiến trình: sổ ghi lần lỗi, Log hẹn thử lại, không chạy lại ngay trong lần hỏi này',
-      [F.processBookRead().heartbeat.failures, retry.length, retry[0] && retry[0].detail.kind, after.code, after.request, closed.process],
-      [1, 1, 'heartbeat', 'NO_PROCESS_DUE', null, '']);
+    check(so, 'lượt nền bỏ dở là một lần lỗi của tiến trình: runClose ghi lần lỗi vào sổ, Log hẹn thử lại, không chạy lại ngay trong lần hỏi này',
+      [F.processBookRead().heartbeat.failures, retry.length, retry[0] && retry[0].detail.kind, after.code, after.request],
+      [1, 1, 'heartbeat', 'NO_PROCESS_DUE', null]);
   }
   {
     const { F, logs, hoi } = hopNen();
@@ -166,32 +166,34 @@ function chay(so) {
       [pickup.request && pickup.request.meta.kind, pickup.poll.minutes > 0, !!pickup.poll.stop],
       ['identity_user_grid', true, false]);
   }
+  // Lượt nền đang chạy (ô lượt dựng tay) đóng qua đúng cổng đóng lượt: `runClose` ghi kết quả tiến trình vào sổ ngay lúc đóng, lần hỏi sau không ghi lại.
+  const moNen = (F, runId, process) => F.statePatch({ runId, origin: 'background', process, phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
   {
     const { F, logs, hoi } = hopNen();
-    F.statePatch({ runId: 'run-nen-1', origin: 'background', process: 'customerFull', phase: 'error', lastFailureCode: 'HTTP_500', activeRequestId: '', deadlineAt: 0 });
-    hoi(MAY_A, 'config');
+    moNen(F, 'run-nen-1', 'customerFull');
+    F.stateWrite(F.runFail(F.stateRead(), 'HTTP_500', 'FBM trả HTTP 500.'));
     const retry = maCua(logs, 'schedule_retry_later');
-    check(so, 'lượt nền đã đóng với lỗi: lần hỏi kế ghi lần lỗi vào sổ của đúng tiến trình, Log hẹn thử lại kèm mã lỗi, ô lượt bỏ tên tiến trình để không ghi hai lần',
-      [F.processBookRead().customerFull.failures, retry.length, retry[0] && /HTTP_500/.test(retry[0].reason), F.stateRead().process], [1, 1, true, '']);
+    check(so, 'lượt nền đóng lỗi: runClose ghi lần lỗi vào sổ của đúng tiến trình, Log hẹn thử lại kèm mã lỗi; ô lượt giữ tên tiến trình cho đuôi chuỗi',
+      [F.processBookRead().customerFull.failures, retry.length, retry[0] && /HTTP_500/.test(retry[0].reason), F.stateRead().process], [1, 1, true, 'customerFull']);
     hoi(MAY_A, 'config');
-    check(so, 'lần hỏi sau không ghi lại lần lỗi đã ghi',
-      [F.processBookRead().customerFull.failures, maCua(logs, 'schedule_retry_later').length],
-      [1, 1]);
+    hoi(MAY_A, 'config');
+    check(so, 'các lần hỏi sau không ghi lại lần lỗi đã ghi', [F.processBookRead().customerFull.failures, maCua(logs, 'schedule_retry_later').length], [1, 1]);
   }
   {
     const { F, hoi } = hopNen();
     const before = Date.now();
-    F.statePatch({ runId: 'run-nen-2', origin: 'background', process: 'heartbeat', phase: 'done', activeRequestId: '', deadlineAt: 0 });
+    moNen(F, 'run-nen-2', 'heartbeat');
+    F.stateWrite(F.runClose(F.stateRead(), 'done', { message: 'Giữ phiên FBM OK.' }));
     const done = hoi(MAY_A);
-    check(so, 'lượt Giữ phiên đã xong: sổ ghi lần xong, Giữ phiên chưa đến hạn lại nên lần hỏi không mở lượt mới',
-      [F.processBookRead().heartbeat.doneAt >= before, F.stateRead().process, done.code], [true, '', 'NO_PROCESS_DUE']);
+    check(so, 'lượt Giữ phiên đóng xong: sổ ghi lần xong, Giữ phiên chưa đến hạn lại nên lần hỏi không mở lượt mới',
+      [F.processBookRead().heartbeat.doneAt >= before, done.code], [true, 'NO_PROCESS_DUE']);
   }
   {
     const { F, logs, hoi } = hopNen();
-    F.statePatch({ runId: 'run-nen-3', origin: 'background', process: 'customerFull', phase: 'paused', lastFailureCode: '', activeRequestId: '', deadlineAt: 0 });
-    hoi(MAY_A, 'config');
-    check(so, 'người dùng dừng lượt nền (tạm dừng không mã lỗi): không tính là lỗi, không đánh dấu xong, tiến trình chạy lại ở lần hỏi sau',
-      [F.processBookRead().customerFull.failures, maCua(logs, 'schedule_retry_later').length, F.stateRead().process], [0, 0, '']);
+    moNen(F, 'run-nen-3', 'customerFull');
+    const truoc = F.processBookRead().customerFull.doneAt;
+    F.stateWrite(F.runClose(F.stateRead(), 'paused', { message: 'Đã dừng.' }));
+    check(so, 'người dùng dừng lượt nền (tạm dừng không mã lỗi): không tính là lỗi, không dời mốc chạy xong, không hẹn thử lại', [F.processBookRead().customerFull.failures, F.processBookRead().customerFull.doneAt === truoc, maCua(logs, 'schedule_retry_later').length], [0, true, 0]);
   }
 }
 

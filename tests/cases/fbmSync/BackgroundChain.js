@@ -36,7 +36,7 @@ async function chay(so) {
   for (let i = 0; i < 8; i += 1) { tamLan.push((await doi.hoi(60)).xong); }
   check(so, 'Hỏi 60 phút một lần trong 8 lần: Quét nhanh và Vòng xoay chạy ở cả 8 lần, Lấy toàn bộ giao dịch chạy ít nhất một lần, Giữ phiên chạy sau cùng mỗi lần, không lần nào dừng lỗi', [
     tamLan.filter((list) => list.indexOf('customerFull') >= 0).length, tamLan.filter((list) => list.indexOf('detail') >= 0).length, tamLan.some((list) => list.indexOf('activityFull') >= 0), tamLan.every((list) => list[list.length - 1] === 'heartbeat'), doi.F.stateRead().phase, doi.F.stateRead().process
-  ], [8, 8, true, true, 'done', '']);
+  ], [8, 8, true, true, 'done', 'heartbeat']);
   const lanDau = tamLan[0];
   check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần (lần hỏi đầu: chưa tiến trình nào từng chạy xong nên cả bốn đến hạn)', lanDau, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
 
@@ -60,7 +60,7 @@ async function chay(so) {
   // Mỗi request 30 giây (dưới ngưỡng thu hồi phiên treo) nên cả lượt Vòng xoay kéo dài hơn 3 phút, gấp ba chu kỳ.
   const batDau = cham.clock.now + 5 * PHUT;
   const chamLan = await cham.hoi(5, 30000);
-  check(so, 'Vòng xoay chu kỳ 1 phút mà mỗi lần chạy mất hơn 3 phút: chuỗi vẫn dừng, Vòng xoay chạy đúng một lần trong lần hỏi', [cham.clock.now - batDau >= 3 * PHUT, dem(chamLan.xong, 'detail'), chamLan.end.request || null, cham.F.stateRead().phase, cham.F.stateRead().process], [true, 1, null, 'done', '']);
+  check(so, 'Vòng xoay chu kỳ 1 phút mà mỗi lần chạy mất hơn 3 phút: chuỗi vẫn dừng, Vòng xoay chạy đúng một lần trong lần hỏi', [cham.clock.now - batDau >= 3 * PHUT, dem(chamLan.xong, 'detail'), chamLan.end.request || null, cham.F.stateRead().phase, cham.F.stateRead().process], [true, 1, null, 'done', 'detail']);
 
   // Người dùng chọn dừng lượt nền: lượt nền dừng sau response đang chờ, không ghi giờ chạy xong, lần hỏi kế tiếp chạy lại.
   const chen = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
@@ -111,14 +111,15 @@ async function chay(so) {
   const loiLan = [];
   for (let i = 0; i < 8; i += 1) { loiLan.push((await loi.hoi(5, 1000, hongTab)).xong); }
   const giaHan = loi.logs.filter((event) => event.action === 'schedule_retry_later');
-  check(so, 'Quét nhanh lỗi liền: chờ thử lại 5, 10, 20 phút; Giữ phiên chạy ở mọi lần hỏi không trùng lần thử lại của Quét nhanh, không lần nào bị chặn hai nhịp liền', [
+  // Lần lỗi tính giờ từ lúc lỗi (runClose ghi sổ ngay), nên lần thử lại 5 phút đầu trùng lần hỏi kế: Giữ phiên bị chặn tối đa hai nhịp liền, sau đó chạy ở mọi lần hỏi không trùng lần thử lại.
+  check(so, 'Quét nhanh lỗi liền: chờ thử lại 5, 10, 20, 40 phút; Giữ phiên chạy ở mọi lần hỏi không trùng lần thử lại của Quét nhanh, không bị chặn quá hai nhịp liền', [
     loiLan, giaHan.map((event) => event.detail.retryMinutes), giaHan.every((event) => event.outcome === 'warn')
-  ], [[[], ['heartbeat'], [], ['heartbeat'], ['heartbeat'], [], ['heartbeat'], ['heartbeat']], [5, 10, 20], true]);
+  ], [[[], [], ['heartbeat'], [], ['heartbeat'], ['heartbeat'], ['heartbeat'], []], [5, 10, 20, 40], true]);
   check(so, 'Dòng Log lần thử lại nói tiến trình nào, mã lỗi, lỗi liền mấy lần và bao lâu nữa thử lại', giaHan[1].reason, 'Quét nhanh chạy nền không xong (mã FBM_TAB_NOT_READY), lỗi liền 2 lần; thử lại sau 10 phút, các tiến trình khác vẫn chạy theo lịch.');
   hong = false;
   const hoiPhuc = [];
-  for (let i = 0; i < 6; i += 1) { hoiPhuc.push((await loi.hoi(5, 1000, hongTab)).xong); }
-  check(so, 'Tab FBM trở lại: Quét nhanh chạy khi tới giờ thử lại, chạy xong thì xóa lần thử lại và quay về chu kỳ thường', [hoiPhuc, loi.F.processBookRead().customerFull.retryAt], [[['heartbeat'], ['heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat'], ['customerFull', 'heartbeat']], 0]);
+  for (let i = 0; i < 12; i += 1) { hoiPhuc.push((await loi.hoi(5, 1000, hongTab)).xong); }
+  check(so, 'Tab FBM trở lại: Quét nhanh chạy khi tới giờ thử lại, chạy xong thì xóa lần thử lại và quay về chu kỳ thường', [hoiPhuc, loi.F.processBookRead().customerFull.retryAt], [Array(7).fill(['heartbeat']).concat(Array(5).fill(['customerFull', 'heartbeat'])), 0]);
 
   // Lượt nền bị bỏ dở (Extension không bao giờ trả lời, lượt bị thu hồi khi quá hạn) cũng là lỗi của tiến trình đó.
   const boDo = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });

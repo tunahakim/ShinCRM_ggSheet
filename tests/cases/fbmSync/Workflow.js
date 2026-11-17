@@ -387,7 +387,7 @@ async function chay(so) {
       hop.logTrace = (entry) => vet.push(entry);
       datLichNen(hop, { heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
       vaSoNen(hop.FbmSync, { heartbeat: { doneAt: Date.now() }, customerFull: { doneAt: Date.now() } });
-      const hoi = hop.FbmSync.backgroundNext({ now: Date.now() + 60000, pollAt: Date.now() + 60000 });
+      const hoi = hop.FbmSync.backgroundNext({ now: Date.now() + 60000, pollAt: Date.now() + 60000, book: hop.FbmSync.processBookRead() });
       check(so, 'LOG_TRACE: lần Extension hỏi mà chưa có việc ghi một dòng vết nói tiến trình nào sớm nhất và còn bao lâu',
         [hoi, vet.map((v) => [v.source, v.action, v.reason])], [null, [['fbm_sync', 'schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; sớm nhất là Giữ phiên FBM, còn 4 phút.']]]);
     }
@@ -403,11 +403,12 @@ async function chay(so) {
       datLichNen(GH, { customerFull: { enabled: true, minutes: '10' } });
       check(so, 'Lịch nền: lưu cài đặt không đụng giờ chạy xong; đổi chu kỳ có hiệu lực ngay tính từ lần chạy xong cũ',
         [sau60, G.processDue(T + 10 * PHUT, docLichNen(GH), G.processBookRead(), 0)], [[T, []], ['customerFull']]);
-      G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'conflict', process: 'customerFull', pollAt: Date.now() });
+      G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, process: 'customerFull', pollAt: Date.now() });
       vaSoNen(G, { customerFull: { doneAt: 1 } });
+      G.stateWrite(G.runClose(G.stateRead(), 'conflict', { message: 'Có xung đột cần người dùng xử lý.' }));
       G.backgroundTail({ ok: true, request: null });
       check(so, 'Lịch nền: lượt nền dừng ở xung đột vẫn tính là chạy xong (không chạy lại mỗi lần hỏi), chuỗi dừng chờ người dùng',
-        [G.processBookRead().customerFull.doneAt > 1, G.stateRead().process, G.stateRead().phase], [true, '', 'conflict']);
+        [G.processBookRead().customerFull.doneAt > 1, G.stateRead().runId, G.stateRead().phase], [true, 'conflict-run', 'conflict']);
     }
     check(so, 'Chu kỳ 0: ghi giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
       [F.processBookRead().heartbeat.doneAt, F.processDue(now + 1, docLichNen(H), F.processBookRead(), 0).indexOf('heartbeat') >= 0], [now, true]);
@@ -731,7 +732,7 @@ async function chay(so) {
     vaSoNen(F, { customerFull: { doneAt: now }, heartbeat: { doneAt: 1 } });
     if (opt.cleanMark) { F.pushGateWrite({ status: 'clean', mark: F.pushGateMark(), at: now }); }
     F.backgroundMachineWrite(F.machineAssigned('may-A', 'Máy A', now));
-    const result = opt.viaChain ? F.backgroundNext({ now, pollAt: now }) : F.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' });
+    const result = opt.viaChain ? F.backgroundNext({ now, pollAt: now, book: F.processBookRead() }) : F.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' });
     return { flow, F, traces, result, state: F.stateRead() };
   };
   {
