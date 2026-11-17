@@ -37,3 +37,17 @@ function fbmDevReleaseUnsentRequest() {
   var status = result && (result.status || result) || {};
   return { released: true, code: result && result.code || '', running: status.running, phase: status.phase };
 }
+
+/** Đo lệnh mở lượt tay khi ô lượt đang giữ một lượt nền đã kẹt (không còn request trong hạn, quá `STALE_RUN_MS`): mở lượt nền, làm già ô lượt, gọi đúng cửa Sidebar gọi và bấm giờ, rồi hủy lượt tay. Chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
+function fbmDevProbeStartAfterStale() {
+  var opened = fbmDevOpenBackgroundRun();
+  FbmSync.withOrchestrationLock(function () {
+    var state = FbmSync.stateRead();
+    state.updatedAt = Date.now() - FbmSync.STALE_RUN_MS - 60000; state.activeRequestId = ''; state.deadlineAt = 0;
+    FbmSync.stateStore(state);
+  });
+  var t0 = Date.now(), started = fbmDriveCommand('start', { kind: 'sync', mode: 'read', machineId: 'dev-probe' }), t1 = Date.now();
+  var trace = FbmSync.traceRead(60).filter(function (row) { return Number(row.at || 0) >= t0; }).map(function (row) { return { ms: Number(row.at) - t0, stage: row.stage, operation: row.operation, error: row.error }; });
+  var cancelled = fbmCancelSync(), released = fbmDevReleaseUnsentRequest();
+  return { opened: opened, startMs: t1 - t0, started: { ok: started.ok, code: started.code || '', runId: started.runId || '', phase: started.status && started.status.phase }, trace: trace, cancelled: { ok: cancelled.ok, code: cancelled.code || '' }, released: released };
+}
