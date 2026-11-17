@@ -296,6 +296,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── reconcile\Conflict.js     Hai lệnh xung đột (mở, chốt), bước kết của chặng mở và cửa ghi chốt `conflictSettle`.
     ├── reconcile\ConflictStage.js Chặng `conflict_refresh` theo hợp đồng chung: response mở bản ghi FBM thành DTO xem xung đột.
     ├── reconcile\Identity.js     Nối định danh, ánh xạ bản ghi và liên kết Activity với Customer.
+    ├── reconcile\ConnectionSave.js  Lưu kết nối tài khoản FBM: kiểm liên kết và form đăng nhập, GAS quyết giữ/lưu/xóa credential, ghi ba kho một lần.
     ├── reconcile\Pull.js         Đối soát chiều pull và ghi thay đổi an toàn.
     ├── reconcile\CategoryGate.js Cổng danh mục của lần gọi (map từ Category, mã bị chặn của phiên) và phép kiểm ô danh mục cho cả hai chiều.
     ├── reconcile\CategoryLookup.js Đối chiếu bảng tra danh mục FBM của phiên với Category; không ghi Sheet.
@@ -468,6 +469,7 @@ tests\
     │   ├── PushEligible.js         Kiểm phép xét đẩy một dòng, quyền đồng bộ, người phụ trách, và preflight đếm đúng tập chặng đẩy dựng.
     │   ├── Fingerprint.js          Kiểm dấu vân giữ giá trị cố định, băm hai đường ra cùng kết quả, chuẩn hóa ngày, threeWay, cổng danh mục.
     │   ├── Identity.js            Kiểm liên kết tài khoản FBM với Sheet: xem trạng thái không đọc Sheet, hủy liên kết bị chặn khi request đang bay.
+    │   ├── ConnectionSave.js      Kiểm lưu kết nối: mã từ chối, một lần setProperties, giữ/lưu/xóa credential theo form, mã khóa cũ trả về.
     │   ├── WebAppRelay.js         Kiểm cổng Web App relay của GAS: khóa, Sheet, mã giao thức, danh sách lệnh relay, ghi địa chỉ Web App, Log qua runEntryPoint.
     │   ├── Orchestration.js       Kiểm state, cursor, resume, luồng nhiều lát, chặn cấu hình đẩy, trigger hẹn giờ cũ còn sót.
     │   ├── PropertyBuffer.js      Kiểm bộ đệm DocumentProperties: thấy lượt khác ghi trong lúc chờ khóa, lỗi giữa chừng vẫn lưu phần đã ghi.
