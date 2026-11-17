@@ -26,10 +26,10 @@ FbmSync.credentialShape = function (stored) {
 FbmSync.credentialRead = function () {
   return FbmSync.credentialShape(FbmSync.mergedStoreRead(FbmSync.CREDENTIAL_KEY, 'Kho credential đăng nhập FBM', FbmSync.LOGIN_OLD_KEYS, FbmSync.LOGIN_MIGRATOR));
 };
-/** Cổng ghi duy nhất của kho credential; chưa cấu hình thì xóa khóa. */
+/** Cổng ghi duy nhất của kho credential. Chưa cấu hình thì ghi bản trống thay vì xóa khóa: xóa khóa là một lần gọi riêng sau `setProperties`, hỏng giữa hai lần thì liên kết đã đổi mà credential cũ còn. */
 FbmSync.credentialWrite = function (credential) {
   var shaped = FbmSync.credentialShape(credential);
-  return FbmSync.propertyJsonWrite(FbmSync.CREDENTIAL_KEY, shaped.configured ? { credentialRef: shaped.credentialRef, ciphertext: shaped.ciphertext, public: shaped.public } : null);
+  return FbmSync.propertyJsonWrite(FbmSync.CREDENTIAL_KEY, shaped.configured ? { credentialRef: shaped.credentialRef, ciphertext: shaped.ciphertext, public: shaped.public } : {});
 };
 
 FbmSync.loginAttemptShape = function (stored) {
@@ -61,4 +61,9 @@ FbmSync.loginAttemptMark = function (current, event, now, retryMinutes) {
 /** Cổng ghi duy nhất của kho dấu lần thử; không chạm kho credential. */
 FbmSync.loginAttemptWrite = function (attempt) {
   return FbmSync.propertyJsonWrite(FbmSync.LOGIN_ATTEMPT_KEY, FbmSync.loginAttemptShape(attempt));
+};
+/** Phần công khai của credential và dấu lần thử cho Sidebar: không có bản mã. */
+FbmSync.credentialPublicView = function () {
+  var credential = FbmSync.credentialRead(), attempt = FbmSync.loginAttemptRead();
+  return { ok: true, configured: credential.configured, credentialRef: credential.credentialRef, public: credential.public, lastAttemptAt: attempt.lastAttemptAt, lastLoginAt: attempt.lastLoginAt, nextRetryAt: attempt.nextRetryAt, lastError: attempt.lastError };
 };

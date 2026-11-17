@@ -24,7 +24,7 @@ FbmSync.COMMANDS = {
   reset_settings: { lock: true, run: function (input) { return FbmSync.settingsResetCommand(input); } },
   set_master: { run: function (input) { return FbmSync.masterSwitchCommand(input.enabled === true); } },
   set_background: { lock: true, run: function (input) { return FbmSync.backgroundSwitchCommand(input.enabled === true); } },
-  save_identity_binding: { lock: true, run: function (input) { return FbmSync.bindingWrite(input.binding || {}); } },
+  save_identity_binding: { lock: true, run: function (input) { return FbmSync.connectionSave({ binding: input.binding || {} }); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
   retry_push_failures: { lock: true, run: function () { return FbmSync.pushFailuresClearCommand(); } },
@@ -159,8 +159,8 @@ FbmSync.START_KINDS = {
   sync: { slice: true, run: function (input) { return FbmSync.start({ mode: input.mode, pack: input.pack, origin: 'manual', manual: true, approvedFingerprint: input.approvedFingerprint }); } },
   identity_check: { slice: true, run: function (input) { return FbmSync.start({ mode: 'check', scan: 'identity_check', identity: input.identity || null, origin: 'manual', manual: true }); } },
   identity_probe: { slice: true, run: function () { return FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); } },
-  login_test: { run: function (input) { return FbmSync.loginTestRequest(input.credentialDraft || null, input.identity || null); } },
-  login_force: { run: function () { return FbmSync.loginForceRequest(); } }
+  login_test: { run: function (input) { return FbmSync.loginOpen('test', input); } },
+  login_force: { run: function (input) { return FbmSync.loginOpen('force', input); } }
 };
 FbmSync.commandStart = function (input) {
   var kind = String(input.kind || '');
@@ -197,7 +197,7 @@ FbmSync.continueGuard = function (input, state) {
 FbmSync.statusRead = function () {
   var status;
   try { status = FbmSync.statusView(); } catch (error) { if (!FbmSync.stateStorageError(error)) { throw error; } status = FbmSync.stateStuckView(error); FbmSync.storageFailureLog(error, status); }
-  return { ok: true, status: status, identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.loginConfigPublic() };
+  return { ok: true, status: status, identity: FbmSync.identityStatus({}), settings: FbmSync.settingsView(), login: FbmSync.credentialPublicView() };
 };
 /** Đặt lại phiên kẹt rồi trả status mới; bị từ chối thì trả status hiện tại kèm lý do để Sidebar hiện đúng chỗ. */
 FbmSync.controlResetState = function () {

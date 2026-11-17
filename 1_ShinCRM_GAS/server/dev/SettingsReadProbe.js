@@ -5,7 +5,7 @@
  */
 
 var SETTINGS_READ_PROBE_GLOBALS = ['categoryReadAll', 'settingsRead', 'settingsValues', 'settingsDefaultsChecked', 'entityReadAll', 'entityReadAllCombined', 'sheetReadWhole', 'sheetReadTop', 'sheetReadRows', 'sheetReadDataRows', 'sheetReadColumnValues', 'categoryReadColumns', 'documentPropertyJson'];
-var SETTINGS_READ_PROBE_FBM = ['loginConfigRead', 'scope', 'readLocal', 'documentPropertyJson', 'stateRead'];
+var SETTINGS_READ_PROBE_FBM = ['credentialRead', 'scope', 'readLocal', 'documentPropertyJson', 'stateRead'];
 
 function fbmProbeSettingsReads() {
   var scenarios = {
