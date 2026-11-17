@@ -12,6 +12,7 @@ async function chay(so) {
   const gateLogs = batLogCong(heartbeat);
   const beforeTestConfig = Object.assign({}, heartbeat.FbmSync.credentialRead(), heartbeat.FbmSync.loginAttemptRead());
   heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0, session: { expired: false, cookie: '' } });
+  const tuHong = gateLogs.length;
   const testRequest = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
   const testFirst = testRequest.request, testUnit = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: TRA_BUOC.page, transport: { contract: MA_HOP_DONG, trace: [{ requestId: testFirst.id }] } }));
   const testUnitRequest = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: TRA_BUOC.entity, transport: { contract: MA_HOP_DONG, trace: [{ requestId: testUnit.request.id }] } })).request;
@@ -20,6 +21,7 @@ async function chay(so) {
     ['login_step', 'test', 'cred-heartbeat-123', 'ciphertext-long-enough', '']);
   const testFailure = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), testUnitRequest, { login: '{"d":false}' });
   const afterTestFailure = Object.assign({}, heartbeat.FbmSync.credentialRead(), heartbeat.FbmSync.loginAttemptRead());
+  const denHong = gateLogs.length;
   check(so, 'dang nhap thu bang thong tin da luu bi bao sai mat khau: khong doi moc thu lai, nhung ngung tu dang nhap vi thong tin da luu da sai',
     [testFailure.code, afterTestFailure.lastAttemptAt, afterTestFailure.lastLoginAt, afterTestFailure.lastError, afterTestFailure.loginHalted],
     ['LOGIN_FAILED', beforeTestConfig.lastAttemptAt, beforeTestConfig.lastLoginAt, 'FBM báo sai tên đăng nhập hoặc mật khẩu.', true]);
@@ -80,6 +82,7 @@ async function chay(so) {
     [throttleText.indexOf('sau 16:48') > 0, throttleText.indexOf('Lý do lần trước: FBM báo sai tên đăng nhập') > 0, throttleText.indexOf('Đăng nhập thử') > 0],
     [true, true, true]);
   heartbeat.FbmSync.statePatch({ phase: 'paused', loginForceOffered: true, activeRequestId: '', deadlineAt: 0 });
+  const tuEp = gateLogs.length;
   const forceAgain = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('force', {}, heartbeat.FbmSync.stateRead()));
   const forceLogin = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), forceAgain.request);
   const forceAuthorize = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: forceLogin.request.id }] } }));
@@ -87,6 +90,17 @@ async function chay(so) {
   check(so, 'hủy phiên cũ và đăng nhập đúng tài khoản đã liên kết thì báo thành công, mở lại quyền tự đăng nhập ngay và ghi Log',
     [forceIdentity.code, heartbeat.FbmSync.stateRead().message.indexOf('Đã hủy phiên cũ và đăng nhập') === 0, congVao(heartbeat.FbmSync).ok, gateLogs.some((event) => event.action === 'login_force_ok')],
     ['LOGIN_OK', true, true, true]);
+  const denEp = gateLogs.length;
+  // Mỗi lượt đăng nhập đúng một dòng kết thúc do luồng đăng nhập ghi; không còn dòng chụp `slice` lặp lại câu thông báo của lượt.
+  const dongKet = (tu, den) => gateLogs.slice(tu, den).filter((e) => /^(login_test_ok|login_force_ok|login_failure|slice|start)$/.test(e.action)).map((e) => e.action);
+  heartbeat.FbmSync.statePatch({ runId: '', phase: 'idle', cursor: {}, activeRequestId: '', deadlineAt: 0 });
+  const tuThu = gateLogs.length, thuMo = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.loginOpen('test', {}, heartbeat.FbmSync.stateRead()));
+  const thuDangNhap = quaTrang((reply) => heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue(reply)), thuMo.request);
+  const thuXacNhan = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Authorized":"auth-customer"}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: thuDangNhap.request.id }] } }));
+  const thuXong = heartbeat.FbmSync.runSlice(() => heartbeat.FbmSync.continue({ ok: true, status: 200, body: USER_BODY, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: thuXacNhan.request.id }] } }));
+  check(so, 'mỗi lượt đăng nhập đúng một dòng kết thúc: Đăng nhập thử thành công, bị FBM báo sai mật khẩu, Hủy phiên cũ thành công',
+    [thuXong.code, dongKet(tuThu), dongKet(tuHong, denHong), dongKet(tuEp, denEp)],
+    ['LOGIN_OK', ['login_test_ok'], ['login_failure'], ['login_force_ok']]);
 }
 
 module.exports = { chay };

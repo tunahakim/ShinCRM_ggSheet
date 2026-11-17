@@ -87,7 +87,7 @@ async function chay(so) {
   const nhanTay = TF.stateRead().runLabel;
   TF.logContextNote(null); TF.issueContext = { channel: 'relay' };
   const dongTay = TF.withOrchestrationLock(() => TF.runSlice(() => { TF.runClose(TF.stateRead(), 'done'); return { ok: true, request: null }; }, TF.stateRead()));
-  TF.logStatus(TF.stateRead(), 'slice');
+  tayNhan.hop.logEvent({ action: 'login_test_ok', cycleId: TF.stateRead().runId });
   const dongSlice = tayNhan.logs[tayNhan.logs.length - 1], maTay = TF.stateRead().runId;
   TF.logContextNote(null); TF.logContextNote(TF.stateRead());
   const nhanNgoaiRelay = TF.logContextText();
@@ -100,7 +100,7 @@ async function chay(so) {
   nenNhan.F.withOrchestrationLock(() => nenNhan.F.stateWrite(nenNhan.F.runClose(nenNhan.F.stateRead(), 'error')));
   const nhanNenDong = nenNhan.F.logContextText();
   nenNhan.F.logContextNote(null); nenNhan.F.logContextNote(nenNhan.F.stateRead());
-  check(so, 'nhãn lượt: lượt tay đóng trong lời gọi đến qua relay, dòng slice ghi sau khi đóng vẫn mang nhãn Tay và mã lượt (từng ghi "Nền")', [
+  check(so, 'nhãn lượt: lượt tay đóng trong lời gọi đến qua relay, dòng kết thúc ghi sau khi đóng vẫn mang nhãn Tay và mã lượt (từng ghi "Nền")', [
     !!dongTay, dongSlice.luot, dongSlice.cycleId === maTay, nhanTay.split(' · ')[0]
   ], [true, 'Tay · Đăng nhập thử', true, 'Tay']);
   check(so, 'nhãn lượt: lượt Hủy phiên cũ mở trong lát có ngay nhãn của nó cho dòng ghi trong cùng lát (từng lấy nhãn ô lượt cũ)', dongEp.luot, 'Tay · Hủy phiên cũ');

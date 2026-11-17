@@ -137,9 +137,8 @@ async function chay(so) {
   const finishedEmpty = empty.hop.FbmSync.stateRead();
   finishedEmpty.phase = 'done'; finishedEmpty.cursor = {}; finishedEmpty.counts = { total: 0, completed: 0, succeeded: 0, skipped: 0, conflict: 0, error: 0 };
   empty.hop.FbmSync.stateWrite(finishedEmpty);
-  empty.hop.FbmSync.logStatus(empty.hop.FbmSync.statusView(), 'empty_run');
   const emptyCounts = empty.hop.FbmSync.stateRead().counts;
-  check(so, 'phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và chỉ một tổng kết', [emptyCustomer.written, emptyActivity.written, empty.writes.length, [emptyCounts.total, emptyCounts.completed, emptyCounts.succeeded, emptyCounts.skipped, emptyCounts.conflict, emptyCounts.error], empty.logs.length, empty.logs[0] && empty.logs[0].action], [0, 0, 0, [0, 0, 0, 0, 0, 0], 1, 'empty_run']);
+  check(so, 'phiên rỗng hai phía kết thúc với mọi bộ đếm bằng 0 và không ghi dòng vấn đề bản ghi nào', [emptyCustomer.written, emptyActivity.written, empty.writes.length, [emptyCounts.total, emptyCounts.completed, emptyCounts.succeeded, emptyCounts.skipped, emptyCounts.conflict, emptyCounts.error], empty.logs.length], [0, 0, 0, [0, 0, 0, 0, 0, 0], 0]);
 
   // Hàng đợi push: Sheet giả trong bộ nhớ, danh sách ứng viên dựng lại từ Sheet sau mỗi bản ghi như GAS thật.
 

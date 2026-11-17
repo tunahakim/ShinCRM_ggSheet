@@ -174,7 +174,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 3,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 1,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,

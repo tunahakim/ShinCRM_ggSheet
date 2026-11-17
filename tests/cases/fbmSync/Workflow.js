@@ -800,15 +800,14 @@ async function chay(so) {
   const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
-  deadlineFlow.hop.FbmSync.logStatus(deadlineState, 'runtime_limit');
-  const deadlineLog = deadlineLogs[deadlineLogs.length - 1] || {};
+  const deadlineLog = deadlineLogs.filter((line) => line.action === 'slice_limit').pop() || {};
   const deadlineUi = taoBoTest();
   deadlineUi.hop.fbmSyncPaint(deadlineStatus);
   check(so, 'lát GAS chạm trần dừng trước request kế tiếp, DTO Sidebar và Log giữ runId/phase/cursor', [
     blockedByDeadline, deadlineState.phase, deadlineState.lastFailureCode, deadlineState.cursor.pageIndex, deadlineState.activeRequestId,
-    deadlineLog.action, deadlineLog.detail && deadlineLog.detail.runId, deadlineLog.detail && deadlineLog.detail.phase, deadlineLog.detail && deadlineLog.detail.cursor,
+    deadlineLog.action, deadlineLog.detail && deadlineLog.detail.runId, deadlineLog.detail && deadlineLog.detail.phase, deadlineLog.detail && deadlineLog.detail.cursor && deadlineLog.detail.cursor.kind,
     deadlineUi.content.textContent.indexOf('Tạm dừng') >= 0
-  ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'runtime_limit', 'runtime-limit', 'paused', 'customer_grid', true]);
+  ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'slice_limit', 'runtime-limit', 'paused', 'customer_grid', true]);
 
   const quotaData = {}, quotaLogs = [];
   let quotaFull = false;
@@ -1001,12 +1000,10 @@ async function chay(so) {
         // Đi đúng đường của fbmContinueSync (bộ đệm một lần gọi, khóa điều phối) để đếm số lần gọi kho của một lát Activity.
         const callsBefore = fullPropCalls.count, readsBefore = Object.assign({}, fullSheetReads), writesBefore = fullWrites.length;
         fullFlow.hop.FbmSync.propertyBufferBegin();
-        const before = fullFlow.hop.FbmSync.statusView();
         // Chặng ném lỗi có mã thì lát đã đóng lượt lỗi rồi ném tiếp, như cửa relay thật nhận lỗi; ca kiểm đọc kết quả qua ô lượt.
         try { fullStep = fullFlow.hop.FbmSync.controlDispatch('continue', { response: raw }, 'relay'); }
         catch (stageError) { if (!stageError.code) { throw stageError; } fullStep = { ok: false, code: stageError.code, request: null, status: fullFlow.hop.FbmSync.statusView() }; }
         if (withTrace) { fullFlow.hop.FbmSync.traceEvent({}, 'engine_after', { operation: 'fbmContinueSync' }); }
-        if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) { fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice'); }
         fullFlow.hop.FbmSync.propertyBufferEnd();
         fullActivityPropCalls.push(fullPropCalls.count - callsBefore);
         const sliceReads = Object.keys(fullSheetReads).reduce((out, key) => Object.assign(out, { [key]: fullSheetReads[key] - readsBefore[key] }), {});
@@ -1015,12 +1012,8 @@ async function chay(so) {
         fullStatuses.push(fullStep.status);
         continue;
       }
-      const before = fullFlow.hop.FbmSync.statusView();
       fullStep = fullFlow.hop.FbmSync.runSlice(() => fullFlow.hop.FbmSync.continue(raw));
       fullStatuses.push(fullStep.status);
-      if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
-        fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
-      }
     }
     }
     return { customerPageIndexes, activityItemTypes, customerItemTypes, fullFlow, fullLogs, fullWrites, fullLocal, fullStep, fullKinds, fullStatuses, fullActivityPropCalls, fullActivitySheetReads, fullBatches, fullLookupFields };
@@ -1242,13 +1235,6 @@ async function chay(so) {
     JSON.stringify(publicStatus).indexOf('private-authorized') < 0,
     JSON.stringify(publicStatus).indexOf('private-lookup') < 0
   ], [true, true, true]);
-  const logged = [];
-  dto.hop.LOG_OK = 'ok'; dto.hop.LOG_ERROR = 'error'; dto.hop.LOG_CONFLICT = 'conflict';
-  dto.hop.logEvent = (event) => logged.push(event); dto.hop.logTrace = (event) => logged.push(event);
-  dto.hop.FbmSync.logStatus(Object.assign({}, publicStatus, { current: '', message: 'Lượt tổng hợp' }), 'workflow_summary');
-  check(so, 'log tong hop: recordId rong va khong dua session noi bo vao detail', [
-    logged.length, logged[0].recordId, JSON.stringify(logged[0]).indexOf('private-cookie') < 0, JSON.stringify(logged[0]).indexOf('private-authorized') < 0
-  ], [1, '', true, true]);
 
   const disabled = workflowGas();
   datCongTac(disabled.hop, false);
