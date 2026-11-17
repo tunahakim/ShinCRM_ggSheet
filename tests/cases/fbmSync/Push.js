@@ -5,7 +5,7 @@ const { taoHopCat, napServer, TEP_KHUNG_LUOT, giuBanGhi, giuBanGhiDongBo, soBan 
 const { datUngVienDay, boUngVienDay } = require('../../lib/fbm/ung-vien-day');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 const { luoiDaCat } = require('../../lib/fbm/tab-fbm-gia');
-const { noiLat } = require('../../lib/fbm/hop-dong-bo');
+const { noiLat, trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 
 async function chay(so) {
@@ -31,7 +31,7 @@ async function chay(so) {
   pushState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' };
   pushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(pushState);
-  const pushRequest = push.FbmSync.pushStageResume(pushState);
+  const pushRequest = trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(pushState), pushState);
   const pushedState = push.FbmSync.stateRead();
   check(so, 'Trước request ghi FBM, bản ghi được giữ trong sổ bận dưới tên đồng bộ', soBan(push)['customer:C-1'].by, 'fbm');
   check(so, 'push request luu dung cursor cho phan hoi tiep', pushedState.cursor.kind, 'push_wait');
@@ -44,7 +44,7 @@ async function chay(so) {
   changedState.session = pushState.session;
   changedState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(changedState);
-  const changedRequest = push.FbmSync.pushStageResume(changedState);
+  const changedRequest = trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(changedState), changedState);
   check(so, 'ứng viên bị sửa sau lúc chọn thì hoãn tới lượt sau, không giữ, không gửi; lượt chuyển sang ứng viên kế tiếp', [
     !!changedRequest, push.FbmSync.stateRead().counts.skipped, Object.keys(soBan(push)), push.FbmSync.stateRead().current
   ], [true, 1, ['customer:C-NEXT'], 'C-NEXT']);
@@ -53,11 +53,11 @@ async function chay(so) {
   conflictPushState.counts.conflict = 1;
   conflictPushState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
   push.FbmSync.stateWrite(conflictPushState);
-  const conflictPushRequest = push.FbmSync.pushStageResume(conflictPushState);
+  const conflictPushRequest = trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(conflictPushState), conflictPushState);
   check(so, 'pull phát hiện xung đột giữa lượt không dừng chiều đẩy: bản ghi khác vẫn được phát request đẩy', [!!conflictPushRequest, push.FbmSync.stateRead().phase, push.FbmSync.stateRead().current], [true, 'push', 'C-1']);
   datUngVienDay(push, () => []);
   const emptyWriteState = push.FbmSync.runOpen({ phase: 'push' }); emptyWriteState.mode = 'write'; emptyWriteState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 }; push.FbmSync.stateWrite(emptyWriteState);
-  push.FbmSync.pushStageResume(emptyWriteState);
+  trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(emptyWriteState), emptyWriteState);
   check(so, 'push khong co ung vien hien thong bao khong co ban ghi day', push.FbmSync.stateRead().message, 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.');
   let pushPatch, pushWriteRequest;
   const pushLogs = [];
@@ -139,7 +139,7 @@ async function chay(so) {
   const bugState = push.FbmSync.runOpen({ phase: 'push' });
   bugState.mode = 'push'; bugState.activeRequestId = 'test-bug-request'; bugState.cursor = { kind: 'push_wait', operation: 'customer_edit_save', entity: 'customer', index: 0, candidate: { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', fbmId: 'A-ERR', fbmHash: 'h-err' } } };
   push.FbmSync.stateWrite(bugState);
-  const bugResult = push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } });
+  const bugResult = push.FbmSync.runSlice(() => push.FbmSync.continue({ ok: true, status: 200, body: '{"d":{"Bugs":{"Message":"Sai du lieu"}}}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-bug-request' }] } }));
   check(so, 'Bugs HTTP 200 danh dau loi record va khong retry request da gui', [bugResult.ok, push.FbmSync.stateRead().counts.error, push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'] !== undefined], [true, 1, true]);
   const transportState = push.FbmSync.runOpen({ phase: 'read' });
   push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', cookie: 'cookie' });
@@ -221,7 +221,7 @@ async function chay(so) {
     batchState.session = pushState.session;
     batchState.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     push.FbmSync.stateWrite(batchState);
-    const batchRequest = push.FbmSync.pushStageResume(batchState), batchAfter = push.FbmSync.stateRead();
+    const batchRequest = trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(batchState), batchState), batchAfter = push.FbmSync.stateRead();
     push.FbmSync.recordIssuesFlush();
     check(so, 'FBM-021: ba bản ghi giữ (một dòng đã đổi giữa chừng) chỉ một lần ghi Sheet, rồi mới tới lần ghi "đang đẩy"; dòng đã đổi không được tính', [writes, batchRequest && batchRequest.meta.kind, batchAfter.counts.skipped, batchAfter.cursor.progress, batchAfter.current], [[['H-1:' + push.FbmSync.SYNC_STATUS.skipped, 'H-3:' + push.FbmSync.SYNC_STATUS.skipped], ['P-1:' + push.FbmSync.SYNC_STATUS.pushing]], 'customer_edit_open', 2, 2, 'P-1']);
     check(so, 'FBM-021: lô giữ đó ra đúng một dòng Log kèm hai mã', [skipLogs.length, skipLogs[0] && skipLogs[0].detail.ids], [1, ['H-1', 'H-3']]);
@@ -276,7 +276,7 @@ async function chay(so) {
   const activityPushState = push.FbmSync.runOpen({ phase: 'push' });
   activityPushState.cursor = { kind: 'push_scan', entity: 'activity', index: 0 };
   push.FbmSync.stateWrite(activityPushState);
-  const activityCreate = push.FbmSync.pushStageResume(activityPushState);
+  const activityCreate = trongLat(push.FbmSync, () => push.FbmSync.pushStageResume(activityPushState), activityPushState);
   check(so, 'Activity moi dung request New va marker', [activityCreate.meta.kind, activityCreate.body.action, activityCreate.body.memvars.filter((item) => item.Name === 'details')[0].NewValue, push.FbmSync.stateRead().cursor.operation], ['activity_create', 'New', 'Nội dung #SC-ACT-NEW', 'activity_create']);
   const activityResponse = buocDay(push.FbmSync, { d: { InternalValues: [{ Name: 'id', Value: 42 }] } });
   check(so, 'Activity New nhan ID FBM va tao request doc xac nhan', [activityResponse.meta.kind, activityResponse.meta.id, push.FbmSync.stateRead().counts.succeeded, push.FbmSync.stateRead().phase], ['activity_edit_open', '42', 0, 'push']);
@@ -321,7 +321,7 @@ async function chay(so) {
   push.FbmSync.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Owner', userId: '2037', cookie: 'cookie', customerAuthorized: '1.test' });
   push.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const createState = push.FbmSync.runOpen({ phase: 'push' }); createState.session = { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' }; createState.activeRequestId = 'test-create-request'; createState.cursor = { kind: 'push_wait', entity: 'customer', index: 0, operation: 'customer_create_save', candidate: createCandidate }; push.FbmSync.stateWrite(createState);
-  const recoveryStart = push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } });
+  const recoveryStart = push.FbmSync.runSlice(() => push.FbmSync.continue({ ok: false, status: 500, body: '{"Message":"timeout"}', transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'test-create-request' }] } }));
   check(so, 'Customer create mat response chuyen sang request doc MST contains, khong ghi lai', [recoveryStart.ok, recoveryStart.request.meta.kind, recoveryStart.request.body.gridPageIndex, recoveryStart.request.body.filter, recoveryStart.request.body.externalKey.some((item) => item.Name === 'ma_kh' && item.Value === 'ALT00010'), push.FbmSync.stateRead().cursor.operation], [true, 'grid', -2, ['ma_so_thue:**0100123456'], false, 'customer_create_recover']);
   const customerFields = push.FbmSync.GRID_FIELDS.customer.slice();
   const customerRow = []; customerRow[0] = 'FBM-CREATE'; customerRow[1] = 'ALT00020'; customerRow[2] = 'Khach tao lai'; customerRow[3] = '0100123456'; customerRow[4] = 'Nguoi lien he'; customerRow[5] = 'Ha Noi'; customerRow[6] = '0900000000'; customerRow[7] = 'a@example.com'; customerRow[9] = ''; customerRow[12] = 'HNI'; customerRow[18] = 'Source'; customerRow[21] = '';

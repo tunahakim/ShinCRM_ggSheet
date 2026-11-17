@@ -1,4 +1,5 @@
 /** Mở việc quét và trang kéo: cursor và state không phình, mô tả trang FBM, tiến trình lượt, xét khách vắng, mốc số khách chỉ ghi khi lượt đóng xong. */
+const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { section, check } = require('../../lib/assert');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../../lib/load-gas');
 const { taoPropertiesService } = require('../../lib/gas/kho-thuoc-tinh');
@@ -24,7 +25,7 @@ async function chay(so) {
   builders.FbmSync.prepareCategoryGate = () => {};
   builders.FbmSync.seenStoreBegin = () => {};
   builders.FbmSync.readLocal = () => [];
-  const firstPage = builders.FbmSync.beginCustomerPull(pageState);
+  const firstPage = trongLat(builders.FbmSync, () => builders.FbmSync.beginCustomerPull(pageState), pageState);
   check(so, 'quét toàn bộ lấy cả danh sách khách bằng một việc quét có số dòng mỗi request theo cấu hình, Extension cắt gói',
     [pageState.cursor.kind, pageState.cursor.count, firstPage.meta.kind, firstPage.body.count, firstPage.meta.job.chunkMaxBytes],
     ['customer_scan', builders.FbmSync.BUDGET.scanCustomerRows, 'scan_job', builders.FbmSync.BUDGET.scanCustomerRows, builders.FbmSync.BUDGET.chunkMaxBytes]);

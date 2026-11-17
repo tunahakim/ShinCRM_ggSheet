@@ -7,7 +7,7 @@ const { section, check } = require('../../lib/assert');
 const { datCongTac, datNen, datPhan, docPhan, datLichNen, docLichNen, vaSoNen } = require('../../lib/fbm/cai-dat-thu');
 const { taoHopCat, napServer, soBan, TRANG_FBM_THU } = require('../../lib/load-gas');
 const { datUngVienDay } = require('../../lib/fbm/ung-vien-day');
-const { workflowGas, khoDongBo, noiLat } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, khoDongBo, noiLat, trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { quaTrangLogin } = require('../../lib/fbm/trang-login');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
@@ -225,7 +225,7 @@ async function chay(so) {
   ], ['', 'Lê Tuấn Anh', 'BOUND', 'REBIND_REQUIRED']);
 
   const engine = workflowGas();
-  const started = engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const started = engine.hop.FbmSync.runSlice(() => engine.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, engine.hop.FbmSync.stateRead()));
   const firstRequest = started.request;
   check(so, 'tu dong dien: GAS cap dung mot grid User va khong xin Authorized khong dung', [
     firstRequest.meta.kind, firstRequest.body.controller, firstRequest.body.type, firstRequest.body.authorized
@@ -239,18 +239,18 @@ async function chay(so) {
   check(so, 'tu dong dien: Extension chuyen nguyen envelope GAS toi FBM', [
     transport.sent.url, JSON.parse(transport.sent.body).controller, JSON.parse(transport.sent.body).cookie
   ], [firstRequest.url, 'User', '461020379855cFHN_CRM_App']);
-  const finished = engine.hop.FbmSync.continue(executorRaw(transport.reply, firstRequest.id));
+  const finished = engine.hop.FbmSync.runSlice(() => engine.hop.FbmSync.continue(executorRaw(transport.reply, firstRequest.id)));
   check(so, 'tu dong dien: GAS nhan response Extension va tra draft chua luu binding', [
     finished.ok, finished.request || null, finished.status.phase, finished.status.metadata.identityProbe, engine.hop.FbmSync.bindingRead().spreadsheetId || null
   ], [true, null, 'done', { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' }, null]);
 
   const incomplete = workflowGas();
-  const incompleteStarted = incomplete.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
-  const incompleteResult = incomplete.hop.FbmSync.continue({
+  const incompleteStarted = incomplete.hop.FbmSync.runSlice(() => incomplete.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, incomplete.hop.FbmSync.stateRead()));
+  const incompleteResult = incomplete.hop.FbmSync.runSlice(() => incomplete.hop.FbmSync.continue({
     ok: true, status: 200,
     body: JSON.stringify({ d: { TotalRowCount: 1, Rows: [[2037]], ViewPage: { Fields: [{ AliasName: 'id' }] } } }),
     transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: incompleteStarted.request.id }] }
-  });
+  }));
   check(so, 'tu dong dien: FBM thieu nhan dien phai ket thuc loi ro rang, khong tu luu', [
     incompleteResult.ok, incompleteResult.code, incompleteResult.status.phase, incomplete.hop.FbmSync.bindingRead().spreadsheetId || null
   ], [false, 'IDENTITY_PROBE_INCOMPLETE', 'error', null]);
@@ -258,15 +258,15 @@ async function chay(so) {
   const identityCheck = workflowGas();
   identityCheck.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
   identityCheck.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
-  const identityStarted = identityCheck.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true });
+  const identityStarted = identityCheck.hop.FbmSync.runSlice(() => identityCheck.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true }, identityCheck.hop.FbmSync.stateRead()));
   const identityProbe = await sendThroughExecutor(identityStarted.request, userResponse);
-  const identityAfterProbe = identityCheck.hop.FbmSync.continue(executorRaw(identityProbe.reply, identityStarted.request.id));
+  const identityAfterProbe = identityCheck.hop.FbmSync.runSlice(() => identityCheck.hop.FbmSync.continue(executorRaw(identityProbe.reply, identityStarted.request.id)));
   const identityAuthorized = await sendThroughExecutor(identityAfterProbe.request, JSON.stringify({ d: { Authorized: 'identity-auth' } }));
-  const identityGridStep = identityCheck.hop.FbmSync.continue(executorRaw(identityAuthorized.reply, identityAfterProbe.request.id));
+  const identityGridStep = identityCheck.hop.FbmSync.runSlice(() => identityCheck.hop.FbmSync.continue(executorRaw(identityAuthorized.reply, identityAfterProbe.request.id)));
   const customerFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
   const customerRow = customerFields.map((field) => field === 'stt_rec_kh' ? 'FBM-1' : field === 'ma_kh' ? 'ALT00010' : '');
   const identityGrid = await sendThroughExecutor(identityGridStep.request, JSON.stringify({ d: { TotalRowCount: 1, Rows: [customerRow], ViewPage: { Fields: customerFields.map((AliasName) => ({ AliasName })) } } }));
-  const identityDone = identityCheck.hop.FbmSync.continue(executorRaw(identityGrid.reply, identityGridStep.request.id));
+  const identityDone = identityCheck.hop.FbmSync.runSlice(() => identityCheck.hop.FbmSync.continue(executorRaw(identityGrid.reply, identityGridStep.request.id)));
   check(so, 'kiem tra lien ket: chi quet Customer va tra tong hop n/N, khong cap Activity hoac ghi binding', [
     identityGridStep.request.meta.entity, identityDone.request || null, identityDone.status.phase,
     identityDone.status.metadata.identityCheck.total, identityDone.status.metadata.identityCheck.matched, identityDone.status.metadata.identityCheck.missing,
@@ -278,9 +278,9 @@ async function chay(so) {
     const flow = workflowGas();
     flow.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
     flow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: savedName } });
-    const started = flow.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true, identity: draft });
+    const started = flow.hop.FbmSync.runSlice(() => flow.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true, identity: draft }, flow.hop.FbmSync.stateRead()));
     const probe = await sendThroughExecutor(started.request, userResponse);
-    return flow.hop.FbmSync.continue(executorRaw(probe.reply, started.request.id));
+    return flow.hop.FbmSync.runSlice(() => flow.hop.FbmSync.continue(executorRaw(probe.reply, started.request.id)));
   };
   const draftWrongName = await draftCheck({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anhhh' }, 'Le Tuan Anh');
   check(so, 'kiem tra lien ket: ban nhap sai Ten day du thi dung o buoc kiem phien va bao lech dung o Ten day du, khong quet Customer', [
@@ -292,7 +292,7 @@ async function chay(so) {
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   loginFlow.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const loginStarted = loginFlow.hop.FbmSync.loginOpen('test', {}, loginFlow.hop.FbmSync.stateRead());
+  const loginStarted = loginFlow.hop.FbmSync.runSlice(() => loginFlow.hop.FbmSync.loginOpen('test', {}, loginFlow.hop.FbmSync.stateRead()));
   const afterLogin = quaTrangLogin((response) => noiDangNhap(loginFlow.hop, response), loginStarted.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = noiDangNhap(loginFlow.hop, executorRaw(loginAuthorize.reply, afterLogin.request.id));
@@ -306,7 +306,7 @@ async function chay(so) {
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   wrongLogin.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const wrongStart = wrongLogin.hop.FbmSync.loginOpen('test', {}, wrongLogin.hop.FbmSync.stateRead());
+  const wrongStart = wrongLogin.hop.FbmSync.runSlice(() => wrongLogin.hop.FbmSync.loginOpen('test', {}, wrongLogin.hop.FbmSync.stateRead()));
   const wrongAfterLogin = quaTrangLogin((response) => noiDangNhap(wrongLogin.hop, response), wrongStart.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const wrongAuthorize = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = noiDangNhap(wrongLogin.hop, {
@@ -387,7 +387,7 @@ async function chay(so) {
       hop.logTrace = (entry) => vet.push(entry);
       datLichNen(hop, { heartbeat: { enabled: true, minutes: '5' }, customerFull: { enabled: true, minutes: '60' }, activityFull: { enabled: false }, detail: { enabled: false } });
       vaSoNen(hop.FbmSync, { heartbeat: { doneAt: Date.now() }, customerFull: { doneAt: Date.now() } });
-      const hoi = hop.FbmSync.backgroundNext({ now: Date.now() + 60000, pollAt: Date.now() + 60000, book: hop.FbmSync.processBookRead() });
+      const hoi = hop.FbmSync.runSlice(() => hop.FbmSync.backgroundNext({ now: Date.now() + 60000, pollAt: Date.now() + 60000, book: hop.FbmSync.processBookRead() }));
       check(so, 'LOG_TRACE: lần Extension hỏi mà chưa có việc ghi một dòng vết nói tiến trình nào sớm nhất và còn bao lâu',
         [hoi, vet.map((v) => [v.source, v.action, v.reason])], [null, [['fbm_sync', 'schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; sớm nhất là Giữ phiên FBM, còn 4 phút.']]]);
     }
@@ -406,7 +406,7 @@ async function chay(so) {
       G.statePatch({ runId: 'conflict-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, process: 'customerFull', pollAt: Date.now() });
       vaSoNen(G, { customerFull: { doneAt: 1 } });
       G.stateWrite(G.runClose(G.stateRead(), 'conflict', { message: 'Có xung đột cần người dùng xử lý.' }));
-      G.backgroundTail({ ok: true, request: null });
+      trongLat(G, () => G.backgroundTail({ ok: true, request: null }));
       check(so, 'Lịch nền: lượt nền dừng ở xung đột vẫn tính là chạy xong (không chạy lại mỗi lần hỏi), chuỗi dừng chờ người dùng',
         [G.processBookRead().customerFull.doneAt > 1, G.stateRead().runId, G.stateRead().phase], [true, 'conflict-run', 'conflict']);
     }
@@ -441,7 +441,8 @@ async function chay(so) {
     const state = F.runOpen({ phase: 'push' });
     state.mode = 'push'; state.phase = 'push'; state.entity = 'customer'; state.session = verified; state.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
     F.stateWrite(state);
-    let envelope = F.sliceIssue(F.pushStageResume(F.stateRead())), lastStep = null;
+    const resumed = trongLat(F, () => F.pushStageResume(F.stateRead()));
+    let envelope = F.sliceIssue(F.stateRead(), resumed), lastStep = null;
     for (let guard = 0; envelope && guard < 60; guard += 1) {
       if (envelope.meta.kind !== 'batch') {
         const current = F.stateRead(); issued.push(current.cursor.candidate.id);
@@ -453,7 +454,7 @@ async function chay(so) {
       const items = [0, 1, 2].map((id) => (lookupAt.length === 2 && options && options.failSecond && id === 1)
         ? { id: String(id), ok: false, status: 500, body: '' }
         : { id: String(id), ok: true, status: 200, body: JSON.stringify({ d: id === 1 ? Object.keys(fbmNames).map((code) => [code, fbmNames[code]]) : [['X', 'x']] }) });
-      lastStep = F.continue({ ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: envelope.id }] } });
+      lastStep = F.runSlice(() => F.continue({ ok: true, status: 200, items, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: envelope.id }] } }));
       envelope = lastStep.request;
     }
     return { F, logs, sheetSaves, lookupAt, issued, lastStep };
@@ -512,10 +513,10 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
   compactLookupFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' });
+  compactLookupFlow.hop.FbmSync.runSlice(() => compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' }, compactLookupFlow.hop.FbmSync.stateRead()));
   const compactContinue = (body, items) => {
     const requestId = compactLookupFlow.hop.FbmSync.stateRead().activeRequestId;
-    return compactLookupFlow.hop.FbmSync.continue(Object.assign({ ok: true, status: 200, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId }] } }, items ? { items } : { body: JSON.stringify(body) }));
+    return compactLookupFlow.hop.FbmSync.runSlice(() => compactLookupFlow.hop.FbmSync.continue(Object.assign({ ok: true, status: 200, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId }] } }, items ? { items } : { body: JSON.stringify(body) })));
   };
   compactContinue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } } });
   compactContinue({ d: { Authorized: 'customer-auth' } });
@@ -574,7 +575,7 @@ async function chay(so) {
   compactLookupFlow.hop.FbmSync.pushEligibilityErrors = () => [];
   compactLookupFlow.hop.writeGateSave = () => ({ ok: true });
   compactLookupFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
-  const pushRequest = compactLookupFlow.hop.FbmSync.pushStageResume(pushState);
+  const pushRequest = trongLat(compactLookupFlow.hop.FbmSync, () => compactLookupFlow.hop.FbmSync.pushStageResume(pushState), pushState);
   const pushWaitState = compactLookupFlow.hop.FbmSync.stateRead();
   const pushRawState = compactLookupFlow.documentProperties.data.FBM_SYNC_STATE_V1 || '';
   let pushRawParsed = null; try { pushRawParsed = JSON.parse(pushRawState); } catch (ignorePushRaw) {}
@@ -638,7 +639,7 @@ async function chay(so) {
   let orderWriteCount = 0;
   orderFlow.hop.FbmSync.stateWrite = (state) => { orderWriteCount += 1; if (orderWriteCount === 1) { const error = new Error('quota'); error.code = 'FBM_DOCUMENT_PROPERTIES_QUOTA'; throw error; } return orderStateWrite(state); };
   let orderError = null, orderRequest = 'chưa chạy';
-  try { orderRequest = orderFlow.hop.FbmSync.pushStageResume(orderState); } catch (error) { orderError = error; }
+  try { orderRequest = trongLat(orderFlow.hop.FbmSync, () => orderFlow.hop.FbmSync.pushStageResume(orderState), orderState); } catch (error) { orderError = error; }
   // Chặng chạy trên bản sao nên dòng được đánh dấu trước khi patch ghi xuống kho (trong lát, kho cũng chỉ ghi ở cuối lát). Bất biến cần giữ: ghi ô lượt hỏng thì không request nào rời GAS; dòng "đang đẩy" mà không có lệnh ghi thì lượt sau đi đường khôi phục (FBM-027), không gửi lại mù.
   check(so, 'ghi ô lượt đẩy hỏng thì không phát request ghi FBM, ô lượt giữ dấu trang cũ, dòng ở "đang đẩy" cho lượt sau khôi phục', [orderError && orderError.code, orderRequest, orderSheetWrites, orderFlow.hop.FbmSync.stateRead().cursor.kind], ['FBM_DOCUMENT_PROPERTIES_QUOTA', 'chưa chạy', 1, 'push_scan']);
   // FBM-045: bước nạp Category gọi nextPushRequest rồi tự ghi lại object state của nó; khóa phải đặt trên chính object đó.
@@ -652,7 +653,7 @@ async function chay(so) {
   ['categoryGateCheck', 'pushEligibilityErrors'].forEach((name) => { aliasFlow.hop.FbmSync[name] = () => []; });
   aliasFlow.hop.writeGateSave = () => ({ ok: true });
   aliasFlow.hop.FbmSync.customerEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'customer_edit_open' } });
-  const aliasRequest = aliasFlow.hop.FbmSync.pushStageResume(aliasState);
+  const aliasRequest = trongLat(aliasFlow.hop.FbmSync, () => aliasFlow.hop.FbmSync.pushStageResume(aliasState), aliasState);
   aliasFlow.hop.FbmSync.stateWrite(aliasState);
   const aliasStored = aliasFlow.hop.FbmSync.stateRead();
   check(so, 'FBM-045: hàm gọi ghi lại object state sau khi phát lệnh đẩy vẫn giữ cursor push_wait; bản ghi nằm trong sổ bận nên ghi đè state không thả nó',
@@ -670,7 +671,7 @@ async function chay(so) {
   pushingFlow.hop.FbmSync.activityEditOpenRequest = () => ({ url: 'https://example.test', meta: { kind: 'activity_edit_open' } });
   pushingFlow.hop.writeGateSave = () => ({ ok: false, invalid: [{ id: 'ACT-PUSHING', field: 'syncStatus', label: 'Trạng thái đồng bộ', reason: 'Giá trị không hợp lệ.' }] });
   let pushingRequest = 'chưa gọi', pushingError = null;
-  try { pushingRequest = pushingFlow.hop.FbmSync.pushStageResume(pushingFlow.hop.FbmSync.stateRead()); } catch (error) { pushingError = error; }
+  try { pushingRequest = trongLat(pushingFlow.hop.FbmSync, () => pushingFlow.hop.FbmSync.pushStageResume(pushingFlow.hop.FbmSync.stateRead())); } catch (error) { pushingError = error; }
   check(so, 'không ghi được trạng thái "đang đẩy" thì không phát lệnh ghi FBM và báo lỗi có tên bản ghi',
     [pushingError && pushingError.code, pushingRequest, /ACT-PUSHING/.test(pushingError && pushingError.message)],
     ['FBM_SHEET_WRITE_FAILED', 'chưa gọi', true]);
@@ -689,7 +690,7 @@ async function chay(so) {
   htmlFailureFlow.hop.LOG_OK = 'ok'; htmlFailureFlow.hop.LOG_ERROR = 'error'; htmlFailureFlow.hop.LOG_CONFLICT = 'conflict';
   htmlFailureFlow.hop.logEvent = (event) => htmlLogs.push(event);
   htmlFailureFlow.hop.logTrace = () => {};
-  const htmlStarted = htmlFailureFlow.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const htmlStarted = htmlFailureFlow.hop.FbmSync.runSlice(() => htmlFailureFlow.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, htmlFailureFlow.hop.FbmSync.stateRead()));
   let htmlResult = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const requestId = htmlFailureFlow.hop.FbmSync.stateRead().activeRequestId;
@@ -732,7 +733,7 @@ async function chay(so) {
     vaSoNen(F, { customerFull: { doneAt: now }, heartbeat: { doneAt: 1 } });
     if (opt.cleanMark) { F.pushGateWrite({ status: 'clean', mark: F.pushGateMark(), at: now }); }
     F.backgroundMachineWrite(F.machineAssigned('may-A', 'Máy A', now));
-    const result = opt.viaChain ? F.backgroundNext({ now, pollAt: now, book: F.processBookRead() }) : F.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' });
+    const result = opt.viaChain ? F.runSlice(() => F.backgroundNext({ now, pollAt: now, book: F.processBookRead() })) : F.heartbeatRun({ trigger: 'alarm', machineId: 'may-A' });
     return { flow, F, traces, result, state: F.stateRead() };
   };
   {
@@ -745,7 +746,7 @@ async function chay(so) {
     const recountModes = [];
     two.F.recountStart = (mode, origin) => { recountModes.push([mode, origin]); return { ok: true, request: null }; };
     const counted = two.F.stateRead(); counted.metadata.countTail = { pending: false, mode: 'write', message: 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.' }; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);
-    two.F.stageRun(two.F.CURSOR_TABLE.customer_count, two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } }));
+    trongLat(two.F, () => two.F.stageRun(two.F.CURSOR_TABLE.customer_count, two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } })));
     check(so, 'C2: số khách lệch sau lượt Giữ phiên có đẩy thì Quét nhanh bù chạy theo chiều lịch nền (Hai chiều), không theo mode push của lượt', recountModes, [['write', 'background']]);
   }
   {
@@ -764,12 +765,12 @@ async function chay(so) {
   const waitFlow = workflowGas({ extraFiles: ['server/gate/IdGate.js'] });
   datPhan(waitFlow.hop, 'run', { scopeLimited: false });
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 1, requestGapMaxSeconds: 3 });
-  waitFlow.hop.FbmSync.start({ mode: 'read' });
+  waitFlow.hop.FbmSync.runSlice(() => waitFlow.hop.FbmSync.start({ mode: 'read' }, waitFlow.hop.FbmSync.stateRead()));
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 5, requestGapMaxSeconds: 9 });
   waitFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid' }, activeRequestId: '', deadlineAt: 0 });
-  const gapGrid = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
+  const gapGrid = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
-  const gapChunk = waitFlow.hop.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
+  const gapChunk = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: '', meta: { kind: 'scan_chunk', job: { jobId: 'j', chunkIndex: 1 } } });
   const gapBudget = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'Lượt chạy tay chụp khoảng cách giữa hai request FBM vào state đầu lượt và gửi kèm mọi envelope; đổi cài đặt giữa lượt chỉ áp lượt sau; hạn Extension cộng khoảng nghỉ dài nhất, trừ gói lấy từ RAM tab',
     [JSON.stringify(waitFlow.hop.FbmSync.stateRead().requestGap), JSON.stringify(gapGrid.meta.requestGap), gapGrid.meta.timeoutMs, gapChunk.meta.timeoutMs],
@@ -779,11 +780,11 @@ async function chay(so) {
   check(so, 'Khoảng cách request FBM: tối đa nhỏ hơn tối thiểu hoặc vượt trần bị từ chối', [gapInvalid.ok, gapTooLong.ok], [false, false]);
   datPhan(waitFlow.hop, 'run', { requestGapMinSeconds: 0, requestGapMaxSeconds: 0 });
   waitFlow.hop.FbmSync.statePatch({ scan: 'full', requestGap: null, activeRequestId: '', deadlineAt: 0 });
-  const gapNone = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
+  const gapNone = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), waitFlow.hop.FbmSync.customerGridRequest({ type: 0, count: 50, gridPageIndex: -1, gridRefresh: false, scope: null }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead())));
   check(so, 'Mặc định 0 giây: envelope không mang khoảng nghỉ', gapNone.meta.requestGap, undefined);
   waitFlow.hop.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
   const truocCap = Date.now();
-  const loEnvelope = waitFlow.hop.FbmSync.sliceIssue({ items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
+  const loEnvelope = waitFlow.hop.FbmSync.sliceIssue(waitFlow.hop.FbmSync.stateRead(), { items: ['STT1', 'STT2'].map((stt) => waitFlow.hop.FbmSync.activityGridRequest(stt, { type: 0, count: 100, gridPageIndex: -1, gridRefresh: false }, waitFlow.hop.FbmSync.scriptSettings(waitFlow.hop.FbmSync.stateRead()))), meta: { kind: 'batch', entity: 'activity' } });
   const loState = waitFlow.hop.FbmSync.stateRead(), B = waitFlow.hop.FbmSync.BUDGET;
   check(so, 'GAS cấp envelope lô: hai phần tử, hạn Extension theo ngân sách, maxBytes, hạn Sidebar chờ GAS, deadlineAt thu hồi cộng đường về và đường lên', [
     loEnvelope.items.length, loEnvelope.url, loEnvelope.meta.kind, loEnvelope.meta.timeoutMs, loEnvelope.meta.batch.maxBytes, loEnvelope.meta.gasReplyMs, loState.activeRequestId === loEnvelope.id,
@@ -795,11 +796,11 @@ async function chay(so) {
   deadlineFlow.hop.FbmSync.statePatch({ runId: 'runtime-limit', phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: Date.now() - 1 });
   // FBM-031: hạn của request vừa nhận đã qua nhưng lời gọi GAS mới bắt đầu thì vẫn cấp request kế; trần tính từ lúc lời gọi bắt đầu.
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now());
-  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
+  const notBlockedByRequestDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   check(so, 'trần thời gian GAS tính từ lúc lời gọi bắt đầu, không từ hạn request vừa nhận', [!!notBlockedByRequestDeadline, deadlineFlow.hop.FbmSync.stateRead().lastFailureCode], [true, '']);
   deadlineFlow.hop.FbmSync.statePatch({ phase: 'pull_customer', cursor: { kind: 'customer_grid', pageIndex: 4, pageValue: ['2026-09-20', 'CUS-000004'] }, activeRequestId: '', deadlineAt: 0 });
   deadlineFlow.hop.FbmSync.budgetCallBegin(Date.now() - deadlineFlow.hop.FbmSync.BUDGET.gasSoftMs - 1);
-  const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
+  const blockedByDeadline = deadlineFlow.hop.FbmSync.sliceIssue(deadlineFlow.hop.FbmSync.stateRead(), deadlineFlow.hop.FbmSync.customerGridRequest({ type: 1, scope: null, count: 3, gridPageIndex: 5, gridRefresh: false, sourceFields: deadlineFlow.hop.FbmSync.GRID_FIELDS.customer }, deadlineFlow.hop.FbmSync.scriptSettings(deadlineFlow.hop.FbmSync.stateRead())));
   const deadlineState = deadlineFlow.hop.FbmSync.stateRead();
   const deadlineStatus = deadlineFlow.hop.FbmSync.statusView();
   deadlineFlow.hop.FbmSync.logStatus(deadlineStatus, 'runtime_limit');
@@ -946,7 +947,7 @@ async function chay(so) {
     let lanMat = 0;
     for (let round = 0; round < (options && options.rounds || 1); round += 1) {
     fullFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    fullStep = fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true });
+    fullStep = fullFlow.hop.FbmSync.runSlice(() => fullFlow.hop.FbmSync.start({ mode: mode || 'read', origin: 'manual', manual: true }, fullFlow.hop.FbmSync.stateRead()));
     for (let hop = 0; fullStep && fullStep.request && hop < 60; hop += 1) {
       const request = fullStep.request;
       const kind = String(request.meta && request.meta.kind || '');
@@ -1018,7 +1019,7 @@ async function chay(so) {
         continue;
       }
       const before = fullFlow.hop.FbmSync.statusView();
-      fullStep = fullFlow.hop.FbmSync.continue(raw);
+      fullStep = fullFlow.hop.FbmSync.runSlice(() => fullFlow.hop.FbmSync.continue(raw));
       fullStatuses.push(fullStep.status);
       if (fullStep.status && fullFlow.hop.FbmSync.shouldLogStatus(before, fullStep.status)) {
         fullFlow.hop.FbmSync.logStatus(fullStep.status, 'slice');
@@ -1148,7 +1149,7 @@ async function chay(so) {
   readFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   readFlow.hop.FbmSync.pullPageApply = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [] });
   readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  let readStep = readFlow.hop.FbmSync.runSlice(() => readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, readFlow.hop.FbmSync.stateRead()));
   const readKinds = [];
   for (let hop = 0; readStep && readStep.request && hop < 12; hop += 1) {
     const request = readStep.request;
@@ -1164,7 +1165,7 @@ async function chay(so) {
       } });
     }
     const throughExtension = await sendThroughExecutor(request, body);
-    readStep = readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id));
+    readStep = readFlow.hop.FbmSync.runSlice(() => readFlow.hop.FbmSync.continue(executorRaw(throughExtension.reply, request.id)));
   }
   check(so, 'phiên rỗng: Extension chỉ chuyển request đọc, không phát request ghi hoặc xóa và pipeline kết thúc', [
     readKinds, readKinds.length, readKinds.every((kind) => ['session_probe:user', 'authorize:customer', 'authorize:activity', 'completion:@CAT_TINH_THANH', 'completion:@CAT_NGUON_KH', 'completion:@CAT_CONG_VIEC', 'scan_job:customer', 'customer_count:customer'].indexOf(kind) >= 0), readStep.ok, readStep.request || null, readStep.status.phase, readFlow.hop.FbmSync.stateRead().counts.succeeded
@@ -1182,7 +1183,7 @@ async function chay(so) {
     flow.hop.FbmSync.pullPageApply = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
     flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
-    let step = flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }), last = step;
+    let step = flow.hop.FbmSync.runSlice(() => flow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, flow.hop.FbmSync.stateRead())), last = step;
     for (let hop = 0; step && step.request && hop < 12; hop += 1) {
       const request = step.request, grid = request.meta.kind === 'scan_job';
       let body = userResponse;
@@ -1190,7 +1191,7 @@ async function chay(so) {
       if (grid) { body = gridResponse(fields, [row(fields, { stt_rec_kh: 'KH-REC-1', ma_kh: 'KH001', ten_kh: 'Khách thử' })], 1); }
       const raw = executorRaw((await sendThroughExecutor(request, body)).reply, request.id);
       if (grid) { raw.transport.contract = contract; }
-      step = flow.hop.FbmSync.continue(raw); last = step;
+      step = flow.hop.FbmSync.runSlice(() => flow.hop.FbmSync.continue(raw)); last = step;
       if (grid) { break; }
     }
     return { last, logs, sheetWrites, state: flow.hop.FbmSync.stateRead() };
@@ -1210,13 +1211,13 @@ async function chay(so) {
   const stopAfterResponse = workflowGas();
   stopAfterResponse.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  const stopStarted = stopAfterResponse.hop.FbmSync.runSlice(() => stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, stopAfterResponse.hop.FbmSync.stateRead()));
   const stopNow = stopAfterResponse.hop.FbmSync.runStopCommand('any');
   const stopState = stopAfterResponse.hop.FbmSync.stateRead();
-  const stopped = stopAfterResponse.hop.FbmSync.continue({
+  const stopped = stopAfterResponse.hop.FbmSync.runSlice(() => stopAfterResponse.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: stopStarted.request.id }] }
-  });
+  }));
   check(so, 'Dừng khi request đọc đang bay: đóng lượt ngay, response về sau (kể cả lô bị Extension cắt dở) bị loại, không cấp request, không ghi gì vào state', [
     stopNow.code || '', stopNow.status.phase, stopState.runId === stopStarted.status.runId, JSON.stringify(stopState.cursor), stopped.ok, stopped.code, stopped.request || null, JSON.stringify(stopAfterResponse.hop.FbmSync.stateRead()) === JSON.stringify(stopState)
   ], ['SYNC_STOPPED', 'paused', true, '{}', false, 'STALE_RESPONSE', null, true]);
@@ -1224,12 +1225,12 @@ async function chay(so) {
   const masterOff = workflowGas();
   masterOff.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
+  const masterStarted = masterOff.hop.FbmSync.runSlice(() => masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true }, masterOff.hop.FbmSync.stateRead()));
   datCongTac(masterOff.hop, false);
-  const masterStopped = masterOff.hop.FbmSync.continue({
+  const masterStopped = masterOff.hop.FbmSync.runSlice(() => masterOff.hop.FbmSync.continue({
     ok: true, status: 200, body: userResponse,
     transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ stage: 'executor_response_sent', requestId: masterStarted.request.id }] }
-  });
+  }));
   check(so, 'tắt khi request đang bay: đóng lượt', [masterStopped.request || null, masterStopped.status.phase, masterOff.hop.FbmSync.runInProgress(masterOff.hop.FbmSync.stateRead())], [null, 'paused', false]);
 
   const dto = workflowGas();
@@ -1254,14 +1255,14 @@ async function chay(so) {
 
   const disabled = workflowGas();
   datCongTac(disabled.hop, false);
-  const blocked = disabled.hop.FbmSync.start({ mode: 'read' });
+  const blocked = disabled.hop.FbmSync.runSlice(() => disabled.hop.FbmSync.start({ mode: 'read' }, disabled.hop.FbmSync.stateRead()));
   check(so, 'cong tac tong tat: GAS khong cap envelope FBM moi', [blocked.ok, blocked.code, blocked.request || null], [false, 'SYNC_DISABLED', null]);
 
   const stale = workflowGas();
-  const staleStarted = stale.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const staleStarted = stale.hop.FbmSync.runSlice(() => stale.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, stale.hop.FbmSync.stateRead()));
   const staleLogs = [];
   stale.hop.logEvent = (event) => staleLogs.push(event);
-  const staleResult = stale.hop.FbmSync.continue({ ok: true, status: 200, body: userResponse, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: 'old-request' }] } });
+  const staleResult = stale.hop.FbmSync.runSlice(() => stale.hop.FbmSync.continue({ ok: true, status: 200, body: userResponse, transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: 'old-request' }] } }));
   check(so, 'response cu khong duoc phep mo bat ky buoc pipeline nao', [
     staleResult.ok, staleResult.code, stale.hop.FbmSync.stateRead().activeRequestId === staleStarted.request.id
   ], [false, 'STALE_RESPONSE', true]);
@@ -1271,15 +1272,15 @@ async function chay(so) {
   ], ['error', 'old-request', true, true]);
 
   const manualTransport = workflowGas();
-  const manualStarted = manualTransport.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
-  const transportFailure = manualTransport.hop.FbmSync.transportFailureRun({ requestId: manualStarted.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' });
+  const manualStarted = manualTransport.hop.FbmSync.runSlice(() => manualTransport.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, manualTransport.hop.FbmSync.stateRead()));
+  const transportFailure = manualTransport.hop.FbmSync.runSlice(() => manualTransport.hop.FbmSync.transportFailureRun({ requestId: manualStarted.request.id, code: 'FBM_TAB_NOT_FOUND', message: 'Không tìm thấy tab FBM đang mở.' }));
   check(so, 'loi bridge thu cong: GAS chi ghi nhan loi dung reservation, ket thuc ro rang va khong cap request moi', [
     transportFailure.ok, transportFailure.code, transportFailure.request || null, transportFailure.status.phase,
     transportFailure.status.lastError, manualTransport.hop.FbmSync.stateRead().activeRequestId
   ], [false, 'FBM_TAB_NOT_FOUND', null, 'error', 'Không tìm thấy tab FBM đang mở.', '']);
 
   const cancelling = workflowGas();
-  const cancellingStarted = cancelling.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true });
+  const cancellingStarted = cancelling.hop.FbmSync.runSlice(() => cancelling.hop.FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }, cancelling.hop.FbmSync.stateRead()));
   const cancelNow = cancelling.hop.FbmSync.runStopCommand('any');
   const cancelState = cancelling.hop.FbmSync.stateRead();
   check(so, 'Dừng khi request dò danh tính đang bay: xóa reservation và cursor ngay, nhớ mã request vừa đóng', [
@@ -1347,7 +1348,7 @@ async function chay(so) {
   const sangDay = soBuoc('write');
   ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
   sangDay.F.pushNext = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return { end: { kind: 'done', remaining: 0 } }; };
-  sangDay.F.pullFinishOrPush(sangDay.st, {});
+  trongLat(sangDay.F, () => sangDay.F.pullFinishOrPush(sangDay.st, {}), sangDay.st);
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy', ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')), true);
 }
 

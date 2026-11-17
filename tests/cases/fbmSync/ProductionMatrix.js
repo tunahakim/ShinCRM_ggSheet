@@ -1,4 +1,5 @@
 /** Ma trận offline cho kỳ đồng bộ nhiều Customer/Activity và lỗi vận chuyển. */
+const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { section, check } = require('../../lib/assert');
 const { buocDay, buocDayLoi, ungVienDay } = require('../../lib/fbm/buoc-day');
 const { datCongTac } = require('../../lib/fbm/cai-dat-thu');
@@ -41,8 +42,8 @@ async function chay(so) {
   protocol.Date.now = () => fixedNow;
   // Request nào cũng đi theo cursor đang lưu (cổng phiên xét dòng bảng của cursor); dùng dòng không có cổng để chỉ kiểm phần cấp mã.
   protocol.FbmSync.statePatch({ cursor: { kind: 'identity_user_grid' } });
-  const first = protocol.FbmSync.sliceIssue({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
-  const second = protocol.FbmSync.sliceIssue({ url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
+  const first = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
+  const second = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   protocol.Date.now = originalNow;
   check(so, 'hai envelope cung mili-giay van co requestId khac nhau', [first.id, second.id, first.id !== second.id], [first.id, second.id, true]);
 
@@ -144,7 +145,7 @@ async function chay(so) {
 
   const skipOnError = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnError = [];
-  let errorRequest = skipOnError.F.pushStageResume(skipOnError.F.stateRead());
+  let errorRequest = trongLat(skipOnError.F, () => skipOnError.F.pushStageResume(skipOnError.F.stateRead()));
   for (let guard = 0; guard < 5 && errorRequest; guard += 1) {
     const current = skipOnError.F.stateRead(); triedOnError.push(current.cursor.candidate.id);
     errorRequest = buocDayLoi(skipOnError.F, { reason: 'FBM từ chối', code: 'FBM_ERROR' }).request;
@@ -153,7 +154,7 @@ async function chay(so) {
 
   const skipOnSuccess = pushQueue(['A', 'B', 'C'].map(editCustomer));
   const triedOnSuccess = [];
-  let successRequest = skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead());
+  let successRequest = trongLat(skipOnSuccess.F, () => skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead()));
   for (let guard = 0; guard < 5 && successRequest; guard += 1) {
     const current = skipOnSuccess.F.stateRead(), id = current.cursor.candidate.id;
     triedOnSuccess.push(id);
@@ -162,7 +163,7 @@ async function chay(so) {
     row.syncStatus = 'đã đồng bộ'; row.fbmHash = skipOnSuccess.F.hash(row, 'customer', NO_CATEGORY);
     current.cursor = { kind: 'push_scan', entity: 'customer', index: current.cursor.index + 1 };
     skipOnSuccess.F.stateWrite(current);
-    successRequest = skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead());
+    successRequest = trongLat(skipOnSuccess.F, () => skipOnSuccess.F.pushStageResume(skipOnSuccess.F.stateRead()));
   }
   check(so, 'FBM-032: bản ghi vừa đẩy xong rời danh sách ứng viên thì bản ghi kế tiếp vẫn được đẩy', triedOnSuccess, ['CUS-A', 'CUS-B', 'CUS-C']);
 
@@ -176,7 +177,7 @@ async function chay(so) {
     return queue;
   };
   const stuckFound = stuckQueue();
-  const activityLookup = stuckFound.F.pushStageResume(stuckFound.F.stateRead());
+  const activityLookup = trongLat(stuckFound.F, () => stuckFound.F.pushStageResume(stuckFound.F.stateRead()));
   check(so, 'FBM-027: Giao dịch "đang đẩy" chưa có ID FBM (đã qua khoảng chờ) chỉ phát request đọc giao dịch của đúng khách cha, không phát lệnh tạo',
     [activityLookup && activityLookup.meta && activityLookup.meta.kind, JSON.stringify(activityLookup && activityLookup.body && activityLookup.body.externalKey), stuckFound.F.stateRead().cursor.operation],
     ['grid', JSON.stringify([{ Name: 'stt_rec', Opr: '=', Value: 'F-A', Type: 'String', Ignore: false }]), 'activity_create_recover']);
@@ -186,26 +187,26 @@ async function chay(so) {
     [linkedActivity.fbmId, linkedActivity.fbmHash, afterActivityFound && afterActivityFound.meta && afterActivityFound.meta.kind, stuckFound.F.stateRead().counts.error],
     ['9001', '', 'activity_edit_open', 0]);
   const stuckMissing = stuckQueue();
-  stuckMissing.F.pushStageResume(stuckMissing.F.stateRead());
+  trongLat(stuckMissing.F, () => stuckMissing.F.pushStageResume(stuckMissing.F.stateRead()));
   const recreate = buocDay(stuckMissing.F, await activityRows([{ id: 9000, details: 'Việc khác #SC-ACT-OTHER' }]));
   const recreated = stuckMissing.run.local.activity[0];
   check(so, 'FBM-027: tra hết giao dịch của khách cha không thấy dấu #SC thì tạo lại đúng một lần, dòng về "đang đẩy" với mốc giờ mới',
     [recreate && recreate.meta && recreate.meta.kind, recreated.syncStatus, recreated.fbmId, recreated.syncedAt instanceof Date, stuckMissing.F.stateRead().counts.error],
     ['activity_create', 'đang đẩy', '', true, 0]);
   const stuckWaiting = stuckQueue({ syncedAt: new Date() });
-  const waitingRequest = stuckWaiting.F.pushStageResume(stuckWaiting.F.stateRead());
+  const waitingRequest = trongLat(stuckWaiting.F, () => stuckWaiting.F.pushStageResume(stuckWaiting.F.stateRead()));
   check(so, 'FBM-027: lệnh tạo vừa mất phản hồi, chưa qua khoảng chờ thì không tra, không tạo, không báo lỗi; dòng giữ "đang đẩy"',
     [waitingRequest, stuckWaiting.run.local.activity[0].syncStatus, stuckWaiting.F.stateRead().counts.error, stuckWaiting.F.pushEligible('activity', stuckWaiting.run.local.activity[0], stuckWaiting.run.local.customer[0], stuckWaiting.F.pushReviewContext(stuckWaiting.F.stateRead(), null)).reason],
     [null, 'đang đẩy', 0, 'recoverWait']);
   const stuckFailed = stuckQueue();
   stuckFailed.F.pushFailureAdd('activity:ACT-STUCK', stuckFailed.F.hash(stuckFailed.run.local.activity[0], 'activity', NO_CATEGORY), { code: 'FBM_ERROR', reason: 'Mất phản hồi' });
-  const failedLookup = stuckFailed.F.pushStageResume(stuckFailed.F.stateRead());
+  const failedLookup = trongLat(stuckFailed.F, () => stuckFailed.F.pushStageResume(stuckFailed.F.stateRead()));
   check(so, 'FBM-027: sổ lỗi đẩy không chặn lệnh tạo chưa xác nhận; lượt sau tự tra lại, không chờ người bấm', failedLookup && failedLookup.meta && failedLookup.meta.kind, 'grid');
 
   // FBM từ chối rõ ràng lệnh tạo giao dịch (lỗi nghiệp vụ): tra ngay theo dấu, không thấy thì lỗi thường, không giữ "đang đẩy" để khỏi lặp mỗi lượt.
   const rejectQueue = pushQueue([editCustomer('A')], [Object.assign({}, stuckActivity, { syncStatus: '' })]);
   rejectQueue.run.local.customer[0].fbmHash = rejectQueue.F.hash(rejectQueue.run.local.customer[0], 'customer', NO_CATEGORY);
-  const rejectCreate = rejectQueue.F.pushStageResume(rejectQueue.F.stateRead());
+  const rejectCreate = trongLat(rejectQueue.F, () => rejectQueue.F.pushStageResume(rejectQueue.F.stateRead()));
   const rejectLookup = buocDayLoi(rejectQueue.F, { code: 'FBM_BUSINESS_ERROR', reason: 'Thiếu công việc' }, true).request;
   buocDay(rejectQueue.F, await activityRows([]));
   const rejectReason = (rejectQueue.F.pushFailuresRead().details['activity:ACT-STUCK'] || {}).reason || '';
@@ -222,7 +223,7 @@ async function chay(so) {
   const customerGridFields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
   const taxRows = (rows) => luoiTheoTen(sync.hop.FbmSync, 'customer', customerGridFields, rows);
   const recoverFound = pushQueue([lostCustomer]);
-  const lookup = recoverFound.F.pushStageResume(recoverFound.F.stateRead());
+  const lookup = trongLat(recoverFound.F, () => recoverFound.F.pushStageResume(recoverFound.F.stateRead()));
   check(so, 'FBM-027: Customer "đang đẩy" chưa có ID FBM ở phiên sau chỉ phát request tra theo MST, không phát lệnh tạo',
     [lookup && lookup.meta && lookup.meta.kind, JSON.stringify(lookup && lookup.body && lookup.body.filter), recoverFound.F.stateRead().cursor.operation],
     ['grid', JSON.stringify(['ma_so_thue:**0101234567']), 'customer_create_recover']);
@@ -233,7 +234,7 @@ async function chay(so) {
     ['FBM-LOST', 'ALT00077', '', 'customer_edit_open', 0]);
 
   const recoverMissing = pushQueue([Object.assign({}, lostCustomer)]);
-  recoverMissing.F.pushStageResume(recoverMissing.F.stateRead());
+  trongLat(recoverMissing.F, () => recoverMissing.F.pushStageResume(recoverMissing.F.stateRead()));
   const afterMissing = buocDay(recoverMissing.F, await taxRows([{ stt_rec_kh: 'FBM-OTHER', ma_kh: 'ALT00078', ma_so_thue: '01012345678' }]));
   check(so, 'FBM-027: tra không thấy Customer khớp chính xác MST thì tạo lại như Tạo khách (FBM chặn trùng MST nên không thể ra hai khách), không báo lỗi',
     [afterMissing && afterMissing.meta && afterMissing.meta.kind, recoverMissing.run.local.customer[0].syncStatus, recoverMissing.run.local.customer[0].fbmId, recoverMissing.F.stateRead().counts.error],
@@ -268,19 +269,19 @@ async function chay(so) {
   {
     const q = pushQueue(['A', 'B', 'C', 'D', 'E'].map(editCustomer));
     q.F.SHARD_LIST_BYTES = 40;
-    const first = q.F.pushStageResume(q.F.stateRead()), firstCursor = q.F.stateRead().cursor;
+    const first = trongLat(q.F, () => q.F.pushStageResume(q.F.stateRead())), firstCursor = q.F.stateRead().cursor;
     const { tried } = (() => { const out = [q.F.stateRead().cursor.candidate.id]; let r = first; for (let g = 0; g < 20 && r; g += 1) { r = pushOk(q); if (r) { out.push(q.F.stateRead().cursor.candidate.id); } } return { tried: out }; })();
     check(so, 'C0: danh sách không vừa một khóa thì chỉ ghi phần đầu; lần quét lại nhặt phần còn lại, không sót bản ghi',
       [firstCursor.size, tried, q.F.stateRead().phase, pushListKey(q)], [2, ['CUS-A', 'CUS-B', 'CUS-C', 'CUS-D', 'CUS-E'], 'done', '']);
   }
   {
     const broken = pushQueue(['A', 'B'].map(editCustomer));
-    broken.F.pushStageResume(broken.F.stateRead());
+    trongLat(broken.F, () => broken.F.pushStageResume(broken.F.stateRead()));
     broken.run.documentProperties.setProperty('FBM_SYNC_PUSH_LIST_0', 'hỏng');
     pushOk(broken);
     const brokenLog = broken.run.logs.filter((event) => event.action === 'push_list_read');
     const missing = pushQueue(['A', 'B'].map(editCustomer));
-    missing.F.pushStageResume(missing.F.stateRead());
+    trongLat(missing.F, () => missing.F.pushStageResume(missing.F.stateRead()));
     missing.run.documentProperties.deleteProperty('FBM_SYNC_PUSH_LIST_0'); missing.run.documentProperties.deleteProperty('FBM_SYNC_PUSH_LIST_SHARDS');
     pushOk(missing);
     check(so, 'C0: khóa danh sách hỏng thì ghi Log lỗi rồi quét lại; khóa mất thì quét lại không cần Log; cả hai vẫn đẩy tiếp bản ghi còn lại',
@@ -290,14 +291,14 @@ async function chay(so) {
   {
     const capped = pushQueue(['A', 'B'].map(editCustomer));
     capped.F.SHARD_LIST_BYTES = 8; capped.F.BUDGET.pushPassesMax = 1;
-    capped.F.pushStageResume(capped.F.stateRead());
+    trongLat(capped.F, () => capped.F.pushStageResume(capped.F.stateRead()));
     const cappedNext = pushOk(capped), cappedEnd = capped.F.stateRead(), cappedLog = capped.run.logs.find((event) => event.action === 'push_unfinished') || {};
     const busy = pushQueue(['A', 'B'].map(editCustomer));
     busy.F.pushRowChange = () => ({ status: 'busy', busy: { reason: 'đang có người sửa' } });
-    const busyRequest = busy.F.pushStageResume(busy.F.stateRead()), busyEnd = busy.F.stateRead(), busyLog = busy.run.logs.find((event) => event.action === 'push_unfinished') || {};
+    const busyRequest = trongLat(busy.F, () => busy.F.pushStageResume(busy.F.stateRead())), busyEnd = busy.F.stateRead(), busyLog = busy.run.logs.find((event) => event.action === 'push_unfinished') || {};
     const paused = pushQueue(['A'].map(editCustomer));
-    paused.F.pushStageResume(paused.F.stateRead());
-    paused.F.pushEndApply(paused.F.stateRead(), { kind: 'pause', message: 'Tạm dừng thử' });
+    trongLat(paused.F, () => paused.F.pushStageResume(paused.F.stateRead()));
+    trongLat(paused.F, () => paused.F.pushEndApply(paused.F.stateRead(), { kind: 'pause', message: 'Tạm dừng thử' }));
     check(so, 'C0: đạt pushPassesMax hoặc vòng đứng yên (mọi mã đều hoãn) thì dừng không sạch, Log cảnh báo nêu số còn lại; dừng, tạm dừng hay sạch đều xóa danh sách',
       [cappedNext, cappedEnd.phase, /Còn 1 bản ghi/.test(cappedEnd.message), cappedLog.outcome, cappedLog.detail && cappedLog.detail.remaining, cappedLog.detail && cappedLog.detail.stalled, pushListKey(capped),
         busyRequest, busyEnd.phase, busyLog.detail && busyLog.detail.stalled, busyLog.detail && busyLog.detail.remaining, pushListKey(busy), paused.F.stateRead().phase, pushListKey(paused)],
@@ -386,22 +387,22 @@ async function chay(so) {
   cfNewRun.phase = 'done'; CF.stateWrite(cfNewRun);
   CF.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
-  const cfBackground = CF.runConflictOpenCommand();
+  const cfBackground = CF.runSlice(() => CF.runConflictOpenCommand());
   const cfAfterBackground = CF.stateRead();
   check(so, 'Mở xung đột giữa lượt nền trả mã để Sidebar hỏi dừng hay chờ, không phát request và không đụng lượt nền', [cfBackground.code, !!cfBackground.status, cfBackground.request, cfAfterBackground.runId, cfAfterBackground.activeRequestId, cfAfterBackground.metadata.manualPending || null], ['SYNC_BACKGROUND_RUNNING', true, undefined, 'nen-1', 'nen-req', null]);
   cfAfterBackground.runId = ''; cfAfterBackground.origin = 'manual'; cfAfterBackground.phase = 'done'; cfAfterBackground.activeRequestId = ''; CF.stateWrite(cfAfterBackground);
-  const cfOpen = CF.runConflictOpenCommand();
+  const cfOpen = CF.runSlice(() => CF.runConflictOpenCommand());
   check(so, 'FBM-024: phiên mới không làm mất hàng đợi xung đột; mở chế độ xung đột chỉ phát request đọc bản ghi FBM đầu hàng đợi',
     [cfOpen.ok, cfOpen.remaining, cfOpen.request && cfOpen.request.meta.kind, cfOpen.request && cfOpen.request.meta.conflictId, JSON.stringify(CF.stateRead().cursor)],
     [true, 3, 'conflict_refresh_grid', 'CUS-000001', JSON.stringify({ kind: 'conflict_refresh', entity: 'customer', id: 'CUS-000001', fbmId: 'F-1' })]);
-  const cfOpened = CF.continue(await gridResponse(cfOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM khác 1')]));
+  const cfOpened = CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(cfOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên FBM khác 1')])));
   check(so, 'FBM-024: response đọc FBM về thì GAS tính diff tại chỗ, trả DTO kèm ảnh chụp lúc mở; state không giữ bản đang xem',
     [cfOpened.ok, cfOpened.conflict && cfOpened.conflict.id, cfOpened.conflict && cfOpened.conflict.remaining, nameDiff(cfOpened.conflict).left, nameDiff(cfOpened.conflict).right, cfOpened.conflict.snapshot.old.companyName, !!cfOpened.conflict.snapshot.openedHash, (CF.stateRead().cursor.kind || null)],
     [true, 'CUS-000001', 3, 'Tên Shin 1', 'Tên FBM khác 1', 'Tên Shin 1', true, null]);
   // Lệnh chốt không đọc lại FBM: Sidebar gửi lại giá trị FBM các trường lệch và ảnh chụp như màn đã hiện.
   const fbmValuesOf = (dto) => Object.fromEntries(((dto && dto.fields) || []).map((item) => [item.field, item.right]));
   const shinValuesOf = (dto) => Object.fromEntries(((dto && dto.fields) || []).map((item) => [item.field, item.left]));
-  const cfReopen = async (rows) => { const opened = CF.runConflictOpenCommand(); return CF.continue(await gridResponse(opened.request.id, rows)); };
+  const cfReopen = async (rows) => { const opened = CF.runSlice(() => CF.runConflictOpenCommand()); return CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(opened.request.id, rows))); };
   check(so, 'Chốt xung đột không phát request đọc lại FBM: lệnh chốt không còn hàm chuẩn bị đọc lại', typeof CF.prepareConflictResolution, 'undefined');
 
   cf.logs.length = 0;
@@ -445,8 +446,8 @@ async function chay(so) {
   const cfGone = chotXungDot(CF, 'customer', 'CUS-000001', 'fbm', null, fbmValuesOf(cfOpenedNewer.conflict), shinValuesOf(cfOpenedNewer.conflict), cfShotNew);
   check(so, 'Chốt lại dòng đã rời trạng thái xung đột chờ quyết thì báo không còn, không ghi gì', [cfGone.code, cf.local.customer[0].companyName], ['CONFLICT_NOT_FOUND', 'Tên FBM mới hơn 1']);
 
-  const cfOpen2 = CF.runConflictOpenCommand();
-  const cfOpened2 = CF.continue(await gridResponse(cfOpen2.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')]));
+  const cfOpen2 = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfOpened2 = CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(cfOpen2.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')])));
   // Màn hiện 'Tên Shin 2'; Sheet bị sửa giữa chừng, người dùng thấy popup và chọn giữ lựa chọn: ghi giá trị màn đang hiện, giá trị Sheet chỉ làm mốc.
   cf.local.customer[1].companyName = 'Tên Shin 2 sửa trên Sheet';
   const cfShinChanged = chotXungDot(CF, 'customer', 'CUS-000002', 'shin', null, fbmValuesOf(cfOpened2.conflict), shinValuesOf(cfOpened2.conflict), cfOpened2.conflict.snapshot);
@@ -460,15 +461,15 @@ async function chay(so) {
     [cfShin.ok, cfOpen2.request.meta.conflictId, cfShinRow.companyName, cfShinRow.syncStatus, cfShinRow.fbmHash === CF.hash(CF.customerRecord(fbmRow('F-2', 'ALT00002', 'Tên FBM 2'), NO_CATEGORY), 'customer', NO_CATEGORY), ungVienDay(CF, 'customer').map((item) => item.id)],
     [true, 'CUS-000002', 'Tên Shin 2', 'chờ đối soát', true, ['CUS-000002']]);
 
-  const cfOpen3 = CF.runConflictOpenCommand();
-  const cfOpened3 = CF.continue(await gridResponse(cfOpen3.request.id, [fbmRow('F-3', 'ALT00003', 'Tên FBM 3')]));
+  const cfOpen3 = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfOpened3 = CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(cfOpen3.request.id, [fbmRow('F-3', 'ALT00003', 'Tên FBM 3')])));
   const cfMergeField = nameDiff(cfOpened3.conflict).field;
   const cfManual = chotXungDot(CF, 'customer', 'CUS-000003', 'manual', { [cfMergeField]: { choice: 'manual', value: 'Tên tự nhập 3' } }, fbmValuesOf(cfOpened3.conflict), shinValuesOf(cfOpened3.conflict), cfOpened3.conflict.snapshot);
   const cfManualState = CF.stateRead();
   check(so, 'FBM-024 PA3: tùy chỉnh ghi giá trị tự nhập vào ShinCRM, trạng thái chờ đối soát; hết hàng đợi thì số đếm về 0 và không còn request đang chờ',
     [cfManual.ok, cf.local.customer[2].companyName, cf.local.customer[2].syncStatus, cfManual.remaining, cfManualState.metadata.conflictCount, (cfManualState.cursor.kind || null)],
     [true, 'Tên tự nhập 3', 'chờ đối soát', 0, 0, null]);
-  const cfEmpty = CF.runConflictOpenCommand();
+  const cfEmpty = CF.runSlice(() => CF.runConflictOpenCommand());
   check(so, 'FBM-024: hàng đợi rỗng thì mở chế độ xung đột báo không còn xung đột, không phát request', [cfEmpty.empty, cfEmpty.request], [true, undefined]);
 
   // FBM-053: đọc xác nhận lệch nhưng bản đọc lại đã khớp mọi trường thì không còn gì để người dùng chọn.
@@ -479,8 +480,8 @@ async function chay(so) {
   keoVe(SM, 'customer', [SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên FBM 1'), NO_CATEGORY)]);
   const smDone = SM.runOpen({ phase: 'checking_session' }); smDone.phase = 'done'; SM.stateWrite(smDone);
   SM.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const smOpen = SM.runConflictOpenCommand();
-  const smSame = SM.continue(await gridResponse(smOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên Shin 1')]));
+  const smOpen = SM.runSlice(() => SM.runConflictOpenCommand());
+  const smSame = SM.runSlice(((r) => () => SM.continue(r))(await gridResponse(smOpen.request.id, [fbmRow('F-1', 'ALT00001', 'Tên Shin 1')])));
   check(so, 'FBM-053: đọc lại FBM thấy khớp ShinCRM mọi trường thì tự đóng xung đột (đã đồng bộ, baseline là hash FBM), không trả màn xung đột rỗng',
     [smOpen.remaining, smSame.ok, smSame.conflict, sm.local.customer[0].syncStatus, sm.local.customer[0].fbmHash === SM.hash(SM.customerRecord(fbmRow('F-1', 'ALT00001', 'Tên Shin 1'), NO_CATEGORY), 'customer', NO_CATEGORY), smSame.remaining, (SM.stateRead().cursor.kind || null)],
     [1, true, null, 'đã đồng bộ', true, 0, null]);
@@ -495,20 +496,20 @@ async function chay(so) {
   const unDone = UN.runOpen({ phase: 'checking_session' }); unDone.phase = 'done'; UN.stateWrite(unDone);
   UN.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   un.logs.length = 0;
-  const unOpen = UN.runConflictOpenCommand();
-  const unMissing = UN.continue(await gridResponse(unOpen.request.id, []));
+  const unOpen = UN.runSlice(() => UN.runConflictOpenCommand());
+  const unMissing = UN.runSlice(((r) => () => UN.continue(r))(await gridResponse(unOpen.request.id, [])));
   const unLog = un.logs.find((event) => event.action === 'pull_record_issue' && /rời hàng đợi xung đột/.test(String(event.reason)));
   check(so, 'FBM-033: FBM không trả bản ghi đầu hàng đợi thì dòng đó chuyển "không thấy bên FBM", rời hàng đợi, Sidebar nhận lý do và Log có dòng ghi mã bản ghi',
     [unMissing.code, un.local.customer[0].syncStatus, unMissing.remaining, /CUS-000001.*bị xóa hoặc chuyển quyền/.test(unMissing.message), !!unLog && unLog.recordId, (UN.stateRead().cursor.kind || null)],
     ['CONFLICT_RECORD_UNREADABLE', 'không thấy bên FBM', 3, true, 'CUS-000001', null]);
-  const unNext = UN.runConflictOpenCommand();
+  const unNext = UN.runSlice(() => UN.runConflictOpenCommand());
   check(so, 'FBM-033: mở lại chế độ xung đột thì tới lượt bản ghi kế tiếp, không kẹt ở bản ghi không đọc được', [unNext.ok, unNext.request && unNext.request.meta.conflictId, unNext.remaining], [true, 'CUS-000002', 3]);
-  const unOpened2 = UN.continue(await gridResponse(unNext.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')]));
+  const unOpened2 = UN.runSlice(((r) => () => UN.continue(r))(await gridResponse(unNext.request.id, [fbmRow('F-2', 'ALT00002', 'Tên FBM 2')])));
   const unSettled = chotXungDot(UN, 'customer', 'CUS-000002', 'fbm', null, Object.fromEntries(unOpened2.conflict.fields.map((item) => [item.field, item.right])), Object.fromEntries(unOpened2.conflict.fields.map((item) => [item.field, item.left])), unOpened2.conflict.snapshot);
   check(so, 'FBM-033: chốt bản ghi kế tiếp theo bản đã mở thì rời hàng đợi', [unSettled.ok, un.local.customer[1].companyName, unSettled.remaining], [true, 'Tên FBM 2', 2]);
   un.local.customer[2].fbmId = '';
-  const unNoId = UN.runConflictOpenCommand();
-  check(so, 'FBM-033: bản ghi xung đột thiếu ID FBM cũng rời hàng đợi ngay, không phát request', [unNoId.code, unNoId.request, un.local.customer[2].syncStatus, UN.runConflictOpenCommand().request.meta.conflictId], ['CONFLICT_RECORD_UNREADABLE', undefined, 'không thấy bên FBM', 'CUS-000004']);
+  const unNoId = UN.runSlice(() => UN.runConflictOpenCommand());
+  check(so, 'FBM-033: bản ghi xung đột thiếu ID FBM cũng rời hàng đợi ngay, không phát request', [unNoId.code, unNoId.request, un.local.customer[2].syncStatus, UN.runSlice(() => UN.runConflictOpenCommand()).request.meta.conflictId], ['CONFLICT_RECORD_UNREADABLE', undefined, 'không thấy bên FBM', 'CUS-000004']);
 
   const cfBig = makeSync(), CB = cfBig.hop.FbmSync;
   const cfBigState = CB.runOpen({ phase: 'pull_customer' }); cfBigState.mode = 'read'; CB.readCategoryGate = () => cfGate; CB.stateWrite(cfBigState);
@@ -578,9 +579,9 @@ async function chay(so) {
   const acPull = keoLo(AC, 'activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate, { sttRec: 'FBM-C1' })], 'read');
   const acDone = AC.stateRead(); acDone.phase = 'done'; AC.stateWrite(acDone);
   AC.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const acOpen = AC.runConflictOpenCommand();
+  const acOpen = AC.runSlice(() => AC.runConflictOpenCommand());
   const acLatest = fbmActivity('Nội dung FBM', '/Date(1757473200000)/');
-  const acOpened = AC.continue(await activityGrid(acOpen.request && acOpen.request.id, [acLatest]));
+  const acOpened = AC.runSlice(((r) => () => AC.continue(r))(await activityGrid(acOpen.request && acOpen.request.id, [acLatest])));
   const acFields = ((acOpened.conflict && acOpened.conflict.fields) || []).map((item) => item.field);
   // DTO cho màn chọn giá trị (G9.1) đọc nhãn và kiểu từ DATA_SCHEMA thật; hộp test mặc định để DATA_SCHEMA rỗng nên nạp bảng khai thật rồi trả lại.
   const realSchema = napServer(taoHopCat({}), 'server/data/DataSchema.js').DATA_SCHEMA;

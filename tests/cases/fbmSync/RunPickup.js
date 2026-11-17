@@ -118,7 +118,7 @@ async function chay(so) {
   check(so, 'hộp đen có ô lỗi gọi relay thì GAS ghi Log mang mã và HTTP, trả trailAck đúng mốc, không chép khóa lạ', [acked.trailAck, !!failureLog, failureLog && failureLog.detail.code, failureLog && failureLog.detail.httpStatus, JSON.stringify(failureLog || {}).indexOf('bi-mat') < 0], [failureAt, true, 'RELAY_ENDPOINT_NOT_FOUND', 404, true]);
   check(so, 'relay trả statusView đầy đủ cho Extension chuyển sang Sidebar', [!!acked.status, typeof acked.status.label], [true, 'string']);
 
-  check(so, 'phong bì mang URL ngoài miền FBM bị GAS từ chối trước khi phát', loi(() => FbmSync.sliceIssue({ url: 'https://evil.test/Main/x', body: {}, meta: { kind: 'session_probe' } })) !== null, true);
+  check(so, 'phong bì mang URL ngoài miền FBM bị GAS từ chối trước khi phát', loi(() => FbmSync.sliceIssue(FbmSync.stateRead(), { url: 'https://evil.test/Main/x', body: {}, meta: { kind: 'session_probe' } })) !== null, true);
 
   // Request mở lượt phải dựng lại được từ cursor: bước đăng nhập giữ bước và cờ hủy phiên cũ, xung đột giữ fbmId.
   const banNhap = { credentialRef: 'cred-1', ciphertext: { iv: '123456789012', ciphertext: 'ciphertext-long-enough' } };

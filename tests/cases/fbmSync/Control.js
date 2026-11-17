@@ -26,9 +26,9 @@ async function chay(so) {
   check(so, 'relay gửi nhầm Sheet thì từ chối', loi(() => FbmSync.relayHandle({ spreadsheetId: 'sheet-khac', contract, command: 'heartbeat', payload: {} })), 'RELAY_SPREADSHEET_MISMATCH');
   check(so, 'phong bì GAS gửi Extension mang mã giao thức', FbmSync.protocol.request('r1', 'https://fbm.test/x', {}, {}).contract, contract);
 
-  // Lượt khác đang chạy: Đăng nhập thử bị từ chối với SYNC_BUSY và không đổi ô lượt.
+  // Lượt khác đang chạy (đang chờ một request): Đăng nhập thử bị từ chối với SYNC_BUSY và không đổi ô lượt.
   const running = FbmSync.runOpen({ phase: 'pull_customer', total: 1 });
-  running.phase = 'pull_customer'; running.cursor = { kind: 'customer_grid' };
+  running.phase = 'pull_customer'; running.cursor = { kind: 'customer_grid' }; running.activeRequestId = 'req-dang-cho'; running.deadlineAt = Date.now() + 60000;
   FbmSync.stateWrite(running);
   FbmSync.credentialRead = () => ({ configured: true, credentialRef: 'cred-test-1234', ciphertext: { ciphertext: 'ban-ma-gia' }, public: {} });
   const busyState = JSON.stringify(FbmSync.stateRead());

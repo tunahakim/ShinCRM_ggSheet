@@ -60,7 +60,7 @@ function chay(so) {
     ['Tay · Quét nhanh', 'Tay · Quét kỹ', 'Tay · Quét toàn bộ', 'Nền · Quét nhanh', 'Nền · Lấy toàn bộ giao dịch', 'Tay · Kiểm tra liên kết']);
   // Gặp khi nghiệm thu B8: lượt Quét kỹ bấm tay ghi "Tay · Quét nhanh" vì gói quét được gán sau khi nhãn đã chốt.
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  F.start({ mode: 'read', origin: 'manual', manual: true, scan: 'full', pack: 'deep' });
+  F.runSlice(() => F.start({ mode: 'read', origin: 'manual', manual: true, scan: 'full', pack: 'deep' }, F.stateRead()));
   check(so, 'Mở lượt tay Quét kỹ qua lệnh start: gói quét vào ô lượt cùng lúc mở lượt nên nhãn chốt là "Tay · Quét kỹ"', [F.stateRead().scanPack, F.stateRead().runLabel], ['deep', 'Tay · Quét kỹ']);
   check(so, 'Mọi dòng RUN_PLANS có tên; tên tiến trình nền lấy từ bảng dãy chặng', [
     Object.keys(F.RUN_PLANS).filter((key) => !F.RUN_PLANS[key].label), F.SCHEDULE_LABELS, ['heartbeat', 'customerFull', 'activityFull', 'detail'].map(F.scheduleLabel)
@@ -88,7 +88,7 @@ function chay(so) {
   check(so, 'trạng thái gửi Sidebar nêu lượt đang chạy là của ai và của tiến trình nào',
     [F.statusView().origin, F.statusView().process],
     ['background', 'customerFull']);
-  const manualRequest = F.start({ mode: 'read', manual: true });
+  const manualRequest = F.runSlice(() => F.start({ mode: 'read', manual: true }, F.stateRead()));
   check(so, 'chạy tay giữa lượt nền không tự dừng nền mà trả mã để Sidebar hỏi người dùng',
     [manualRequest.ok, manualRequest.code, !!manualRequest.status, F.stateRead().runId],
     [false, 'SYNC_BACKGROUND_RUNNING', true, 'background-run']);
@@ -97,7 +97,7 @@ function chay(so) {
     [stopRequest.ok, stopRequest.code, stopRequest.status.running, afterStop.phase, afterStop.runId, afterStop.activeRequestId, afterStop.closedRequestId, afterStop.process],
     [true, 'SYNC_BACKGROUND_STOPPED', false, 'paused', 'background-run', '', 'background-request', 'customerFull']);
   const beforeLate = JSON.stringify(F.stateRead());
-  const late = F.continue({ d: { Rows: [] }, transport: { contract, trace: [{ requestId: 'background-request' }] } });
+  const late = F.runSlice(() => F.continue({ d: { Rows: [] }, transport: { contract, trace: [{ requestId: 'background-request' }] } }));
   check(so, 'response đến muộn của lượt nền đã dừng bị loại STALE_RESPONSE, không cấp request và không đổi state',
     [late.ok, late.code, late.request, JSON.stringify(F.stateRead()) === beforeLate],
     [false, 'STALE_RESPONSE', null, true]);

@@ -1,4 +1,5 @@
 /** Kiểm liên kết Customer và probe danh tính: chỉ đọc grid cần thiết, nhận diện đủ mã số và tên, thiếu dòng User thì báo lỗi rõ. */
+const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { section, check } = require('../../lib/assert');
 const { TRANG_FBM_THU } = require('../../lib/load-gas');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -28,26 +29,26 @@ function chay(so) {
     });
     return identityFlowState;
   };
-  const identityStarted = builders.FbmSync.authorizeEnd(identityFlowState, { entity: 'customer' });
+  const identityStarted = trongLat(builders.FbmSync, () => builders.FbmSync.authorizeEnd(identityFlowState, { entity: 'customer' }), identityFlowState);
   check(so, 'Identity check sau authorize chi mo Customer grid, khong mo Activity',
     [identityStarted.request.meta.kind, identityFlowState.scan, identityFlowState.phase, identityFlowState.metadata.identityCheck.total],
     ['grid', 'identity_check', 'pull_customer', 2]);
   identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: false, activityAuthorized: false }, metadata: {} };
   identityFlowState.runId = ''; identityFlowState.phase = 'idle'; identityFlowState.cursor = {};
-  const identityProbeStarted = builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' });
+  const identityProbeStarted = builders.FbmSync.runSlice(() => builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' }, builders.FbmSync.stateRead()));
   const identityUserRequest = identityProbeStarted.request;
   check(so, 'Identity probe chi doc User grid, khong lay Authorized thua',
     [identityProbeStarted.ok, identityUserRequest.meta.kind, identityFlowState.phase, identityFlowState.cursor.kind, identityUserRequest.body.controller],
     [true, 'identity_user_grid', 'checking_session', 'identity_user_grid', 'User']);
-  const identityProbeFinished = builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: identityUserRequest.id }] } });
+  const identityProbeFinished = builders.FbmSync.runSlice(() => builders.FbmSync.continue({ d: { TotalRowCount: 1, Rows: [[2037, 'ANHLT', 'Le Tuan Anh']], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] }, Authorized: true }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: identityUserRequest.id }] } }));
   check(so, 'Identity probe nhan dien du ma so va ten day du, cho xac nhan luu',
     [identityProbeFinished.ok, identityFlowState.phase, identityFlowState.cursor, identityFlowState.metadata.identityProbe.userId, identityFlowState.metadata.identityProbe.accountName],
     [true, 'done', {}, '2037', 'Le Tuan Anh']);
   // FBM trả grid User thiếu danh tính: lượt đọc danh tính đóng lỗi có mã (kết quả nghiệp vụ), không ném lỗi GAS và không phát request kế.
   identityFlowState = { mode: 'check', scan: 'identity_probe', session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', customerAuthorized: false, activityAuthorized: false }, metadata: {} };
   identityFlowState.runId = ''; identityFlowState.phase = 'idle'; identityFlowState.cursor = {};
-  const thieuStarted = builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' });
-  const thieu = builders.FbmSync.continue({ d: { TotalRowCount: 0, Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: thieuStarted.request.id }] } });
+  const thieuStarted = builders.FbmSync.runSlice(() => builders.FbmSync.start({ mode: 'check', scan: 'identity_probe' }, builders.FbmSync.stateRead()));
+  const thieu = builders.FbmSync.runSlice(() => builders.FbmSync.continue({ d: { TotalRowCount: 0, Rows: [], ViewPage: { Fields: [{ AliasName: 'id' }, { AliasName: 'name' }, { AliasName: 'ten' }] } }, transport: { contract: MA_HOP_DONG, captures: TRANG_FBM_THU, trace: [{ requestId: thieuStarted.request.id }] } }));
   check(so, 'lượt đọc danh tính gặp grid User thiếu dòng thì đóng lỗi IDENTITY_PROBE_INCOMPLETE, không phát request',
     [thieuStarted.request.meta.kind, thieu.ok, thieu.code, thieu.request, identityFlowState.phase, identityFlowState.lastFailureCode],
     ['identity_user_grid', false, 'IDENTITY_PROBE_INCOMPLETE', null, 'error', 'IDENTITY_PROBE_INCOMPLETE']);

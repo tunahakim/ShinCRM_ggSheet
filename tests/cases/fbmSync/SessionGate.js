@@ -1,6 +1,6 @@
 /** Cổng phiên ở bước phát request và chặng phiên: thứ tự cổng, lệnh ghi nghi phiên, nối lại lượt dở, dựng lại request sau khi phiên vừa xác minh, đứt kênh tới tab khi đang đọc (đăng xuất giữa lượt). */
 const { section, check } = require('../../lib/assert');
-const { workflowGas, noiLat } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, noiLat, trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { TRANG_FBM_THU } = require('../../lib/load-gas');
 
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
@@ -27,13 +27,13 @@ async function chay(so) {
   // Hết ngân sách lời gọi xét trước cổng phiên: lượt tạm dừng ở đúng cursor nghiệp vụ, không để lại cursor phiên mà lần chạy sau phải gỡ.
   const ngan = hopLuot(LUOI_KHACH);
   ngan._callStartedAt = Date.now() - ngan.BUDGET.gasSoftMs - 1000;
-  const nganKetQua = ngan.cursorIssue();
+  const nganKetQua = ngan.cursorIssue(ngan.stateRead());
   ngan._callStartedAt = 0;
   check(so, 'hết ngân sách khi cổng phiên sắp mở: tạm dừng, giữ cursor nghiệp vụ, không phát request', [nganKetQua && nganKetQua.request || null, ngan.stateRead().phase, ngan.stateRead().cursor.kind, ngan.stateRead().activeRequestId], [null, 'paused', 'customer_grid', '']);
 
   // Phiên chưa xác minh: request gửi đi là request hỏi phiên; phiên sống đúng tài khoản thì dựng lại request nghiệp vụ bằng danh tính vừa xác minh (lọc quyền theo mã người dùng).
   const mo = hopLuot(LUOI_KHACH);
-  const hoi = mo.cursorIssue();
+  const hoi = mo.cursorIssue(mo.stateRead());
   const tiep = traLoi(mo, PHIEN_SONG);
   const khoaLoc = JSON.stringify(tiep.request && tiep.request.body && tiep.request.body.externalKey || []);
   check(so, 'cổng mở trước request nghiệp vụ; phiên sống thì nối lại đúng cursor cũ và request mang mã người dùng vừa xác minh', [hoi.meta.kind, tiep.ok, tiep.request && tiep.request.meta.kind, mo.stateRead().cursor.kind, mo.stateRead().session.identityVerified, khoaLoc.indexOf("GetCustomerValidate('2037')") >= 0], ['session_probe', true, 'grid', 'customer_grid', true, true]);
@@ -51,19 +51,19 @@ async function chay(so) {
   const chetKetQua = traLoi(chet, '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}');
   check(so, 'phiên chết khi đang chờ lệnh ghi: tạm dừng SESSION_EXPIRED_AT_WRITE, không gửi đăng nhập', [chetKetQua.code, chetKetQua.request, chet.stateRead().phase], ['SESSION_EXPIRED_AT_WRITE', null, 'paused']);
 
-  // Bấm chạy khi lượt vừa dừng giữa chừng: cursor khai `resumable: false` thì báo bận; đang ở chặng phiên thì gửi lại chính request hỏi phiên, không mở chặng phiên lồng.
+  // Bấm chạy khi lượt vừa dừng giữa chừng: cursor khai `resumable: false` thì báo bận; đang ở chặng phiên thì gửi lại chính request hỏi phiên, không mở chặng phiên lồng. Lượt đăng nhập thử ở mức bước mở lượt: qua `runSlice` thì lượt không request nào chờ bị đóng RUN_LEFT_OPEN như mọi lượt bỏ ngỏ.
   const dangNhap = hopLuot(ghi.loginCursorOpen({ purpose: 'auto', afterLogin: { cursor: LUOI_KHACH } }), { phase: 'checking_session' });
   const phien = hopLuot({ kind: 'session', cause: 'issue', resume: { cursor: LUOI_KHACH, phase: 'pull_customer', entity: 'customer' }, replay: false, probeRetried: false, pageReloaded: false }, { phase: 'checking_session' });
-  const phienLai = phien.startRun({ origin: 'manual', manual: true, mode: 'read' });
+  const phienLai = phien.runSlice(() => phien.startRun({ origin: 'manual', manual: true, mode: 'read' }, phien.stateRead()));
   check(so, 'nối lượt dở: lượt đăng nhập không nối mù; chặng phiên gửi lại request hỏi phiên với nguyên chỗ quay về', [
-    dangNhap.startRun({ origin: 'manual', manual: true, mode: 'read' }).code, phienLai.ok, phienLai.request && phienLai.request.meta.kind, phien.stateRead().cursor.kind, phien.stateRead().cursor.resume.cursor.kind
+    trongLat(dangNhap, () => dangNhap.startRun({ origin: 'manual', manual: true, mode: 'read' }, dangNhap.stateRead())).code, phienLai.ok, phienLai.request && phienLai.request.meta.kind, phien.stateRead().cursor.kind, phien.stateRead().cursor.resume.cursor.kind
   ], ['SYNC_BUSY', true, 'session_probe', 'session', 'customer_grid']);
   // Đăng xuất FBM giữa lượt làm tab đổi trang nên request đọc đang chạy chết giữa đường: gửi lại phải qua chặng phiên (hỏi phiên trước), không đi thẳng tới FBM.
   const dutKenh = (options) => {
     const F = hopLuot(LUOI_KHACH, null, options);
-    F.cursorIssue();
+    F.cursorIssue(F.stateRead());
     const luoi = traLoi(F, PHIEN_SONG);
-    return { F, ketQua: F.transportFailureRun({ requestId: luoi.request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Kênh tới tab FBM đã đóng.' }) };
+    return { F, ketQua: F.runSlice(() => F.transportFailureRun({ requestId: luoi.request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Kênh tới tab FBM đã đóng.' })) };
   };
   const nhatKy = [];
   const chet2 = dutKenh({ logEvent: (event) => nhatKy.push(event) });
@@ -76,7 +76,7 @@ async function chay(so) {
   const songKetQua = traLoi(song.F, PHIEN_SONG);
   check(so, 'đứt kênh khi đọc, phiên vẫn sống: gửi lại đúng request đọc của cursor cũ', [songKetQua.ok, songKetQua.request && songKetQua.request.meta.kind, song.F.stateRead().cursor.kind, song.F.stateRead().cursor.pageIndex], [true, 'grid', 'customer_grid', -1]);
   const haiLan = dutKenh();
-  const haiLanKetQua = haiLan.F.transportFailureRun({ requestId: haiLan.ketQua.request.id, code: 'FBM_FETCH_TIMEOUT', message: 'FBM không phản hồi sau 10 giây.' });
+  const haiLanKetQua = haiLan.F.runSlice(() => haiLan.F.transportFailureRun({ requestId: haiLan.ketQua.request.id, code: 'FBM_FETCH_TIMEOUT', message: 'FBM không phản hồi sau 10 giây.' }));
   check(so, 'đứt kênh rồi chính request hỏi phiên cũng hỏng: dừng lượt lỗi, không gửi gì thêm', [haiLanKetQua.ok, haiLanKetQua.code, haiLanKetQua.request, haiLan.F.stateRead().phase], [false, 'FBM_FETCH_TIMEOUT', null, 'error']);
 
   // Tự đăng nhập là sự kiện của tài khoản FBM: dòng hoàn thành phải vào Log thường (kể cả lượt nền), không chỉ dòng vết.

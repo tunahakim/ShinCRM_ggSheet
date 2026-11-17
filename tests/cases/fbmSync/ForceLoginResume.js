@@ -1,6 +1,6 @@
 /** Hủy phiên cũ rồi chạy tiếp: GAS nhớ lượt FBM vừa chặn vì còn phiên cũ và tự quyết sau khi đăng nhập ép thành công (lượt đồng bộ tay không đẩy thì mở lại đúng loại đó, nối mã lượt qua `follows`; lượt đẩy, lượt nền, Đăng nhập thử thì chỉ đăng nhập). Sidebar không tự mở lượt. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, trongLat } = require('../../lib/fbm/hop-dong-bo');
 
 function hopDangNhap() {
   const { hop } = workflowGas({ logEvent() {}, LOG_WARN: 'warn' });
@@ -12,13 +12,13 @@ function hopDangNhap() {
 function biChan(F, luot, purpose) {
   F.statePatch(Object.assign({ runId: 'chan-' + Math.random().toString(36).slice(2), phase: 'checking_session', activeRequestId: '', deadlineAt: 0, session: { expired: true },
     cursor: F.loginCursorOpen({ purpose: purpose || 'auto', step: 'login', facts: { salt: 'ab12cd34', database: 'FHN_CRM_App', unit: 'CTY' }, afterLogin: { cursor: { kind: 'customer_grid' } } }) }, luot));
-  return F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: '{"d":"Duplicate"}' });
+  return trongLat(F, () => F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: '{"d":"Duplicate"}' }));
 }
 /** Bấm Hủy phiên cũ rồi FBM nhận đăng nhập: trả `[mã lượt đăng nhập ép, kết quả]`. */
 function huyPhienCu(F) {
-  const mo = F.loginOpen('force', {}, F.stateRead());
+  const mo = F.runSlice(() => F.loginOpen('force', {}, F.stateRead()));
   const runId = F.stateRead().runId;
-  return [mo.ok, runId, F.loginEnd(F.stateRead(), { ok: true })];
+  return [mo.ok, runId, trongLat(F, () => F.loginEnd(F.stateRead(), { ok: true }))];
 }
 
 function chay(so) {

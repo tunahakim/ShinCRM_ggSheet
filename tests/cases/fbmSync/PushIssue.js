@@ -1,6 +1,6 @@
 /** Chiều đẩy phát request qua đúng bước phát của lát (`sliceIssue` → `requestIssue`): phong bì mở chặng đẩy mang mã request, hạn chờ và ô lượt ghi request đang chờ; phiên chưa xác minh thì cổng phiên đổi thành hỏi thử. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, trongLat } = require('../../lib/fbm/hop-dong-bo');
 
 function moChangDay(xacMinh) {
   const luong = workflowGas({}), F = luong.hop.FbmSync, st = F.runOpen({ phase: 'pull_customer' });
@@ -9,7 +9,7 @@ function moChangDay(xacMinh) {
   F.stateWrite(st);
   // Như bản thật: bước có request đặt dấu chờ response (`push_wait`) trước khi trả request.
   F.pushNext = (copy) => { copy.cursor = F.pushCursor(copy.cursor, { kind: 'push_wait', operation: 'owner_lookup' }); return { next: { url: F.FBM_BASE_URL + '/AppService/FastBusiness.asmx/GetDirViewPage', body: {}, meta: { kind: 'owner_lookup' } } }; };
-  return { F, ket: F.pullFinishOrPush(st, {}), st: F.stateRead() };
+  return { F, ket: trongLat(F, () => F.pullFinishOrPush(st, {}), st), st: F.stateRead() };
 }
 
 function chay(so) {

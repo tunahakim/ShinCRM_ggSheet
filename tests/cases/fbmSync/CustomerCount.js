@@ -1,4 +1,5 @@
 /** Bước đếm khách cuối lượt: FBM không đổi thì lượt kết thúc sau một request đếm; số khách đổi hoặc chưa có mốc thì chạy đúng một lượt Quét nhanh rồi dừng. */
+const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const { section, check } = require('../../lib/assert');
 const { scanHarness } = require('./ScanJob');
 const { vaSoNen } = require('../../lib/fbm/cai-dat-thu');
@@ -50,7 +51,7 @@ async function chay(so) {
   // Chặng nhận bản sao ô lượt: sửa thẳng bản sao không lọt vào ô lượt thật, chỉ patch được gộp.
   const sao = scanHarness({ customers: 12 });
   sao.F.statePatch({ runId: 'r-sao', phase: 'pull_customer', cursor: { kind: 'customer_count' }, message: 'cũ' });
-  const traVe = sao.F.stageRun({ stage: (ctx) => { ctx.state.phase = 'done'; ctx.state.cursor.kind = 'xong'; return { patch: { message: 'mới' }, end: {} }; }, end: (state) => ({ phase: state.phase, kind: state.cursor.kind, message: state.message }) }, sao.F.stateRead(), JSON.stringify({ d: {} }));
+  const traVe = trongLat(sao.F, () => sao.F.stageRun({ stage: (ctx) => { ctx.state.phase = 'done'; ctx.state.cursor.kind = 'xong'; return { patch: { message: 'mới' }, end: {} }; }, end: (state) => ({ phase: state.phase, kind: state.cursor.kind, message: state.message }) }, sao.F.stateRead(), JSON.stringify({ d: {} })));
   check(so, 'chặng sửa thẳng ô lượt nhận được thì ô lượt thật không đổi; chỉ patch được gộp', [traVe.phase, traVe.kind, traVe.message], ['pull_customer', 'customer_count', 'mới']);
 
   // Phép kiểm response chung: lỗi HTTP ném có mã, phiên đáng ngờ nhường cổng phiên, response tốt qua.

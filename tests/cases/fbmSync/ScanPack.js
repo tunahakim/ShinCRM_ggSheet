@@ -110,7 +110,7 @@ async function chay(so) {
   const truocGoNham = goNham.F.stateRead().runId;
   const maLoi = (fn) => { try { fn(); return ''; } catch (error) { return String(error && error.code || ''); } };
   check(so, 'gói lạ, mức quét lạ: lệnh start ném SYNC_UNKNOWN_SCAN trước khi mở lượt, ô lượt không đổi', [
-    maLoi(() => goNham.F.start({ mode: 'read', pack: 'gõ nhầm', origin: 'manual', manual: true })), maLoi(() => goNham.F.start({ mode: 'read', scan: 'detial', origin: 'manual', manual: true })), goNham.F.stateRead().runId === truocGoNham
+    maLoi(() => goNham.F.runSlice(() => goNham.F.start({ mode: 'read', pack: 'gõ nhầm', origin: 'manual', manual: true }, goNham.F.stateRead()))), maLoi(() => goNham.F.runSlice(() => goNham.F.start({ mode: 'read', scan: 'detial', origin: 'manual', manual: true }, goNham.F.stateRead()))), goNham.F.stateRead().runId === truocGoNham
   ], ['SYNC_UNKNOWN_SCAN', 'SYNC_UNKNOWN_SCAN', true]);
   check(so, 'RUN_PLANS: các lớp chặng Giao dịch của từng mức quét, kiểu lượt riêng không có lớp Giao dịch; runPlanNext đi hết dãy rồi trả -1', [
     goNham.F.runPlanOf('sync', 'full', 'quick').activity, goNham.F.runPlanOf('sync', 'full', 'deep').activity, goNham.F.runPlanOf('sync', 'full', 'all').activity, goNham.F.runPlanOf('sync', 'activity_bulk').activity, goNham.F.runPlanOf('sync', 'detail').activity,

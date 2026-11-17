@@ -40,6 +40,13 @@ async function chay(so) {
   const lanDau = tamLan[0];
   check(so, 'Trong một chuỗi các tiến trình chạy theo ưu tiên Quét nhanh, Lấy toàn bộ giao dịch, Vòng xoay, Giữ phiên, mỗi tiến trình đúng một lần (lần hỏi đầu: chưa tiến trình nào từng chạy xong nên cả bốn đến hạn)', lanDau, ['customerFull', 'activityFull', 'detail', 'heartbeat']);
 
+  // Lượt nền mở trong lát như lượt tay: bước chọn và mở lượt chạy khi kho lát đã mở, nên mọi sửa ô lượt lúc mở được ghi một lần cuối lát.
+  const nenLat = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
+  const moNen = nenLat.F.backgroundNext, latKhiMo = [];
+  nenLat.F.backgroundNext = function () { latKhiMo.push(!!nenLat.F.sliceStore); return moNen.apply(this, arguments); };
+  const latNen = await nenLat.hoi(60);
+  check(so, 'Lượt nền mở bên trong lát: mỗi lần chọn tiến trình nền đều có kho lát, Quét nhanh chạy xong', [latKhiMo.length > 0 && latKhiMo.every(Boolean), latNen.xong.indexOf('customerFull') >= 0], [true, true]);
+
   // Mỗi lần hỏi nền là một lượt mới (09/02 Phần 3): không còn giới hạn số request mỗi lần hỏi, lượt dài chạy liền tới cuối.
   const dai = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } }, { customers: 60, budget: { chunkTargetBytes: 600 } });
   const daiLan = await dai.hoi(60);

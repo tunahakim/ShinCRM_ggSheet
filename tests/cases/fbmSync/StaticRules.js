@@ -153,9 +153,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 11,
-    '1_ShinCRM_GAS/fbm_sync/transport/PushStage.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 10,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {
@@ -177,8 +174,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 6,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 11,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2,
+    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 10,
     '2_ShinCRM_Extension/background/service_worker.js': 11,
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
   },
@@ -211,9 +207,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2
+    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1
   },
   // Còn lại: Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đóng, và đối tượng status (không phải ô lượt).
   phaseClose: {

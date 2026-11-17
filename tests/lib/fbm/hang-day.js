@@ -1,6 +1,7 @@
 /**
  * Hộp thử chiều đẩy dùng chung: hộp GAS nạp đủ tệp đồng bộ thật với Sheet giả trong RAM (cửa ghi bản ghi kiểm xung đột như cửa thật), và hàng đợi đẩy dựng sẵn ở đầu chặng đẩy. Ma trận production và ca cổng chặng đẩy cùng dựng từ đây.
  */
+const { trongLat } = require('./hop-dong-bo');
 const { taoHopCat, napServer, TEP_KHUNG_LUOT } = require('../load-gas');
 const { taoKhoThuocTinh } = require('../gas/kho-thuoc-tinh');
 
@@ -80,7 +81,7 @@ function pushQueue(customers, activities) {
   run.local.customer.push(...customers); run.local.activity.push(...(activities || []));
   F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
   F.categoryGateCheck = () => [];
-  F.sliceIssue = (request) => request;
+  F.sliceIssue = (state, request) => request;
   const st = F.runOpen({ phase: 'push' });
   st.mode = 'write'; st.phase = 'push'; 
   st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };
@@ -97,13 +98,13 @@ const pushOk = (q) => {
   const st = q.F.stateRead(), id = st.cursor.candidate.id;
   q.F.pushRowChange('customer', id, { release: true, build: (local) => ({ patch: { id, syncStatus: 'đã đồng bộ', fbmHash: q.F.hash(local, 'customer', q.F.stateCategoryGate(st)) } }) });
   const after = q.F.stateRead(); after.cursor = q.F.pushCursorNext(after.cursor, true); after.current = ''; q.F.stateWrite(after);
-  return q.F.pushStageResume(q.F.stateRead());
+  return trongLat(q.F, () => q.F.pushStageResume(q.F.stateRead()));
 };
 
 /** Đẩy liên tục tới khi chặng hết request; `onStep(id, lần)` chạy trước khi bản ghi đó ghi xong, để ca kiểm chen sửa Sheet giữa lượt. */
 const pushDrive = (q, onStep) => {
   const tried = [];
-  let request = q.F.pushStageResume(q.F.stateRead());
+  let request = trongLat(q.F, () => q.F.pushStageResume(q.F.stateRead()));
   for (let guard = 0; guard < 20 && request; guard += 1) {
     const id = q.F.stateRead().cursor.candidate.id; tried.push(id);
     if (onStep) { onStep(id, tried.length); }

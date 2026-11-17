@@ -1,4 +1,5 @@
 /** Lấy toàn bộ giao dịch (lớp 1): việc quét chỉ giữ id đã có trên Sheet, quá lớn thì chia cửa sổ ngày trong lượt; lớp 1 không ghi Sheet, chỉ đánh dấu khách cha của giao dịch sửa hoặc vắng để cửa ghi đọc lại. */
+const { trongLat } = require('../../lib/fbm/hop-dong-bo');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -97,7 +98,7 @@ async function chay(so) {
   const nenState = nenLoi.F.runOpen({ phase: 'pull_activity' });
   Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
   nenState.metadata.customerErrors = { total: 2, recent: [] };
-  nenLoi.F.finishPullRun(nenState);
+  trongLat(nenLoi.F, () => nenLoi.F.finishPullRun(nenState), nenState);
   const nenXong = nenLoi.F.stateRead();
   check(so, 'Lượt nền lấy toàn bộ giao dịch có khách lỗi khi đọc: thông báo cuối lượt trên Sidebar nêu số khách lỗi, không chỉ ghi ở Log', [nenXong.phase, String(nenXong.message || '').indexOf('2 khách lỗi khi đọc giao dịch') >= 0], ['done', true]);
 

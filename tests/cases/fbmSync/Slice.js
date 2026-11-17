@@ -17,7 +17,7 @@ function hopCoLuot() {
   const F = hop.FbmSync;
   F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  F.start({ mode: 'read', origin: 'manual', manual: true });
+  F.runSlice(() => F.start({ mode: 'read', origin: 'manual', manual: true }, F.stateRead()));
   const kho = { soLanGhi: 0, hongLanGhi: false };
   const ghiThat = F.stateStore;
   F.stateStore = function (state) {
@@ -58,6 +58,19 @@ async function chay(so) {
   const yen = hopCoLuot();
   yen.lat(() => { yen.F.stateRead(); return { ok: true, request: { id: 'request-ke' } }; });
   check(so, 'lát chỉ đọc ô lượt: không ghi kho lần nào', yen.kho.soLanGhi, 0);
+
+  // Công cụ sửa ô lượt của lát mà quên gọi `stateWrite`: thay đổi vẫn vào kho, vì cuối lát so bản đang cầm với bản chụp lúc mở.
+  const quen = hopCoLuot();
+  quen.lat(() => { quen.F.stateRead().message = 'sửa không gọi ghi'; return { ok: true, request: { id: 'request-ke' } }; });
+  check(so, 'sửa ô lượt trong lát không gọi stateWrite: thay đổi vẫn nằm trong kho, kho ghi đúng một lần', [quen.trongKho().message, quen.kho.soLanGhi], ['sửa không gọi ghi', 1]);
+
+  // Cửa lệnh đưa bản đã đọc vào lát: lát không đổi bản đó thì không ghi; đổi thì ghi một lần.
+  const mang = hopCoLuot();
+  const banCua = mang.F.stateRead();
+  mang.F.withOrchestrationLock(() => mang.F.runSlice(() => ({ ok: true, request: { id: 'request-ke' } }), banCua));
+  const ghiKhiYen = mang.kho.soLanGhi;
+  mang.F.withOrchestrationLock(() => mang.F.runSlice(() => { banCua.counts.updated = 9; return { ok: true, request: { id: 'request-ke' } }; }, banCua));
+  check(so, 'lát nhận bản từ cửa lệnh: không đổi thì không ghi; sửa bản đó thì kho có thay đổi, ghi một lần', [ghiKhiYen, mang.trongKho().counts.updated, mang.kho.soLanGhi], [0, 9, 1]);
 
   // Bản sao cũ đọc thẳng từ kho (như hàm đọc kho riêng rồi ghi lại) bị chặn trước khi đè; lượt sang lỗi với đúng mã.
   const cu = hopCoLuot();

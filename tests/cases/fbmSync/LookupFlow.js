@@ -21,7 +21,7 @@ function chay(so) {
     [lookupErrorCode !== '', lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().cursor.kind, lookupHop.FbmSync.stateRead().activeRequestId],
     [true, 'error', 'lookup', '']);
   const lookupEmptyState = lookupHop.FbmSync.stateRead(); lookupEmptyState.runId = 'lookup-empty-run'; lookupEmptyState.phase = 'checking_session'; lookupEmptyState.cursor = { kind: 'lookup', index: 0 }; lookupEmptyState.activeRequestId = 'lookup-empty-request'; lookupEmptyState.session.identityVerified = true; lookupEmptyState.session.sessionId = 'lookup-session'; lookupEmptyState.session.identitySessionId = 'lookup-session'; lookupHop.FbmSync.stateWrite(lookupEmptyState);
-  const lookupEmpty = lookupHop.FbmSync.continue({ ok: true, status: 200, items: [0, 1, 2].map((id) => ({ id: String(id), ok: true, status: 200, body: '{"d":{"Rows":[]}}' })), transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-empty-request' }] } });
+  const lookupEmpty = lookupHop.FbmSync.runSlice(() => lookupHop.FbmSync.continue({ ok: true, status: 200, items: [0, 1, 2].map((id) => ({ id: String(id), ok: true, status: 200, body: '{"d":{"Rows":[]}}' })), transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'lookup-empty-request' }] } }));
   check(so, 'lo danh muc thanh cong nhung khong co dong la ket qua hop le va di tiep',
     [lookupEmpty.ok, lookupEmpty.request && lookupEmpty.request.meta.kind, lookupHop.FbmSync.stateRead().phase, lookupHop.FbmSync.stateRead().metadata.categoryLookupFailed],
     [true, 'scan_job', 'pull_customer', undefined]);

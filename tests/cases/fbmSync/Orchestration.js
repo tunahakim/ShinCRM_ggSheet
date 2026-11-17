@@ -16,7 +16,7 @@ async function chay(so) {
   });
   napServer(orchestration, 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/report/Report.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/write/RequestBuilders.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/TransportCore.js', 'fbm_sync/transport/PushFlow.js', 'fbm_sync/transport/PushRecover.js', 'fbm_sync/transport/PushStage.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/transport/EntryPoints.js', 'fbm_sync/control/PushCommands.js', 'fbm_sync/write/SheetSave.js');
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const started = orchestration.FbmSync.start({ mode: 'read' });
+   const started = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
    check(so, 'start bat dau bang probe User truoc bootstrap Customer', started.request.meta.kind, 'session_probe');
   check(so, 'DTO pipeline tu GAS chi danh dau buoc kiem tra phien o dau luot',
     [started.status.pipeline.kind, started.status.pipeline.title, started.status.pipeline.steps.map((step) => step.state)],
@@ -73,12 +73,12 @@ async function chay(so) {
   restartFromConflict.counts.conflict = 1;
   orchestration.FbmSync.stateWrite(restartFromConflict);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const restartedConflict = orchestration.FbmSync.start({ mode: 'read' });
+   const restartedConflict = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
    check(so, 'bam Dong bo ngay khi phase conflict phai probe lai phien; so xung dot ton dong van hien',
      [restartedConflict.ok, restartedConflict.request.meta.kind, restartedConflict.status.metadata.conflictCount, restartedConflict.status.counts.conflict],
      [true, 'session_probe', 1, 0]);
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.runOpen({ phase: 'idle' }));
-  const bulkStarted = orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' });
+  const bulkStarted = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read', scan: 'activity_bulk' }, orchestration.FbmSync.stateRead()));
   const bulkSnapshotState = orchestration.FbmSync.stateRead();
   const bulkSnapshotRequest = orchestration.FbmSync.activityBulkRequest({ type: 0 }, orchestration.FbmSync.scriptSettings(orchestration.FbmSync.stateRead()));
    check(so, 'start bulk Activity probe User truoc request bulk; request lấy toàn bộ giao dịch không lọc ngày',
@@ -94,7 +94,7 @@ async function chay(so) {
    check(so, 'fixture transport dat marker phien song truoc request nghiep vu',
      [orchestration.FbmSync.sessionIdentityIsVerified(orchestration.FbmSync.stateRead()), orchestration.FbmSync.stateRead().cursor.kind],
      [true, 'customer_grid']);
-   const dateEnvelope = orchestration.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
+   const dateEnvelope = orchestration.FbmSync.sliceIssue(orchestration.FbmSync.stateRead(), { url: 'https://fbo.com.vn:8888/AppService/FastBusiness.ReportExtenderService.asmx/GetGridViewPage', body: { gridPageValue: [new Date('2026-09-09T00:00:00Z'), { nested: new Date('2026-09-10T00:00:00Z') }] }, meta: { kind: 'grid' } });
    check(so, 'request nghiep vu sau marker live khong bi thay bang probe',
      [dateEnvelope.meta.kind, orchestration.FbmSync.stateRead().cursor.kind, orchestration.FbmSync.stateRead().activeRequestId === dateEnvelope.id],
      ['grid', 'customer_grid', true]);
@@ -108,7 +108,7 @@ async function chay(so) {
     orchestration.FbmSync.responseRequestId({ transport: { contract: MA_HOP_DONG, trace: [{ requestId: 'gas-request-2' }, { stage: 'bridge_response_sent', requestId: 'sidebar-waiter-2' }] } }),
     'gas-request-2');
   let blockedEndpoint = '';
-  try { orchestration.FbmSync.sliceIssue({ url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
+  try { orchestration.FbmSync.sliceIssue(orchestration.FbmSync.stateRead(), { url: 'https://fbo.com.vn:8888/Main/undefined', body: {}, meta: { kind: 'legacy' } }); } catch (err) { blockedEndpoint = String(err && err.message || err); }
   check(so, 'endpoint legacy undefined bi chan truoc khi cap envelope',
     blockedEndpoint.indexOf('FBM_ENDPOINT_MISSING') >= 0,
     true);
@@ -136,24 +136,24 @@ async function chay(so) {
     check(so, 'loi request nghiep vu fail-closed khong tu retry',
       [retryCode, orchestration.FbmSync.stateRead().phase, orchestration.FbmSync.stateRead().lastFailureCode, orchestration.FbmSync.stateRead().activeRequestId],
       ['TRANSPORT_ERROR', 'error', 'TRANSPORT_ERROR', '']);
-  const missingRequestId = orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{}}' });
+  const missingRequestId = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.continue({ ok: true, status: 200, body: '{"d":{}}' }));
    check(so, 'response thieu requestId bi chan khong an nham reservation',
      [missingRequestId.ok, missingRequestId.code, orchestration.FbmSync.stateRead().activeRequestId],
      [false, 'STALE_RESPONSE', '']);
    orchestration.FbmSync.statePatch({ runId: 'active-run', phase: 'pull_customer', cursor: { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 }, activeRequestId: 'active-request', deadlineAt: Date.now() + 60000, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const blockedDuplicate = orchestration.FbmSync.start({ mode: 'read' });
+   const blockedDuplicate = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'start khong cap request chong khi reservation cu con hieu luc',
     [blockedDuplicate.ok, blockedDuplicate.code, blockedDuplicate.request],
     [false, 'REQUEST_IN_FLIGHT', null]);
    orchestration.FbmSync.statePatch({ activeRequestId: '', deadlineAt: 0 });
-  const resumed = orchestration.FbmSync.start({ mode: 'read' });
+  const resumed = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'start chi tiep tuc sau khi reservation cu da thu hoi bang probe moi',
     [resumed.ok, resumed.resumed, resumed.request.meta.kind],
     [true, true, 'session_probe']);
   const staleState = JSON.parse(props.data[orchestration.FbmSync.STATE_KEY]);
   staleState.runId = 'old-run'; staleState.updatedAt = Date.now() - orchestration.FbmSync.STALE_RUN_MS - 1; staleState.lastProgressAt = staleState.updatedAt; staleState.activeRequestId = '';
   props.data[orchestration.FbmSync.STATE_KEY] = JSON.stringify(staleState);
-  const restarted = orchestration.FbmSync.start({ mode: 'read' });
+  const restarted = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
    check(so, 'run stale duoc thay bang phien moi va probe lai',
      [restarted.ok, restarted.resumed, restarted.request.meta.kind, orchestration.FbmSync.stateRead().runId === 'old-run'],
      [true, undefined, 'session_probe', false]);
@@ -193,7 +193,7 @@ async function chay(so) {
   resumeState.runId = 'resume-run'; resumeState.phase = 'pull_customer'; resumeState.cursor = { kind: 'customer_grid', type: 1, pageIndex: 2, pageValue: ['d', 't', 'x'], count: 2000 }; resumeState.metadata = Object.assign({}, resumeState.metadata, { customerFields: orchestration.FbmSync.GRID_FIELDS.customer });
   orchestration.FbmSync.stateWrite(resumeState);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const resumedGrid = orchestration.FbmSync.start({ mode: 'read' });
+   const resumedGrid = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'Sidebar mo lai probe lai phien truoc khi tiep tuc cursor Customer',
     [resumedGrid.ok, resumedGrid.resumed, resumedGrid.request.meta.kind],
     [true, true, 'session_probe']);
@@ -220,7 +220,7 @@ async function chay(so) {
   pausedState.runId = 'paused-run'; pausedState.phase = 'paused'; pausedState.cursor = {};
   orchestration.FbmSync.stateWrite(pausedState);
    orchestration.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-   const restartedPaused = orchestration.FbmSync.start({ mode: 'read' });
+   const restartedPaused = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead()));
   check(so, 'dong bo lai tu trang thai tam dung probe lai phien',
     [restartedPaused.ok, restartedPaused.request.meta.kind, restartedPaused.resumed],
     [true, 'session_probe', undefined]);

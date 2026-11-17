@@ -80,4 +80,17 @@ function noiLat(F, response) {
   catch (error) { return { ok: false, code: String(error && error.code || ''), request: null, thrown: true, error: String(error && error.message || error) }; }
 }
 
-module.exports = { workflowGas, khoDongBo, noiLat };
+/**
+ * Chạy một công cụ lẻ (chặng đẩy, chặng kéo, bước đăng nhập...) trong kho lát như khi người điều phối gọi nó, rồi ghi bản của lát xuống kho. Không qua hậu xử lý của `runSlice` (đóng lượt bỏ ngỏ, áp cờ dừng), vì công cụ trả request thô chứ không trả kết quả lát. Công cụ ném thì bỏ bản của lát không ghi, để ca kiểm lỗi giữa chừng thấy kho như trước lát. Đang trong lát thì dùng chung bản của lát ngoài.
+ */
+function trongLat(F, work, state) {
+  if (F.sliceStore) { return work(); }
+  F.sliceStore = { state: state || null, snapshot: state ? JSON.stringify(state) : '', dirty: false };
+  let result;
+  try { result = work(); }
+  catch (error) { F.sliceStore = null; throw error; }
+  F.sliceStoreClose();
+  return result;
+}
+
+module.exports = { workflowGas, khoDongBo, noiLat, trongLat };

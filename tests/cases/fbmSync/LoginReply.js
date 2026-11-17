@@ -1,6 +1,6 @@
 /** Kiểm cách GAS đọc câu trả lời Login của FBM (`d`): một bảng duy nhất, lượt bị từ chối đóng lỗi qua cổng phiên, sai mật khẩu hoặc câu trả lời chưa gặp thì ngừng tự đăng nhập, dòng Log ghi trước khi lượt đóng. */
 const { section, check } = require('../../lib/assert');
-const { workflowGas } = require('../../lib/fbm/hop-dong-bo');
+const { workflowGas, trongLat } = require('../../lib/fbm/hop-dong-bo');
 
 const MA_THONG_TIN = 'cred-login-reply';
 
@@ -16,7 +16,7 @@ function hopDangNhap() {
 /** Nộp body cho bước Login của lượt đăng nhập qua chặng chung (`CURSOR_TABLE.login`). `cursor` là các trường ô lượt (mục đích, bản nháp...). */
 function nopLogin(F, body, cursor, origin) {
   F.statePatch({ runId: 'login-' + Math.random().toString(36).slice(2), origin: origin, phase: 'checking_session', cursor: F.loginCursorOpen(Object.assign({ step: 'login', facts: { salt: 'ab12cd34', database: 'FHN_CRM_App', unit: 'CTY' } }, cursor)), activeRequestId: '', deadlineAt: 0, session: { expired: true } });
-  return F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: body });
+  return trongLat(F, () => F.stageRun(F.cursorTable('login'), F.stateRead(), { ok: true, status: 200, body: body }));
 }
 /** Lượt tự đăng nhập đang chờ trả lời Login; `manual` là lượt người dùng bấm. */
 function traLoi(F, body, manual) {

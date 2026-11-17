@@ -17,7 +17,7 @@ function hopCoLuot(origin, them) {
   const F = hop.FbmSync;
   F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const started = F.start(Object.assign({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' }, them || {}));
+  const started = F.runSlice(() => F.start(Object.assign({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' }, them || {}), F.stateRead()));
   return { hop, F, khoa, logs, data: documentProperties.data, started };
 }
 
@@ -45,7 +45,7 @@ async function chay(so) {
     ban.logs.slice(truocLog).filter((line) => /_finished$/.test(line.action)).every((line) => line.cycleId === runId && line.outcome === 'warn'),
     ban.logs.slice(truocLog).some((line) => line.action === 'sync_session_finished')
   ], [false, 'SYNC_STOPPED', null, 'paused', true, '', true, true]);
-  check(so, 'cờ của lượt đã đóng không chặn lượt mới: lượt sau vẫn phát request đầu', (() => { const lai = ban.F.start({ mode: 'read', origin: 'manual', manual: true }); return [!!lai.request, ban.F.statusView().running]; })(), [true, true]);
+  check(so, 'cờ của lượt đã đóng không chặn lượt mới: lượt sau vẫn phát request đầu', (() => { const lai = ban.F.runSlice(() => ban.F.start({ mode: 'read', origin: 'manual', manual: true }, ban.F.stateRead())); return [!!lai.request, ban.F.statusView().running]; })(), [true, true]);
 
   const dauDuyet = (origin) => hopCoLuot(origin, { approvedFingerprint: 'abcd1234-2' }).F.stateRead().approvedFingerprint;
   check(so, 'K6: lượt tay do nút Chấp thuận mở giữ dấu tập trong ô lượt; lượt nền bỏ dấu dù được truyền, nên không lượt nền nào tự đẩy tập chạm ngưỡng; lệnh start loại sync chuyển dấu xuống', [dauDuyet(), dauDuyet('background'), /approvedFingerprint: input\.approvedFingerprint/.test(String(ban.F.START_KINDS.sync.run))], ['abcd1234-2', '', true]);
@@ -102,7 +102,7 @@ async function chay(so) {
   // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
   const runCu = tayNhan.F.stateRead().runId;
   tayNhan.F.credentialWrite({ credentialRef: 'ref-thu-01', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const dangNhap = tayNhan.F.loginOpen('test', {}, tayNhan.F.stateRead());
+  const dangNhap = tayNhan.F.runSlice(() => tayNhan.F.loginOpen('test', {}, tayNhan.F.stateRead()));
   check(so, 'đăng nhập thử mở lượt riêng qua runOpen: mã lượt mới, nhãn "Tay · Đăng nhập thử", cursor login', [
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);
@@ -112,7 +112,7 @@ async function chay(so) {
 
   // Gặp khi nghiệm thu B4: dòng transport_failure ghi sau khi lượt đã đóng nên mất nhãn lượt.
   const hongDuong = hopCoLuot(), nhanHong = hongDuong.F.stateRead().runLabel;
-  hongDuong.F.transportFailureRun({ requestId: hongDuong.F.stateRead().activeRequestId, code: 'FBM_SITE_ACCESS_BLOCKED', message: 'Chrome chặn quyền truy cập trang FBM.' });
+  hongDuong.F.runSlice(() => hongDuong.F.transportFailureRun({ requestId: hongDuong.F.stateRead().activeRequestId, code: 'FBM_SITE_ACCESS_BLOCKED', message: 'Chrome chặn quyền truy cập trang FBM.' }));
   const dongHong = hongDuong.logs.filter((line) => line.action === 'transport_failure')[0] || {};
   check(so, 'hỏng đường truyền giữa lượt: dòng transport_failure mang nhãn lượt, lượt đóng lỗi', [dongHong.luot, hongDuong.F.stateRead().phase], [nhanHong, 'error']);
 
@@ -124,7 +124,7 @@ async function chay(so) {
   const truocStatus = ket.data.FBM_SYNC_STATE_V1, xem = ket.F.statusView();
   check(so, 'status gặp lượt chết: báo stuck kèm mã và chữ hướng dẫn, không ghi ô lượt', [xem.stuck, xem.stuckCode, /Bấm Đồng bộ/.test(xem.stuckMessage), ket.data.FBM_SYNC_STATE_V1 === truocStatus], [true, 'SYNC_STALE_RUN', true, true]);
   const truocMoi = ket.logs.length;
-  const moi = ket.F.start({ mode: 'read', origin: 'manual', manual: true });
+  const moi = ket.F.runSlice(() => ket.F.start({ mode: 'read', origin: 'manual', manual: true }, ket.F.stateRead()));
   const thuHoi = ket.logs.slice(truocMoi).filter((line) => line.action === 'stale_run')[0] || {};
   check(so, 'lượt kẹt rồi bấm Đồng bộ: lượt cũ đóng lỗi SYNC_STALE_RUN có dòng Log riêng, lượt mới mở với mã khác và phát request đầu', [
     thuHoi.cycleId === runKet, thuHoi.detail && thuHoi.detail.code, ket.F.stateRead().runId !== runKet, !!moi.request, ket.F.statusView().stuck

@@ -131,7 +131,7 @@ function scanHarness(options) {
   async function run(hooks) {
     const h = hooks || {};
     F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-    let step = F.start(Object.assign({ mode: 'read', origin: 'manual', manual: true, pack: h.pack }, h.startOptions || {}));
+    let step = F.runSlice(() => F.start(Object.assign({ mode: 'read', origin: 'manual', manual: true, pack: h.pack }, h.startOptions || {}), F.stateRead()));
     for (let hop = 0; step && step.request && hop < 200; hop += 1) {
       const sent = await deliver(step.request, h);
       if (sent.fail) {
@@ -205,7 +205,7 @@ async function chay(so) {
   const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey.map((k) => k.Name + '=' + k.Value).join('|'));
   const writeFailEnd = await writeFail.run({
     beforeSend: (request) => { if (request.meta.kind === 'batch' && !firstBatch) { firstBatch = request; } },
-    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.sliceIssue(retryRequest) }; }
+    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.sliceIssue(F.stateRead(), retryRequest) }; }
   });
   const writeFailIds = writeFail.local.customer.map((item) => item.fbmId), writeFailActs = writeFail.local.activity.map((item) => item.fbmId);
   check(so, 'Ghi Sheet lỗi ở bước ghi của lô: cursor không tiến, request kế dựng lại đúng lô đó, lượt đủ 12 khách và 12 giao dịch không trùng', [

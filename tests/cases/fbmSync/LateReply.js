@@ -26,7 +26,7 @@ async function chay(so) {
   const dung = hopChoGhi();
   dung.F.runStopCommand('any');
   const truoc = JSON.stringify(dung.F.stateRead());
-  const muon = dung.F.continue(dung.traLoi);
+  const muon = dung.F.runSlice(() => dung.F.continue(dung.traLoi));
   check(so, 'bấm Dừng khi lệnh ghi đang bay, response về sau: bỏ, không cấp request, không áp kết quả đẩy, không ghi Sheet, ô lượt giữ nguyên', [
     muon.code, muon.request, dung.dem.apKetQua, dung.dem.ghiSheet, JSON.stringify(dung.F.stateRead()) === truoc
   ], ['STALE_RESPONSE', null, 0, 0, true]);
@@ -36,7 +36,7 @@ async function chay(so) {
   const quaHan = hopChoGhi();
   quaHan.F.statePatch({ deadlineAt: Date.now() - 1000 });
   quaHan.F.STALE_RUN_MS = -1;
-  const tre = quaHan.F.continue(quaHan.traLoi);
+  const tre = quaHan.F.runSlice(() => quaHan.F.continue(quaHan.traLoi));
   check(so, 'response lệnh ghi về sau hạn an toàn: lượt đóng SYNC_STALE_WRITE, không áp kết quả, không ghi Sheet, không phát lại lệnh ghi', [
     tre.code, tre.request, quaHan.dem.apKetQua, quaHan.dem.ghiSheet, quaHan.F.stateRead().phase, quaHan.F.stateRead().activeRequestId
   ], ['SYNC_STALE_WRITE', null, 0, 0, 'error', '']);
