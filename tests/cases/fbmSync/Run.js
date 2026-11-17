@@ -102,7 +102,7 @@ async function chay(so) {
   // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
   const runCu = tayNhan.F.stateRead().runId;
   tayNhan.F.credentialWrite({ credentialRef: 'ref-thu-01', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const dangNhap = tayNhan.F.loginOpen("test");
+  const dangNhap = tayNhan.F.loginOpen('test', {}, tayNhan.F.stateRead());
   check(so, 'đăng nhập thử mở lượt riêng qua runOpen: mã lượt mới, nhãn "Tay · Đăng nhập thử", cursor login', [
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);

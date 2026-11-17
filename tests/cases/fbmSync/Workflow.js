@@ -292,7 +292,7 @@ async function chay(so) {
   const loginFlow = workflowGas();
   loginFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   loginFlow.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const loginStarted = loginFlow.hop.FbmSync.loginOpen("test");
+  const loginStarted = loginFlow.hop.FbmSync.loginOpen('test', {}, loginFlow.hop.FbmSync.stateRead());
   const afterLogin = quaTrangLogin((response) => noiDangNhap(loginFlow.hop, response), loginStarted.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = noiDangNhap(loginFlow.hop, executorRaw(loginAuthorize.reply, afterLogin.request.id));
@@ -306,7 +306,7 @@ async function chay(so) {
   const wrongLogin = workflowGas();
   wrongLogin.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   wrongLogin.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const wrongStart = wrongLogin.hop.FbmSync.loginOpen("test");
+  const wrongStart = wrongLogin.hop.FbmSync.loginOpen('test', {}, wrongLogin.hop.FbmSync.stateRead());
   const wrongAfterLogin = quaTrangLogin((response) => noiDangNhap(wrongLogin.hop, response), wrongStart.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const wrongAuthorize = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = noiDangNhap(wrongLogin.hop, {

@@ -16,7 +16,7 @@ function biChan(F, luot, purpose) {
 }
 /** Bấm Hủy phiên cũ rồi FBM nhận đăng nhập: trả `[mã lượt đăng nhập ép, kết quả]`. */
 function huyPhienCu(F) {
-  const mo = F.loginOpen('force');
+  const mo = F.loginOpen('force', {}, F.stateRead());
   const runId = F.stateRead().runId;
   return [mo.ok, runId, F.loginEnd(F.stateRead(), { ok: true })];
 }

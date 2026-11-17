@@ -141,7 +141,6 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 1,
     // Bước kết của chặng (người điều phối của chặng): ghi ô lượt trước khi đóng lượt hoặc chọn request kế.
     '1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 9,
@@ -208,7 +207,6 @@ const EXCEPTIONS = {
   },
   logEvent: {
     '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
