@@ -159,8 +159,8 @@ FbmSync.START_KINDS = {
   sync: { slice: true, run: function (input) { return FbmSync.start({ mode: input.mode, pack: input.pack, origin: 'manual', manual: true, approvedFingerprint: input.approvedFingerprint }); } },
   identity_check: { slice: true, run: function (input) { return FbmSync.start({ mode: 'check', scan: 'identity_check', identity: input.identity || null, origin: 'manual', manual: true }); } },
   identity_probe: { slice: true, run: function () { return FbmSync.start({ mode: 'check', scan: 'identity_probe', origin: 'manual', manual: true }); } },
-  login_test: { run: function (input) { return FbmSync.loginOpen('test', input); } },
-  login_force: { run: function (input) { return FbmSync.loginOpen('force', input); } }
+  login_test: { run: function (input) { return FbmSync.loginOpen('test', input, FbmSync.stateRead()); } },
+  login_force: { run: function (input) { return FbmSync.loginOpen('force', input, FbmSync.stateRead()); } }
 };
 FbmSync.commandStart = function (input) {
   var kind = String(input.kind || '');

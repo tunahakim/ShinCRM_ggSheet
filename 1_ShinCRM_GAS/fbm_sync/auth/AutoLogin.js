@@ -44,20 +44,21 @@ FbmSync.applyTransportSession = function (state, response) {
 
 /**
  * Mở lượt đăng nhập do người dùng bấm: `test` (Đăng nhập thử) hoặc `force` (Hủy phiên cũ và đăng nhập). `input.credentialDraft` là bản nháp Sidebar vừa mã hóa nhưng chưa lưu (`{ credentialRef, ciphertext, public }`), chỉ nằm trong ô lượt của lượt này; không có thì dùng credential đã lưu. `input.identity` là danh tính mong đợi; không có thì so với liên kết đã lưu.
+ * `state` là ô lượt người điều phối (cửa lệnh) đã đọc.
  * Hủy phiên cũ chỉ khi người dùng bấm nút trên Sidebar và đã xác nhận (chủ dự án chốt 2026-10-07): FBM giữ khóa đăng nhập lâu hơn phiên thật, nên "phiên cũ" thường đã chết. GAS chỉ mở nút ngay sau khi FBM trả lời từ chối (`loginForceOffered`); máy không bao giờ tự hủy phiên cũ, kể cả chạy nền. Hủy phiên cũ luôn dùng credential đã lưu.
  */
-FbmSync.loginOpen = function (purpose, input) {
-  var force = purpose === 'force', value = input || {}, state = FbmSync.stateRead(), draft = force ? null : value.credentialDraft || null;
+FbmSync.loginOpen = function (purpose, input, state) {
+  var force = purpose === 'force', value = input || {}, draft = force ? null : value.credentialDraft || null;
   if (force && state.loginForceOffered !== true) { return { ok: false, code: 'LOGIN_FORCE_NOT_OFFERED', message: 'Chỉ hủy phiên cũ được ngay sau khi FBM vừa từ chối đăng nhập.' }; }
   var credential = draft ? FbmSync.credentialShape(draft) : FbmSync.credentialRead();
   if (!credential.configured) { return { ok: false, code: 'LOGIN_CREDENTIAL_REF_INVALID', message: draft ? 'Thông tin đăng nhập chưa được mã hóa hợp lệ.' : 'Chưa có thông tin đăng nhập đã lưu để đăng nhập.' }; }
   var busy = FbmSync.runOpenCheck(state, 'Đang có phiên đồng bộ; chưa thể đăng nhập thử.');
   if (busy) { return busy; }
-  if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_requested', outcome: LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { runId: String(state.runId || '') } }); }
   var expected = value.identity && typeof value.identity === 'object' ? FbmSync.identityNormalize(value.identity) : FbmSync.boundIdentity();
   var cursor = FbmSync.loginCursorOpen({ purpose: force ? 'force' : 'test', resume: force ? state.loginForceResume || null : null, draft: draft ? { credentialRef: credential.credentialRef, ciphertext: credential.ciphertext, public: credential.public } : null, expectedIdentity: expected });
   // Đăng nhập là một lượt riêng (nhãn Tay · Đăng nhập thử / Hủy phiên cũ): mã lượt mới để Extension nhận đúng lượt và dòng Log không lẫn với lượt trước.
-  FbmSync.runOpen({ origin: 'manual', phase: 'checking_session', kindLabel: force ? 'Hủy phiên cũ' : 'Đăng nhập thử', cursor: cursor, message: force ? 'Đang hủy phiên cũ, đăng nhập và xác minh tài khoản FBM...' : 'Đang đăng nhập thử và xác minh tài khoản FBM...' });
+  var opened = FbmSync.runOpen({ origin: 'manual', phase: 'checking_session', kindLabel: force ? 'Hủy phiên cũ' : 'Đăng nhập thử', cursor: cursor, message: force ? 'Đang hủy phiên cũ, đăng nhập và xác minh tài khoản FBM...' : 'Đang đăng nhập thử và xác minh tài khoản FBM...' });
+  if (force) { FbmSync.stagePatchApply(opened, { logs: [{ action: 'login_force_requested', outcome: LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { blockedRunId: String(state.runId || '') } }] }); }
   return { ok: true, request: FbmSync.sliceIssue(FbmSync.loginStepRequest(cursor, credential)), status: FbmSync.statusView() };
 };
 
