@@ -2,7 +2,8 @@
 function fbmSyncAccountNoticeBlocks(scope) {
   var notice = (FBM_SYNC_CLIENT.accountNotices || {})[scope], message = notice && notice.message;
   var corrupt = scope === 'accountSettings' ? fbmSyncCorruptBlocks(FBM_SYNC_CONFIG_SECTIONS.accountSettings) : [];
-  return (message ? [Notice({ kind: notice && notice.kind, text: String(message) })] : []).concat(corrupt);
+  var lines = message ? (notice.lines || []).map(function (line) { return Text({ className: FBM_SYNC_ACCOUNT_UI.classes.preview, text: line }); }) : [];
+  return (message ? [Notice({ kind: notice && notice.kind, text: String(message) })] : []).concat(lines, corrupt);
 }
 function fbmSyncIdentitySummaryBlocks() {
   var identity = FBM_SYNC_CLIENT.identityStatus || {}, binding = identity.binding || {};
@@ -40,21 +41,10 @@ function fbmSyncIdentityActionReady() {
   var value = fbmSyncIdentityActionValues();
   return !!(value.spreadsheetId && value.userId && value.username && value.accountName);
 }
-function fbmSyncIdentityResultBlocks(status) {
-  var blocks = [], probeResult = status && status.metadata && status.metadata.identityProbe, result = status && status.metadata && status.metadata.identityCheck;
-  var identityNotice = FBM_SYNC_CLIENT.accountNotices && FBM_SYNC_CLIENT.accountNotices.identity;
-  var messages = FBM_SYNC_ACCOUNT_SCHEMA.identity.messages;
-  if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe' && !(status && status.phase === 'error') && !(identityNotice && identityNotice.message)) { blocks.push(Text({ className: FBM_SYNC_ACCOUNT_UI.classes.pass, text: messages.probeSuccess })); }
-  if (probeResult && FBM_SYNC_CLIENT.identityLastAction === 'probe' && status && status.phase === 'error') { blocks.push(Text({ className: FBM_SYNC_ACCOUNT_UI.classes.error, text: String(status.message || messages.probeError) })); }
-  if (result && FBM_SYNC_CLIENT.identityLastAction === 'check' && (status.phase === 'done' || result.missing !== undefined)) {
-    blocks.push(Card({ title: messages.checkDone, elements: [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.preview, text: messages.matched + Number(result.matched || 0) + '/' + Number(result.total || 0) + (Number(result.missing || 0) ? messages.missing + Number(result.missing || 0) : '') })].concat((result.missingSample || []).slice(0, 5).map(function (item) { return Text({ className: FBM_SYNC_ACCOUNT_UI.classes.preview, text: messages.missingId + String(item.fbmId || '') + messages.separator + String(item.code || item.id || '') }); })) }));
-  }
-  return blocks;
-}
 function fbmSyncIdentityBlock(status) {
   var active = fbmSyncBusy();
   var schema = FBM_SYNC_ACCOUNT_SCHEMA, messages = schema.identity.messages;
-  return FBM_SYNC_ACCOUNT_UI.layout.identity({ summary: fbmSyncIdentitySummaryBlocks(), form: fbmSyncIdentityFormBlocks(), actions: fbmSyncIdentityActionBlocks(), actionStatus: FBM_SYNC_CLIENT.identityAction ? [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.actionStatus, text: FBM_SYNC_CLIENT.identityAction === 'check' ? messages.actionCheck : messages.actionProbe })] : [], notice: fbmSyncAccountNoticeBlocks('identity'), result: fbmSyncIdentityResultBlocks(status) });
+  return FBM_SYNC_ACCOUNT_UI.layout.identity({ summary: fbmSyncIdentitySummaryBlocks(), form: fbmSyncIdentityFormBlocks(), actions: fbmSyncIdentityActionBlocks(), actionStatus: FBM_SYNC_CLIENT.identityAction ? [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.actionStatus, text: FBM_SYNC_CLIENT.identityAction === 'check' ? messages.actionCheck : messages.actionProbe })] : [], notice: fbmSyncAccountNoticeBlocks('identity') });
 }
 function fbmSyncPaintIdentityBlock(panel, active, status) { return fbmSyncAppendBlock(panel, fbmSyncIdentityBlock(status)); }
 function fbmSyncPatchIdentityBlock(panel, active, status) {
@@ -66,7 +56,6 @@ function fbmSyncPatchIdentityBlock(panel, active, status) {
   fbmSyncRenderTarget(regions.identityActions, fbmSyncIdentityActionBlocks());
   fbmSyncRenderTarget(regions.identityActionStatus, FBM_SYNC_CLIENT.identityAction ? [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.actionStatus, text: FBM_SYNC_CLIENT.identityAction === 'check' ? messages.actionCheck : messages.actionProbe })] : []);
   fbmSyncRenderTarget(regions.identityNotice, fbmSyncAccountNoticeBlocks('identity'));
-  fbmSyncRenderTarget(regions.identityResult, fbmSyncIdentityResultBlocks(status));
   return true;
 }
 </script>

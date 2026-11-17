@@ -89,19 +89,25 @@ async function chay(so) {
     [thanh.active, thanh.determinate, thanh.percent, thanh.label],
     [true, true, 70, 'Tiến trình: 7/10 (70%)']);
 
-  // Kiểm liên kết: câu kết quả là identityResult của GAS, Sidebar chỉ đặt vào thẻ Liên kết.
+  // Kiểm liên kết: câu kết quả và các dòng mã chưa thấy là identityResult của GAS, Sidebar chỉ đặt vào thẻ Liên kết.
+  const goc = dung('account');
+  goc.hop.FBM_SYNC_CLIENT.accountNotices = { identity: { kind: 'warning', message: 'Câu GAS', lines: ['Dòng 1', 'Dòng 2'] } };
+  const khoi = JSON.stringify(goc.hop.fbmSyncAccountNoticeBlocks('identity'));
+  check(so, 'thẻ Liên kết vẽ câu GAS rồi đúng các dòng GAS trả, màn Tài khoản không còn thẻ kết quả thứ hai',
+    [khoi.indexOf('Câu GAS') >= 0 && khoi.indexOf('Câu GAS') < khoi.indexOf('Dòng 1') && khoi.indexOf('Dòng 1') < khoi.indexOf('Dòng 2'), typeof goc.hop.fbmSyncIdentityResultBlocks, 'identityResult' in goc.hop.FBM_SYNC_ACCOUNT_SCHEMA.regions],
+    [true, 'undefined', false]);
   const tk = dung('account');
   const theTk = [];
-  tk.hop.fbmSyncSetAccountNotice = (area, tone, text) => { theTk.push([area, tone, text]); };
+  tk.hop.fbmSyncSetAccountNotice = (area, tone, text, lines) => { theTk.push([area, tone, text].concat(lines === undefined ? [] : [lines])); };
   tk.hop.fbmSyncIdentityActionValues = () => ({ spreadsheetId: 's', userId: 'u', username: 'n', accountName: 'a' });
   tk.hop.fbmSyncRequireBridge = () => Promise.resolve(null);
   tk.hop.fbmSyncLoadIdentityStatus = () => Promise.resolve(null);
-  const kiem = statusGas({ phase: 'done', scan: 'identity_check', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } });
+  const kiem = statusGas({ phase: 'done', scan: 'identity_check', metadata: { identityCheck: { total: 3, matched: 2, missing: 1, missingSample: [{ id: 'CUS-3', code: 'KH3', fbmId: 'FBM-3' }] } } });
   tk.hop.fbmSyncDrive = () => Promise.resolve({ ok: true, status: kiem });
   await tk.hop.fbmSyncCheckIdentity();
   check(so, 'kiểm liên kết: thẻ Liên kết hiện đúng tone và câu identityResult GAS dựng',
     theTk[theTk.length - 1],
-    ['identity', kiem.identityResult.tone, kiem.identityResult.text]);
+    ['identity', kiem.identityResult.tone, kiem.identityResult.text, kiem.identityResult.lines]);
 
   // Đăng nhập thử: câu báo là message GAS ghi khi đóng lượt; thiếu message là lỗi hợp đồng, không thay chữ dự phòng.
   tk.hop.FBM_SYNC_CLIENT.loginStatus = { configured: true, credentialRef: 'cred-1' };

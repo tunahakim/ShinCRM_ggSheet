@@ -37,6 +37,9 @@ async function chay(so) {
   check(so, 'kiểm liên kết: câu chờ, câu thiếu, câu đủ, câu lỗi do GAS dựng; lượt khác không có câu',
     [kiem(dangChay).tone, kiem({ phase: 'done', metadata: { identityCheck: { total: 3, matched: 2, missing: 1 } } }).text, kiem({ phase: 'done', metadata: { identityCheck: { total: 2, matched: 2, missing: 0 } } }).tone, kiem({ phase: 'error', lastError: 'mất phiên' }).text, dung({ phase: 'done' }).identityResult],
     ['pending', 'Kiểm tra liên kết hoàn tất: 2/3 Customer hợp lệ; không tìm thấy: 1.', 'success', 'Kiểm tra liên kết không thành công: mất phiên', null]);
+  check(so, 'kiểm liên kết: GAS dựng sẵn từng dòng mã FBM chưa thấy, câu chờ và câu lỗi không có dòng',
+    [kiem({ phase: 'done', metadata: { identityCheck: { total: 3, matched: 1, missing: 2, missingSample: [{ id: 'CUS-2', code: 'KH2', fbmId: 'FBM-2' }, { id: 'CUS-3', code: '', fbmId: 'FBM-3' }] } } }).lines, kiem(dangChay).lines, kiem({ phase: 'error', lastError: 'x' }).lines],
+    [['Chưa thấy FBM ID FBM-2 · KH2', 'Chưa thấy FBM ID FBM-3 · CUS-3'], [], []]);
   const phamVi = (run) => dung({ phase: 'idle' }, { run }).scopeNotice;
   check(so, 'phạm vi giới hạn: câu có mã khách, danh sách trống thì câu chặn, không giới hạn thì không có',
     [phamVi({ scopeLimited: true, scopeCodes: ['ALT00010'] }).text.indexOf('ALT00010') > 0, phamVi({ scopeLimited: true, scopeCodes: [] }).text === F.SCOPE_NOTICE_TEXT.empty, phamVi({ scopeLimited: false, scopeCodes: ['ALT00010'] })],

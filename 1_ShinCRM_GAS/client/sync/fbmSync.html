@@ -107,10 +107,10 @@ function fbmSyncApplyIdentityProbeDraft(status) {
   return true;
 }
 /** Thông báo thao tác chỉ là trạng thái hiển thị cục bộ, không chứa bí mật hoặc quyết định nghiệp vụ. */
-function fbmSyncSetAccountNotice(scope, kind, message) {
+function fbmSyncSetAccountNotice(scope, kind, message, lines) {
   var name = scope === 'identity' ? 'identity' : scope === 'accountSettings' ? 'accountSettings' : 'login';
   FBM_SYNC_CLIENT.accountNotices = FBM_SYNC_CLIENT.accountNotices || {};
-  var notice = { kind: kind || 'info', message: String(message || '') };
+  var notice = { kind: kind || 'info', message: String(message || ''), lines: (lines || []).map(String) };
   FBM_SYNC_CLIENT.accountNotices[name] = notice;
   var targetId = name === 'accountSettings' ? 'fbm-sync-account-settings-notice-region' : 'fbm-sync-' + name + '-notice-region';
   if (typeof RENDER_INDEX !== 'undefined' && RENDER_INDEX.nodes[targetId]) { fbmSyncRenderTarget(targetId, fbmSyncAccountNoticeBlocks(name)); }
@@ -1103,10 +1103,10 @@ function fbmSyncCheckIdentity() {
   }).then(function (value) {
     FBM_SYNC_CLIENT.identityAction = '';
     if (value && value.code === 'SYNC_BACKGROUND_SKIPPED') { return value; }
-    // Câu kết quả (đủ, thiếu, lỗi kèm lý do GAS) là `identityResult` của GAS; Sidebar chỉ đặt vào thẻ Liên kết.
+    // Câu và dòng kết quả do GAS dựng (`identityResult`).
     var result = value && value.status && value.status.identityResult;
     if (!result) { throw fbmSyncDriveFailure(value, 'Không bắt đầu được kiểm tra liên kết.'); }
-    fbmSyncSetAccountNotice('identity', result.tone, result.text);
+    fbmSyncSetAccountNotice('identity', result.tone, result.text, result.lines);
     return fbmSyncLoadIdentityStatus().then(function () { return value; });
   }).catch(function (error) {
     FBM_SYNC_CLIENT.identityAction = 'check';
@@ -1138,14 +1138,14 @@ function fbmSyncAutoFill() {
     if (!value || value.code === 'SYNC_BACKGROUND_SKIPPED') { return value; }
     var status = value.status, probe = status.metadata && status.metadata.identityProbe || {};
     if (value.ok === false || status.phase === 'error') {
-      fbmSyncSetAccountNotice('identity', 'error', fbmSyncDriveFailure(value, 'Không lấy được thông tin tài khoản FBM.').message);
+      fbmSyncSetAccountNotice('identity', 'error', fbmSyncDriveFailure(value, FBM_SYNC_ACCOUNT_SCHEMA.identity.messages.probeError).message);
       return value;
     }
     if (!probe.spreadsheetId || !probe.userId || !probe.username || !probe.accountName) {
       fbmSyncSetAccountNotice('identity', 'error', 'Không đọc đủ Spreadsheet ID, mã user hoặc tên tài khoản từ tab FBM.');
       return null;
     }
-    fbmSyncSetAccountNotice('identity', 'success', 'Đã lấy thông tin thành công và điền vào form.');
+    fbmSyncSetAccountNotice('identity', 'success', FBM_SYNC_ACCOUNT_SCHEMA.identity.messages.probeSuccess);
     return { ok: true, code: 'IDENTITY_DRAFT_READY', status: status };
   });
 }

@@ -137,14 +137,15 @@ var CORE_LOAD_PROVIDERS = typeof CORE_LOAD_PROVIDERS !== 'undefined' ? CORE_LOAD
 CORE_LOAD_PROVIDERS.fbm_sync = function () { return { tone: FbmSync.toneView() }; };
 /** Username so được: có chữ và không phải bản che dấu `*`. */
 FbmSync.usernameComparable = function (value) { var text = String(value || '').trim(); return !!text && text.indexOf('*') < 0; };
-/** Kết quả kiểm liên kết thành câu cho màn Tài khoản; chỉ có khi lượt là kiểm liên kết. */
+/** Kết quả kiểm liên kết thành câu cho màn Tài khoản; chỉ có khi lượt là kiểm liên kết. `lines` là các mã FBM chưa thấy (đã cắt ở `identityCheckFinish`), Sidebar vẽ nguyên dưới câu chính, không tự ghép câu từ số liệu thô. */
 FbmSync.identityResultView = function (state, running) {
   if (String(state.scan || '') !== 'identity_check') { return null; }
-  if (running) { return { tone: 'pending', text: 'Đang kiểm tra liên kết Customer với FBM...' }; }
+  if (running) { return { tone: 'pending', text: 'Đang kiểm tra liên kết Customer với FBM...', lines: [] }; }
   var result = state.metadata && state.metadata.identityCheck;
-  if (String(state.phase || '') !== 'done' || !result) { return { tone: 'error', text: 'Kiểm tra liên kết không thành công: ' + String(state.lastError || state.message || 'lượt dừng trước khi có kết quả.') }; }
+  if (String(state.phase || '') !== 'done' || !result) { return { tone: 'error', text: 'Kiểm tra liên kết không thành công: ' + String(state.lastError || state.message || 'lượt dừng trước khi có kết quả.'), lines: [] }; }
   var total = Math.max(0, Number(result.total || 0)), matched = Math.max(0, Number(result.matched || 0)), missing = Math.max(0, Number(result.missing || 0));
-  return { tone: missing ? 'warning' : 'success', text: total ? 'Kiểm tra liên kết hoàn tất: ' + matched + '/' + total + ' Customer hợp lệ' + (missing ? '; không tìm thấy: ' + missing + '.' : '.') : 'Kiểm tra liên kết hoàn tất: chưa có Customer nào mang FBM_ID để đối chiếu.' };
+  var lines = (result.missingSample || []).map(function (item) { return 'Chưa thấy FBM ID ' + String(item.fbmId || '') + ' · ' + String(item.code || item.id || ''); });
+  return { tone: missing ? 'warning' : 'success', text: total ? 'Kiểm tra liên kết hoàn tất: ' + matched + '/' + total + ' Customer hợp lệ' + (missing ? '; không tìm thấy: ' + missing + '.' : '.') : 'Kiểm tra liên kết hoàn tất: chưa có Customer nào mang FBM_ID để đối chiếu.', lines: lines };
 };
 /**
  * Dựng status cho Sidebar từ dữ liệu đã đọc; thuần (không đọc kho, không đọc đồng hồ). Mọi quyết định hiển thị nằm ở đây: Sidebar đọc `tone`, `actions`, `progress`, `pipeline.visible`… chứ không chép danh sách phase hay suy từ cursor.

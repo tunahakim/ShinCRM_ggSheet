@@ -87,13 +87,17 @@ FbmSync.identityPreflight = function (mode) {
   return { status: status, blocking: blocking, message: message };
 };
 
+/** Số Customer local giữ làm mẫu để chỉ ra mã FBM chưa thấy; Customer ngoài mẫu vẫn được đếm n/N nhưng không được nêu tên, để state trong DocumentProperties không phình theo số khách. */
+FbmSync.IDENTITY_SAMPLE_MAX = 50;
+/** Số mã FBM chưa thấy tối đa nêu ra trong câu kết quả ở màn Tài khoản. */
+FbmSync.IDENTITY_MISSING_SHOWN = 20;
 /** Chuẩn bị bảng đối chiếu ID Customer mà không đưa danh sách lên Sidebar. */
 FbmSync.identityCheckBegin = function (state) {
   var local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], sample = [], target = state.identityTarget || {};
   (local || []).forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
     if (!fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record)) { return; }
-    if (sample.length < 50) { sample.push({ id: String(record.id || ''), code: String(record.fbmCustomerCode || ''), fbmId: fbmId, seen: false }); }
+    if (sample.length < FbmSync.IDENTITY_SAMPLE_MAX) { sample.push({ id: String(record.id || ''), code: String(record.fbmCustomerCode || ''), fbmId: fbmId, seen: false }); }
   });
   state.metadata = state.metadata || {};
   state.metadata.identityCheck = {
@@ -131,7 +135,7 @@ FbmSync.identityCheckFinish = function (state) {
   result.total = Number(result.total || 0);
   result.matched = Math.min(result.total, Number(result.matched || 0));
   result.missing = Math.max(0, result.total - result.matched);
-  result.missingSample = sample.filter(function (item) { return !item.seen; }).slice(0, 20).map(function (item) {
+  result.missingSample = sample.filter(function (item) { return !item.seen; }).slice(0, FbmSync.IDENTITY_MISSING_SHOWN).map(function (item) {
     return { id: item.id, code: item.code, fbmId: item.fbmId };
   });
   delete result.sample;
