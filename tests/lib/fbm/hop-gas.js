@@ -65,6 +65,8 @@ function capDauDaySach(hopCat) {
   if (!luu.ok) { throw new Error('Hộp thử không đặt được phạm vi: ' + JSON.stringify(luu.problems)); }
   // Tài khoản đã liên kết đọc bằng hàm thật của Identity.js (kho trống thì chưa liên kết); không cấp hàm giả để hàm bị đổi tên là test hỏng ngay.
   if (typeof F.boundIdentity !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/Identity.js'), hopCat, { filename: 'fbm_sync/reconcile/Identity.js' }); }
+  if (typeof F.connectionSave !== 'function') { vm.runInContext(docTep('fbm_sync/reconcile/ConnectionSave.js'), hopCat, { filename: 'fbm_sync/reconcile/ConnectionSave.js' }); }
+  if (typeof F.credentialRead !== 'function') { vm.runInContext(docTep('fbm_sync/auth/LoginStores.js'), hopCat, { filename: 'fbm_sync/auth/LoginStores.js' }); }
   if (typeof hopCat.reloadJournalRead !== 'function') { hopCat.reloadJournalRead = () => ({ rev: 0 }); }
 }
 

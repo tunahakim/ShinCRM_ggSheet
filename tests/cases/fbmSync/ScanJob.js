@@ -43,7 +43,7 @@ function scanHarness(options) {
   const F = flow.hop.FbmSync;
   F.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
   F.readCategoryGate = () => ({ map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] });
-  F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   // Máy Extension của harness là máy được giao chạy nền, để lần hỏi theo chuông được chạy việc nền.
   F.backgroundMachineWrite(F.machineAssigned(MAY_NEN, 'Máy nền thử', Date.now()));
   Object.assign(F.BUDGET, opt.budget || {});

@@ -53,7 +53,7 @@ function kiemKho(so) {
   const cu = F.loginAttemptRead();
   F.credentialWrite(null);
   F.loginAttemptWrite(F.loginAttemptMark(cu, { kind: 'failure', message: 'Sai', halt: true }, 1000, 30));
-  check(so, 'ghi dấu lần thử từ bản đọc trước khi credential bị xóa không khôi phục credential', [t.kho.getProperty('FBM_CREDENTIAL_V1'), F.credentialRead().configured, F.loginAttemptRead().loginHalted], [null, false, true]);
+  check(so, 'ghi dấu lần thử từ bản đọc trước khi credential bị xóa không khôi phục credential (xóa là ghi bản trống, cùng một lần setProperties)', [t.kho.getProperty('FBM_CREDENTIAL_V1'), F.credentialRead().configured, F.loginAttemptRead().loginHalted], ['{}', false, true]);
   const mark = (truoc, suKien) => F.loginAttemptMark(truoc, suKien, 10 * 60 * 1000, 30);
   const thu = mark({}, { kind: 'attempt', transportText: 'Mất kết nối' }), hong2 = mark(thu, { kind: 'failure', message: 'Sai', halt: true });
   check(so, 'công cụ tính dấu lần thử: thử ghi lý do đường truyền và hạn; hỏng giữ ngừng; lưu mới gỡ ngừng giữ hạn; thành công gỡ hết; xóa bỏ hạn; sự kiện lạ thì ném',

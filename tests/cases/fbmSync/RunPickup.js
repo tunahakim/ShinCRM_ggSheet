@@ -128,7 +128,7 @@ async function chay(so) {
   ], [['login_step', 'page'], false, true, 'cred-1']);
   check(so, 'cursor đọc lại xung đột dựng lại đúng request đọc theo ID FBM', FbmSync.cursorRequest({ cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' } }).meta.kind, 'conflict_refresh_grid');
 
-  FbmSync.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234' });
+  FbmSync.credentialRead = () => ({ configured: true, credentialRef: 'cred-test-1234', ciphertext: null, public: {} });
   FbmSync.credentialRead = () => FbmSync.credentialShape({ credentialRef: 'cred-test-1234', ciphertext: banNhap.ciphertext });
   documentProperties.deleteProperty(FbmSync.STATE_KEY);
   const login = FbmSync.controlDispatch('start', { kind: 'login_test', machineId: 'may-A' });

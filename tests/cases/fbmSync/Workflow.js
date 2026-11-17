@@ -212,7 +212,7 @@ async function chay(so) {
 
   const legacyAccount = workflowGas();
   legacyAccount.hop.FbmSync.configValue = (name) => name === 'FBM_ACCOUNT_NAME' ? 'Tên còn sót trong Config' : '';
-  legacyAccount.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
+  legacyAccount.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' } });
   const ownerBeforeVerify = legacyAccount.hop.FbmSync.scriptSettings(legacyAccount.hop.FbmSync.stateRead()).accountName;
   const verifiedOwner = legacyAccount.hop.FbmSync.stateRead();
   legacyAccount.hop.FbmSync.sessionIdentityVerify(verifiedOwner, { userId: '2037', username: 'ANHLT', accountName: 'Lê Tuấn Anh' });
@@ -257,7 +257,7 @@ async function chay(so) {
 
   const identityCheck = workflowGas();
   identityCheck.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
-  identityCheck.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  identityCheck.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   const identityStarted = identityCheck.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true });
   const identityProbe = await sendThroughExecutor(identityStarted.request, userResponse);
   const identityAfterProbe = identityCheck.hop.FbmSync.continue(executorRaw(identityProbe.reply, identityStarted.request.id));
@@ -277,7 +277,7 @@ async function chay(so) {
   const draftCheck = async (draft, savedName) => {
     const flow = workflowGas();
     flow.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
-    flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: savedName });
+    flow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: savedName } });
     const started = flow.hop.FbmSync.start({ mode: 'check', scan: 'identity_check', origin: 'manual', manual: true, identity: draft });
     const probe = await sendThroughExecutor(started.request, userResponse);
     return flow.hop.FbmSync.continue(executorRaw(probe.reply, started.request.id));
@@ -290,9 +290,9 @@ async function chay(so) {
   check(so, 'kiem tra lien ket: lien ket da luu cu nhung ban nhap khop tai khoan FBM thi qua buoc kiem phien va sang xac thuc Customer', [draftRight.ok, draftRight.request && draftRight.request.meta.kind], [true, 'authorize']);
 
   const loginFlow = workflowGas();
-  loginFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  loginFlow.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const loginStarted = loginFlow.hop.FbmSync.loginTestRequest();
+  loginFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
+  loginFlow.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  const loginStarted = loginFlow.hop.FbmSync.loginOpen("test");
   const afterLogin = quaTrangLogin((response) => noiDangNhap(loginFlow.hop, response), loginStarted.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const loginAuthorize = await sendThroughExecutor(afterLogin.request, JSON.stringify({ d: { Authorized: 'login-auth' } }));
   const afterAuthorize = noiDangNhap(loginFlow.hop, executorRaw(loginAuthorize.reply, afterLogin.request.id));
@@ -304,9 +304,9 @@ async function chay(so) {
   ], ['login_step', 'authorize', 'identity_user_grid', true, 'LOGIN_OK', 'done', 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.']);
 
   const wrongLogin = workflowGas();
-  wrongLogin.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  wrongLogin.hop.FbmSync.loginConfigSave({ credentialRef: 'workflow-credential-ref', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const wrongStart = wrongLogin.hop.FbmSync.loginTestRequest();
+  wrongLogin.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
+  wrongLogin.hop.FbmSync.credentialWrite({ credentialRef: 'workflow-credential-ref', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  const wrongStart = wrongLogin.hop.FbmSync.loginOpen("test");
   const wrongAfterLogin = quaTrangLogin((response) => noiDangNhap(wrongLogin.hop, response), wrongStart.request, MA_HOP_DONG, null, { captures: { payloadCookie: '461020379855cFHN_CRM_App' } });
   const wrongAuthorize = noiDangNhap(wrongLogin.hop, { ok: true, status: 200, body: JSON.stringify({ d: { Authorized: 'wrong-auth' } }), transport: { contract: MA_HOP_DONG, trace: [{ stage: 'executor_response_sent', requestId: wrongAfterLogin.request.id }] } });
   const wrongDone = noiDangNhap(wrongLogin.hop, {
@@ -319,16 +319,16 @@ async function chay(so) {
   ], [false, 'LOGIN_IDENTITY_MISMATCH', 'error', '2037']);
 
   const binding = workflowGas();
-  const bindingSaved = binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
-  const bindingCleared = binding.hop.FbmSync.bindingWrite({});
+  const bindingSaved = binding.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
+  const bindingCleared = binding.hop.FbmSync.connectionSave({ binding: {} });
   check(so, 'xoa lien ket rong: chi xoa binding, giu Sheet va khoa dong bo thuong', [
     bindingSaved.ok, bindingCleared.code, binding.hop.FbmSync.bindingRead().spreadsheetId || null, bindingCleared.identityStatus.status
   ], [true, 'IDENTITY_BINDING_CLEARED', null, 'UNBOUND']);
-  binding.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  binding.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   const activeBindingState = binding.hop.FbmSync.stateRead();
   activeBindingState.runId = 'binding-request'; activeBindingState.phase = 'checking_session'; activeBindingState.activeRequestId = 'request-binding';
   binding.hop.FbmSync.stateWrite(activeBindingState);
-  const rejectedClear = binding.hop.FbmSync.bindingWrite({});
+  const rejectedClear = binding.hop.FbmSync.connectionSave({ binding: {} });
   check(so, 'xoa lien ket bi chan khi request FBM dang bay', [rejectedClear.ok, rejectedClear.code, Boolean(binding.hop.FbmSync.bindingRead().spreadsheetId || null)], [false, 'SYNC_BUSY', true]);
 
   const gates = workflowGas().hop.FbmSync;
@@ -509,7 +509,7 @@ async function chay(so) {
     }
   });
   compactLookupFlow.hop.FbmSync.readCategoryGate = () => ({ map: compactLookupMap, names: compactLookupAllNames, namesBySource: compactLookupNames, valid: compactLookupValid, warnings: [] });
-  compactLookupFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  compactLookupFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   compactLookupFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   compactLookupFlow.hop.FbmSync.start({ mode: 'write', origin: 'manual', scan: 'full' });
   const compactContinue = (body, items) => {
@@ -914,7 +914,7 @@ async function chay(so) {
     });
     fullFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {}, names: {}, valid: {}, warnings: [] });
     fullFlow.hop.FbmSync.readCategoryGate = () => { fullSheetReads.category += 1; return { map: {}, names: {}, namesBySource: {}, valid: {}, warnings: [] }; };
-    fullFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+    fullFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
     if (options && options.scanCustomerRows) { fullFlow.hop.FbmSync.BUDGET.scanCustomerRows = options.scanCustomerRows; }
     if (options && options.activityCustomerRows) { fullFlow.hop.FbmSync.BUDGET.activityCustomerRows = options.activityCustomerRows; }
     const fullCustomerFields = fullFlow.hop.FbmSync.GRID_FIELDS.customer;
@@ -1144,7 +1144,7 @@ async function chay(so) {
 
   const readFlow = workflowGas();
   readFlow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
-  readFlow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  readFlow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   readFlow.hop.FbmSync.pullPageApply = () => ({ ok: true, written: 0, conflicts: 0, skipped: 0, identityBlocks: [] });
   readFlow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   let readStep = readFlow.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
@@ -1177,7 +1177,7 @@ async function chay(so) {
     const flow = workflowGas({ logEvent: (event) => { logs.push(event); } });
     let sheetWrites = 0;
     flow.hop.FbmSync.prepareCategoryGate = () => ({ map: {} });
-    flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+    flow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
     flow.hop.FbmSync.pullPageApply = (entity, records) => { sheetWrites += records.length; return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
     flow.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
     const fields = ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dc_lh', 'dien_thoai', 'email', 'website', 'ten_dclh_tinh', 'ten_nguon_dm', 'ten_sp', 'ten_cv', 'ngay_gd', 'datetime0', 'xorder'];
@@ -1207,7 +1207,7 @@ async function chay(so) {
   ], [0, 'batch', 2]);
 
   const stopAfterResponse = workflowGas();
-  stopAfterResponse.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  stopAfterResponse.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   stopAfterResponse.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const stopStarted = stopAfterResponse.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   const stopNow = stopAfterResponse.hop.FbmSync.runStopCommand('any');
@@ -1221,7 +1221,7 @@ async function chay(so) {
   ], ['SYNC_STOPPED', 'paused', true, '{}', false, 'STALE_RESPONSE', null, true]);
 
   const masterOff = workflowGas();
-  masterOff.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  masterOff.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   masterOff.hop.FbmSync.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const masterStarted = masterOff.hop.FbmSync.start({ mode: 'read', origin: 'manual', manual: true });
   datCongTac(masterOff.hop, false);

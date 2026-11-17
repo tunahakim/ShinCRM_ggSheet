@@ -141,11 +141,12 @@ const RULES = [
 const EXCEPTIONS = {
   stateReadWrite: {
     '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 2,
+    '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 1,
     // Bước kết của chặng (người điều phối của chặng): ghi ô lượt trước khi đóng lượt hoặc chọn request kế.
     '1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 9,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
+    // Lưu kết nối chạy trong khóa điều phối ngoài lượt: đọc ô lượt để từ chối khi đang có lượt.
+    '1_ShinCRM_GAS/fbm_sync/reconcile/ConnectionSave.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 4,
     // Hàm chuyển kho một lần là cửa vào riêng: đọc pha để chặn khi đang có lượt; xóa cùng server/dev/.
@@ -172,9 +173,9 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 4,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 7,
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 6,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 11,
@@ -184,13 +185,11 @@ const EXCEPTIONS = {
   },
   phaseList: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 2,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/schema/FbmFields.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1
   },
   propertyWrite: {
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
@@ -212,7 +211,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/auth/AutoLogin.js': 1,
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 3,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1,

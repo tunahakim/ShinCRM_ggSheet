@@ -32,7 +32,7 @@ function makeSync() {
     'fbm_sync/read/GridRead.js',
     'fbm_sync/reconcile/Fingerprint.js',
     'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js',
-    'fbm_sync/reconcile/Identity.js',
+    'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/ConnectionSave.js', 'fbm_sync/auth/LoginStores.js',
     'fbm_sync/reconcile/Pull.js',
     'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js',
     'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js',

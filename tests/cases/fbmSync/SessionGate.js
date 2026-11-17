@@ -12,7 +12,7 @@ const LUOI_KHACH = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: n
 function hopLuot(cursor, patch, options) {
   const { hop } = workflowGas(options);
   const F = hop.FbmSync;
-  F.bindingWrite(NGUOI_DUNG);
+  F.connectionSave({ binding: NGUOI_DUNG });
   F.stateWrite(Object.assign(F.runOpen({ phase: 'pull_customer' }), { entity: 'customer', cursor: cursor }, patch || {}));
   return F;
 }

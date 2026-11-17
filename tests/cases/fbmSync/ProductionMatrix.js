@@ -549,7 +549,7 @@ async function chay(so) {
   napServer(dpDown.hop, 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js');
   ddProps.getProperty = () => { throw new Error('Service invoked too many times: properties'); };
   check(so, 'FBM-025/026/028: dịch vụ DocumentProperties lỗi thì state, sổ lỗi đẩy, cấu hình đăng nhập và công tắc tổng đều ném DOCUMENT_PROPERTIES_READ_FAILED, công tắc không mở theo mặc định',
-    [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pushFailuresRead()), thrownCode(() => DD.loginConfigRead()), thrownCode(() => dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))],
+    [thrownCode(() => DD.stateRead()), thrownCode(() => DD.pushFailuresRead()), thrownCode(() => Object.assign({}, DD.credentialRead(), DD.loginAttemptRead())), thrownCode(() => dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))],
     ['DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED', 'DOCUMENT_PROPERTIES_READ_FAILED']);
   ddProps.getProperty = ddGet;
   check(so, 'FBM-028: Spreadsheet chưa có công tắc tổng vẫn coi là bật; chỉ "false" rõ ràng mới khóa', [dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'), (datCongTac(dpDown.hop, false), dpDown.hop.settingsValue(DD.SETTING_SECTIONS.master, 'enabled'))], [true, false]);
@@ -557,7 +557,7 @@ async function chay(so) {
   const secretEnvelope = '{"ciphertext":"BI-MAT-ENVELOPE","password":"mat-khau-that"';
   dpData.FBM_CREDENTIAL_V1 = secretEnvelope;
   let loginError = null;
-  try { DP.loginConfigRead(); } catch (error) { loginError = error; }
+  try { Object.assign({}, DP.credentialRead(), DP.loginAttemptRead()); } catch (error) { loginError = error; }
   check(so, 'FBM-028: cấu hình đăng nhập JSON hỏng thì ném lỗi có mã, thông báo không chứa envelope hay mật khẩu, không ghi đè cấu hình',
     [loginError && loginError.code, /BI-MAT|mat-khau/.test(String(loginError && loginError.message)), dpData.FBM_CREDENTIAL_V1 === secretEnvelope],
     ['DOCUMENT_PROPERTY_CORRUPT', false, true]);

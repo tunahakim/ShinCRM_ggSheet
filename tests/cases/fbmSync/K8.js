@@ -11,7 +11,7 @@ const MAT_KHAU = 'K8-mat-khau-gia-7f3a';
 async function luotDangNhap(kind, loginReply) {
   const c = chuoiDangNhap({ password: MAT_KHAU, loginReply, hetPhien: kind === 'identity_probe' }), F = c.gas.hop.FbmSync;
   const ma = await c.sendWorker({ type: 'FBM_ENCRYPT_CREDENTIALS', credentials: { username: 'k8user', password: MAT_KHAU } });
-  const luu = F.controlDispatch('save_credential', { binding: { spreadsheetId: c.SHEET, userId: '2037', username: 'k8user', accountName: 'K8 Demo' }, credential: { mode: 'save', credentialRef: ma.credentialRef, envelope: ma.envelope, public: ma.public } }, 'sidebar');
+  const luu = F.controlDispatch('save_credential', { binding: { spreadsheetId: c.SHEET, userId: '2037', username: 'k8user', accountName: 'K8 Demo' }, credential: { username: 'k8user', credentialRef: ma.credentialRef, envelope: ma.envelope, public: ma.public } }, 'sidebar');
   const mo = F.controlDispatch('start', { kind, machineId: c.MAY }, 'sidebar');
   await c.chayLuot();
   return { c, F, ma, luu, mo };

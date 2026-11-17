@@ -15,7 +15,7 @@ function loi(fn) {
 function hopCoLuot() {
   const { hop, documentProperties } = workflowGas({});
   const F = hop.FbmSync;
-  F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   F.start({ mode: 'read', origin: 'manual', manual: true });
   const kho = { soLanGhi: 0, hongLanGhi: false };

@@ -16,7 +16,7 @@ function luotDangCho(FbmSync) {
 }
 
 /** Mỗi ca: `ten` hiện trong báo cáo, `lenh`, `payload` (hoặc hàm dựng payload từ FbmSync), `kenh`, `chuan` chuẩn bị state trước. */
-const dangNhapDaLuu = (F) => { F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-test-1234', username: 'nguoi-thu' }); };
+const dangNhapDaLuu = (F) => { F.credentialRead = () => ({ configured: true, credentialRef: 'cred-test-1234', ciphertext: null, public: {} }); };
 
 /** Giá trị bí mật phiên đặt vào ô lượt trước mỗi lệnh; ngoài `request` (body gửi FBM cần chúng) không được xuất hiện ở đâu trong kết quả. */
 const BI_MAT = { cookie: 'bi-mat-cookie-7f3a', customerAuthorized: 'bi-mat-customer-9c1d', activityAuthorized: 'bi-mat-activity-2b8e' };

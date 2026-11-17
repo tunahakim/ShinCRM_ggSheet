@@ -7,7 +7,7 @@ const { datPhan } = require('../../lib/fbm/cai-dat-thu');
 async function chay(so) {
   section('FBM sync — danh sách ứng viên đẩy');
   const pushed = taoHopCat({ FbmSync: {}, DATA_SCHEMA: {}, SYNC_SCHEMA: {} });
-  napServer(pushed, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(pushed, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/protocol/Protocol.js', 'fbm_sync/read/GridRead.js', 'fbm_sync/reconcile/Fingerprint.js', 'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/ConnectionSave.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/write/FormValues.js', 'fbm_sync/write/PushCandidates.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   // Ngoài ca phạm vi thử bên dưới, hộp này đẩy mọi dòng có việc: lưu qua cổng cài đặt rằng không giới hạn phạm vi khách.
   datPhan(pushed, 'run', { scopeLimited: false });
   // pushCandidates không còn nuốt lỗi đọc state, nên hộp thử phải có state và sổ lỗi đẩy dù rỗng.

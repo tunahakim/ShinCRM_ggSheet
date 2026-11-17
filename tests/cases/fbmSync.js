@@ -34,6 +34,7 @@ const NHOM = [
   require("./fbmSync/PullNewCustomer"),
   require("./fbmSync/PullCompare"),
   require("./fbmSync/IdentityBinding"),
+  require("./fbmSync/ConnectionSave"),
   require("./fbmSync/PullFingerprint"),
   require("./fbmSync/SeenStore"),
   require("./fbmSync/PullEdges"),

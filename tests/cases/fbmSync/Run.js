@@ -15,7 +15,7 @@ function hopCoLuot(origin, them) {
   const { hop, documentProperties } = workflowGas({ LockService: { getScriptLock: () => khoa }, logEvent, LOG_WARN: 'warn' });
   ref.F = hop.FbmSync;
   const F = hop.FbmSync;
-  F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   F.statePatch({ session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const started = F.start(Object.assign({ mode: 'read', origin: origin || 'manual', manual: origin !== 'background' }, them || {}));
   return { hop, F, khoa, logs, data: documentProperties.data, started };
@@ -101,8 +101,8 @@ async function chay(so) {
 
   // Đăng nhập thử là lượt riêng: mã lượt mới và nhãn của nó, không mượn mã lượt vừa đóng.
   const runCu = tayNhan.F.stateRead().runId;
-  tayNhan.F.loginConfigSave({ credentialRef: 'ref-thu-01', envelope: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
-  const dangNhap = tayNhan.F.loginTestRequest(null, null);
+  tayNhan.F.credentialWrite({ credentialRef: 'ref-thu-01', ciphertext: { version: 1, alg: 'AES-GCM', iv: '123456789012', ciphertext: 'ciphertext-long-enough' }, public: { usernameHint: 'ANHLT' } });
+  const dangNhap = tayNhan.F.loginOpen("test");
   check(so, 'đăng nhập thử mở lượt riêng qua runOpen: mã lượt mới, nhãn "Tay · Đăng nhập thử", cursor login', [
     dangNhap.ok, tayNhan.F.stateRead().runId !== runCu, tayNhan.F.stateRead().runLabel, tayNhan.F.stateRead().cursor.kind
   ], [true, true, 'Tay · Đăng nhập thử', 'login']);

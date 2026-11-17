@@ -92,7 +92,7 @@ const EXCEPTIONS = {
     'cases/extensionBridge.js': 26,
     'cases/fbmSync/ActivityScan.js': 3,
     'cases/fbmSync/Audit.js': 1,
-    'cases/fbmSync/AutoLogin.js': 7,
+    'cases/fbmSync/AutoLogin.js': 5,
     'cases/fbmSync/BackgroundChain.js': 1,
     'cases/fbmSync/Builders.js': 1,
     'cases/fbmSync/Push.js': 2,

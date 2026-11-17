@@ -43,11 +43,11 @@ function chay(so) {
     kho.deleteProperty('FBM_SYNC_BINDING_V1');
     check(so, 'còn khóa liên kết cũ mà kho kết nối chưa có: đọc liên kết ném FBM_STORES_MIGRATION_PENDING, không hiện "chưa liên kết"', ma, 'FBM_STORES_MIGRATION_PENDING');
     const khoaFbm = () => Object.keys(kho.getProperties()).filter((key) => /BINDING|CONNECTION/.test(key));
-    F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: 'u1', username: 'A', accountName: 'Tai khoan A' });
+    F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: 'u1', username: 'A', accountName: 'Tai khoan A' } });
     F.stateRead = () => ({});
-    F.bindingClear();
+    F.connectionSave({ binding: {} });
     const sauGo = F.connectionRead();
-    F.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: 'u2', username: 'B', accountName: 'Tai khoan B' });
+    F.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: 'u2', username: 'B', accountName: 'Tai khoan B' } });
     const sauLienKetMoi = F.connectionRead();
     check(so, 'gỡ liên kết giữ dấu tài khoản vừa gỡ trong cùng khóa; liên kết mới bỏ dấu trong cùng lần ghi; chỉ có một khóa FBM_CONNECTION_V1',
       [sauGo.binding.userId || '', sauGo.clearedFrom.userId, sauLienKetMoi.binding.userId, Object.keys(sauLienKetMoi.clearedFrom).length, khoaFbm()],

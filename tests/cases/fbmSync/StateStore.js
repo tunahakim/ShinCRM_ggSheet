@@ -45,7 +45,7 @@ function kiemKhoTrangThai(so) {
 
   nen.props.FBM_SYNC_STATE_V1 = '{"phase":"push"';
   nen.props.FBM_SYNC_PENDING_PUSHES_V1 = '{"activity:ACT-1":{"hash":"h"}}';
-  Object.assign(F, { identityStatus: () => ({ status: 'BOUND' }), settingsView: () => ({}), loginConfigPublic: () => ({ configured: true }) });
+  Object.assign(F, { identityStatus: () => ({ status: 'BOUND' }), settingsView: () => ({}), credentialPublicView: () => ({ configured: true }) });
   const ket = trongLanGoi(nen.hop, () => F.statusRead()).status;
   check(so, 'state hỏng thì status trả "kẹt" kèm nút đặt lại và ghi Log, không ném lỗi',
     [ket.code, ket.resetOffered, ket.phase, docLog(nen).some((row) => row.join('|').indexOf('state_stuck') >= 0)], ['SYNC_STATE_STUCK', true, 'error', true]);

@@ -129,7 +129,7 @@ function chay(so) {
     const { hop, F, logs, notices, hoi } = hopNen();
     datMayIm(hop);
     datPhan(hop, 'background', { machineAutoTakeover: true });
-    F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-1', username: 'nguoi-thu' });
+    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
     const taken = hoi(MAY_B, 'alarm', { keyRefs: ['fbmCredentialVault:khac', 'cred-1'] }), machine = F.backgroundMachineRead(), view = F.statusView().backgroundMachine;
     const log = maCua(logs, 'background_machine_takeover'), topics = loaiThongBao();
     check(so, 'tự nhận bật, máy được giao im quá ngưỡng, máy hỏi có khóa giải mã mật khẩu đã lưu: máy hỏi thành máy nền, Log BACKGROUND_MACHINE_TAKEOVER, thông báo chung loại bấm ✕ mới hết nói nhận thay máy nào (không hẹn giờ trong khối máy nền), chạy tiếp việc đến hạn',
@@ -140,7 +140,7 @@ function chay(so) {
     const { hop, F, logs, hoi } = hopNen();
     datMayIm(hop);
     datPhan(hop, 'background', { machineAutoTakeover: false });
-    F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-1', username: 'nguoi-thu' });
+    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
     const refused = hoi(MAY_B, 'alarm', { keyRefs: ['cred-1'] }), view = F.statusView().backgroundMachine;
     check(so, 'tự nhận tắt, máy được giao im: máy hỏi không nhận việc, chỉ có thông báo máy nền im trên màn trạng thái',
       [refused.code, F.backgroundMachineRead().machineId, maCua(logs, 'background_machine_takeover').length, view.silent, view.notice && view.notice.code],
@@ -150,9 +150,9 @@ function chay(so) {
     const { hop, F, logs, hoi } = hopNen();
     datMayIm(hop);
     datPhan(hop, 'background', { machineAutoTakeover: true });
-    F.loginConfigRead = () => ({ configured: true, credentialRef: 'cred-1', username: 'nguoi-thu' });
+    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
     const noKey = hoi(MAY_B, 'alarm', { keyRefs: ['cred-khac'] });
-    F.loginConfigRead = () => ({ configured: false, credentialRef: '', username: '' });
+    F.credentialRead = () => ({ configured: false, credentialRef: '', ciphertext: null, public: {} });
     const noSaved = hoi(MAY_B, 'alarm', { keyRefs: [] });
     check(so, 'tự nhận bật nhưng máy hỏi không có khóa giải mã mật khẩu đã lưu (hoặc chưa lưu mật khẩu): không tự nhận, Log lý do no_key',
       [noKey.code, noSaved.code, F.backgroundMachineRead().machineId, maCua(logs, 'background_machine_refused').map((line) => line.detail.reason)],

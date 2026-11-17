@@ -48,7 +48,7 @@ async function chay(so) {
   // Kiểm liên kết gửi bản nháp: đối chiếu bản nháp người dùng đang xem, không phải liên kết đã lưu.
   const flow = workflowGas();
   flow.hop.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-000001', fbmId: 'FBM-1', fbmCustomerCode: 'ALT00010' }] : [];
-  flow.hop.FbmSync.bindingWrite({ spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  flow.hop.FbmSync.connectionSave({ binding: { spreadsheetId: 'sheet-workflow', userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' } });
   const draft = { spreadsheetId: 'sheet-workflow', userId: '9999', username: 'NHAP', accountName: 'Ban Nhap' };
   const started = flow.hop.fbmDriveCommand('start', { kind: 'identity_check', identity: draft, machineId: 'may-A' });
   check(so, 'Kiểm liên kết với bốn ô nháp: state.identityTarget bằng bản nháp, không phải liên kết đã lưu', [started.ok, flow.hop.FbmSync.stateRead().identityTarget], [true, draft]);
