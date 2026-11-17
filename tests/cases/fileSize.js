@@ -38,7 +38,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/client/ui/uiBuilder.html', 264, 15919, 'giữ', 'bộ dựng Block'],
   ['1_ShinCRM_GAS/client/ui/unsavedChanges.html', 355, 17450, 'UI', 'cảnh báo chưa lưu + hộp quyết định dùng chung'],
   ['1_ShinCRM_GAS/fbm_sync/control/ControlPort.js', 239, 18191, 'B4', 'một việc: cổng lệnh'],
-  ['1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js', 283, 19667, 'B4', 'vết kỹ thuật + bước nghiệp vụ; thêm cổng gửi dòng Log thường cho cửa lệnh ghi (`callLogAdd`); nhãn lượt theo `cycleId` của dòng'],
+  ['1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js', 286, 20035, 'B4', 'vết kỹ thuật + bước nghiệp vụ; cổng gửi dòng Log thường (`callLogAdd`); nhãn lượt theo `cycleId`; bước có dòng hoàn thành ghi Log thường'],
   ['1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js', 291, 23207, 'B8', 'các lớp quét giao dịch'],
   ['1_ShinCRM_GAS/fbm_sync/read/GridRead.js', 319, 27386, 'B8', 'đọc lưới FBM; thêm lệnh cắt cột meta.keep và một cửa đọc lưới đã cắt (gridKeep, gridPicked); cài đặt dựng request đã tách sang RequestSettings.js'],
   ['1_ShinCRM_GAS/fbm_sync/write/PushCandidates.js', 209, 16262, 'B9', 'một việc: chọn ứng viên đẩy và các phép quyết thuần của cổng chặng đẩy (bỏ chặng, ngưỡng chấp thuận, dấu tập)'],

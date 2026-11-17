@@ -1133,10 +1133,10 @@ async function chay(so) {
   const matTab = await fullPipeline(false, 'read', { customers: 5, rounds: 2, loseTab: true });
   const matMotLan = await fullPipeline(false, 'read', { customers: 5, loseTab: 1 });
   const daDanhVang = (run) => run.fullLocal.activity.concat(run.fullLocal.customer).filter((item) => item.syncStatus === 'không thấy bên FBM').length;
-  check(so, 'chạy lại cùng lô không tạo dòng trùng; đường truyền đứt ở lô đọc đầu thì GAS gửi lại lô đúng một lần, lần gửi lại vẫn đứt thì lượt đó dừng lỗi (lượt đầu 2 lô, lượt sau 1 lô), lượt sau quét lại cả lượt, không trùng dòng và không đánh vắng mặt nhầm', [
+  check(so, 'chạy lại cùng lô không tạo dòng trùng; lô đọc cứ đứt đường truyền thì mỗi lần GAS hỏi phiên rồi gửi lại, chạm trần gửi lại của lượt thì lượt đó dừng lỗi (lượt đầu 4 lô = 1 + 3 lần gửi lại, lượt sau 1 lô), lượt sau quét lại cả lượt, không trùng dòng và không đánh vắng mặt nhầm', [
     chayLai.fullLocal.customer.length, chayLai.fullLocal.activity.length, daDanhVang(chayLai), chayLai.fullStep.status.phase,
     matTab.fullStatuses.some((status) => status && status.phase === 'error'), matTab.fullLocal.customer.length, matTab.fullLocal.activity.length, daDanhVang(matTab), matTab.fullStep.status.phase, matTab.fullBatches.length
-  ], [5, 5, 0, 'done', true, 5, 5, 0, 'done', 3]);
+  ], [5, 5, 0, 'done', true, 5, 5, 0, 'done', 5]);
   check(so, 'đường truyền đứt một lần ở lô đọc giao dịch: GAS gửi lại đúng lô đó (cùng các khách) một lần, lượt đi tiếp đến xong, đủ khách và giao dịch, Log ghi lần gửi lại, đếm 1 lần vào trần gửi lại của lượt', [
     matMotLan.fullStep.status.phase, matMotLan.fullBatches.length, JSON.stringify(matMotLan.fullBatches[0].items.map((item) => item.body)) === JSON.stringify(matMotLan.fullBatches[1].items.map((item) => item.body)), matMotLan.fullBatches[0].id !== matMotLan.fullBatches[1].id,
     matMotLan.fullLocal.customer.length, matMotLan.fullLocal.activity.length, matMotLan.fullLogs.filter((event) => event.action === 'transport_retry').length, matMotLan.fullFlow.hop.FbmSync.stateRead().metadata.transportReplays

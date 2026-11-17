@@ -1,4 +1,4 @@
-/** Cổng phiên ở bước phát request và chặng phiên: thứ tự cổng, lệnh ghi nghi phiên, nối lại lượt dở, dựng lại request sau khi phiên vừa xác minh. */
+/** Cổng phiên ở bước phát request và chặng phiên: thứ tự cổng, lệnh ghi nghi phiên, nối lại lượt dở, dựng lại request sau khi phiên vừa xác minh, đứt kênh tới tab khi đang đọc (đăng xuất giữa lượt). */
 const { section, check } = require('../../lib/assert');
 const { workflowGas, noiLat } = require('../../lib/fbm/hop-dong-bo');
 const { TRANG_FBM_THU } = require('../../lib/load-gas');
@@ -9,8 +9,8 @@ const PHIEN_SONG = '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]
 const LUOI_KHACH = { kind: 'customer_grid', type: 0, pageIndex: -1, pageValue: null, count: 2000 };
 
 /** Hộp có liên kết đã xác nhận và một lượt đọc đang chạy ở `cursor`, phiên chưa xác minh. */
-function hopLuot(cursor, patch) {
-  const { hop } = workflowGas();
+function hopLuot(cursor, patch, options) {
+  const { hop } = workflowGas(options);
   const F = hop.FbmSync;
   F.bindingWrite(NGUOI_DUNG);
   F.stateWrite(Object.assign(F.runOpen({ phase: 'pull_customer' }), { entity: 'customer', cursor: cursor }, patch || {}));
@@ -58,6 +58,34 @@ async function chay(so) {
   check(so, 'nối lượt dở: lượt đăng nhập không nối mù; chặng phiên gửi lại request hỏi phiên với nguyên chỗ quay về', [
     dangNhap.startRun({ origin: 'manual', manual: true, mode: 'read' }).code, phienLai.ok, phienLai.request && phienLai.request.meta.kind, phien.stateRead().cursor.kind, phien.stateRead().cursor.resume.cursor.kind
   ], ['SYNC_BUSY', true, 'session_probe', 'session', 'customer_grid']);
+  // Đăng xuất FBM giữa lượt làm tab đổi trang nên request đọc đang chạy chết giữa đường: gửi lại phải qua chặng phiên (hỏi phiên trước), không đi thẳng tới FBM.
+  const dutKenh = (options) => {
+    const F = hopLuot(LUOI_KHACH, null, options);
+    F.cursorIssue();
+    const luoi = traLoi(F, PHIEN_SONG);
+    return { F, ketQua: F.transportFailureRun({ requestId: luoi.request.id, code: 'FBM_TRANSPORT_UNAVAILABLE', message: 'Kênh tới tab FBM đã đóng.' }) };
+  };
+  const nhatKy = [];
+  const chet2 = dutKenh({ logEvent: (event) => nhatKy.push(event) });
+  const chet2Cursor = chet2.F.stateRead().cursor;
+  const chet2KetQua = traLoi(chet2.F, '{"d":{"TotalRowCount":0,"Rows":null,"ViewPage":null,"Authorized":false}}');
+  check(so, 'đứt kênh khi đọc: gửi request hỏi phiên (giữ chỗ quay về, tính 1 lần vào trần gửi lại); phiên đã chết thì tới cổng tự đăng nhập (ở đây chưa cấu hình nên dừng có báo), không dừng vì lỗi đường truyền', [
+    chet2.ketQua.request && chet2.ketQua.request.meta.kind, chet2Cursor.kind, chet2Cursor.cause, chet2Cursor.resume.cursor.kind, chet2.F.stateRead().metadata.transportReplays, chet2KetQua.code, nhatKy.some((event) => event.action === 'session_gate_blocked')
+  ], ['session_probe', 'session', 'issue', 'customer_grid', 1, 'AUTO_LOGIN_NOT_CONFIGURED', true]);
+  const song = dutKenh();
+  const songKetQua = traLoi(song.F, PHIEN_SONG);
+  check(so, 'đứt kênh khi đọc, phiên vẫn sống: gửi lại đúng request đọc của cursor cũ', [songKetQua.ok, songKetQua.request && songKetQua.request.meta.kind, song.F.stateRead().cursor.kind, song.F.stateRead().cursor.pageIndex], [true, 'grid', 'customer_grid', -1]);
+  const haiLan = dutKenh();
+  const haiLanKetQua = haiLan.F.transportFailureRun({ requestId: haiLan.ketQua.request.id, code: 'FBM_FETCH_TIMEOUT', message: 'FBM không phản hồi sau 10 giây.' });
+  check(so, 'đứt kênh rồi chính request hỏi phiên cũng hỏng: dừng lượt lỗi, không gửi gì thêm', [haiLanKetQua.ok, haiLanKetQua.code, haiLanKetQua.request, haiLan.F.stateRead().phase], [false, 'FBM_FETCH_TIMEOUT', null, 'error']);
+
+  // Tự đăng nhập là sự kiện của tài khoản FBM: dòng hoàn thành phải vào Log thường (kể cả lượt nền), không chỉ dòng vết.
+  const dongLog = [];
+  const dn = hopLuot(LUOI_KHACH, { origin: 'background' }, { logEvent: (event) => dongLog.push(event) });
+  const dnState = dn.stateRead();
+  dn.businessStepStart(dnState, 'auto_login', {});
+  dn.businessStepFinish(dnState, 'auto_login', 'ok', {});
+  check(so, 'tự đăng nhập xong ghi một dòng Log thường auto_login_finished', [dongLog.filter((event) => event.action === 'auto_login_finished').map((event) => event.outcome)], [['ok']]);
 }
 
 module.exports = { chay };
