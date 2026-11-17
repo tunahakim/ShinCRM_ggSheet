@@ -126,7 +126,8 @@ FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
   if (value === 'FBM_TAB_NOT_READY' && !reissued) { plan = 'reload_page'; }
   if (value === 'FBM_TAB_NOT_FOUND' && !reissued && policy && policy.autoOpenTab === true) { plan = 'open_tab'; }
   // Lỗi sau khi request có thể đã tới FBM (tab tải lại giữa chừng, mạng đứt): chỉ gửi lại request đọc thuần đã khai trong REQUEST_REPLAY.
-  if (value === 'FBM_TRANSPORT_UNAVAILABLE' && !reissued && state.activeRequestReplay === true) { plan = 'replay'; }
+  // Quá giờ (FBM chậm hoặc tab đang đổi trang) cũng vậy: request đọc thì hỏi phiên rồi gửi lại, có trần của lượt; quét giao dịch lớp 1 đã chia cửa sổ ngày ở trên.
+  if ((value === 'FBM_TRANSPORT_UNAVAILABLE' || value === 'FBM_FETCH_TIMEOUT') && !reissued && state.activeRequestReplay === true) { plan = 'replay'; }
   if (plan !== 'stop' && Number(state.metadata && state.metadata.transportReplays || 0) >= FbmSync.BUDGET.transportReplaysPerRun) { plan = 'replay_budget'; }
   return plan;
 };
