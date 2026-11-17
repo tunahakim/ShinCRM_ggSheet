@@ -30,7 +30,7 @@
     },
     {
       "matches": ["https://fbo.com.vn:8888/*"],
-      "js": ["content_scripts/fbm_sync/executor.js"],
+      "js": ["content_scripts/fbm_sync/response_shape.js", "content_scripts/fbm_sync/executor.js"],
       "run_at": "document_idle"
     }
   ]
