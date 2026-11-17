@@ -340,6 +340,8 @@ tests\
 │   │   ├── hop-lien-ket.js       Hộp cho tầng liên kết client/link: đồng hồ, hẹn giờ, DOM giả, callServer trả ngay.
 │   │   ├── fbm-cai-dat.js        Gói cài đặt FBM đúng dạng GAS trả cho Sidebar, dùng chung cho test màn đồng bộ.
 │   │   ├── bo-dong-bo.js         Sidebar Đồng bộ FBM thật trong hộp cát với DOM giả, renderer giả và đồng hồ giả không tự nổ.
+│   │   ├── hanh-trinh.js         Hành trình người dùng trên Sidebar Đồng bộ FBM: Sidebar đã gắn listener thật, GAS giả giữ công tắc tổng và công tắc nền, bấm/đổi ô qua listener của tài liệu.
+│   │   ├── tep-dong-bo.js        Danh sách tệp giao diện Sidebar Đồng bộ FBM cho các ca kiểm tĩnh đọc chung.
 │   │   ├── schema-node.js        Duyệt mọi node của một cây Block.
 │   │   └── ten-hanh-dong.js      Bảng tên hành động của Sidebar.
 │   ├── ext\
@@ -358,6 +360,7 @@ tests\
 │   │   ├── tu-dang-nhap.js       Khung các ca tự đăng nhập: dựng hộp cổng và hộp Giữ phiên (liên kết, credential giả), nộp response nền, hỏi cổng, vá dấu lần thử.
 │   │   ├── worker-nap.js         Service worker thật của Extension chạy trong vm với Chrome giả (`workerNap`, `phongBi`, `chayLuot`), dùng chung cho kiểm vòng chở lát và kiểm quyền trang.
 │   │   ├── hop-dong-bo.js        Hộp cát GAS của đồng bộ FBM: nạp đủ tệp fbm_sync thật, kho thuộc tính chung, khóa script; mọi tệp ca FBM dựng hộp từ đây.
+│   │   ├── status-gas.js         Status Sidebar dựng bằng bộ dựng thật `FbmSync.statusViewBuild`: fixture của ca test Sidebar lấy từ đây để luôn đúng hợp đồng GAS trả.
 │   │   ├── buoc-day.js           Lối gọi chặng đẩy cho ca kiểm đúng như khung lát gọi (bản sao ô lượt, patch, chốt lượt).
 │   │   └── hang-day.js           Hộp thử chiều đẩy: hộp GAS với Sheet giả trong RAM và hàng đợi đẩy dựng sẵn đầu chặng; ma trận production và ca cổng chặng đẩy cùng dựng từ đây.
 │   ├── view\
@@ -441,9 +444,20 @@ tests\
     ├── fbmSync\AutoLoginSauXoa.js Kiểm Giữ phiên sau lượt bị xóa phiên: lọc quyền theo grid User, trang FBM lệch hoặc thiếu danh tính.
     ├── fbmSync\LoginReply.js    Kiểm bảng đọc câu trả lời Login của FBM (`d`): lượt bị từ chối đóng lỗi, sai mật khẩu hoặc câu trả lời chưa gặp thì ngừng tự đăng nhập, dòng Log ghi trước khi lượt đóng.
     ├── fbmSync\ForceLoginResume.js    Kiểm Hủy phiên cũ rồi chạy tiếp: GAS mở lại lượt đồng bộ tay không đẩy bị chặn, lượt đẩy/nền/Đăng nhập thử chỉ đăng nhập
-    ├── fbmSync\Sidebar.js       Smoke test renderer và thao tác chính của Sidebar Đồng bộ FBM.
-    ├── fbmSync\UserJourneys.js  Kiểm các hành trình Sidebar, cấu hình kết nối, công tắc và thông báo lỗi.
+    ├── fbmSync\Sidebar.js       Kiểm khung Sidebar Đồng bộ FBM: vòng đời mở và đóng màn, header, menu và vùng báo đầu màn.
+    ├── fbmSync\SidebarRun.js    Kiểm màn Chạy vẽ đúng status GAS dựng: nút theo actions, khóa ô chọn theo busy, pipeline, tiến độ, băng phạm vi.
+    ├── fbmSync\SidebarRunActions.js  Kiểm nút màn Chạy (Bắt đầu, Dừng, Đặt lại, Hủy phiên cũ, Chấp thuận): gửi lệnh, vẽ status GAS trả, báo lỗi.
+    ├── fbmSync\SidebarBackground.js  Kiểm lượt nền đang chạy khi bấm lệnh (popup hỏi, nút X) và chỗ chờ lượt tay.
+    ├── fbmSync\SidebarAccount.js  Kiểm màn Tài khoản: kiểm liên kết, lấy nhận diện, cổng cầu nối Extension, gửi cấu hình kết nối.
+    ├── fbmSync\SidebarConflict.js  Kiểm màn xung đột: gom lựa chọn thành một quyết định gửi GAS và các nhánh GAS trả về.
+    ├── fbmSync\SidebarReport.js  Kiểm đường báo lỗi phía trình duyệt: dòng báo, nút Bỏ, cửa báo lỗi duy nhất.
+    ├── fbmSync\SidebarGasStatus.js  Kiểm Sidebar chỉ vẽ status GAS dựng: nút theo actions, icon header theo tone, thanh theo progress, câu kiểm liên kết và đăng nhập thử của GAS; lỗi cầu nối không vẽ status giả.
+    ├── fbmSync\SidebarConnectionSave.js  Kiểm lưu kết nối tài khoản FBM: chặn nhập thiếu, hỏi khi lệch username, thứ tự xóa credential, mọi lỗi hệ thống hiện Sidebar và ghi Log.
+    ├── fbmSync\UserJourneys.js  Kiểm hành trình người dùng trên màn Chạy, menu, công tắc tổng và màn Tài khoản.
+    ├── fbmSync\JourneySettings.js  Kiểm hành trình người dùng trên màn Cài đặt phiên: xem/sửa, ô sai, lịch dày, khóa hỏng, chính sách tự đăng nhập.
+    ├── fbmSync\JourneyResults.js  Kiểm hành trình người dùng trên màn Kết quả: vá tại chỗ, tab Xung đột, phân trang, thử lại.
     ├── fbmSync\Components.js    Kiểm hợp đồng Sync dùng component/lớp chung của ShinCRM, không tái tạo control generic.
+    ├── fbmSync\ComponentSpacing.js  Kiểm nhịp khoảng cách của component lõi: mỗi khoảng một chủ sở hữu bằng gap, không cộng margin lần hai.
     ├── fbmSync\FunctionTrace.js  Kiểm log bắt đầu/kết thúc hàm, tóm tắt payload và che dữ liệu bí mật.
     ├── fbmSync\SliceFailure.js   Kiểm lát bị exception, Sidebar báo lỗi và cửa ghi Sheet bị chặn: lượt chuyển lỗi ngay, đóng đúng bước đang mở, lỗi theo bản ghi vẫn xả ra Log.
     ├── fbmSync\LateReply.js      Kiểm response lệnh ghi FBM về muộn: bỏ, không áp kết quả đẩy, không ghi Sheet, không phát lại lệnh ghi.
