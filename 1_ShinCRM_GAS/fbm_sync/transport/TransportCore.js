@@ -114,7 +114,7 @@ FbmSync.transportFailClosed = function (state, cause) {
 };
 /**
  * Bảng lỗi đường truyền: nơi duy nhất quyết GAS làm gì khi Extension không gửi được request (không đọc kho, không ghi; chính sách tự mở tab được truyền vào).
- * Mỗi request được phát lại tối đa một lần (`metadata.transportRetryId`), cả lượt tối đa `BUDGET.transportReplaysPerRun` lần; chạm trần thì `replay_budget` (dừng, báo đường truyền chập chờn). `replay`: request đọc thuần mất giữa đường thì gửi lại.
+ * Mỗi request được phát lại tối đa một lần (`metadata.transportRetryId`), cả lượt tối đa `BUDGET.transportReplaysPerRun` lần; chạm trần thì `replay_budget` (dừng, báo đường truyền chập chờn). `replay`: request đọc thuần mất giữa đường thì hỏi phiên trước rồi gửi lại; request nối lại sau lần hỏi phiên là request mới nên chỉ trần của lượt chặn nó.
  * `activity_windows`: quét giao dịch quá sức thì chia cửa sổ ngày. `scan_restart`: tab mất việc quét thì chạy lại việc. `reload_page`: tab không sẵn sàng thì phát lại kèm lệnh đổi trang (Extension không tự tải lại). `open_tab`: không có tab và chính sách cho mở. `stop`: còn lại, kể cả lần phát lại của chính request vừa cứu tab.
  */
 FbmSync.transportRecoverPlan = function (state, requestId, code, policy) {
@@ -137,18 +137,24 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state.deadlineAt = 0;
   state.metadata.transportRetryId = String(requestId || '');
   state.metadata.transportReplays = Number(state.metadata.transportReplays || 0) + 1;
-  state.message = replay ? 'Đường truyền tới tab FBM đứt giữa chừng; GAS gửi lại request đọc một lần.' : reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
+  state.message = replay ? 'Đường truyền tới tab FBM đứt giữa chừng; GAS kiểm tra lại phiên rồi gửi lại request đọc một lần.' : reload ? 'Tab FBM không phản hồi; GAS yêu cầu Extension tải lại trang khách hàng và thử lại một lần.' : 'Chưa tìm thấy tab FBM; GAS yêu cầu Extension mở tab và thử lại một lần.';
   state.lastError = String(message || state.message).slice(0, 240);
+  // Kênh tới tab đứt thường vì tab vừa đổi trang, kể cả do đăng xuất: bỏ dấu phiên đã xác minh để bước phát request mở chặng phiên và hỏi phiên trước (sống thì nối lại đúng cursor, chết thì qua cổng tự đăng nhập). Gửi lại thẳng thì phiên đã chết chỉ thấy lỗi đường truyền, không bao giờ tới cổng đăng nhập.
+  if (replay) { FbmSync.sessionIdentityClear(state); }
   FbmSync.stateWrite(state);
-  request = FbmSync.cursorRequest(state);
-  if (!request) { return null; }
-  if (reload) { request = FbmSync.pageReloadAttach(request); }
-  envelope = FbmSync.sliceIssue(request);
+  if (replay) {
+    envelope = FbmSync.cursorIssue();
+  } else {
+    request = FbmSync.cursorRequest(state);
+    if (!request) { return null; }
+    if (reload) { request = FbmSync.pageReloadAttach(request); }
+    envelope = FbmSync.sliceIssue(request);
+  }
   if (!envelope) { return null; }
   state = FbmSync.stateRead();
   state.metadata.transportRetryId = String(envelope.id || '');
-  state.message = replay ? 'Đang gửi lại request đọc sau khi đường truyền tới tab FBM đứt.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
-  FbmSync.transportFailureRecord(state, String(code || ''), (replay ? 'Gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
+  state.message = replay ? 'Đang kiểm tra lại phiên FBM trước khi gửi lại request đọc.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
+  FbmSync.transportFailureRecord(state, String(code || ''), (replay ? 'Kiểm tra lại phiên rồi gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
   return { ok: true, code: 'FBM_TAB_RETRY_REQUEST_READY', request: envelope, status: FbmSync.statusView() };
 };
 /** Response của request vừa phát lại đã về: bỏ dấu phát lại để lần hỏng sau của request khác lại được cứu một lần. */

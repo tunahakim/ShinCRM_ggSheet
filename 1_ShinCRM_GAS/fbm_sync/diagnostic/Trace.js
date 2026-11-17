@@ -129,6 +129,8 @@ FbmSync.callLogAdd = function (line) {
 };
 /** Bước mà dòng bắt đầu của lượt tay ghi Log thường. */
 FbmSync.BUSINESS_VISIBLE_STARTS = ['run', 'session'];
+/** Bước mà dòng hoàn thành ghi Log thường ở mọi lượt (các bước khác chỉ ghi dòng vết khi xong). Tự đăng nhập là sự kiện của tài khoản FBM nên phải thấy được trong Log, kể cả ở lượt nền. */
+FbmSync.BUSINESS_VISIBLE_FINISHES = ['run', 'auto_login'];
 /** Các bước của chiều Lấy theo đối tượng, đóng cùng nhau khi chặng của đối tượng đó xong. */
 FbmSync.BUSINESS_PULL_STEPS = {
   customer: ['pull_customer', 'reconcile_customer'],
@@ -198,6 +200,7 @@ FbmSync.businessStepFinish = function (state, key, outcome, result) {
   var current = state || {}, metadata = current.metadata || {}, step = metadata.businessSteps && metadata.businessSteps[String(key || '')], name = String(key || ''), definition = FbmSync.businessStepDefinition(name);
   if (!step || step.finishedAt) { return false; }
   var now = Date.now(), totals = Object.assign({}, step.totals || {}, FbmSync.businessStepNumbers(result)), failed = outcome === 'error', paused = outcome === 'paused', stopped = outcome === 'stopped', error = String(result && result.error || (failed ? current.lastError : '') || '');
+  var visible = FbmSync.BUSINESS_VISIBLE_FINISHES.indexOf(name) >= 0;
   step.finishedAt = now;
   step.outcome = failed ? 'error' : paused ? 'paused' : stopped ? 'stopped' : 'ok';
   step.totals = totals;
@@ -210,8 +213,8 @@ FbmSync.businessStepFinish = function (state, key, outcome, result) {
       : stopped
         ? 'Dừng ' + definition.label + ' vì lỗi ở bước ' + FbmSync.businessStepDefinition(result && result.failedStep).label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals)
         : 'Hoàn thành ' + definition.label + ' - Kết quả: ' + FbmSync.businessStepSummary(totals);
-  var entry = { source: 'fbm_sync', action: definition.action + '_finished', outcome: failed ? LOG_ERROR : paused || stopped ? LOG_WARN : name === 'run' ? LOG_OK : 'trace', cycleId: String(current.runId || metadata.businessRunId || ''), entity: String(current.entity || ''), reason: reason, detail: { step: name, input: step.input || {}, result: totals, durationMs: step.durationMs, phase: String(current.phase || ''), failureCode: String(current.lastFailureCode || '') } };
-  if (failed || paused || stopped || name === 'run') {
+  var entry = { source: 'fbm_sync', action: definition.action + '_finished', outcome: failed ? LOG_ERROR : paused || stopped ? LOG_WARN : visible ? LOG_OK : 'trace', cycleId: String(current.runId || metadata.businessRunId || ''), entity: String(current.entity || ''), reason: reason, detail: { step: name, input: step.input || {}, result: totals, durationMs: step.durationMs, phase: String(current.phase || ''), failureCode: String(current.lastFailureCode || '') } };
+  if (failed || paused || stopped || visible) {
     logEvent(entry);
   } else {
     logTrace(entry);
