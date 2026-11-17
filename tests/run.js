@@ -91,6 +91,7 @@ const NHOM_CA = [
   require('./cases/unsavedChanges'),
   require('./cases/fbmSync/AutoLogin'),
   require('./cases/fbmSync/LoginReply'),
+  require('./cases/fbmSync/ForceLoginResume'),
   require('./cases/fbmSync/Sidebar'),
   require('./cases/fbmSync/Components'),
   require('./cases/fbmSync/ProductionMatrix')];

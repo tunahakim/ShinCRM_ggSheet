@@ -165,6 +165,14 @@ async function testNoSelfCancel(so) {
   hop.syncScreenClose();
   hop.fbmSyncStatusReceived({ status: { runId: 'run-10', phase: 'pull_customer', running: true } });
   check(so, 'đóng màn đồng bộ: đồng hồ chờ bị hủy, status relay về sau không đặt đồng hồ mới, chỗ chờ vẫn giữ', [timers[daDat - 1].cleared, timers.length === daDat, hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId], [true, true, 'run-10']);
+  let ketNoi = null;
+  hop.FBM_SYNC_CLIENT.runWaiter = { runId: 'run-20', resolve(value) { ketNoi = value; }, reject() {}, timer: null };
+  hop.fbmSyncStatusReceived({ status: { runId: 'run-99', phase: 'pull_customer', running: true }, done: true });
+  hop.fbmSyncStatusReceived({ status: { runId: 'run-21', follows: 'run-20', phase: 'pull_customer', running: true } });
+  const sauNoi = [hop.FBM_SYNC_CLIENT.runWaiter && hop.FBM_SYNC_CLIENT.runWaiter.runId, hop.FBM_SYNC_CLIENT.ownRunId, ketNoi];
+  hop.fbmSyncStatusReceived({ status: { runId: 'run-21', phase: 'done' }, done: true });
+  check(so, 'GAS mở lượt nối tiếp (follows là mã lượt đang chờ) thì chỗ chờ chuyển sang lượt mới và kết thúc khi lượt mới xong; status lượt khác không nối thì bỏ qua',
+    [sauNoi, ketNoi && ketNoi.status.runId, hop.FBM_SYNC_CLIENT.runWaiter], [['run-21', 'run-21', null], 'run-21', null]);
 }
 
 async function testStuckStopsWaiting(so) {
@@ -654,7 +662,7 @@ async function chay(so) {
   hop.FBM_SYNC_CLIENT.mode = 'read';
   await hop.fbmSyncForceLogin();
   hop.fbmSyncRun = realRun; hop.fbmSyncDrive = realDrive;
-  check(so, 'FBM-057: hủy phiên cũ và đăng nhập xong thì tự chạy lại đúng loại đồng bộ đang chọn', [forceDrives, forceRuns], [[['start', 'login_force']], ['read']]);
+  check(so, 'FBM-057: hủy phiên cũ và đăng nhập xong thì Sidebar không tự mở lượt đồng bộ (GAS quyết có mở lại lượt bị chặn hay không)', [forceDrives, forceRuns], [[['start', 'login_force']], []]);
   // FBM-017: lỗi giữa phiên vẽ lỗi lên snapshot GAS gần nhất, không dựng bộ đếm 0 và không làm mất pipeline.
   const errorPaints = [], savedCallServer = hop.callServer, savedDrive = hop.fbmSyncDrive;
   hop.fbmSyncPaint = (status) => { const snapshot = status.status || status; hop.FBM_SYNC_CLIENT.lastStatus = snapshot; errorPaints.push(snapshot); };
