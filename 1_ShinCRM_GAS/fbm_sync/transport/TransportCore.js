@@ -87,29 +87,26 @@ FbmSync.transportPolicy = function () {
  * Ghi state lỗi thì ném lên lát để `runSlice` chuyển phiên sang lỗi; nuốt ở đây thì Sidebar thấy state cũ còn Log không có gì.
  */
 FbmSync.transportFailureRecord = function (state, code, message, action, cause, facts) {
-  var current = state || FbmSync.stateRead(), reason = String(message || 'Đường truyền tới FBM đã dừng vì lỗi.').slice(0, 240), detail;
-  current.lastFailureCode = String(code || 'FBM_SESSION_GATE_FAILED');
-  current.lastError = reason;
-  current.message = reason;
-  FbmSync.stateWrite(current);
-  detail = { code: current.lastFailureCode, phase: String(current.phase || ''), runId: String(current.runId || '') };
+  var reason = String(message || 'Đường truyền tới FBM đã dừng vì lỗi.').slice(0, 240), detail;
+  state.lastFailureCode = String(code || 'FBM_SESSION_GATE_FAILED');
+  state.lastError = reason;
+  state.message = reason;
+  detail = { code: state.lastFailureCode, phase: String(state.phase || ''), runId: String(state.runId || '') };
   // Chỉ ghi mã/loại lỗi gốc, không ghi message: exception có thể mang nội dung cấu hình đăng nhập.
   if (cause) { detail.causeCode = String(cause.code || cause.name || 'Error'); }
   // `facts` chỉ nhận dấu hiệu đã lọc sẵn (mã, độ dài, tên khóa), không nhận giá trị response.
   if (facts) { detail.response = facts; }
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: action || 'session_gate_error', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', reason: reason, detail: detail }); }
-  if (typeof flushLog === 'function') { flushLog(); }
-  return current;
+  FbmSync.stagePatchApply(state, { logs: [{ action: action || 'session_gate_error', outcome: LOG_ERROR, reason: reason, detail: detail }] });
+  return state;
 };
 /** Lỗi nội bộ khi đọc chính sách hay dựng lại request phải dừng trước khi cấp envelope; mã lỗi gốc đi vào Log để còn điều tra. */
 FbmSync.transportFailClosed = function (state, cause) {
-  var current = state || {};
-  current.activeRequestId = '';
-  current.deadlineAt = 0;
-  current.phase = 'error';
-  current.retryable = false;
-  current.cursor = {};
-  FbmSync.transportFailureRecord(current, 'FBM_SESSION_GATE_EXCEPTION', 'Bước phát request FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'transport_exception', cause);
+  state.activeRequestId = '';
+  state.deadlineAt = 0;
+  state.phase = 'error';
+  state.retryable = false;
+  state.cursor = {};
+  FbmSync.transportFailureRecord(state, 'FBM_SESSION_GATE_EXCEPTION', 'Bước phát request FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'transport_exception', cause);
   return null;
 };
 /**
@@ -142,17 +139,15 @@ FbmSync.transportReissue = function (state, requestId, code, message, plan) {
   state.lastError = String(message || state.message).slice(0, 240);
   // Kênh tới tab đứt thường vì tab vừa đổi trang, kể cả do đăng xuất: bỏ dấu phiên đã xác minh để bước phát request mở chặng phiên và hỏi phiên trước (sống thì nối lại đúng cursor, chết thì qua cổng tự đăng nhập). Gửi lại thẳng thì phiên đã chết chỉ thấy lỗi đường truyền, không bao giờ tới cổng đăng nhập.
   if (replay) { FbmSync.sessionIdentityClear(state); }
-  FbmSync.stateWrite(state);
   if (replay) {
-    envelope = FbmSync.cursorIssue();
+    envelope = FbmSync.cursorIssue(state);
   } else {
     request = FbmSync.cursorRequest(state);
     if (!request) { return null; }
     if (reload) { request = FbmSync.pageReloadAttach(request); }
-    envelope = FbmSync.sliceIssue(request);
+    envelope = FbmSync.sliceIssue(state, request);
   }
   if (!envelope) { return null; }
-  state = FbmSync.stateRead();
   state.metadata.transportRetryId = String(envelope.id || '');
   state.message = replay ? 'Đang kiểm tra lại phiên FBM trước khi gửi lại request đọc.' : reload ? 'Đang thử lại request sau khi GAS yêu cầu tải lại trang FBM.' : 'Đang thử lại request sau khi GAS yêu cầu mở tab FBM.';
   FbmSync.transportFailureRecord(state, String(code || ''), (replay ? 'Kiểm tra lại phiên rồi gửi lại request đọc đúng một lần: ' : '') + (message || (reload ? 'Tab FBM không phản hồi. Đang tải lại và thử lại đúng một lần.' : 'Không tìm thấy tab FBM. Đang thử lại đúng một lần.')), 'transport_retry');
@@ -164,16 +159,14 @@ FbmSync.transportRetryClear = function (state) {
   return state;
 };
 FbmSync.pauseForRuntimeLimit = function (state) {
-  var current = state || FbmSync.stateRead();
-  current.activeRequestId = '';
-  current.deadlineAt = 0;
-  current.phase = 'paused';
-  current.lastFailureCode = 'GAS_RUNTIME_LIMIT';
-  current.lastError = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.';
-  current.message = current.lastError;
-  current.retryable = true;
-  logEvent({ source: 'fbm_sync', action: 'slice_limit', outcome: LOG_ERROR, reason: current.lastFailureCode, detail: { runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: current.cursor || {} } });
-  FbmSync.stateWrite(current);
+  state.activeRequestId = '';
+  state.deadlineAt = 0;
+  state.phase = 'paused';
+  state.lastFailureCode = 'GAS_RUNTIME_LIMIT';
+  state.lastError = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.';
+  state.message = state.lastError;
+  state.retryable = true;
+  FbmSync.stagePatchApply(state, { logs: [{ action: 'slice_limit', outcome: LOG_ERROR, reason: state.lastFailureCode, detail: { runId: String(state.runId || ''), phase: String(state.phase || ''), cursor: state.cursor || {} } }] });
   return null;
 };
 /**
@@ -230,7 +223,6 @@ FbmSync.requestIssue = function (state, request, now) {
   if (FbmSync.issueContext && FbmSync.issueContext.machineId) { state.driverMachineId = FbmSync.issueContext.machineId; }
   state.lastProgressAt = now;
   state.deadlineAt = FbmSync.budgetDeadlineAt(now, meta.timeoutMs);
-  FbmSync.stateWrite(state);
   FbmSync.traceEvent(state, 'response_built', { requestId: id, operation: meta.kind, entity: meta.entity, recordId: meta.id || meta.shinId || meta.stt_rec_kh, items: request.items ? request.items.length : undefined });
   if (request.items) { return FbmSync.protocol.batch(id, request.items.map(function (item) { return { url: item.url, body: FbmSync.transportValue(item.body), meta: item.meta }; }), FbmSync.transportValue(meta)); }
   return FbmSync.protocol.request(id, request.url, FbmSync.transportValue(request.body), FbmSync.transportValue(meta), request.method);
@@ -239,8 +231,8 @@ FbmSync.requestIssue = function (state, request, now) {
  * Giữ chỗ nhận lượt cho máy đang mở lượt từ Sidebar; lần hỏi kế tiếp của Extension máy đó (Sidebar đánh thức hoặc chuông) nhận lượt. Lúc Extension đến nhận, GAS dựng lại request từ cursor, nên request định phát phải dựng lại được từ cursor: lệch là lỗi lập trình, ném ngay chứ không để Extension nhận nhầm bước.
  * Chỗ giữ là một request đang chờ có hạn (`REQUEST_IN_FLIGHT` với nhịp nền máy khác); quá hạn mà không ai nhận thì luật lượt treo đóng lượt như request không được trả lời.
  */
-FbmSync.envelopeHold = function (request) {
-  var state = FbmSync.stateRead(), rebuilt = FbmSync.cursorRequest(state), machineId = String(FbmSync.issueContext.machineId || ''), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
+FbmSync.envelopeHold = function (state, request) {
+  var rebuilt = FbmSync.cursorRequest(state), machineId = String(FbmSync.issueContext.machineId || ''), fail = function (code, message) { var error = new Error(message); error.code = code; throw error; };
   if (!machineId) { fail('SYNC_MACHINE_ID_REQUIRED', 'Lệnh mở lượt từ Sidebar thiếu mã máy Extension sẽ chở lượt.'); }
   if (!state.runId) { fail('PICKUP_RUN_ID_MISSING', 'Lượt vừa mở không có mã lượt nên Extension không nhận được.'); }
   if (!rebuilt || String(rebuilt.meta && rebuilt.meta.kind || '') !== String(request.meta && request.meta.kind || '') || String(rebuilt.url || '') !== String(request.url || '')) {
@@ -250,7 +242,6 @@ FbmSync.envelopeHold = function (request) {
   state.activeRequestSig = FbmSync.requestSig(request);
   state.deadlineAt = FbmSync.budgetPickupDeadlineAt(Date.now(), settingsValue(FbmSync.SETTING_SECTIONS.extension, 'pollMinutes'));
   state.driverMachineId = machineId;
-  FbmSync.stateWrite(state);
   return { pickup: true, runId: String(state.runId) };
 };
 /**
@@ -288,8 +279,7 @@ FbmSync.envelopeReissue = function (state, answeredId) {
   if (answeredId) { state.resubmit = { answered: String(answeredId), issued: '' }; FbmSync.requestWatch.lastAnswered = String(answeredId); }
   state.activeRequestId = '';
   state.deadlineAt = 0;
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() };
 };
 /** Nộp lặp: lượt còn request đang chờ thì phát lại nó, lượt đã đóng thì trả status để Extension kết thúc chuỗi. Không chạy lại nghiệp vụ của lần nộp đầu. */
 FbmSync.envelopeResubmit = function (state) {

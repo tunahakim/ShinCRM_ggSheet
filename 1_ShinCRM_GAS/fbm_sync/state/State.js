@@ -170,7 +170,7 @@ FbmSync.sliceStore = null;
 FbmSync.stateRead = function () {
   var store = FbmSync.sliceStore;
   if (!store) { return FbmSync.stateLoad(); }
-  if (!store.state) { store.state = FbmSync.stateLoad(); }
+  if (!store.state) { store.state = FbmSync.stateLoad(); store.snapshot = JSON.stringify(store.state); }
   return store.state;
 };
 /**
@@ -197,11 +197,14 @@ FbmSync.stateReplace = function (state) {
   store.dirty = true;
   return state;
 };
-/** Đóng bản của lát; có thay đổi thì ghi xuống kho một lần. Trả bản đã ghi, hoặc `null` khi lát không đổi ô lượt. */
+/**
+ * Đóng bản của lát; có thay đổi thì ghi xuống kho một lần. Trả bản đã ghi, hoặc `null` khi lát không đổi ô lượt.
+ * "Có thay đổi" gồm cả bản lát đã sửa mà không ai gọi `stateWrite` (so với bản chụp lúc nạp), nên công cụ trong lát chỉ sửa ô lượt nhận được, không có đường quên ghi.
+ */
 FbmSync.sliceStoreClose = function () {
   var store = FbmSync.sliceStore;
   FbmSync.sliceStore = null;
-  return store && store.dirty ? FbmSync.stateStore(store.state) : null;
+  return store && store.state && (store.dirty || JSON.stringify(store.state) !== store.snapshot) ? FbmSync.stateStore(store.state) : null;
 };
 /** Đọc ô lượt từ kho và tự bù field thiếu từ mặc định. */
 FbmSync.stateLoad = function () {

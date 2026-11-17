@@ -46,7 +46,6 @@ FbmSync.pushEndApply = function (state, end) {
   FbmSync.pushListClear();
   if (end.kind === 'fail') {
     FbmSync.runFail(state, end.code, end.message, { keepRecords: true });
-    FbmSync.stateWrite(state);
     return { ok: false, code: end.code, request: null, status: FbmSync.statusView(), error: end.message };
   }
   if (end.mark) {
@@ -58,7 +57,6 @@ FbmSync.pushEndApply = function (state, end) {
   } else {
     FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) + (end.remaining ? ' Còn ' + end.remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '') + (end.note || ''), keepRecords: true });
   }
-  FbmSync.stateWrite(state);
   return { ok: true, request: null, status: FbmSync.statusView() };
 };
 

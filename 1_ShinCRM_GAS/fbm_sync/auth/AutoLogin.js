@@ -59,7 +59,7 @@ FbmSync.loginOpen = function (purpose, input, state) {
   // Đăng nhập là một lượt riêng (nhãn Tay · Đăng nhập thử / Hủy phiên cũ): mã lượt mới để Extension nhận đúng lượt và dòng Log không lẫn với lượt trước.
   var opened = FbmSync.runOpen({ origin: 'manual', phase: 'checking_session', kindLabel: force ? 'Hủy phiên cũ' : 'Đăng nhập thử', cursor: cursor, message: force ? 'Đang hủy phiên cũ, đăng nhập và xác minh tài khoản FBM...' : 'Đang đăng nhập thử và xác minh tài khoản FBM...' });
   if (force) { FbmSync.stagePatchApply(opened, { logs: [{ action: 'login_force_requested', outcome: LOG_WARN, reason: 'Người dùng xác nhận hủy phiên FBM cũ để đăng nhập lại.', detail: { blockedRunId: String(state.runId || '') } }] }); }
-  return { ok: true, request: FbmSync.sliceIssue(FbmSync.loginStepRequest(cursor, credential)), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.sliceIssue(opened, FbmSync.loginStepRequest(cursor, credential)), status: FbmSync.statusView() };
 };
 
 /**
@@ -105,5 +105,5 @@ FbmSync.autoLoginOpen = function (state, login) {
   FbmSync.autoLoginMarkAttempt();
   FbmSync.businessStepStart(state, 'auto_login', { mode: state.mode, scan: state.scan });
   FbmSync.stagePatchApply(state, { metadata: { autoLoginTried: true }, cursor: FbmSync.loginCursorOpen({ purpose: 'auto', manual: login.manual === true, afterLogin: login.afterLogin }), phase: 'checking_session', entity: '', message: 'Phiên FBM hết hạn; đang thử đăng nhập lại tự động...', lastFailureCode: 'AUTO_LOGIN_STARTED' });
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
 };

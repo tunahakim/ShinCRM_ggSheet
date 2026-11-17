@@ -6,9 +6,9 @@ FbmSync.backgroundRunningResult = function () {
   return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.', status: FbmSync.statusView() };
 };
 
-/** Mở lượt và trả request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. */
-FbmSync.start = function (options) { return FbmSync.runTail(FbmSync.startRun(options)); };
-FbmSync.startRun = function (options) {
+/** Mở lượt và trả request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. `current` là ô lượt người gọi đang cầm (bản của lát). */
+FbmSync.start = function (options, current) { return FbmSync.runTail(FbmSync.startRun(options, current)); };
+FbmSync.startRun = function (options, current) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
   // Tra dãy chặng trước mọi việc: mức quét lạ ném `SYNC_UNKNOWN_SCAN` khi lượt cũ chưa bị đụng tới.
@@ -16,7 +16,6 @@ FbmSync.startRun = function (options) {
   if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
     return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; hãy bật công tắc tổng trước khi chạy.', status: FbmSync.statusView() };
   }
-  var current = FbmSync.stateRead();
   var stale = FbmSync.staleRunCheck(current, Date.now());
   if (stale) { current = FbmSync.staleRunClose(current, stale); }
   // Tạm dừng là điểm dừng để người dùng chạy lại, không phải cursor đang chạy;
@@ -32,7 +31,7 @@ FbmSync.startRun = function (options) {
     if (!recent || !kind || FbmSync.cursorTable(kind).resumable === false) { return { ok: false, code: 'SYNC_BUSY', status: FbmSync.statusView() }; }
     // Đang ở chặng phiên thì gửi lại chính request hỏi phiên (chỉ đọc); không mở chặng phiên lồng trong chặng phiên.
     if (kind !== 'session') { FbmSync.stagePatchApply(current, FbmSync.sessionGateOpen(current, 'issue', 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...', false)); }
-    return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView(), resumed: true };
+    return { ok: true, request: FbmSync.cursorIssue(current), status: FbmSync.statusView(), resumed: true };
   }
   if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
   var state = FbmSync.runOpen({
@@ -71,14 +70,12 @@ FbmSync.startRun = function (options) {
     // chỉ để tự động điền, vì token này không được probe sử dụng.
     state.cursor = { kind: 'identity_user_grid' };
     state.message = 'Đang đọc thông tin tài khoản FBM...';
-    FbmSync.stateWrite(state);
-    return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
   }
   // Xác thực Customer có cổng phiên: request đầu thực gửi là hỏi thử phiên, xác thực đi sau khi đúng tài khoản.
   state.cursor = { kind: 'authorize_customer' };
   state.message = 'Đang kiểm tra phiên FBM...';
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
 };
 /**
  * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
@@ -119,7 +116,6 @@ FbmSync.preflightApply = function (state, preflight) {
   if (!preflight.ok) {
     var first = preflight.blocking[0] || {};
     FbmSync.runFail(state, 'SYNC_PREFLIGHT_FAILED', 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.'));
-    FbmSync.stateWrite(state);
     return { ok: false, code: 'SYNC_PREFLIGHT_FAILED', status: FbmSync.statusView(), error: state.lastError };
   }
   return null;
@@ -134,7 +130,7 @@ FbmSync.preflightLocalStep = function (state) {
   if (typeof FbmSync.preflightLocal !== 'function' || !FbmSync.preflightNeedsLocal(options)) { return null; }
   if (FbmSync.canWriteFbm(state.mode)) {
     if (!state.pushGate) { state.pushGate = FbmSync.pushGateCheck(state, options); }
-    if (!state.pushGate.open) { FbmSync.stateWrite(state); return null; }
+    if (!state.pushGate.open) { return null; }
   }
   if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'preflight_hash', options); }
   var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
@@ -182,15 +178,13 @@ FbmSync.progressCustomersDone = function (state, count) {
 /** Kết thúc lượt đọc: cờ vắng mặt đã do cửa ghi gắn theo từng lô nên ở đây chỉ chốt lượt và xóa danh sách đọc của lượt. */
 FbmSync.finishPullRun = function (state) {
   FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) });
-  FbmSync.stateWrite(state);
   return true;
 };
 
 /** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */
 FbmSync.activityStagesContinue = function (state, extra) {
   var request = FbmSync.activityStageNext(state);
-  FbmSync.stateWrite(state);
-  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() }, extra || {}); }
+  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() }, extra || {}); }
   return FbmSync.pullFinishOrPush(state, extra);
 };
 
@@ -213,7 +207,6 @@ FbmSync.beginCustomerPull = function (state) {
   FbmSync.seenStoreBegin('customer', FbmSync.readLocal('customer'));
   FbmSync.scanJobOpen(state, { entity: 'customer', type: 0, pageIndex: -1, pageValue: null, pageItems: null, count: FbmSync.BUDGET.scanCustomerRows, seen: 0 });
   state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
-  FbmSync.stateWrite(state);
   return FbmSync.scanJobRequest(state, FbmSync.scriptSettings(state), FbmSync.scope());
 };
 
@@ -223,7 +216,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
     if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
-    result.request = FbmSync.sliceIssue(FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
+    result.request = FbmSync.sliceIssue(state, FbmSync.pushStageOpen(state)); result.status = FbmSync.statusView();
     return result;
   }
   FbmSync.finishPullRun(state);
@@ -236,14 +229,13 @@ FbmSync.pullFinishOrPush = function (state, extra) {
  * Response từ Extension lệch mã hợp đồng thì dừng phiên trước mọi xử lý: Extension khác bản có thể đọc envelope sai mà vẫn trả HTTP 200, xử lý tiếp sẽ ghi dữ liệu sai xuống Sheet.
  * Trả `null` khi khớp mã.
  */
-FbmSync.contractGate = function (rawResponse) {
+FbmSync.contractGate = function (state, rawResponse) {
   var mismatch = FbmSync.protocol.contractMismatch(rawResponse);
   if (!mismatch) { return null; }
-  var before = FbmSync.stateRead(), failed = FbmSync.runFailCurrent(mismatch.message, mismatch.code).failed, state = FbmSync.stateRead();
+  var runId = String(state.runId || ''), closed = FbmSync.runFailCurrent(mismatch.message, mismatch.code), current = closed.state;
   // Heartbeat và đăng nhập nền không có phiên đồng bộ nên `runFailCurrent` bỏ qua; vẫn phải nhả request đang chờ, không thì mọi lượt sau kẹt REQUEST_IN_FLIGHT.
-  if (!failed) { state.phase = 'error'; state.lastFailureCode = mismatch.code; state.retryable = false; state.lastError = mismatch.message; state.message = mismatch.message; }
-  state.activeRequestId = ''; state.deadlineAt = 0;
-  FbmSync.stateWrite(state);
-  if (typeof logEvent === 'function') { logEvent({ source: 'fbm_sync', action: 'extension_contract_mismatch', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(before.runId || ''), reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }); }
+  if (!closed.failed) { current.phase = 'error'; current.lastFailureCode = mismatch.code; current.retryable = false; current.lastError = mismatch.message; current.message = mismatch.message; }
+  current.activeRequestId = ''; current.deadlineAt = 0;
+  FbmSync.stagePatchApply(current, { logs: [{ action: 'extension_contract_mismatch', outcome: LOG_ERROR, cycleId: runId, reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }] });
   return { ok: false, code: mismatch.code, request: null, error: mismatch.message, status: FbmSync.statusView() };
 };

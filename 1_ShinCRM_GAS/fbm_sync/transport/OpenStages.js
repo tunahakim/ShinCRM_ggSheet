@@ -6,14 +6,14 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Kết quả trả về sau khi bước kết đã chọn request kế (hoặc không): lượt đóng lỗi thì trả đúng lý do dừng chứ không trả "không có request". */
 FbmSync.openStageResult = function (state, request) {
-  if (request) { return { ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() }; }
+  if (request) { return { ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() }; }
   if (state.phase === 'error') { return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError }; }
   return { ok: true, request: null, status: FbmSync.statusView() };
 };
 /** Đổi cursor rồi phát request của cursor mới (qua cổng phiên). */
 FbmSync.openStageMove = function (state, patch) {
   FbmSync.stagePatchApply(state, patch);
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
 };
 
 /** Chặng xác thực: lấy mã `authorized` của controller rồi giao bước kết chọn chặng kế. Mã gắn với phiên nên lưu vào ô phiên trước mọi request ghi. */

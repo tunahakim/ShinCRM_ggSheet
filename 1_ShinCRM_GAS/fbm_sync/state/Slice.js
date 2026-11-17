@@ -11,7 +11,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.runSlice = function (work, state) {
   var owner = !FbmSync.sliceStore, failure = null, result;
-  if (owner) { FbmSync.sliceStore = { state: state || null, dirty: false }; }
+  if (owner) { FbmSync.sliceStore = { state: state || null, snapshot: state ? JSON.stringify(state) : '', dirty: false }; }
   try {
     // Áp cờ dừng nằm trong khối bắt lỗi: state hay cờ hỏng thì lượt cũng được ghi lỗi như mọi lỗi của lát.
     result = FbmSync.stopPendingApply().stopped ? { ok: true, code: 'SYNC_STOPPED', request: null, status: FbmSync.statusView() } : FbmSync.stopBeforeIssue(work());
@@ -213,27 +213,34 @@ FbmSync.stageRun = function (entry, state, rawResponse) {
   var inputs = entry.inputs ? entry.inputs(state, rawResponse) : {}, settings = FbmSync.scriptSettings(state), out = FbmSync.stageCall(state, function (copy) { return entry.stage({ state: copy, reply: rawResponse, inputs: inputs, settings: settings, now: Date.now() }); });
   if (out.session && out.session.suspected) { return FbmSync.sessionSuspectRun(state, out.session.suspected); }
   if (kind !== 'session' && state.metadata && state.metadata.suspectReplayed === true) { FbmSync.stagePatchApply(state, { metadata: { suspectReplayed: false } }); }
-  if (out.next) { return { ok: true, request: FbmSync.sliceIssue(out.next), status: FbmSync.statusView() }; }
+  if (out.next) { return { ok: true, request: FbmSync.sliceIssue(state, out.next), status: FbmSync.statusView() }; }
   if (!out.end) { var empty = new Error('Chặng ' + String(state.cursor && state.cursor.kind || '') + ' không trả next hay end.'); empty.code = 'STAGE_RESULT_EMPTY'; throw empty; }
   return entry.end(state, out.end);
 };
 /**
  * Bước phát request của lát, theo thứ tự: kênh Sidebar giữ chỗ nhận lượt (Extension nhận lượt thì phát lại từ cursor qua đúng bước này); công tắc tổng tắt thì đóng lượt như lệnh Dừng; hết ngân sách lời gọi thì tạm dừng; cổng phiên (cursor có `gate` mà phiên chưa xác minh thì mở chặng phiên, request gửi đi là request hỏi thử); rồi `requestIssue` cấp mã.
- * Đây là chỗ duy nhất mở chặng phiên trước khi gửi, và cổng xét theo dòng bảng của cursor đang lưu, nên request nào cũng phải có cursor (cursor trống ném `CURSOR_KIND_UNKNOWN`). `sliceIssue` nhận request chặng đã dựng; `cursorIssue` dựng từ cursor đang lưu (sau khi đổi cursor: mở lượt, nối lại, đếm khách).
+ * `state` là ô lượt người gọi đang cầm (bản của lát); bước phát ghi nó một lần ở cuối, nên người gọi không cần ghi trước khi phát. Đây là chỗ duy nhất mở chặng phiên trước khi gửi, và cổng xét theo dòng bảng của cursor đang lưu, nên request nào cũng phải có cursor (cursor trống ném `CURSOR_KIND_UNKNOWN`). `sliceIssue` nhận request chặng đã dựng; `cursorIssue` dựng từ cursor đang lưu (sau khi đổi cursor: mở lượt, nối lại, đếm khách).
  */
-FbmSync.sliceIssue = function (request) {
-  return request ? FbmSync.issueThroughGate(function () { return request; }) : null;
+FbmSync.sliceIssue = function (state, request) {
+  return request ? FbmSync.issueThroughGate(state, function () { return request; }) : null;
 };
-FbmSync.cursorIssue = function () {
-  return FbmSync.issueThroughGate(FbmSync.cursorRequest);
+FbmSync.cursorIssue = function (state) {
+  return FbmSync.issueThroughGate(state, FbmSync.cursorRequest);
 };
-FbmSync.issueThroughGate = function (build) {
-  var state = FbmSync.stateRead(), sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar');
+FbmSync.issueThroughGate = function (state, build) {
+  FbmSync.stateWrite(state);
+  var envelope = FbmSync.issueEnvelope(state, build);
+  // Phong bì vừa cấp ghi request đang chờ vào ô lượt; nhánh không phát (dừng, tạm dừng, chặn) tự ghi qua cổng của nó.
+  if (envelope) { FbmSync.stateWrite(state); }
+  return envelope;
+};
+FbmSync.issueEnvelope = function (state, build) {
+  var sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel === 'sidebar');
   // Cổng sẽ mở thì request gửi đi là request hỏi phiên: không dựng request nghiệp vụ (có cursor chưa đủ dữ liệu để dựng trước khi phiên được xác minh).
   var gated = !sidebar && FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
   var request = gated ? null : build(state);
   if (!gated && !request) { return null; }
-  if (sidebar) { return FbmSync.envelopeHold(request); }
+  if (sidebar) { return FbmSync.envelopeHold(state, request); }
   if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
     FbmSync.stopPendingApply(true);
     return null;
@@ -278,7 +285,7 @@ FbmSync.replyAdmit = function (state, requestId, rawResponse) {
   var stale = FbmSync.staleRunCheck(state, Date.now());
   if (stale) { var closed = FbmSync.staleRunClose(state, stale); return { ok: false, code: closed.lastFailureCode, request: null, status: FbmSync.statusView(), error: closed.lastError, stale: true }; }
   if (!FbmSync.requestAnswered(state, requestId)) { return FbmSync.staleReplyDrop(state, requestId, !rawResponse); }
-  return rawResponse ? FbmSync.contractGate(rawResponse) : null;
+  return rawResponse ? FbmSync.contractGate(state, rawResponse) : null;
 };
 
 /**

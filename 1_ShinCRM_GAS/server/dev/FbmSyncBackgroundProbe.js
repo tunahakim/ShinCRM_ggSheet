@@ -4,7 +4,7 @@
 
 /** Mở ngay một lượt nền chỉ đọc trong khóa điều phối và ranh giới lát như cửa lệnh làm (lệnh `start` của Sidebar chỉ mở lượt tay), để nghiệm thu nút dừng nền mà không chờ nhịp hỏi của Extension. Lượt nằm ở bước kiểm phiên tới khi Extension hỏi; chế độ đọc nên không gửi gì lên FBM. Chỉ DEV. */
 function fbmDevOpenBackgroundRun() {
-  var opened = FbmSync.withOrchestrationLock(function () { return FbmSync.runSlice(function () { return FbmSync.start({ mode: 'read', scan: 'full', origin: 'background', manual: false }); }); });
+  var opened = FbmSync.withOrchestrationLock(function () { return FbmSync.runSlice(function () { return FbmSync.start({ mode: 'read', scan: 'full', origin: 'background', manual: false }, FbmSync.stateRead()); }); });
   var status = FbmSync.statusView();
   return { ok: opened && opened.ok !== false, code: opened && opened.code || '', running: status.running, origin: status.origin, phase: status.phase, message: status.message };
 }

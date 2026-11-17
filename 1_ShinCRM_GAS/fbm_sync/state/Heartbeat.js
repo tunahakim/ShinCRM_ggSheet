@@ -32,8 +32,7 @@ FbmSync.keepaliveCountOpen = function (direction, carry) {
   var state = FbmSync.runOpen({ origin: 'background', mode: direction, scan: 'keepalive', phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_count' }, message: 'Đang giữ phiên FBM...', process: carry.process, pollAt: carry.pollAt });
   state.scheduleMode = FbmSync.modeOf(direction);
   state.metadata.countTail = { pending: false, mode: state.scheduleMode, message: 'Giữ phiên FBM OK.', recount: FbmSync.customerCountApplies(direction) };
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
 };
 
 /**
@@ -46,9 +45,9 @@ FbmSync.backgroundNext = function (ask) {
   if (!due.length && ask.startup && schedule.heartbeat.enabled) { due = ['heartbeat']; }
   if (!due.length) { FbmSync.scheduleTrace('schedule_idle', 'Extension hỏi lịch nền: chưa có tiến trình đến hạn; ' + FbmSync.scheduleNextText(ask.now, schedule, book) + '.'); return null; }
   var kind = due[0], carry = { process: kind, pollAt: ask.pollAt }, direction = schedule.direction;
-  if (kind !== 'heartbeat') { return FbmSync.backgroundTail(FbmSync.start(Object.assign({ mode: direction, scan: FbmSync.SCHEDULE_SCANS[kind], origin: 'background', detail: kind === 'detail' ? schedule.detail : null }, carry))); }
+  if (kind !== 'heartbeat') { return FbmSync.backgroundTail(FbmSync.start(Object.assign({ mode: direction, scan: FbmSync.SCHEDULE_SCANS[kind], origin: 'background', detail: kind === 'detail' ? schedule.detail : null }, carry), FbmSync.stateRead())); }
   var gate = FbmSync.pushGateDue(FbmSync.stateRead(), direction);
-  if (gate) { return FbmSync.backgroundTail(FbmSync.start(Object.assign({ mode: 'push', scan: 'keepalive', origin: 'background', scheduleMode: direction, pushGate: gate }, carry))); }
+  if (gate) { return FbmSync.backgroundTail(FbmSync.start(Object.assign({ mode: 'push', scan: 'keepalive', origin: 'background', scheduleMode: direction, pushGate: gate }, carry), FbmSync.stateRead())); }
   return FbmSync.keepaliveCountOpen(direction, carry);
 };
 
@@ -118,7 +117,8 @@ FbmSync.heartbeatDecide = function (input) {
   if (identity.blocking) { return idle(identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', { message: identity.message }); }
   var book = FbmSync.processBookRead();
   if (FbmSync.identityStopActive(book, FbmSync.bindingRead())) { return idle('BACKGROUND_IDENTITY_STOPPED', { message: 'Chạy nền dừng vì lần trước tài khoản FBM đang mở khác tài khoản đã liên kết. Kiểm tra tài khoản FBM rồi lưu lại liên kết để chạy nền tiếp.' }); }
-  var started = FbmSync.backgroundNext({ now: now, pollAt: now, book: book, startup: purpose === 'startup' });
+  // Lượt nền mở trong lát như lượt tay: lỗi giữa lúc mở đóng lượt lỗi, và mọi sửa ô lượt được ghi một lần cuối lát.
+  var started = FbmSync.runSlice(function () { return FbmSync.backgroundNext({ now: now, pollAt: now, book: book, startup: purpose === 'startup' }); }, state);
   if (!started) { return idle('NO_PROCESS_DUE'); }
   return Object.assign({}, started, { request: started.request || null, poll: FbmSync.pollKeep(), status: FbmSync.statusView() });
 };

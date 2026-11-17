@@ -124,7 +124,7 @@ FbmSync.sessionEnd = function (state, end) {
   if (end.resume) {
     var request = FbmSync.cursorRequest(state);
     if (!request) { var empty = new Error('Đã xác minh phiên nhưng không dựng lại được request đang chờ.'); empty.code = 'SESSION_RESUME_FAILED'; throw empty; }
-    return { ok: true, request: FbmSync.sliceIssue(request), status: FbmSync.statusView() };
+    return { ok: true, request: FbmSync.sliceIssue(state, request), status: FbmSync.statusView() };
   }
   if (end.login) { return FbmSync.autoLoginOpen(state, end.login); }
   var stop = end.fail || end.pause;
@@ -141,5 +141,5 @@ FbmSync.sessionEnd = function (state, end) {
 FbmSync.sessionSuspectRun = function (state, message) {
   var replay = state.activeRequestReplay === true && !(state.metadata && state.metadata.suspectReplayed === true);
   FbmSync.stagePatchApply(state, FbmSync.sessionGateOpen(state, 'suspected', message, replay));
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView(), probing: true };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView(), probing: true };
 };

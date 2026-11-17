@@ -158,7 +158,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     FbmSync.runClose(state, 'done', { message: message });
     FbmSync.stateWrite(state);
     if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, reason: message, detail: { runId: String(state.runId || '') } }); }
-    if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }); }
+    if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }, state); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, status: FbmSync.statusView(), message: message };
   }
   FbmSync.businessStepFinish(state, 'auto_login', 'ok', {});
@@ -171,7 +171,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     return { ok: false, code: state.lastFailureCode, request: null, status: FbmSync.statusView(), error: state.lastError };
   }
   FbmSync.stagePatchApply(state, { cursor: back.cursor, phase: back.phase || 'checking_session', entity: back.entity || '', message: 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...' });
-  return { ok: true, request: FbmSync.cursorIssue(), status: FbmSync.statusView() };
+  return { ok: true, request: FbmSync.cursorIssue(state), status: FbmSync.statusView() };
 };
 
 /**
