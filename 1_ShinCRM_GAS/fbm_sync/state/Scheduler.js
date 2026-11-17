@@ -73,6 +73,14 @@ FbmSync.processBookMark = function (book, kind, outcome, now) {
   entry.failures = failures; entry.retryAt = at + minutes * 60 * 1000;
   return { book: next, failures: failures, minutes: minutes };
 };
+/** Sổ mới sau khi lưu lịch nền (hàm thuần, bên gọi ghi): tiến trình đang tắt không giữ số lần lỗi và giờ thử lại, nên bật lại thì lần lỗi kế chờ từ mức đầu; `doneAt`, số khách mốc và con trỏ Vòng xoay giữ nguyên. Trả `cleared` là các tiến trình vừa được xóa (rỗng thì không cần ghi). */
+FbmSync.processBookDisabledClear = function (book, schedule) {
+  var next = FbmSync.processBookShape(book), cleared = FbmSync.PROCESS_KINDS.filter(function (kind) {
+    return !schedule[kind].enabled && (next[kind].failures || next[kind].retryAt);
+  });
+  cleared.forEach(function (kind) { next[kind].failures = 0; next[kind].retryAt = 0; });
+  return { book: next, cleared: cleared };
+};
 /** Nền đang dừng vì lệch danh tính (thuần): sổ ghi giờ dừng; liên kết được lưu sau giờ đó (`updatedAt` lớn hơn) là hết dừng, không cần ai xóa dấu. Liên kết cũ không có `updatedAt` thì dừng tới khi lưu lại. */
 FbmSync.identityStopActive = function (book, binding) {
   return !!book.identityStop && Number(binding && binding.updatedAt || 0) <= book.identityStop;

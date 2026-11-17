@@ -57,8 +57,16 @@ FbmSync.settingsSaveCommand = function (input) {
   var saved = settingsSave(patches);
   if (!saved.ok) { return FbmSync.settingsRejected(saved.problems, scopeLines); }
   if (merged[FbmSync.SETTING_SECTIONS.master] && merged[FbmSync.SETTING_SECTIONS.master].enabled === false) { FbmSync.stopPendingApply(); }
+  if (merged[FbmSync.SETTING_SECTIONS.background]) { FbmSync.scheduleRetryClear(); }
   FbmSync.scopeLengthWarn(scopeLines);
   return { ok: true, scopeLines: scopeLines, settings: FbmSync.settingsView(), status: FbmSync.statusView() };
+};
+
+/** Bước sau khi lịch nền đã lưu (trong khóa điều phối của lệnh): đọc sổ tiến trình, xóa lịch thử lại của tiến trình đang tắt, có xóa thì ghi một lần. */
+FbmSync.scheduleRetryClear = function () {
+  var result = FbmSync.processBookDisabledClear(FbmSync.processBookRead(), FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)));
+  if (result.cleared.length) { FbmSync.processBookWrite(result.book); }
+  return result.cleared;
 };
 
 /** Từ chối lưu phải để lại dấu ở Log, không chỉ hiện ở Sidebar. */
@@ -97,6 +105,7 @@ FbmSync.backgroundSwitchCommand = function (enabled) {
 FbmSync.settingsResetCommand = function (input) {
   var section = FbmSync.settingsOwnSection(String(input.section || ''));
   settingsReset(section.name);
+  if (section.name === FbmSync.SETTING_SECTIONS.background) { FbmSync.scheduleRetryClear(); }
   logEvent({ source: 'fbm_sync', action: 'settings_reset', outcome: LOG_WARN, reason: 'Đã đặt "' + section.label + '" về mặc định theo yêu cầu người dùng.', detail: { section: section.name } });
   return { ok: true, settings: FbmSync.settingsView(), status: FbmSync.statusView() };
 };
