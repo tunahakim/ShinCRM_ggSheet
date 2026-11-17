@@ -29,27 +29,6 @@ FbmSync.recordIssuesFlush = function (state) {
   return keys.length;
 };
 
-/** Ghi snapshot nghiệp vụ của ô lượt người gọi vừa đọc; payload/cookie không bao giờ đi vào Log. */
-FbmSync.logStatus = function (state, action) {
-  if (!state || typeof logEvent !== 'function') { return; }
-  var phase = String(state.phase || 'idle');
-  // Phiên có sổ bước nghiệp vụ đã có dòng mở/đóng bước (đóng tại stateWrite), nên không ghi thêm snapshot cho mỗi lát.
-  if (state.runId && state.metadata && state.metadata.businessSteps) { return; }
-  var outcome = phase === 'error' || state.lastError ? LOG_ERROR : (phase === 'conflict' ? LOG_CONFLICT : LOG_OK);
-  var writer = outcome === LOG_ERROR || phase === 'done' ? logEvent : logTrace;
-  writer({
-    source: 'fbm_sync', action: action || 'slice', outcome: outcome, cycleId: String(state.runId || ''),
-    entity: state.entity || '', recordId: state.current || '',
-    reason: state.message || FbmSync.statusLabel(phase) || phase,
-    detail: { runId: String(state.runId || ''), phase: phase, cursor: String(state.cursor && state.cursor.kind || ''), direction: FbmSync.syncDirection(state), entityLabel: FbmSync.syncEntityLabel(state.entity, phase), counts: state.counts || {}, lastError: state.lastError || '' }
-  });
-};
-/** Chỉ ghi khi đổi giai đoạn hoặc kết thúc để không làm chậm từng request FBM. */
-FbmSync.shouldLogStatus = function (before, after) {
-  if (!after) { return false; }
-  var phase = String(after.phase || '');
-  return phase === 'error' || phase === 'done' || phase === 'paused' || phase === 'conflict' || !before || String(before.phase || '') !== phase || String(before.entity || '') !== String(after.entity || '');
-};
 /**
  * Response bị bỏ vì không thuộc request đang chờ: không đổi state (lượt đang chạy vẫn là của request khác) nhưng phải có dòng Log, vì response bị bỏ lặp lại là lượt kẹt không ai thấy.
  * Response của request đang bay lúc người dùng dừng lượt (`closedRequestId`) là chuyện thường, ghi mức ok để Log không báo lỗi giả cho một lần dừng hợp lệ.

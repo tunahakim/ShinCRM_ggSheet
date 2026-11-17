@@ -179,9 +179,7 @@ FbmSync.commandStart = function (input) {
   // Lượt nền bị Dừng khi khóa bận còn chờ đóng: đóng trước, ngoài lát, để lát của lượt mới không áp nhầm cờ rồi trả "đã dừng" thay cho mở lượt.
   FbmSync.stopPendingApply();
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };
-  var result = spec.slice ? FbmSync.runSlice(run) : run();
-  if (kind === 'sync' && result) { FbmSync.logStatus(FbmSync.stateRead(), 'start'); }
-  return result;
+  return spec.slice ? FbmSync.runSlice(run) : run();
 };
 
 /**

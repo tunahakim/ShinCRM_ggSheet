@@ -149,7 +149,7 @@ FbmSync.loginEnd = function (state, end) {
 FbmSync.loginForceResumeOf = function (state, cursor) {
   return cursor.purpose !== 'auto' || state.origin !== 'manual' || FbmSync.START_SCAN_KINDS.indexOf(String(state.scan || '')) >= 0 ? null : { mode: FbmSync.modeOf(state.mode), pack: String(state.scanPack || '') };
 };
-/** Đăng nhập thành công. Hủy phiên cũ xong mà lượt bị chặn là lượt đồng bộ tay không đẩy thì mở lại đúng loại đó qua `FbmSync.start` (`follows` để Sidebar chờ tiếp lượt mới); lượt đẩy không mở lại vì phải duyệt lại trên dữ liệu lúc đó. */
+/** Đăng nhập thành công. Hủy phiên cũ xong mà lượt bị chặn là lượt đồng bộ tay không đẩy thì mở lại đúng loại đó qua `FbmSync.start` (`follows` để Sidebar chờ tiếp lượt mới); lượt đẩy không mở lại vì phải duyệt lại trên dữ liệu lúc đó. Dòng Log kết thúc lượt (`login_test_ok`, `login_force_ok`) chỉ ghi ở đây: luồng đăng nhập là chủ duy nhất của dòng kết thúc lượt đăng nhập. */
 FbmSync.loginSucceed = function (state, cursor, end) {
   state.lastFailureCode = ''; state.lastError = ''; state.retryable = false;
   if (cursor.purpose !== 'auto') {
@@ -157,7 +157,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     var message = force ? 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' + (resume && !reopen ? ' Bấm Đồng bộ lại để duyệt và đẩy dữ liệu.' : '') : 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.';
     FbmSync.runClose(state, 'done', { message: message });
     FbmSync.stateWrite(state);
-    if (force) { logEvent({ source: 'fbm_sync', action: 'login_force_ok', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: message, detail: { runId: String(state.runId || '') } }); }
+    logEvent({ source: 'fbm_sync', action: force ? 'login_force_ok' : 'login_test_ok', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: message, detail: { runId: String(state.runId || '') } });
     if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }, state); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, message: message };
   }

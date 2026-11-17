@@ -297,10 +297,8 @@ FbmSync.sliceContinue = function (input, state) {
   if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return FbmSync.transportFailureRun(input.error); }
   if (input.source === 'relay' && !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', request: null }; }
-  // Lượt nền không ghi dòng Log theo pha: nhịp nền chạy vài phút một lần, ghi mỗi lần đổi pha làm trôi Log thật. Xét theo lượt chứ không theo kênh: lượt tay cũng nộp qua relay.
-  var before = FbmSync.stateRead(), result = FbmSync.continue(input.response), after = FbmSync.stateRead();
-  if (before.origin !== 'background' && result && FbmSync.shouldLogStatus(before, after)) { FbmSync.logStatus(after, 'slice'); }
-  return result;
+  // Không ghi dòng chụp trạng thái theo pha: dòng kết thúc lượt do chủ của lượt ghi (sổ bước nghiệp vụ cho lượt đồng bộ, luồng đăng nhập cho lượt đăng nhập); ghi thêm ở đây là nhân đôi.
+  return FbmSync.continue(input.response);
 };
 
 /** Kết quả hay lỗi không thuộc request đang chờ (về muộn sau khi lượt đóng, hoặc của lượt trước): bỏ, không xử lý và không phát lại request nào, kể cả lệnh ghi. */
