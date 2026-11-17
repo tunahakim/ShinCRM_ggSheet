@@ -350,6 +350,7 @@ tests\
 │   ├── fbm\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
+│   │   ├── dat-state.js          Dựng ô lượt cho test qua cổng đọc và ghi state của GAS (GAS không có cửa vá state riêng).
 │   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
 │   │   ├── keo-ve.js             Gọi chặng kéo về như lớp xả đọc gọi (`keoVe` qua cửa ghi `pullPageApply`, `keoLo` qua `pullBatchApply` trên ô lượt): dựng ngữ cảnh lời gọi và xóa mục chờ xác nhận đã khớp như người điều phối.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
@@ -449,7 +450,9 @@ tests\
     ├── fbmSync\SidebarRun.js    Kiểm màn Chạy vẽ đúng status GAS dựng: nút theo actions, khóa ô chọn theo busy, pipeline, tiến độ, băng phạm vi.
     ├── fbmSync\SidebarRunActions.js  Kiểm nút màn Chạy (Bắt đầu, Dừng, Đặt lại, Hủy phiên cũ, Chấp thuận): gửi lệnh, vẽ status GAS trả, báo lỗi.
     ├── fbmSync\SidebarBackground.js  Kiểm lượt nền đang chạy khi bấm lệnh (popup hỏi, nút X) và chỗ chờ lượt tay.
-    ├── fbmSync\SidebarAccount.js  Kiểm màn Tài khoản: kiểm liên kết, lấy nhận diện, cổng cầu nối Extension, gửi cấu hình kết nối.
+    ├── fbmSync\SidebarAccount.js  Kiểm màn Tài khoản: kiểm liên kết, lấy nhận diện, cổng cầu nối Extension, gửi cấu hình kết nối, nút Hủy phiên cũ theo `forceLoginOffered`.
+    ├── fbmSync\BackgroundMachineCommand.js  Kiểm lệnh giao và gỡ máy chạy nền: kết quả lệnh, kho máy nền, dòng Log.
+    ├── fbmSync\GridSourceFields.js  Kiểm cắt lưới theo danh sách cột gốc: thiếu danh sách thì `FBM_GRID_SOURCE_FIELDS_MISSING`, không request nào rời GAS.
     ├── fbmSync\SidebarConflict.js  Kiểm màn xung đột: gom lựa chọn thành một quyết định gửi GAS và các nhánh GAS trả về.
     ├── fbmSync\SidebarReport.js  Kiểm đường báo lỗi phía trình duyệt: dòng báo, nút Bỏ, cửa báo lỗi duy nhất.
     ├── fbmSync\SidebarGasStatus.js  Kiểm Sidebar chỉ vẽ status GAS dựng: nút theo actions, icon header theo tone, thanh theo progress, câu kiểm liên kết và đăng nhập thử của GAS; lỗi cầu nối không vẽ status giả.

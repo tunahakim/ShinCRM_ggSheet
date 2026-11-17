@@ -2,6 +2,8 @@
 const NHOM = [
   require("./fbmSync/Control"),
   require("./fbmSync/CommandResults"),
+  require("./fbmSync/BackgroundMachineCommand"),
+  require("./fbmSync/GridSourceFields"),
   require("./fbmSync/RunPickup"),
   require("./fbmSync/Heartbeat"),
   require("./fbmSync/RunGuards"),
