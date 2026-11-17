@@ -6,7 +6,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.RECOUNT_MESSAGE = 'Số khách FBM vừa đổi, quét thêm một lần...';
 
-/** Số khách mốc trong sổ tiến trình, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Chỉ `runMarksCommit` ghi khi lượt xong. */
+/** Số khách mốc trong sổ tiến trình, hoặc `null` khi chưa có: chưa có mốc thì coi như lệch. Chỉ `runBookCommit` ghi khi lượt xong. */
 FbmSync.customerBaselineRead = function () { return FbmSync.processBookRead().customerFull.baseline; };
 
 /**
@@ -53,8 +53,8 @@ FbmSync.countTailMark = function (state) {
 FbmSync.runTail = function (result) {
   if (!result || result.request) { return result; }
   var state = FbmSync.stateRead();
-  var tail = state.metadata && state.metadata.countTail;
-  if (state.phase !== 'done' || !tail || tail.pending !== true) { return result; }
+  if (!FbmSync.countTailPending(state)) { return result; }
+  var tail = state.metadata.countTail;
   state.metadata.countTail = { pending: false, mode: tail.mode, message: String(state.message || '') };
   state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_count' };
   state.message = 'Đang đếm lại số khách FBM...';
@@ -93,10 +93,13 @@ FbmSync.customerCountEnd = function (state, end) {
     state.session.lastHeartbeatAt = Date.now();
     FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + end.total + ' khách' + (end.changed ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: end.total });
   }
+  // Lệch mốc: tiến trình nền của lượt chưa xong mà chuyển sang lượt Quét nhanh, nên trao tên tiến trình cho lượt đó thay vì để `runClose` ghi xong.
+  var carry = { process: state.process, pollAt: state.pollAt };
+  if (end.changed) { state.process = ''; }
   FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
   FbmSync.stateWrite(state);
   if (!end.changed) { return { ok: true, request: null, status: FbmSync.statusView() }; }
-  return FbmSync.recountStart(tail.mode || state.mode, state.origin, { process: state.process, pollAt: state.pollAt });
+  return FbmSync.recountStart(tail.mode || state.mode, state.origin, carry);
 };
 
 /** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`); không đi qua công tắc tiến trình và không dời mốc lịch nào. */

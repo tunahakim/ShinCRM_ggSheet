@@ -24,7 +24,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'transportRetryClear', 'applyTransportSession', 'authorizeStage', 'authorizeEnd', 'lookupPairs',
   'sessionStage', 'sessionEnd', 'sessionSuspectRun', 'autoLoginOpen', 'transportRecoverPlan', 'transportReissue', 'transportFailureRecord',
   'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors',
-  'heartbeatRun', 'stopPendingApply', 'backgroundSettle', 'machineAskRecord', 'staleRunCheck', 'backgroundNext', 'backgroundTail', 'processBookRead', 'pushGateCheck', 'startRun', 'runTail', 'runOpen', 'runSlice', 'preflightLocal'
+  'heartbeatRun', 'stopPendingApply', 'machineAskRecord', 'staleRunCheck', 'backgroundNext', 'backgroundTail', 'processBookRead', 'pushGateCheck', 'startRun', 'runTail', 'runOpen', 'runSlice', 'preflightLocal'
 ];
 /** Lần gọi GAS chạy lâu từ ngưỡng này được cất riêng (không gộp vào bảng tổng), vì một lần chậm hiếm bị số trung bình của các lần nhanh che mất. */
 var FBM_PERF_SLOW_MS = 20000;

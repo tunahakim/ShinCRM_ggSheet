@@ -4,7 +4,7 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  * Sổ tiến trình nền, một khóa: mỗi tiến trình `{ doneAt, failures, retryAt }`; `customerFull` thêm `baseline` (số khách mốc, `null` khi chưa có), `detail` thêm `cursor` (số CUS cuối của Vòng xoay, `-1` khi chưa có).
  * - Đến hạn khi giờ hiện tại >= `doneAt` + chu kỳ; chưa từng chạy xong thì đến hạn ngay. Chỉ ghi `doneAt` khi tiến trình chạy hết lượt; lượt hỏng giữa chừng không ghi nên tiến trình vẫn quá hạn và lần hỏi sau chạy lại.
  * - Lỗi thì dời `retryAt` của riêng tiến trình đó (nhân đôi tới trần), nên tiến trình khác vẫn chạy thay vì bị một tiến trình lỗi liên tục chặn mãi.
- * - Số khách mốc và con trỏ Vòng xoay chỉ ghi khi lượt xong (`runMarksCommit`), không ghi giữa lượt.
+ * - Số khách mốc và con trỏ Vòng xoay chỉ ghi khi lượt xong (`runBookCommit` của `runClose`), không ghi giữa lượt.
  * Một cổng đọc, một cổng ghi; hàm tính sổ mới là hàm thuần.
  */
 FbmSync.PROCESS_BOOK_KEY = 'FBM_SYNC_PROCESS_BOOK_V1';
@@ -21,6 +21,7 @@ FbmSync.processBookShape = function (stored) {
   var baseline = source.customerFull && source.customerFull.baseline, cursor = source.detail && source.detail.cursor;
   book.customerFull.baseline = typeof baseline === 'number' && isFinite(baseline) && baseline >= 0 ? baseline : null;
   book.detail.cursor = typeof cursor === 'number' && isFinite(cursor) && cursor >= 0 ? Math.floor(cursor) : -1;
+  book.identityStop = count(source.identityStop);
   return book;
 };
 /** Cổng đọc duy nhất của sổ. Đọc một lần mỗi lời gọi rồi truyền cho các công cụ tính. */
@@ -71,6 +72,10 @@ FbmSync.processBookMark = function (book, kind, outcome, now) {
   var failures = entry.failures + 1, minutes = FbmSync.retryDelay(failures);
   entry.failures = failures; entry.retryAt = at + minutes * 60 * 1000;
   return { book: next, failures: failures, minutes: minutes };
+};
+/** Nền đang dừng vì lệch danh tính (thuần): sổ ghi giờ dừng; liên kết được lưu sau giờ đó (`updatedAt` lớn hơn) là hết dừng, không cần ai xóa dấu. Liên kết cũ không có `updatedAt` thì dừng tới khi lưu lại. */
+FbmSync.identityStopActive = function (book, binding) {
+  return !!book.identityStop && Number(binding && binding.updatedAt || 0) <= book.identityStop;
 };
 /** Sổ mới với mốc bền của lượt vừa xong (hàm thuần): `customerTotal` → số khách mốc, `rotationCursor` → vị trí Vòng xoay. Mốc không phải số thì giữ nguyên. */
 FbmSync.processBookMarks = function (book, marks) {

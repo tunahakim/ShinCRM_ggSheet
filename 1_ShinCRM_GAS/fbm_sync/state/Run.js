@@ -73,13 +73,13 @@ FbmSync.runClose = function (state, verdict, detail) {
   state.activeRequestId = ''; state.deadlineAt = 0; state.current = '';
   // Lượt lỗi giữ cursor và thực thể: chỗ hỏng còn đọc được khi tra Log, và lần chạy lại dựng lại đúng request đã hỏng thay vì bỏ qua nó.
   if (!failed) { state.cursor = {}; state.entity = ''; }
-  FbmSync.runMarksCommit(state, spec.phase === 'done');
   if (extra.cursor) { state.cursor = extra.cursor; }
   state.phase = spec.phase;
   state.message = message;
   state.lastError = error;
   state.lastFailureCode = String(extra.code || (failed ? 'FBM_SYNC_EXCEPTION' : ''));
   state.retryable = extra.retryable === true;
+  FbmSync.runBookCommit(state, Date.now());
   return state;
 };
 
@@ -89,14 +89,55 @@ FbmSync.runClose = function (state, verdict, detail) {
  * - `rotationCursor`: vị trí Vòng xoay; ghi sớm thì khách của lô hỏng không bao giờ được đọc lại trong vòng này.
  */
 FbmSync.RUN_CLOSE_MARKS = ['customerTotal', 'rotationCursor'];
-/** Ghi các mốc vào sổ tiến trình khi `done` (một lần ghi sổ), rồi luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. */
-FbmSync.runMarksCommit = function (state, done) {
-  var metadata = state.metadata || {}, marks = {}, found = 0;
+/**
+ * Kết quả lượt nền vừa đóng với tiến trình của nó: `done` (xong, kể cả dừng ở xung đột vì phần đọc đã chạy hết), `failed` (lỗi, hoặc tạm dừng có mã), `dropped` (dừng không phải lỗi: người dùng dừng lượt nền để chạy lượt tay, tiến trình chạy lại ở lần hỏi sau). Lượt còn chạy hoặc không phải lượt nền của tiến trình nào thì `''`.
+ */
+FbmSync.processOutcome = function (state) {
+  if (!state || state.origin !== 'background' || !state.process || FbmSync.runInProgress(state)) { return ''; }
+  var phase = String(state.phase || '');
+  if (phase === 'done' || phase === 'conflict') { return 'done'; }
+  if (phase === 'error') { return 'failed'; }
+  if (phase === 'paused') { return state.lastFailureCode ? 'failed' : 'dropped'; }
+  return '';
+};
+
+/** Lượt vừa đóng `done` mà còn bước đếm khách cuối lượt (`countTail` đặt lúc mở lượt): `runTail` sẽ mở lại chính lượt đó cho bước đếm, nên lượt chưa thật sự xong. Thuần. */
+FbmSync.countTailPending = function (state) {
+  var tail = state.metadata && state.metadata.countTail;
+  return state.phase === 'done' && !!tail && tail.pending === true;
+};
+/** Mã đóng lượt nghĩa là tài khoản FBM đang mở không phải tài khoản đã liên kết: lượt nền gặp mã này thì nền dừng hẳn tới khi liên kết đổi, không thử lại theo lịch (thử lại chỉ chạy tiếp trên tài khoản sai). */
+FbmSync.IDENTITY_STOP_CODES = ['SESSION_IDENTITY_MISMATCH', 'LOGIN_IDENTITY_MISMATCH'];
+/**
+ * Bước ghi sổ tiến trình của `runClose`, một lần đọc và nhiều nhất một lần ghi sổ cho mọi đường đóng lượt (xong, lỗi, dừng, bỏ dở): mốc bền của lượt `done`; kết quả tiến trình của lượt nền (`processOutcome`: xong ghi giờ chạy xong, lỗi dời giờ thử lại, dừng không tính); dấu dừng nền khi lệch danh tính (`identityStop` = giờ dừng).
+ * Mốc luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. Ô lượt giữ `process` sau khi đóng: đuôi chuỗi nền đọc kết quả từ đó, lượt mở sau ghi đè. Bên đóng lượt mà trao tiến trình cho lượt mở tiếp (bước đếm lệch mốc mở Quét nhanh) thì bỏ `process` trước khi đóng.
+ */
+FbmSync.runBookCommit = function (state, now) {
+  var metadata = state.metadata || {}, marks = {}, found = 0, done = state.phase === 'done';
   FbmSync.RUN_CLOSE_MARKS.forEach(function (key) {
     if (done && typeof metadata[key] === 'number') { marks[key] = metadata[key]; found += 1; }
     delete metadata[key];
   });
-  if (found) { FbmSync.processBookWrite(FbmSync.processBookMarks(FbmSync.processBookRead(), marks)); }
+  // Còn bước đếm khách thì kết quả tiến trình ghi ở lần đóng của bước đếm, không ghi hai lần.
+  var outcome = FbmSync.countTailPending(state) ? '' : FbmSync.processOutcome(state), kind = String(state.process || '');
+  if (!found && !outcome) { return; }
+  var book = FbmSync.processBookRead(), mark = null;
+  if (found) { book = FbmSync.processBookMarks(book, marks); }
+  if (outcome === 'done' || outcome === 'failed') {
+    mark = FbmSync.processBookMark(book, kind, outcome, now);
+    book = mark.book;
+    var mismatch = outcome === 'failed' && FbmSync.IDENTITY_STOP_CODES.indexOf(String(state.lastFailureCode)) >= 0;
+    book.identityStop = mismatch ? now : outcome === 'done' ? 0 : book.identityStop;
+  }
+  if (found || mark) { FbmSync.processBookWrite(book); }
+  if (outcome) { state.nextRunAt = FbmSync.scheduleNextAt(FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)), book); }
+  if (outcome !== 'failed') { return; }
+  var label = FbmSync.scheduleLabel(kind), code = state.lastFailureCode ? ' (mã ' + state.lastFailureCode + ')' : '';
+  if (mismatch) {
+    logEvent({ source: 'fbm_sync', action: 'background_identity_stop', outcome: LOG_ERROR, cycleId: String(state.runId || ''), reason: label + ' chạy nền gặp tài khoản FBM khác tài khoản đã liên kết' + code + '; chạy nền dừng hẳn tới khi lưu lại liên kết tài khoản.', detail: { kind: kind, code: String(state.lastFailureCode) } });
+    return;
+  }
+  logEvent({ source: 'fbm_sync', action: 'schedule_retry_later', outcome: LOG_WARN, cycleId: String(state.runId || ''), reason: label + ' chạy nền không xong' + code + ', lỗi liền ' + mark.failures + ' lần; thử lại sau ' + mark.minutes + ' phút, các tiến trình khác vẫn chạy theo lịch.', detail: { kind: kind, failures: mark.failures, retryMinutes: mark.minutes } });
 };
 
 /** Nơi duy nhất đưa lượt sang lỗi. `message` là chữ người dùng đọc, nên bên gọi tự nêu bước hỏng. */
