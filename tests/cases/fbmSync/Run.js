@@ -34,6 +34,25 @@ async function chay(so) {
     pending.ok, pending.code, co.runId === runId, co.verdict, ban.data.FBM_SYNC_STATE_V1 === truocState, ban.F.statusView().running
   ], [true, 'SYNC_STOP_PENDING', true, 'cancelled', true, true]);
 
+  // Lượt kẹt không còn lát nào áp cờ: Dừng chờ khóa rồi tự đóng, không hứa "sẽ dừng" (nút sẽ kẹt ở "Đang dừng…").
+  const dungKetHop = hopCoLuot();
+  dungKetHop.F.STALE_RUN_MS = -1;
+  dungKetHop.F.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  const runDungKet = dungKetHop.F.stateRead().runId;
+  const dungKet = dungKetHop.F.controlDispatch('cancel', {});
+  check(so, 'lượt kẹt, khóa rảnh: Dừng đóng lượt ngay (SYNC_STOPPED), lượt tạm dừng, status không còn đang dừng', [
+    dungKet.ok, dungKet.code, dungKetHop.F.stateRead().phase, dungKetHop.F.stateRead().runId === runDungKet, dungKet.status.running, dungKet.status.actions.run
+  ], [true, 'SYNC_STOPPED', 'paused', true, false, 'start']);
+  const dungKetBanHop = hopCoLuot();
+  dungKetBanHop.F.STALE_RUN_MS = -1;
+  dungKetBanHop.F.statePatch({ activeRequestId: '', deadlineAt: 0 });
+  const truocDungKetBan = dungKetBanHop.data.FBM_SYNC_STATE_V1;
+  dungKetBanHop.khoa.ban = true;
+  const dungKetBan = dungKetBanHop.F.controlDispatch('cancel', {});
+  check(so, 'lượt kẹt, khóa bận: không ghi cờ, state không đổi, trả lỗi SYNC_STOP_BUSY kèm câu bảo bấm lại; nút vẫn là Dừng, không kẹt ở "Đang dừng…"', [
+    dungKetBan.ok, dungKetBan.code, /bấm Dừng lại/.test(String(dungKetBan.message || '')), dungKetBanHop.data.FBM_SYNC_STOP_V1 === undefined, dungKetBanHop.data.FBM_SYNC_STATE_V1 === truocDungKetBan, dungKetBan.status.actions.run
+  ], [false, 'SYNC_STOP_BUSY', true, true, true, 'cancel']);
+
   // Lát kế lấy được khóa: áp cờ trước khi làm gì, không chạy phần việc, không phát request.
   ban.khoa.ban = false;
   let daChay = false;

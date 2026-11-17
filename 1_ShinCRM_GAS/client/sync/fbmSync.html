@@ -1500,11 +1500,13 @@ function fbmSyncStop(scope) {
 /**
  * Nút Dừng. GAS đóng được lượt ngay thì kết thúc chỗ chờ lượt tay bằng status GAS trả, không chờ Extension: response lô đang bay về sau không khớp lượt nào, chờ nó thì nút kẹt ở "Đang dừng…".
  * `SYNC_STOP_PENDING` có chỗ chờ thì vẽ status GAS (nút "Đang dừng…" theo `actions.run`): status đóng lượt về qua relay sẽ kết thúc chỗ chờ.
+ * GAS không dừng được (`ok` false, ví dụ lượt kẹt mà GAS bận) thì vẽ status GAS trả (nút vẫn là Dừng) rồi báo lỗi để người dùng bấm lại.
  */
 function fbmSyncCancel() {
   var ticket = fbmSyncStatusTicket();
   return fbmSyncStop('any').then(function (result) {
     var status = fbmSyncStatusFromResult(result, ticket);
+    if (result.ok === false) { throw fbmSyncDriveFailure(result, 'Không dừng được phiên đồng bộ trên GAS.'); }
     if (result.code === 'SYNC_STOP_PENDING' && FBM_SYNC_CLIENT.runWaiter) { return status; }
     fbmSyncRunWaitEnd({ ok: true, code: '', error: '', status: status, conflict: null });
     return status;

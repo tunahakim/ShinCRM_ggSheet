@@ -71,6 +71,14 @@ async function testDung(so) {
   hop.callServer = (name) => (name === 'fbmCancelSync' ? Promise.reject(new Error('GAS_TEST_FAILURE')) : Promise.resolve({ ok: true }));
   await hop.fbmSyncCancel();
   check(so, 'Dừng thất bại vẫn hiện lỗi ở dòng báo', dongBao(hop), ['fbmClient:GAS_TEST_FAILURE']);
+
+  const { hop: banHop } = taoBo();
+  const banVe = [];
+  banHop.fbmSyncExtensionRpc = () => Promise.resolve({});
+  banHop.fbmSyncPaint = (status) => { banVe.push(status.actions.run); };
+  banHop.callServer = (name) => (name === 'fbmCancelSync' ? Promise.resolve({ ok: false, code: 'SYNC_STOP_BUSY', message: 'GAS đang bận; bấm Dừng lại sau ít giây.', status: statusGas(stateDangChay({ runId: 'run-ket' })) }) : Promise.resolve({ ok: true }));
+  await banHop.fbmSyncCancel();
+  check(so, 'GAS không dừng được lượt kẹt (SYNC_STOP_BUSY): vẽ status GAS trả (nút vẫn là Dừng) rồi hiện câu GAS ở dòng báo, không im lặng', [banVe, dongBao(banHop)], [['cancel'], ['fbmClient:GAS đang bận; bấm Dừng lại sau ít giây.']]);
 }
 
 async function testDatLaiVaHuyPhien(so) {

@@ -44,14 +44,26 @@ FbmSync.stopAllowed = function (state, scope) {
 /**
  * Người điều phối của `cancel`, `stop_background` và phần dừng của `set_master`, chạy ngoài khóa điều phối: ghi cờ dừng rồi thử lấy khóa không chờ.
  * Lấy được khóa (không lát nào đang chạy, thường gặp vì phần lớn thời gian lượt chờ FBM) thì đóng lượt ngay. Không lấy được thì lát đang giữ khóa thấy cờ trước khi phát request kế và tự đóng lượt (`SYNC_STOP_PENDING`); lệnh mở lượt và nhịp nền cũng áp cờ trước khi làm gì khác.
+ * Lượt đã kẹt (`staleRunCheck`) không còn lát nào áp cờ, nên `SYNC_STOP_PENDING` với nó là lời hứa không ai giữ: màn kẹt ở "Đang dừng…" và nút bị khóa tới khi Extension hỏi lại. Vì vậy lượt kẹt chờ khóa như lệnh thường rồi ghi cờ và đóng trong khóa; vẫn bận thì không ghi cờ, trả lỗi để người dùng bấm lại.
  */
 FbmSync.runStopCommand = function (scope) {
   var verdict = FbmSync.STOP_SCOPE_VERDICTS[scope], state = FbmSync.stateRead(), refused = FbmSync.stopAllowed(state, scope);
   if (refused) { return refused; }
+  var closed = { ok: true, code: verdict === 'stopped' ? 'SYNC_BACKGROUND_STOPPED' : 'SYNC_STOPPED' };
+  if (FbmSync.staleRunCheck(state, Date.now())) {
+    var applied = FbmSync.withOrchestrationLock(function () {
+      var current = FbmSync.stateRead(), again = FbmSync.stopAllowed(current, scope);
+      if (again) { return again; }
+      FbmSync.stopFlagWrite({ runId: String(current.runId), verdict: verdict, at: Date.now() });
+      FbmSync.stopPendingApply();
+      return closed;
+    });
+    return applied && applied.code === 'BUSY' ? { ok: false, code: 'SYNC_STOP_BUSY', message: 'GAS đang bận một lượt khác nên chưa dừng được lượt đồng bộ đang kẹt; bấm Dừng lại sau ít giây.' } : applied;
+  }
   FbmSync.stopFlagWrite({ runId: String(state.runId), verdict: verdict, at: Date.now() });
-  var applied = FbmSync.withOrchestrationLock(function () { return FbmSync.stopPendingApply(); }, 0);
-  if (applied && applied.code === 'BUSY') { return { ok: true, code: 'SYNC_STOP_PENDING' }; }
-  return { ok: true, code: verdict === 'stopped' ? 'SYNC_BACKGROUND_STOPPED' : 'SYNC_STOPPED' };
+  var pending = FbmSync.withOrchestrationLock(function () { return FbmSync.stopPendingApply(); }, 0);
+  if (pending && pending.code === 'BUSY') { return { ok: true, code: 'SYNC_STOP_PENDING' }; }
+  return closed;
 };
 
 /**

@@ -89,6 +89,8 @@ FbmSync.masterSwitchCommand = function (enabled) {
   var saved = settingsSave(patches);
   if (!saved.ok) { return FbmSync.settingsRejected(saved.problems, null); }
   var stop = enabled === true ? null : FbmSync.runStopCommand('master');
+  // Công tắc đã tắt nhưng lượt kẹt chưa đóng được vì GAS bận: báo, không coi như đã dừng.
+  if (stop && stop.ok === false) { return Object.assign({ enabled: false }, stop); }
   return { ok: true, enabled: enabled === true, code: stop ? stop.code : '' };
 };
 
