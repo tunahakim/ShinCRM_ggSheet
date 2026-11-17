@@ -20,6 +20,7 @@ const SCOPE = [
   { kind: 'client', dir: '1_ShinCRM_GAS/client/sync', exts: ['.html', '.js'] },
   { kind: 'client', dir: '1_ShinCRM_GAS/client/schema/sync', exts: ['.html', '.js'] },
   { kind: 'ext', file: '2_ShinCRM_Extension/background/service_worker.js' },
+  { kind: 'ext', file: '2_ShinCRM_Extension/background/credential_vault.js' },
   { kind: 'ext', dir: '2_ShinCRM_Extension/content_scripts/fbm_sync', exts: ['.js'] },
   { kind: 'ext', file: '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js' }
 ];
@@ -156,7 +157,8 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
+    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 2,
+    '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 1
   },
   typeofFunction: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 57,
@@ -176,7 +178,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 10,
     '2_ShinCRM_Extension/background/service_worker.js': 11,
-    '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 3
+    '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 3
   },
   phaseList: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 2,
@@ -218,8 +220,8 @@ const EXCEPTIONS = {
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Identity.js': 2,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js': 6,
+    '1_ShinCRM_GAS/fbm_sync/reconcile/RecordMap.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 3,
     '1_ShinCRM_GAS/fbm_sync/transport/PushRecover.js': 2
   }

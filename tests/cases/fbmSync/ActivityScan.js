@@ -1,13 +1,11 @@
 /** Lấy toàn bộ giao dịch (lớp 1): việc quét chỉ giữ id đã có trên Sheet, quá lớn thì chia cửa sổ ngày trong lượt; lớp 1 không ghi Sheet, chỉ đánh dấu khách cha của giao dịch sửa hoặc vắng để cửa ghi đọc lại. */
 const { trongLat } = require('../../lib/fbm/hop-dong-bo');
-const fs = require('fs');
-const path = require('path');
+const { napExtension } = require('../../lib/ext/nap-extension');
 const vm = require('vm');
 const { section, check } = require('../../lib/assert');
 const { giuBanGhi } = require('../../lib/load-gas');
 const { scanHarness, gdSo } = require('./ScanJob');
 
-const EXECUTOR = path.join(__dirname, '..', '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
 const gd = (i, endDate, extra) => Object.assign({ id: gdSo('FBM-C' + i), details: 'Gọi FBM-C' + i, end_date: endDate, owner: 'Owner', datetime0: endDate + 'T03:00:00', line_nbr: 1 }, extra || {});
 
 /**
@@ -42,7 +40,7 @@ function executorWith(fetchImpl) {
     chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(EXECUTOR, 'utf8'), context, { filename: EXECUTOR });
+  napExtension('executor', null, context);
   return (request) => new Promise((resolve) => listener({ type: 'FBM_EXECUTE_V2', request }, null, resolve));
 }
 const scanReq = (job) => ({ id: 'R-1', url: 'https://fbm.test/AppService/Grid', body: { controller: 'zccrAccountTask' }, meta: { kind: 'scan_job', fetchMs: 5000, job: Object.assign({ jobId: 'J-1', fields: ['id', 'details'], idField: 'id', keepIds: null, chunkTargetBytes: 4096, chunkMaxBytes: 8192, maxResponseBytes: 10000 }, job) } });

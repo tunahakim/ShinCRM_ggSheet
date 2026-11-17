@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const nodeCrypto = require('crypto');
+const { napExtension } = require('../ext/nap-extension');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
-const WORKER_FILE = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_worker.js');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(ROOT, '2_ShinCRM_Extension', 'manifest.json'), 'utf8'));
 const RELAY_URL = 'https://script.google.com/macros/s/relay-test/exec';
 const SHEET = 'sheet-test';
@@ -60,7 +60,7 @@ function workerNap(opt) {
     }
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(WORKER_FILE, 'utf8'), context, { filename: WORKER_FILE });
+  napExtension('serviceWorker', null, context);
   return { ctx: context, st };
 }
 

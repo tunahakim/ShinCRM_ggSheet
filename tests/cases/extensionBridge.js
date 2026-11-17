@@ -2,11 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { section, check, ghiLoiNap } = require('../lib/assert');
+const { napExtension, nguonWorkerDu, nguonContentDu } = require('../lib/ext/nap-extension');
 
 const BRIDGE_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'bridge', 'iframe_bridge.js');
 const SCOUT_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'scout', 'sheet_scout.js');
-const WORKER_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'background', 'service_worker.js');
-const EXECUTOR_FILE = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
 const CONTROL_PORT_FILE = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'control', 'ControlPort.js');
 const TRANSPORT_CORE_FILE = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'TransportCore.js');
 
@@ -237,8 +236,8 @@ async function chay(so) {
   cauCu.sendContextToSidebar({ sheetName: 'Customer' });
   check(so, 'Extension vừa tải lại: bản cầu nối cũ không đáp bắt tay, không bắn ảnh chụp sang Sidebar và tự gỡ bộ nghe, nên Sidebar không nhận hai phiên luân phiên', [daDapTruoc, kenhCu.sent.length, cauCu._removed === true], [1, 1, true]);
 
-  const workerSource = fs.readFileSync(WORKER_FILE, 'utf8');
-  const executorSource = fs.readFileSync(EXECUTOR_FILE, 'utf8');
+  const workerSource = nguonWorkerDu();
+  const executorSource = nguonContentDu('executor');
   const pullFlowSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'transport', 'PullFlow.js'), 'utf8');
   const schedulerSource = fs.readFileSync(path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'fbm_sync', 'state', 'Scheduler.js'), 'utf8');
   const gasSyncRoot = path.join(__dirname, '..', '..', '1_ShinCRM_GAS');
@@ -443,7 +442,7 @@ async function chay(so) {
     fetch() { relayFetches += 1; return Promise.reject(new Error('configureRelay không được fetch')); }
   };
   vm.createContext(workerContext);
-  vm.runInContext(workerSource, workerContext, { filename: WORKER_FILE });
+  napExtension('serviceWorker', null, workerContext);
   let virtualNow = 1000;
   const waitTimers = [], sentAt = [];
   let onSend = null;
@@ -655,7 +654,7 @@ async function chay(so) {
       fetch(url, options) { const index = state.bodies.length; state.bodies.push(JSON.parse(options.body)); if ((index > 0 || behaviour.relayReplyFirst) && behaviour.relayReply) { return Promise.resolve(behaviour.relayReply); } const reply = index === 0 && behaviour.request ? { ok: true, request: behaviour.request } : { ok: true, request: null }; return Promise.resolve({ ok: true, status: 200, headers: { get() { return 'application/json'; } }, text() { return Promise.resolve(JSON.stringify(reply)); } }); }
     };
     vm.createContext(context);
-    vm.runInContext(workerSource, context, { filename: WORKER_FILE });
+    napExtension('serviceWorker', null, context);
     return { context, state };
   };
   const relayConfig = { url: 'https://script.google.com/macros/s/relay-test/exec', key: 'relay-key', spreadsheetId: 'sheet-test', generation: 0 };
@@ -754,7 +753,7 @@ async function chay(so) {
       chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    napExtension('executor', null, context);
     listener({ type: 'FBM_EXECUTE_V2', request: null }, null, (reply) => { invalidReply = reply; });
     setTimeout(() => {
       check(so, 'executor khong fetch khi GAS khong cap envelope', [fetchCalls, invalidReply && invalidReply.error, invalidReply && invalidReply.trace && invalidReply.trace.length], [0, 'GAS chưa cấp request FBM; executor chỉ là cầu nối.', 0]);
@@ -809,7 +808,7 @@ async function chay(so) {
       chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    napExtension('executor', null, context);
     listener({ type: 'FBM_EXECUTE_V2', request: { url: 'https://fbo.com.vn:8888/Main/activity', method: 'POST', bodyText: '{}' } }, null, (reply) => {
       setTimeout(() => {
         const body = JSON.parse(reply.result.body);
@@ -879,7 +878,7 @@ async function chay(so) {
       chrome: { runtime: { getManifest: () => ({ version: '22.2' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
-    vm.runInContext(executorSource, context, { filename: EXECUTOR_FILE });
+    napExtension('executor', null, context);
     listener({ type: 'FBM_EXECUTE_V2', request: { id: 'login-key', url: 'https://fbo.com.vn:8888/Main/zccrAccount.aspx', method: 'COMMAND', meta: { kind: 'login_step', step: 'pageKey', command: 'pageKeyStore', pageKeyWrite } } }, null, (reply) => resolve(reply && reply.result || {}));
   });
   const makeBrowserStore = (items) => {

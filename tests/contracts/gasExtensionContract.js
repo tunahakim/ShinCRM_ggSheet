@@ -5,8 +5,6 @@
  * Đổi bất kỳ trường nào bên dưới thì mã đổi, Extension cũ sẽ bị GAS từ chối cho tới khi chủ dự án tải lại Extension.
  */
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 
 const CONTRACT = {
   // GAS → Extension: envelope một request FBM. Extension chỉ đọc các trường này và không suy luận nghiệp vụ.
@@ -86,8 +84,7 @@ function contractVersion(contract) {
 
 /** Mã Extension đang công bố; response giả trong test dùng mã này để giống đúng thứ Extension thật gửi về. */
 function extensionContractVersion() {
-  const worker = path.join(__dirname, '..', '..', '2_ShinCRM_Extension', 'background', 'service_worker.js');
-  return (fs.readFileSync(worker, 'utf8').match(/var FBM_CONTRACT_VERSION = '([^']*)';/) || [])[1];
+  return (require('../lib/ext/nap-extension').docTepExt('serviceWorker').match(/var FBM_CONTRACT_VERSION = '([^']*)';/) || [])[1];
 }
 
 module.exports = { CONTRACT, contractVersion, extensionContractVersion };

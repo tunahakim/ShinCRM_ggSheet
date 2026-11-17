@@ -12,11 +12,10 @@ const { quaTrangLogin } = require('../../lib/fbm/trang-login');
 const { taoKhoThuocTinh } = require('../../lib/gas/kho-thuoc-tinh');
 const { WORKFLOWS, PIPELINE_CATALOG } = require('../../contracts/fbmSyncPipeline');
 const { taoBoTest } = require('./Sidebar');
+const { napExtension } = require('../../lib/ext/nap-extension');
 const MA_HOP_DONG = require('../../contracts/gasExtensionContract').extensionContractVersion();
 
 const ROOT = path.join(__dirname, '..', '..', '..');
-const EXECUTOR = path.join(ROOT, '2_ShinCRM_Extension', 'content_scripts', 'fbm_sync', 'executor.js');
-const WORKER = path.join(ROOT, '2_ShinCRM_Extension', 'background', 'service_worker.js');
 
 /**
  * Trần số lần gọi kho DocumentProperties của một lát Activity sau đợt 1 bước A: nạp cả kho trước khóa, nạp lại trong khóa, ghi gộp, ghi trace (đo 2026-10-07 trước refactor: 83).
@@ -52,7 +51,6 @@ function fbmResponse(body) {
 /** Một tab FBM giả: executor thật chạy trong một context giữ nguyên giữa các request, nên RAM việc quét còn đến khi gọi `reload()`. */
 function executorSession() {
   let listener = null, responseBody = '', fetches = 0, sent = null;
-  const source = fs.readFileSync(EXECUTOR, 'utf8');
   const load = () => {
     listener = null;
     const context = {
@@ -67,7 +65,7 @@ function executorSession() {
       chrome: { runtime: { getManifest: () => ({ version: '22.0' }), onMessage: { addListener(fn) { listener = fn; }, removeListener() {} } } }
     };
     vm.createContext(context);
-    vm.runInContext(source, context, { filename: EXECUTOR });
+    napExtension('executor', null, context);
   };
   load();
   return {
@@ -189,8 +187,7 @@ function workerHarness(relayReplies, fbmTabs, tabReply) {
       return Promise.resolve(relayResponse(relayReplies.shift() || { ok: false, code: 'RELAY_REPLY_MISSING' }));
     }
   };
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(WORKER, 'utf8'), context, { filename: WORKER });
+  napExtension('serviceWorker', null, vm.createContext(context));
   return { context, relayCalls, storage, metrics: () => ({ fbmTabQueries, fbmTabCreates, fbmMessages }) };
 }
 

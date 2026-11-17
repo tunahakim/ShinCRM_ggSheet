@@ -140,7 +140,7 @@ const PIPELINE_CATALOG = [
 ].map(function (item) {
   var group = item[0].charAt(0);
   var testModules = {
-    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLogin.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
+    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLoginChuKy.js', 'tests/cases/fbmSync/AutoLoginGiuPhien.js', 'tests/cases/fbmSync/AutoLoginProbe.js', 'tests/cases/fbmSync/AutoLoginFailClosed.js', 'tests/cases/fbmSync/AutoLoginThatBai.js', 'tests/cases/fbmSync/AutoLoginThu.js', 'tests/cases/fbmSync/AutoLoginKhoaCho.js', 'tests/cases/fbmSync/AutoLoginSauXoa.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
     B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/PullScan.js', 'tests/cases/fbmSync/Reconcile.js'],
     C: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
     D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],

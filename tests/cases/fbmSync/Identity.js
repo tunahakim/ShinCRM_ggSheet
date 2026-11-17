@@ -12,7 +12,7 @@ async function chay(so) {
     PropertiesService: taoPropertiesService({ doc: bindingData }),
     shinOpenBook: () => ({ getId: () => 'sheet-binding-test' })
   });
-  napServer(identity, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/ConnectionSave.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
+  napServer(identity, 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/RecordMap.js', 'fbm_sync/reconcile/ConnectionSave.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/report/Report.js', 'fbm_sync/write/SheetSave.js');
   identity.FbmSync.configValue = () => '';
   let identityLocalReads = 0;
   identity.FbmSync.readLocal = () => { identityLocalReads += 1; return []; };

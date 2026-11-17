@@ -89,16 +89,15 @@ const RULES = [
 const EXCEPTIONS = {
   tenKhung: {},
   dungHop: {
-    'cases/extensionBridge.js': 26,
-    'cases/fbmSync/ActivityScan.js': 3,
+    'cases/extensionBridge.js': 21,
+    'cases/fbmSync/ActivityScan.js': 2,
     'cases/fbmSync/Audit.js': 1,
-    'cases/fbmSync/AutoLogin.js': 5,
     'cases/fbmSync/BackgroundChain.js': 1,
     'cases/fbmSync/Builders.js': 1,
     'cases/fbmSync/Push.js': 2,
     'cases/fbmSync/PushCompare.js': 2,
     'cases/fbmSync/Reconcile.js': 2,
-    'cases/fbmSync/Workflow.js': 6
+    'cases/fbmSync/Workflow.js': 4
   },
   requireCa: {
     'cases/fbmSync/ActivityScan.js': 1,

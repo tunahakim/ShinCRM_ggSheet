@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const { section, check, checkThrows } = require('../../lib/assert');
-const { TEP_EXT, duongDanExt, manifestThat, napExtension } = require('../../lib/ext/nap-extension');
+const { TEP_EXT, duongDanExt, manifestThat, napExtension, nguonWorkerDu } = require('../../lib/ext/nap-extension');
 
 function chay(so) {
   section('Khung test Extension — đường dẫn khai một chỗ, hộp có biến của trình duyệt');
@@ -29,6 +29,9 @@ function chay(so) {
     [true, 'object']);
   const cungHop = napExtension('bindWatcher', null, hop);
   check(so, 'napExtension: truyền hộp đã có thì nạp vào đúng hộp đó', cungHop === hop, true);
+  // Content script nạp kèm các tệp đứng trước nó trong manifest. Service worker nạp lại executor vào tab FBM bằng danh sách riêng: lệch thì tab nạp lại thiếu tệp đọc response mà test vẫn xanh.
+  const tepNapLai = JSON.parse((nguonWorkerDu().match(/var FBM_EXECUTOR_FILES = (\[[^\]]*\]);/) || [])[1].replace(/'/g, '"'));
+  check(so, 'service worker nạp lại executor đúng các tệp và thứ tự của mục content_scripts trong manifest', tepNapLai, manifest.content_scripts.find((m) => m.js.indexOf('content_scripts/fbm_sync/executor.js') >= 0).js);
 }
 
 module.exports = { chay };

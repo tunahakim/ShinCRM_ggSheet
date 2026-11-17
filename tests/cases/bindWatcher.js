@@ -11,7 +11,7 @@ function napWatcher() {
   FakeXHR.prototype.addEventListener = function (name, fn) { (this.listeners[name] = this.listeners[name] || []).push(fn); };
   FakeXHR.prototype.fire = function (name) { (this.listeners[name] || []).forEach((fn) => fn()); };
   FakeXHR.prototype.day = function (frame) { this.responseText += frame; this.readyState = 3; this.fire('progress'); };
-  const window = { XMLHttpRequest: FakeXHR, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
+  const window = { XMLHttpRequest: FakeXHR, addEventListener: () => {}, postMessage: (data, origin) => { posted.push({ kind: data.kind, source: data.source, action: data.action, origin }); facts.push({ kind: data.kind, sameSession: data.sameSession, firstChunk: data.firstChunk, hasChange: data.hasChange }); } };
   const hop = napExtension('bindWatcher', { location: { origin: 'https://docs.google.com' }, window: window });
   return { FakeXHR, posted, facts, hop };
 }
