@@ -18,7 +18,7 @@ FbmSync.recordIssueAdd = function (direction, entity, status, id, reason, outcom
 FbmSync.recordIssuesFlush = function (state) {
   var groups = FbmSync.recordIssues, keys = Object.keys(groups);
   FbmSync.recordIssues = {};
-  if (!keys.length || typeof logEvent !== 'function') { return 0; }
+  if (!keys.length) { return 0; }
   // Gọi từ cửa ghi state thì nhận luôn state đang ghi: đọc lại kho lúc đó trả bản cũ và tốn một lần đọc.
   state = state || FbmSync.stateRead();
   var cycleId = String(state.runId || state.metadata && state.metadata.businessRunId || '');
@@ -35,7 +35,6 @@ FbmSync.recordIssuesFlush = function (state) {
  * Chỉ ghi mã request, không ghi nội dung response.
  */
 FbmSync.logStaleResponse = function (state, responseRequestId, action) {
-  if (typeof logEvent !== 'function') { return; }
   var current = state || {};
   var closed = !!responseRequestId && String(responseRequestId) === String(current.closedRequestId || '');
   logEvent(closed

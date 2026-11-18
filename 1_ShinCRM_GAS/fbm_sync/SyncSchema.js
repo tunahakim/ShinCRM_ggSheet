@@ -36,9 +36,6 @@ function syncColumnsForSheet(sheetName) {
 
 /** Gọi bộ dựng cột chung; module này chỉ cung cấp schema, không chạm SpreadsheetApp. */
 function fbmEnsureSyncColumns(source) {
-  if (typeof ensureColumnsThroughWriteGate !== 'function') {
-    throw new Error('Thiếu cửa dựng cột chung; không ghi schema trực tiếp trong module đồng bộ.');
-  }
   return ensureColumnsThroughWriteGate(source, syncColumnsForSheet);
 }
 

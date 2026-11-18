@@ -93,7 +93,7 @@ FbmSync.IDENTITY_SAMPLE_MAX = 50;
 FbmSync.IDENTITY_MISSING_SHOWN = 20;
 /** Chuẩn bị bảng đối chiếu ID Customer mà không đưa danh sách lên Sidebar. */
 FbmSync.identityCheckBegin = function (state) {
-  var local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], sample = [], target = state.identityTarget || {};
+  var local = FbmSync.readLocal('customer'), sample = [], target = state.identityTarget || {};
   (local || []).forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
     if (!fbmId || String(record.recordStatus || 'active') === 'deleted' || FbmSync.isTemporaryRecord('customer', record)) { return; }
@@ -112,7 +112,7 @@ FbmSync.identityCheckBegin = function (state) {
 
 /** Ghi nhận một trang Customer cho luồng kiểm tra, không ghi Sheet/FBM. */
 FbmSync.identityCheckPage = function (state, rows) {
-  var result = state.metadata && state.metadata.identityCheck || {}, page = rows || [], local = typeof FbmSync.readLocal === 'function' ? FbmSync.readLocal('customer') : [], localById = {};
+  var result = state.metadata && state.metadata.identityCheck || {}, page = rows || [], local = FbmSync.readLocal('customer'), localById = {};
   (local || []).forEach(function (record) {
     var fbmId = String(record && record.fbmId || '').trim();
     if (fbmId && String(record.recordStatus || 'active') !== 'deleted' && !FbmSync.isTemporaryRecord('customer', record)) { localById[fbmId] = record; }

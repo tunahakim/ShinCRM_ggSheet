@@ -31,13 +31,12 @@ FbmSync.categoryMapFromRows = function (rows) {
 
 /** Đọc cặp danh mục thật/companion qua tầng 3 (`categoryReadColumns`): trong một lần gọi chỉ tốn một lần đọc Sheet; lần gọi sau đọc lại nên sửa Category có hiệu lực ngay. */
 FbmSync.readCategoryGate = function () {
-  if (typeof categoryReadColumns !== 'function' || typeof CATEGORY_COLUMNS === 'undefined') { return { map: {}, names: {}, valid: {}, warnings: [] }; }
   var pairs = [];
   CATEGORY_COLUMNS.forEach(function (pair) {
     var source = pair[0];
-    if (typeof categoryIsCompanion === 'function' && categoryIsCompanion(source)) { return; }
-    var companionCode = source + (typeof CATEGORY_FBM_SUFFIX === 'undefined' ? '_FBM' : CATEGORY_FBM_SUFFIX);
-    if (typeof categoryIsCompanion === 'function' && !categoryIsCompanion(companionCode)) { return; }
+    if (categoryIsCompanion(source)) { return; }
+    var companionCode = source + CATEGORY_FBM_SUFFIX;
+    if (!categoryIsCompanion(companionCode)) { return; }
     pairs.push([source, companionCode]);
   });
   var columns = categoryReadColumns([].concat.apply([], pairs));

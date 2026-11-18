@@ -33,9 +33,7 @@ FbmSync.conflictPendingNote = function (state, count) {
   state.metadata.conflictCount = now;
   if (now === before) { return false; }
   state.metadata.conflictLogged = now;
-  if (typeof logEvent === 'function') {
-    logEvent({ source: 'fbm_sync', action: 'conflict_pending_changed', outcome: now ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), cycleId: String(state.runId || ''), reason: now ? 'Còn ' + now + ' bản ghi xung đột chờ quyết (lần ghi trước: ' + before + '); mở chế độ xử lý xung đột để quyết.' : 'Không còn bản ghi xung đột chờ quyết (lần ghi trước: ' + before + ').', detail: { count: now, previous: before } });
-  }
+  logEvent({ source: 'fbm_sync', action: 'conflict_pending_changed', outcome: now ? (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn') : (typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok'), cycleId: String(state.runId || ''), reason: now ? 'Còn ' + now + ' bản ghi xung đột chờ quyết (lần ghi trước: ' + before + '); mở chế độ xử lý xung đột để quyết.' : 'Không còn bản ghi xung đột chờ quyết (lần ghi trước: ' + before + ').', detail: { count: now, previous: before } });
   return true;
 };
 

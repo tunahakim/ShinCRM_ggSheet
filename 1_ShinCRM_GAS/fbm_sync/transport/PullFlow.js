@@ -33,7 +33,7 @@ FbmSync.startRun = function (options, current) {
     if (kind !== 'session') { FbmSync.stagePatchApply(current, FbmSync.sessionGateOpen(current, 'issue', 'Đang probe lại phiên FBM trước khi tiếp tục cursor đã lưu...', false)); }
     return { ok: true, request: FbmSync.cursorIssue(current), resumed: true };
   }
-  if (typeof fbmEnsureSyncColumns === 'function') { fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull'); }
+  fbmEnsureSyncColumns(opt.origin === 'background' ? 'background' : 'pull');
   var state = FbmSync.runOpen({
     origin: opt.origin,
     mode: opt.mode,
@@ -43,9 +43,7 @@ FbmSync.startRun = function (options, current) {
     process: opt.process,
     pollAt: opt.pollAt
   });
-  if (typeof FbmSync.businessStepStart === 'function') {
-    FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
-  }
+  FbmSync.businessStepStart(state, 'run', { mode: state.mode, scan: state.scan, origin: state.origin });
   // Kiểm tra liên kết đối chiếu bản nháp người dùng đang xem trên Sidebar; không gửi bản nháp thì đối chiếu liên kết đã lưu.
   state.identityTarget = state.scan === 'identity_check' ? (opt.identity && typeof opt.identity === 'object' ? FbmSync.identityNormalize(opt.identity) : FbmSync.boundIdentity()) : null;
   // Chụp đầu lượt như mức quét: đổi cài đặt giữa chừng chỉ áp từ lượt sau, và không phải đọc lại DocumentProperties mỗi envelope.
@@ -59,12 +57,10 @@ FbmSync.startRun = function (options, current) {
   FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(opt.detail && opt.detail.customersPerRun || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))) : 0; }
   // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).
-  if (typeof FbmSync.preflightGates === 'function') {
-    var gates = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightGates({ mode: state.mode, origin: state.origin, scan: state.scan }); });
-    var stopped = FbmSync.preflightApply(state, gates);
-    if (stopped) { return stopped; }
-  }
-  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan }); }
+  var gates = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightGates({ mode: state.mode, origin: state.origin, scan: state.scan }); });
+  var stopped = FbmSync.preflightApply(state, gates);
+  if (stopped) { return stopped; }
+  FbmSync.businessStepStart(state, 'session', { mode: state.mode, scan: state.scan });
   if (state.scan === 'identity_probe') {
     // User grid đã tự chứng minh cookie/session đọc được. Không lấy Authorized
     // chỉ để tự động điền, vì token này không được probe sử dụng.
@@ -111,7 +107,7 @@ FbmSync.preflightApply = function (state, preflight) {
   var known = {};
   (state.metadata.preflightIssues || []).forEach(function (item) { known[item.code + '' + item.message] = true; });
   state.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat((preflight.issues || []).filter(function (item) { return !known[item.code + '' + item.message]; }));
-  if (typeof FbmSync.logPreflight === 'function') { FbmSync.logPreflight(preflight); }
+  FbmSync.logPreflight(preflight);
   if (typeof preflight.conflictPending === 'number') { FbmSync.conflictPendingNote(state, preflight.conflictPending); }
   if (!preflight.ok) {
     var first = preflight.blocking[0] || {};
@@ -127,16 +123,14 @@ FbmSync.preflightApply = function (state, preflight) {
  */
 FbmSync.preflightLocalStep = function (state) {
   var options = { mode: state.mode, origin: state.origin, scan: state.scan };
-  if (typeof FbmSync.preflightLocal !== 'function' || !FbmSync.preflightNeedsLocal(options)) { return null; }
+  if (!FbmSync.preflightNeedsLocal(options)) { return null; }
   if (FbmSync.canWriteFbm(state.mode)) {
     if (!state.pushGate) { state.pushGate = FbmSync.pushGateCheck(state, options); }
     if (!state.pushGate.open) { return null; }
   }
-  if (typeof FbmSync.businessStepStart === 'function') { FbmSync.businessStepStart(state, 'preflight_hash', options); }
+  FbmSync.businessStepStart(state, 'preflight_hash', options);
   var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
-  if (typeof FbmSync.businessStepFinish === 'function') {
-    FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking.length || 0), skipped: Number(preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
-  }
+  FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking.length || 0), skipped: Number(preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
   return FbmSync.preflightApply(state, preflight);
 };
 
@@ -194,7 +188,7 @@ FbmSync.beginCustomerPull = function (state) {
   FbmSync.prepareCategoryGate(state, categoryLogs);
   FbmSync.stagePatchApply(state, { logs: categoryLogs });
   if (state.mode === 'push') { return FbmSync.pushStageOpen(state); }
-  if (typeof FbmSync.businessStepStart === 'function' && state.scan === 'full') {
+  if (state.scan === 'full') {
     FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
     FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
   }
@@ -215,7 +209,7 @@ FbmSync.pullFinishOrPush = function (state, extra) {
   var result = Object.assign({ ok: true, status: null }, extra || {});
   if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
     FbmSync.readListClear();
-    if (typeof FbmSync.businessFinishSteps === 'function') { FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity)); }
+    FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity));
     result.request = FbmSync.sliceIssue(state, FbmSync.pushStageOpen(state));
     return result;
   }

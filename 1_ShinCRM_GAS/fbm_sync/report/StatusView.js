@@ -106,7 +106,7 @@ FbmSync.statusInputRead = function () {
     background: settingsValue(FbmSync.SETTING_SECTIONS.background, 'enabled'),
     run: settingsValues(FbmSync.SETTING_SECTIONS.run),
     silentMinutes: FbmSync.machineSilentMinutes(settingsValues(FbmSync.SETTING_SECTIONS.extension)),
-    failures: FbmSync.pushFailuresRead(), preview: FbmSync.previewRead(), trace: typeof FbmSync.traceRead === 'function' ? FbmSync.traceRead(20) : undefined,
+    failures: FbmSync.pushFailuresRead(), preview: FbmSync.previewRead(), trace: FbmSync.traceRead(20),
     // Tập chờ duyệt đọc từ cổng chặng đẩy, không suy từ phase; cổng hỏng thì ném như mọi kho hỏng.
     gate: FbmSync.pushGateRead(), stopFlag: FbmSync.stopFlagRead(), machine: FbmSync.backgroundMachineRead(),
     login: FbmSync.credentialPublicView(), binding: FbmSync.bindingRead()

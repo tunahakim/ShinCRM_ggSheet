@@ -122,7 +122,7 @@ FbmSync.removeLegacyTriggers = function () {
     var handler = trigger.getHandlerFunction();
     if (FbmSync.LEGACY_TRIGGER_HANDLERS.indexOf(handler) >= 0) { ScriptApp.deleteTrigger(trigger); removed.push(handler); }
   });
-  if (removed.length && typeof logEvent === 'function') {
+  if (removed.length) {
     logEvent({ source: 'fbm_sync', action: 'legacy_trigger_removed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Đã gỡ ' + removed.length + ' trigger hẹn giờ của thiết kế cũ (' + removed.join(', ') + '); nhịp nền chỉ còn do Extension hỏi GAS.' });
   }
   return { ok: true, removed: removed };

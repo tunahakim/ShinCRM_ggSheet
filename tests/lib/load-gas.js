@@ -34,6 +34,9 @@ function taoHopCat(stubs) {
   const notices = hopCat._notices = hopCat._notices || []; Object.keys(NOTICE_STUBS).forEach((key) => { if (!hopCat[key]) { hopCat[key] = NOTICE_STUBS[key](notices); } });
   ['logEvent', 'logTrace', 'flushLogIfTraced', 'logRegisterContext'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = () => {}; } });
   ['LOG_OK', 'LOG_WARN', 'LOG_ERROR'].forEach((key) => { if (!hopCat[key]) { hopCat[key] = key.slice(4).toLowerCase(); } });
+  // Tầng lõi ShinCRM mà `fbm_sync` gọi thẳng (trên GAS mọi tệp cùng một dự án): bảng cột danh mục rỗng nên cổng danh mục đọc ra rỗng, dựng cột Sheet coi như đã đủ. Ca nạp tệp thật (`SheetLayout.js`, `CategoryRead.js`, `SyncSchema.js`) thì bản thật đè.
+  const LOI_GIA = { CATEGORY_COLUMNS: () => [], CATEGORY_FBM_SUFFIX: () => '_FBM', categoryIsCompanion: () => () => false, categoryReadColumns: () => () => ({}), fbmEnsureSyncColumns: () => () => {} };
+  Object.keys(LOI_GIA).forEach((key) => { if (!(key in hopCat)) { hopCat[key] = LOI_GIA[key](); } });
   if (!hopCat.LockService) { hopCat.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }; }
   vm.createContext(hopCat);
   return hopCat;

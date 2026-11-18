@@ -33,18 +33,16 @@ FbmSync.preflightResult = function (mode, issues, local) {
 
 /** Phần rẻ: Category lõi, cài đặt kéo từ FBM, liên kết tài khoản, phạm vi khách; không đọc bản ghi Customer/Activity. */
 FbmSync.preflightGates = function (options) {
-  var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = typeof shinCorePreflight === 'function' ? shinCorePreflight({ mode: writeMode ? 'write' : mode }) : { issues: [], category: { categories: {} } }, issues = (core.issues || []).slice();
-  if (typeof FbmSync.identityPreflight === 'function') {
-    // Both identity actions are recovery tools: they must remain usable when
-    // existing FBM IDs require a rebind. Ordinary read/write/background runs
-    // stay fail-closed until the binding has been checked.
-    var identityMode = (opt.scan === 'identity_check' || opt.scan === 'identity_probe') ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
-    var identity = FbmSync.identityPreflight(identityMode);
-    if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
-    else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
-  }
+  var opt = options || {}, mode = FbmSync.modeOf(opt.mode), writeMode = FbmSync.canWriteFbm(mode), core = shinCorePreflight({ mode: writeMode ? 'write' : mode }), issues = (core.issues || []).slice();
+  // Both identity actions are recovery tools: they must remain usable when
+  // existing FBM IDs require a rebind. Ordinary read/write/background runs
+  // stay fail-closed until the binding has been checked.
+  var identityMode = (opt.scan === 'identity_check' || opt.scan === 'identity_probe') ? 'identity_check' : (opt.origin === 'background' ? 'background' : mode);
+  var identity = FbmSync.identityPreflight(identityMode);
+  if (identity.blocking) { FbmSync.preflightIssue(issues, identity.status && identity.status.status === 'UNBOUND' ? 'FBM_IDENTITY_UNBOUND' : 'REBIND_REQUIRED', 'error', 'Identity', identity.message, true); }
+  else if (identity.status && identity.status.status === 'REBIND_REQUIRED') { FbmSync.preflightIssue(issues, 'REBIND_REQUIRED', 'warn', 'Identity', identity.message, false); }
   // Hai lệnh kiểm liên kết chỉ đọc toàn bộ để đối chiếu danh tính, không ghi bản ghi nào, nên không cần phạm vi khách chỉ định.
-  if (opt.scan !== 'identity_check' && opt.scan !== 'identity_probe' && typeof FbmSync.scope === 'function') {
+  if (opt.scan !== 'identity_check' && opt.scan !== 'identity_probe') {
     var scope = FbmSync.scope();
     if (scope && !scope.codes.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_EMPTY', 'error', 'fbm_sync', 'Phạm vi đồng bộ đang là "Chỉ khách chỉ định" nhưng danh sách khách chỉ định còn trống. Vào Cài đặt phiên, thêm mã khách hoặc bỏ giới hạn rồi chạy lại.', true); }
     // Khách bị xóa khỏi Sheet sau khi lưu danh sách: lượt vẫn chạy cho phần còn lại nhưng phải báo, không bỏ qua im lặng.
@@ -68,7 +66,7 @@ FbmSync.preflightLocal = function (options, issues) {
 
 FbmSync.logPreflight = function (result) {
   // Một dòng cho mỗi mã vấn đề; thông điệp mang mã bản ghi nên gom theo mã để số dòng không tăng theo số bản ghi.
-  if (!result || !Array.isArray(result.issues) || !result.issues.length || typeof logEvent !== 'function') { return 0; }
+  if (!result || !Array.isArray(result.issues) || !result.issues.length) { return 0; }
   var groups = {}, order = [];
   result.issues.forEach(function (item) {
     var code = String(item && item.code || 'FBM_PREFLIGHT_ISSUE');
