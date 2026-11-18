@@ -14,7 +14,7 @@ Chỉ đọc tệp này khi phiên có chạm luồng đồng bộ FBM (code GAS
 
 ## Checklist rà soát đồng bộ FBM
 
-- Đợt refactor đồng bộ FBM theo dõi tiến độ duy nhất ở `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/1. Checklist tiến độ.md`; sau khi ngữ cảnh bị nén đọc tệp này và tiếp tục từ dòng `[ ]` đầu tiên.
+- Hồ sơ đợt refactor đồng bộ FBM (đã xong, đã gộp vào `main`) ở `0_Documentation/Phiên code/[Đã xử lý] 2026.10.22 Refactor đồng bộ FBM/`; chỉ đọc khi cần tra lại, việc mới ghi vào Todo.
 - Checklist dựng từ tài liệu 09 và `tests/contracts/fbmSyncPipeline.js`, không suy ra từ code. Mục nào tả bằng tên hàm nội bộ thay vì hành vi người dùng thấy được là sai gốc, phải viết lại.
 - Checklist phủ cả nhánh thành công lẫn nhánh thất bại. Lỗi nhóm theo lớp xử lý, không theo nguyên nhân: mọi lỗi mạng (DNS, TLS, timeout, đứt kết nối) quy về một lớp ở cổng request chung và chỉ cần một ca đại diện. Mỗi nguyên nhân đi một đường xử lý riêng là lỗi kiến trúc phải sửa, không phải lý do viết thêm test. Các lớp phải tách riêng vì đường xử lý khác nhau: transport, HTTP/parse, đăng nhập/session, hạn mức và giới hạn nền tảng, conflict, ghi/đối soát.
 - Mỗi bước chỉ mang đúng một nhãn `[Tự động]` hoặc `[Cần kiểm chứng thật]`. Cấm nhãn gộp kiểu `[Kết hợp]`; bước có cả hai phần thì tách thành hai dòng con.
@@ -23,7 +23,7 @@ Chỉ đọc tệp này khi phiên có chạm luồng đồng bộ FBM (code GAS
 
 ## Kiến trúc đồng bộ FBM
 
-- Kiến trúc đích và lý do nằm ở mục 11 (K1–K10) của `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/2. Thiết kế đích.md`; tài liệu 09 mô tả hành vi theo kiến trúc đó. Sửa luồng đồng bộ mà lệch K1–K10 thì phải trình chủ dự án trước.
+- Kiến trúc đích và lý do nằm ở mục 11 (K1–K10) của `0_Documentation/Phiên code/[Đã xử lý] 2026.10.22 Refactor đồng bộ FBM/2. Thiết kế đích.md`; tài liệu 09 mô tả hành vi theo kiến trúc đó. Sửa luồng đồng bộ mà lệch K1–K10 thì phải trình chủ dự án trước.
 - Mọi thay đổi state FBM đi qua `FbmSync.controlDispatch` (`fbm_sync/control/ControlPort.js`); thêm lệnh là thêm một dòng vào bảng `FbmSync.COMMANDS`, không mở đường gọi thẳng từ Sidebar hay relay.
 - Luật kiến trúc của mã đồng bộ FBM được chốt bằng luật tĩnh ở `tests/cases/fbmSync/StaticRules.js` (đọc/ghi state và `logEvent` chỉ ở người điều phối, phase cuối chỉ trong `runClose`, baseline chỉ ở công cụ áp kết quả, ghi kho chỉ qua cổng kho, không dò hàm bằng `typeof`, không lỗi im lặng, không số nghiệp vụ cứng, Extension không rẽ nhánh theo loại việc). Danh sách ngoại lệ ở đó chỉ được giảm; vi phạm mới thì sửa code, không thêm ngoại lệ.
 - Hàm khai trong `fbm_sync/`, `client/sync/` và Extension mà không mã chạy thật nào gọi bị `tests/cases/fbmSync/UnusedFunctions.js` bắt; hàm chết thì xóa, không có ngoại lệ, test gọi nó không tính là dùng.

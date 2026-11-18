@@ -6,7 +6,7 @@ Tệp này chỉ chứa quy tắc áp cho mọi phiên. Quy tắc riêng một l
 
 ## 1. Phiên đang làm
 
-- Phiên đang mở: refactor đồng bộ FBM theo các quy tắc cứng (chặng 3 của Todo), branch `feature/fbm-audit`, hồ sơ ở thư mục `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/`; tiến độ ở `1. Checklist tiến độ.md`, đầu tệp ghi khi nào đọc tệp nào.
+- Refactor đồng bộ FBM theo các quy tắc cứng đã xong và gộp vào `main`; hồ sơ ở `0_Documentation/Phiên code/[Đã xử lý] 2026.10.22 Refactor đồng bộ FBM/`, chỉ đọc khi cần tra lại.
 - Thứ tự việc kế tiếp ở `0_Documentation/Phiên code/2026.10.17 Todo.md`. Mục nào chi phí chưa rõ thì đo trên GAS DEV trước khi sửa và ghi số đo vào mục; mục sai về kiến trúc thì đọc code là biết, không đo.
 - Việc kế tiếp nằm trong Todo và các tệp `[Chờ xử lý]` ở `0_Documentation/Phiên code/`. Mở phiên cho một tệp thì tạo branch riêng từ `main`, ghi mục tiêu phiên vào mục này và trỏ về tệp đó.
 - Hồ sơ phiên đã xong và đã gộp vào `main` là các tệp `[Đã xử lý]` trong `0_Documentation/Phiên code/`; chỉ đọc khi cần tra lại.
