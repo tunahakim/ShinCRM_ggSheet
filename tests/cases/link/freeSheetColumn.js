@@ -17,7 +17,9 @@ const BANG = [
   { ten: 'Kanban: cột trống ngăn khối thuộc khối bên trái', hang1: ['@CUS_MA_KH', 'Tên', 'GD cuối', '', '@CUS_MA_KH', 'Tên', '', '@ACT_MA_KH', 'Tiền'], cot: 4, mong: 1 },
   { ten: 'Kanban: nhấp khối 2', hang1: ['@CUS_MA_KH', 'Tên', 'GD cuối', '', '@CUS_MA_KH', 'Tên', '', '@ACT_MA_KH', 'Tiền'], cot: 6, mong: 5 },
   { ten: 'Kanban: khối 3 mở bằng @ACT_MA_KH, nhấp ngoài mép phải', hang1: ['@CUS_MA_KH', 'Tên', 'GD cuối', '', '@CUS_MA_KH', 'Tên', '', '@ACT_MA_KH', 'Tiền'], cot: 12, mong: 8 },
-  { ten: 'một cột mã không ở cột A: ô bên trái thuộc cột mã đầu tiên', hang1: ['Ghi chú', '@CUS_MA_KH', '@ACT_MA_KH'], cot: 1, mong: 2 },
+  { ten: 'chỉ một cột mã: ô bên trái cột mã vẫn dùng cột mã đó', hang1: ['Ghi chú', 'Tên', '@CUS_MA_KH', 'GD cuối'], cot: 1, mong: 3 },
+  { ten: 'chỉ một cột mã: ô bên phải cột mã dùng cột mã đó', hang1: ['Ghi chú', '@ACT_MA_KH', 'Tiền'], cot: 3, mong: 2 },
+  { ten: 'từ hai cột mã: ô trước cột mã đầu tiên không thuộc cột nào', hang1: ['Ghi chú', '@CUS_MA_KH', 'Tên', '@CUS_MA_KH'], cot: 1, mong: 0 },
   { ten: 'không có cột mã', hang1: ['Tên', 'Ghi chú'], cot: 2, mong: 0 }
 ];
 
@@ -70,6 +72,27 @@ function chay(so) {
   gui('F7', [read('A', 'CUS-000004'), read('E', ''), read('H', 'CUS-000006')]);
   check(so, 'ô mã khối đang nhấp trống (danh sách ngắn hơn khối bên cạnh): báo hàng không có khách, không lấy khách khối khác',
     [picked.length, misses], [3, [{ kind: 'empty' }]]);
+
+  section('Sheet `!` và sheet kho chỉ được một cột mã: nhân đôi thì không đọc, ở cả GAS và Sidebar');
+  const viewTrung = nen.book.insertSheet('!Trung');
+  ['@CUS_MA_KH', '@ACT_MA_KH', 'Tên', '', '@CUS_MA_KH'].forEach((ma, cot) => { if (ma) { viewTrung.getRange(1, cot + 1).setValue(ma); } });
+  viewTrung.getRange(4, 1).setValue('CUS-000004');
+  viewTrung.getRange(4, 5).setValue('CUS-000005');
+  const khoTrung = nen.book.getSheetByName('Customer');
+  const cuoi = khoTrung.getLastColumn() + 1;
+  khoTrung.getRange(1, cuoi).setValue('@CUS_MA_KH');
+  khoTrung.getRange(4, cuoi).setValue('CUS-000005');
+  check(so, 'GAS: sheet `!` và sheet Customer có @CUS_MA_KH nhân đôi thì ô mã rỗng, không đoán cột',
+    [nen.hop.selectionCustomerCell({ sheet: viewTrung }, { sheetName: '!Trung', row: 4, col: 3 }).value, nen.hop.selectionCustomerCell({ sheet: khoTrung }, { sheetName: 'Customer', row: 4, col: 3 }).value],
+    ['', '']);
+  const view = dungHopLienKet(); batDauLienKet(view);
+  view.SHEET_LINK_READ_PLAN = { Customer: [], Activity: [], Category: [], Config: [], '!': JSON.parse(JSON.stringify(MAU_VIEW)) };
+  view.SHEET_LINK_LAST_ACK = 5000; view._clock.now = 5001;
+  view.callServer = () => ({ then() { return this; } });
+  view.sheetLinkOnMessage({ origin: view.SHEET_LINK_ORIGIN, data: { action: 'CRM_CONTEXT', nonce: view.SHEET_LINK_NONCE, spreadsheetId: 'sheet-1', seq: 1, gid: '11', sheetName: '!Trung', cellRef: 'C4', row: 4, readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'A1', column: 1, value: '@CUS_MA_KH' }, { address: 'B1', column: 2, value: '@ACT_MA_KH' }, { address: 'E1', column: 5, value: '@CUS_MA_KH' }], reads: [] } });
+  check(so, 'Sidebar: sheet `!` có @CUS_MA_KH nhân đôi thì plan bỏ mã đó, chỉ giữ mã có đúng một cột',
+    view.sheetLinkPlanForSheet('!Trung').map((item) => item.expectedValue + '@' + item.valueAddressTemplate),
+    ['@ACT_MA_KH@B{row}']);
 }
 
 module.exports = { chay };

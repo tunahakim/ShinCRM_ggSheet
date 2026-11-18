@@ -19,7 +19,7 @@ const GOC = path.join(__dirname, '..', '..');
 /** [đường dẫn, trần dòng, trần byte, nhóm sẽ xử lý, lý do]. Chỉ được hạ trần hoặc xóa dòng; nâng trần thì lý do phải nói vì sao. */
 const NGOAI_LE = [
   ['1_ShinCRM_GAS/client/link/selectionPoll.html', 254, 11066, 'giữ', 'bộ thăm dò chọn'],
-  ['1_ShinCRM_GAS/client/link/sheetLink.html', 734, 41096, 'UI', 'cầu nối Extension, read plan, điều phối reload, áp ngữ cảnh; luật cột mã sheet tự do nhiều danh sách đi cùng read plan và giải mã ô'],
+  ['1_ShinCRM_GAS/client/link/sheetLink.html', 736, 41241, 'UI', 'cầu nối Extension, read plan, điều phối reload, áp ngữ cảnh; luật cột mã sheet tự do nhiều danh sách đi cùng read plan và giải mã ô'],
   ['1_ShinCRM_GAS/client/ram/bootstrap.html', 255, 14113, 'UI', 'khởi động Sidebar; nhận khối modules của gói lõi (đèn icon ⟳)'],
   ['1_ShinCRM_GAS/client/ram/refresh.html', 226, 11347, 'giữ', 'áp reload vào RAM'],
   ['1_ShinCRM_GAS/client/ram/store.html', 300, 16906, 'giữ', 'kho RAM'],
@@ -57,7 +57,7 @@ const NGOAI_LE = [
   ['1_ShinCRM_GAS/server/gate/WriteGate.js', 519, 33964, 'B8', 'một cửa ghi; công cụ kiểm nằm chung người điều phối'],
   ['1_ShinCRM_GAS/server/log/LogGate.js', 283, 16902, 'giữ', 'bộ đệm và định dạng dòng Log, flushLog điều phối; che bí mật và thao tác sheet Log đã tách; hàm ngữ cảnh nhận cả dòng'],
   ['1_ShinCRM_GAS/server/service/LoadService.js', 419, 22205, 'giữ', 'một việc: nạp dữ liệu cho Sidebar; cổng CORE_LOAD_PROVIDERS cho mẩu nhỏ của module'],
-  ['1_ShinCRM_GAS/server/service/SelectionService.js', 334, 16965, 'giữ', 'dò chọn + read plan; cấp nhịp tầng liên kết cho trang Sidebar (SIDEBAR_SERVER_DATA.link) vì là phía máy chủ của tầng đó'],
+  ['1_ShinCRM_GAS/server/service/SelectionService.js', 336, 17047, 'giữ', 'dò chọn + read plan; cấp nhịp tầng liên kết cho trang Sidebar (SIDEBAR_SERVER_DATA.link) vì là phía máy chủ của tầng đó'],
   ['1_ShinCRM_GAS/server/sheet/EntityRead.js', 277, 16336, 'giữ', 'đọc thực thể'],
   ['1_ShinCRM_GAS/server/sheet/SheetReadCopy.js', 243, 13698, 'giữ', 'cổng đọc Sheet có đệm'],
   ['1_ShinCRM_GAS/server/state/DirtyState.js', 202, 12799, 'giữ', 'state dirty'],
@@ -83,7 +83,7 @@ const NGOAI_LE = [
   ['tests/cases/ramStore.js', 241, 14839, 'giữ', 'một module'],
   ['tests/cases/renderEngine.js', 411, 29616, 'UI', 'renderEngine + combo/picker + quét innerHTML'],
   ['tests/cases/schemaCheck.js', 215, 13887, 'giữ', 'một module'],
-  ['tests/cases/selectionService.js', 358, 22806, 'giữ', 'một module'],
+  ['tests/cases/selectionService.js', 358, 22830, 'giữ', 'một module'],
   ['tests/cases/sheetReadCopy.js', 262, 15614, 'giữ', 'một module; nạp thêm tệp tách khỏi CategoryGate, PushCandidates, Preflight; decide đọc qua cửa trước khi ghi vì cửa bản ghi buộc nguồn máy đọc trong khóa'],
   ['tests/cases/sheetTiers.js', 277, 17782, 'giữ', 'một module; nâng trần khi thêm ca sổ người gác xóa hẳn: sai hình dạng, không phải hàm, hai người gác, sổ trống'],
   ['tests/cases/triggers.js', 292, 16427, 'giữ', 'một module'],

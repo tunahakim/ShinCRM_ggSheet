@@ -138,8 +138,8 @@ function sheetLinkRefreshViewReadPlan(context) {
     dynamic = [];
     template.forEach(function (item) {
       var matches = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); });
-      // Sheet tự do được chứa nhiều danh sách, mỗi danh sách một cột mã: đọc mọi cột mã của hàng, `sheetLinkFreeSheetCodeColumn` chọn ô. Sheet `!` do GAS vẽ, chỉ một cột mỗi mã.
-      if (!free) { matches = matches.slice(0, 1); }
+      // Sheet tự do được chứa nhiều danh sách, mỗi danh sách một cột mã: đọc mọi cột mã của hàng, `sheetLinkFreeSheetCodeColumn` chọn ô. Sheet `!` chỉ được một cột mỗi mã: nhân đôi thì không đọc mã đó, như `selectionColumnIndex` của GAS.
+      if (!free && matches.length > 1) { return; }
       if (!matches.length) { if (!free) { dynamic.push(item); } return; }
       matches.forEach(function (match) {
         dynamic.push(Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: sheetLinkColumnLetters(match.column) + '{row}' }));
@@ -693,8 +693,8 @@ function sheetLinkAddressColumn(address) {
 
 /**
  * Cột mã của ô đang chọn trên sheet xem tự do, quyết từ hàng 1 Extension gửi chứ không từ các ô đã đọc (plan có thể chưa theo kịp hàng 1 và thiếu đúng cột cần).
- * Cùng luật với `selectionFreeSheetColumn` của GAS: cột mã gần nhất bên trái ô (kể cả chính nó); ô trước cột mã đầu tiên thuộc cột mã đầu tiên.
- * Trả -1 khi luật không áp (không phải sheet tự do, hoặc chưa có hàng 1), 0 khi hàng 1 không có cột mã nào.
+ * Cùng luật với `selectionFreeSheetColumn` của GAS: chỉ một cột mã thì mọi ô dùng cột đó; từ hai cột mã thì dùng cột mã gần nhất bên trái ô (kể cả chính nó), bên trái không có thì không có cột.
+ * Trả -1 khi luật không áp (không phải sheet tự do, hoặc chưa có hàng 1), 0 khi ô không thuộc cột mã nào.
  */
 function sheetLinkFreeSheetCodeColumn(ctx) {
   var headers = Array.isArray(ctx && ctx.rawHeaderRow) ? ctx.rawHeaderRow : [];
@@ -702,15 +702,17 @@ function sheetLinkFreeSheetCodeColumn(ctx) {
   var codes = (SHEET_LINK_READ_PLAN['!'] || []).map(function (item) { return String(item.expectedValue || '').trim(); });
   var coordinates = sheetLinkParseNameBox(ctx.cellRef);
   var selected = coordinates ? coordinates.col : Number(ctx.col) || 0;
-  var first = 0;
+  var count = 0;
+  var only = 0;
   var left = 0;
   headers.forEach(function (header) {
     var column = Number(header && header.column) || 0;
     if (!column || codes.indexOf(String(header.value || '').trim()) < 0) { return; }
-    if (!first || column < first) { first = column; }
+    count += 1;
+    only = column;
     if (column <= selected && column > left) { left = column; }
   });
-  return left || first;
+  return count === 1 ? only : left;
 }
 
 function sheetLinkCustomerIdFromContext(ctx) {

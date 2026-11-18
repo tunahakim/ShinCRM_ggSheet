@@ -159,19 +159,21 @@ function selectionIsFreeSheet(sheetName) {
 
 /**
  * Cột mã khách cho ô đang chọn trên sheet xem tự do, từ đúng một lần đọc hàng 1. Sheet tự do được chứa nhiều danh sách cạnh nhau, mỗi danh sách mở đầu bằng một cột mã.
- * Một luật, quyết bằng vị trí: cột mã gần nhất bên trái ô (kể cả chính nó); ô trước cột mã đầu tiên thuộc cột mã đầu tiên. Sidebar áp cùng luật ở `sheetLinkFreeSheetCodeColumn`; test giữ hai nơi cho cùng kết quả. Chỉ dùng khi không có Extension đọc.
+ * Luật quyết bằng vị trí: chỉ một cột mã thì mọi ô dùng cột đó; từ hai cột mã thì dùng cột mã gần nhất bên trái ô (kể cả chính nó), bên trái không có thì không có cột. Sidebar áp cùng luật ở `sheetLinkFreeSheetCodeColumn`; test giữ hai nơi cho cùng kết quả. Chỉ dùng khi không có Extension đọc.
  */
 function selectionFreeSheetColumn(sheet, column) {
   var header = sheetReadHeader(sheet);
   var codes = [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code];
-  var first = 0;
+  var count = 0;
+  var only = 0;
   var left = 0;
   for (var i = 0; i < header.length; i++) {
     if (codes.indexOf(header[i]) < 0) { continue; }
-    if (!first) { first = i + 1; }
+    count += 1;
+    only = i + 1;
     if (i + 1 <= column) { left = i + 1; }
   }
-  return left || first;
+  return count === 1 ? only : left;
 }
 
 /** Kế hoạch đọc thô: Extension chỉ đọc đúng địa chỉ và trả giá trị, không biết token có ý nghĩa gì. */

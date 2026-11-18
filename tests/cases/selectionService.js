@@ -262,18 +262,18 @@ function chay(so) {
     hang1.forEach((ma, i) => sheet.getRange(1, i + 1).setValue(ma));
     Object.keys(dong || {}).forEach((hang) => dong[hang].forEach((v, i) => sheet.getRange(Number(hang), i + 1).setValue(v)));
   };
-  tuDo('Bao cao', ['Ghi chú', '@CUS_MA_KH', '@ACT_MA_KH'], { 5: ['x', 'CUS-000005', 'CUS-000050'] });
+  tuDo('Bao cao', ['Ghi chú', '@CUS_MA_KH', 'Tên'], { 5: ['x', 'CUS-000005', 'An'] });
   tuDo('Chi giao dich', ['@ACT_MA_KH', 'Tiền'], { 4: ['CUS-000041', '100'] });
   tuDo('Trung ma', ['@CUS_MA_KH', '@CUS_MA_KH', '@ACT_MA_KH'], { 4: ['CUS-000001', 'CUS-000002', 'CUS-000043'] });
   tuDo('Khong ma', ['Tên', 'Ghi chú'], { 4: ['CUS-000004', 'y'] });
   const demTuDo = JSON.stringify(nen.dem);
   Object.assign(state, { sheetName: 'Bao cao', row: 5, col: 1, rowEnd: 5, colEnd: 1 });
   const baoCao = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do có cả hai mã: đọc @CUS_MA_KH trước, không trả plan (plan sheet tự do do Sidebar dựng)',
+  check(so, 'sheet tự do chỉ một cột mã: ô bên trái cột mã vẫn đọc cột mã đó, không trả plan (plan sheet tự do do Sidebar dựng)',
     [baoCao.customerId, baoCao.sheetPlan],
     ['CUS-000005', undefined]);
   Object.assign(state, { sheetName: 'Chi giao dich', row: 4, rowEnd: 4 });
-  check(so, 'sheet tự do thiếu @CUS_MA_KH thì đọc @ACT_MA_KH',
+  check(so, 'sheet tự do chỉ có cột @ACT_MA_KH thì đọc cột đó',
     hop.probeSelectionAndReload({}).customerId,
     'CUS-000041');
   state.sheetName = 'Trung ma';
