@@ -73,6 +73,11 @@ async function chay(so) {
     check(so, 'C2: đường đuôi chuỗi (tiến trình kế trong cùng lần hỏi) và đường hỏi nền đi qua cùng một chỗ quyết, ra cùng lượt keepalive',
       [viaChain.state.scan, viaChain.state.mode, viaChain.result.request && viaChain.result.request.meta.kind],
       ['keepalive', 'push', two.result.request && two.result.request.meta.kind]);
+    const recountInputs = [], realStart = two.F.start;
+    two.F.start = (input) => { recountInputs.push([input.openMessage, input.pack, input.follows]); return { ok: true, request: null }; };
+    two.F.recountStart('write', 'background', { follows: 'run-truoc' }, two.F.stateRead());
+    two.F.start = realStart;
+    check(so, 'Quét nhanh bù mang câu mở lượt trong lệnh mở, không ghi đè sau khi mở', recountInputs, [[two.F.RECOUNT_MESSAGE, 'quick', 'run-truoc']]);
     const recountModes = [];
     two.F.recountStart = (mode, origin) => { recountModes.push([mode, origin]); return { ok: true, request: null }; };
     const counted = two.F.stateRead(); counted.metadata.countTail = { pending: false, mode: 'write', message: 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.' }; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);

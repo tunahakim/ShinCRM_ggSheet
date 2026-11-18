@@ -70,8 +70,8 @@ FbmSync.startRun = function (options, current) {
   }
   // Xác thực Customer có cổng phiên: request đầu thực gửi là hỏi thử phiên, xác thực đi sau khi đúng tài khoản.
   state.cursor = { kind: 'authorize_customer' };
-  state.message = 'Đang kiểm tra phiên FBM...';
-  return { ok: true, request: FbmSync.cursorIssue(state) };
+  state.message = opt.openMessage || 'Đang kiểm tra phiên FBM...';
+  return { ok: true, request: FbmSync.cursorIssue(state, opt.openMessage) };
 };
 /**
  * Áp một lô bản ghi vừa đọc của lớp xả đọc: chế độ ghi Sheet thì `pullPageApply` ghi; chế độ xem trước chỉ đếm. Sổ đếm và bước nghiệp vụ cộng vào `state` người gọi đang giữ, người gọi ghi.
@@ -87,7 +87,7 @@ FbmSync.pullBatchApply = function (state, entity, records, ctx) {
     FbmSync.businessStepAdd(state, reconcileStep, { received: count, skipped: count });
     return { ok: true, preview: true, written: 0, skipped: count };
   }
-  var result = FbmSync.pullPageApply(entity, records || [], ctx);
+  var result = FbmSync.pullPageApply(entity, records || [], Object.assign({}, ctx, { runId: state.runId }));
   state.counts.succeeded += Number(result.written || 0);
   // Ô Xung đột của phiên đếm cả dòng cũ vẫn còn xung đột; số chờ quyết trên Sidebar chỉ cộng xung đột mới và trừ dòng đã tự gỡ, vì dòng cũ đã nằm trong số đếm lúc preflight.
   state.counts.conflict += Number(result.conflicts || 0) + Number(result.conflictsKept || 0);
@@ -107,8 +107,8 @@ FbmSync.preflightApply = function (state, preflight) {
   var known = {};
   (state.metadata.preflightIssues || []).forEach(function (item) { known[item.code + '' + item.message] = true; });
   state.metadata.preflightIssues = (state.metadata.preflightIssues || []).concat((preflight.issues || []).filter(function (item) { return !known[item.code + '' + item.message]; }));
-  FbmSync.logPreflight(preflight);
-  if (typeof preflight.conflictPending === 'number') { FbmSync.conflictPendingNote(state, preflight.conflictPending); }
+  var lines = FbmSync.preflightLogLines(preflight), conflictLine = typeof preflight.conflictPending === 'number' ? FbmSync.conflictPendingNote(state, preflight.conflictPending) : null;
+  FbmSync.stagePatchApply(state, { logs: conflictLine ? lines.concat([conflictLine]) : lines });
   if (!preflight.ok) {
     var first = preflight.blocking[0] || {};
     FbmSync.runFail(state, 'SYNC_PREFLIGHT_FAILED', 'Preflight thất bại: ' + String(first.message || 'Thiếu điều kiện trước phiên.'));
@@ -129,7 +129,7 @@ FbmSync.preflightLocalStep = function (state) {
     if (!state.pushGate.open) { return null; }
   }
   FbmSync.businessStepStart(state, 'preflight_hash', options);
-  var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, []); });
+  var preflight = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightLocal(options, [], state); });
   FbmSync.businessStepFinish(state, 'preflight_hash', preflight.ok ? 'ok' : 'error', Object.assign({}, preflight.hashSummary || {}, { candidateCount: Number(preflight.candidateCount || 0), errors: Number(preflight.blocking.length || 0), skipped: Number(preflight.warnings.length || 0), error: !preflight.ok && String(preflight.blocking[0] && preflight.blocking[0].message || '') }));
   return FbmSync.preflightApply(state, preflight);
 };

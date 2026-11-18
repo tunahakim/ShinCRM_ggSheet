@@ -64,13 +64,13 @@ FbmSync.preflightHashSummary = function (rows) {
 };
 
 /**
- * `scan` là bản đọc `localScan` của lần kiểm tra; ứng viên đẩy và hàng xung đột đều xét trên đó, không đọc lại Sheet.
+ * `scan` là bản đọc `localScan` của lần kiểm tra và `state` là ô lượt người gọi đang cầm (hàm này không đọc ô lượt); ứng viên đẩy và hàng xung đột đều xét trên đó, không đọc lại Sheet.
  * Chỉ lỗi chung (đọc dữ liệu hỏng, không dựng được ánh xạ danh mục, thiếu cấu hình chung) mới chặn phiên. Lỗi của riêng một bản ghi chỉ là cảnh báo: dòng xung đột và bản ghi từng đẩy lỗi bị phép xét một dòng (`pushEligible`) loại, bản ghi lệch người phụ trách, thiếu ánh xạ danh mục hoặc thiếu trường bị chặng đẩy đánh dấu chờ sửa; preflight báo trước và không tính chúng vào số ứng viên.
  * Trả `review` là kết quả `preflightPushReview` (thiếu khi không dựng được phép xét) và `conflictPending` là số dòng xung đột chờ quyết để người điều phối ghi Log; hàm này không tự ghi.
  */
-FbmSync.preflightCandidates = function (issues, mode, scan) {
+FbmSync.preflightCandidates = function (issues, mode, scan, state) {
   var candidates = [], review = null, settings = {}, settingsOk = true, conflictPending = 0, blockWrite = mode === 'write', current = null;
-  try { current = FbmSync.stateRead(); settings = FbmSync.scriptSettings(current); } catch (settingsError) {
+  try { current = state; settings = FbmSync.scriptSettings(current); } catch (settingsError) {
     settingsOk = false;
     FbmSync.preflightIssue(issues, 'FBM_SETTINGS_READ_FAILED', 'error', 'Cài đặt', 'Không đọc được cài đặt đồng bộ FBM trước phiên: ' + String(settingsError && settingsError.message || settingsError), blockWrite);
   }

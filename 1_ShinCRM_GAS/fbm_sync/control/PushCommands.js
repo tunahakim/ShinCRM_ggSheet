@@ -9,7 +9,8 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 FbmSync.pushFailuresClearCommand = function () {
   var failures = FbmSync.pushFailuresRead().hashes, keys = Object.keys(failures);
   if (!keys.length) { return { ok: false, code: 'PUSH_FAILURES_NOT_FOUND', message: 'Không có nhóm bản ghi lỗi đẩy cần mở lại.' }; }
-  var opened = FbmSync.recordChange(function (gate) {
+  // Lệnh ngoài lượt và không giữ bản ghi nào trong sổ bận, nên không có mã lượt.
+  var opened = FbmSync.recordChange('', function (gate) {
     var byEntity = { customer: [], activity: [] }, present = { customer: {}, activity: {} }, reset = [], missing = [];
     ['customer', 'activity'].forEach(function (entity) {
       gate.read(entity, FbmSync.recordSchemas()).forEach(function (record) { present[entity][String(record && record.id || '')] = true; });

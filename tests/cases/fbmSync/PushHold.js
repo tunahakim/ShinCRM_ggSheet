@@ -10,7 +10,7 @@ async function chay(so) {
   const logs = [];
   push.logEvent = (event) => logs.push(event);
   push.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-SKIP' }] : [];
-  const skippedState = { counts: { skipped: 0 }, metadata: {} };
+  const skippedState = { runId: 'R-SKIP', counts: { skipped: 0 }, metadata: {} };
   push.FbmSync.markPushSkippedBatch(skippedState, [{ entity: 'activity', id: 'ACT-SKIP', hold: { status: push.FbmSync.SYNC_STATUS.unknownCategory, reason: 'Category chua khop' } }]);
   check(so, 'Push record bị hoãn chỉ tăng state, không ghi Log chi tiết',
     [skippedState.counts.skipped, logs.length],
@@ -21,7 +21,7 @@ async function chay(so) {
   flush();
   push.FbmSync.readLocal = (entity) => entity === 'activity' ? [{ id: 'ACT-1' }, { id: 'ACT-2' }, { id: 'ACT-3' }] : [];
   const holdContext = { settings: () => ({ accountName: 'Lê Tuấn Anh' }), categoryGate: {} };
-  const skipState = { counts: { skipped: 0 }, metadata: {} }, messages = [], held = [];
+  const skipState = { runId: 'R-SKIP2', counts: { skipped: 0 }, metadata: {} }, messages = [], held = [];
   ['ACT-1', 'ACT-2', 'ACT-3'].forEach((id) => {
     const candidate = { entity: 'activity', kind: 'edit', id, record: { id, owner: 'Người khác' } }, hold = push.FbmSync.pushHold(candidate, holdContext);
     candidate.hold = hold; held.push(candidate);

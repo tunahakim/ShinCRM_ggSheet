@@ -14,7 +14,7 @@ async function chay(so) {
   let ghiSheet = 0, ghiCuoi = null;
   hop.writeGateSave = (change) => { ghiSheet += 1; ghiCuoi = change; return { ok: true }; };
   const incoming = F.customerRecord({ stt_rec_kh: 'S1', ma_kh: 'ALT00010', ten_kh: 'Đã đẩy' }, gate);
-  const ctx = { categoryGate: gate, accountName: '', now: Date.now() };
+  const ctx = { categoryGate: gate, accountName: '', now: Date.now(), runId: 'R1' };
   const dongDaDay = (extra) => { F.readLocal = (entity) => (entity === 'customer' ? [Object.assign({}, incoming, { id: 'CUS-1', fbmHash: 'hash-cu', syncStatus: F.SYNC_STATUS.pushed }, extra || {})] : []); };
 
   dongDaDay();

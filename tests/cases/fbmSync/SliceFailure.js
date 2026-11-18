@@ -72,14 +72,13 @@ function chay(so) {
     gom.dong.slice(truocPush).map((e) => e.action + '|' + e.outcome + '|' + e.recordId + '|' + e.detail.status), ['push_record_issue|error|CUS-8|lỗi']);
 
   const pf = taoHopCat({ FbmSync: {}, LOG_WARN: 'warn', LOG_ERROR: 'error', logEvent: (entry) => pf.dong.push(entry) });
-  pf.dong = [];
   napServer(pf, 'fbm_sync/report/Report.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/Pull.js', 'fbm_sync/report/Preflight.js', 'fbm_sync/report/PreflightPush.js');
   const pfIssues = [];
   for (let i = 1; i <= 3; i += 1) { pfIssues.push({ code: 'FBM_DUP_CODE', scope: 'customer', blocking: true, message: 'Trùng mã khách ALT0000' + i }); }
   pfIssues.push({ code: 'FBM_OWNER_MISSING', scope: 'activity', blocking: false, message: 'Thiếu người phụ trách ACT-9' });
-  const pfDong = pf.FbmSync.logPreflight({ issues: pfIssues });
+  const pfLines = pf.FbmSync.preflightLogLines({ issues: pfIssues });
   check(so, 'preflight: mỗi mã vấn đề đúng một dòng Log, chặn ghi là error, cảnh báo là warn, giữ số lượng',
-    [pfDong, pf.dong.map((e) => e.action + '|' + e.outcome + '|' + e.entity + '|' + e.detail.count)],
+    [pfLines.length, pfLines.map((e) => e.action + '|' + e.outcome + '|' + e.entity + '|' + e.detail.count)],
     [2, ['preflight_issue|error|customer|3', 'preflight_issue|warn|activity|1']]);
   // FBM-004: cửa ghi Sheet chặn trang pull thì phiên phải lỗi, không được tổng kết "Hoàn tất", cursor đứng nguyên trang đó.
   const ghi = dungState();
@@ -88,7 +87,7 @@ function chay(so) {
   ghi.nen.FbmSync.canWriteSheet = () => true;
   ghi.nen.DATA_SCHEMA = {}; ghi.nen.SYNC_SCHEMA = {};
   ghi.nen.writeGateSave = () => ({ ok: false, invalid: [{ id: 'CUS-3', field: 'fbmCustomerCode', label: 'Mã KH FBM', reason: 'Đã có bản ghi khác mang mã kh fbm "ALT00010".' }] });
-  ghi.nen.FbmSync.pullPageApply = (entity, records) => { ghi.nen.FbmSync.recordChange(() => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
+  ghi.nen.FbmSync.pullPageApply = (entity, records) => { ghi.nen.FbmSync.recordChange('', () => ({ save: [{ entity, records, source: 'pull' }] })); return { ok: true, written: records.length, conflicts: 0, skipped: 0, identityBlocks: [] }; };
   const cursorGhi = JSON.stringify(ghi.nen.FbmSync.stateRead().cursor || {});
   ghi.nen.FbmSync.continue = () => { keoLo(ghi.nen.FbmSync, 'customer', [{ fbmId: 'C-3' }, { fbmId: 'C-4' }], 'read'); return { ok: true }; };
   const truocGhi = ghi.dong.length;

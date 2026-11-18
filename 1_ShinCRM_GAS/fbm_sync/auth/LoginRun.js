@@ -139,8 +139,7 @@ FbmSync.loginEnd = function (state, end) {
   FbmSync.sessionIdentityClear(state);
   FbmSync.stagePatchApply(state, { logs: [{ action: end.action || 'login_failure', outcome: LOG_ERROR, reason: message.slice(0, 240), detail: { code: code, phase: String(state.phase || ''), response: end.facts } }] });
   FbmSync.runFail(state, code, message, { cursor: {} });
-  FbmSync.stateWrite(state);
-  var result = { ok: false, code: code, request: null, error: message, message: message };
+  var result ={ ok: false, code: code, request: null, error: message, message: message };
   if (end.runtime) { result.identity = end.runtime; }
   return result;
 };
@@ -156,8 +155,7 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     var force = cursor.purpose === 'force', resume = force ? cursor.resume || null : null, reopen = !!resume && !FbmSync.canWriteFbm(resume.mode);
     var message = force ? 'Đã hủy phiên cũ và đăng nhập đúng tài khoản FBM đã liên kết.' + (resume && !reopen ? ' Bấm Đồng bộ lại để duyệt và đẩy dữ liệu.' : '') : 'Đăng nhập thử thành công và đúng tài khoản FBM đã liên kết.';
     FbmSync.runClose(state, 'done', { message: message });
-    FbmSync.stateWrite(state);
-    logEvent({ source: 'fbm_sync', action: force ? 'login_force_ok' : 'login_test_ok', outcome: LOG_OK, cycleId: String(state.runId || ''), reason: message, detail: { runId: String(state.runId || '') } });
+    FbmSync.stagePatchApply(state, { logs: [{ action: force ? 'login_force_ok' : 'login_test_ok', outcome: LOG_OK, reason: message, detail: { runId: String(state.runId || '') } }] });
     if (reopen) { return FbmSync.start({ mode: resume.mode, pack: resume.pack, origin: 'manual', manual: true, follows: state.runId }, state); }
     return { ok: true, code: 'LOGIN_OK', request: null, identity: end.runtime, message: message };
   }
@@ -167,7 +165,6 @@ FbmSync.loginSucceed = function (state, cursor, end) {
     var lost = 'Đăng nhập lại thành công nhưng không dựng lại được request đồng bộ.';
     FbmSync.stagePatchApply(state, { logs: [{ action: 'login_resume_failure', outcome: LOG_ERROR, reason: lost, detail: { code: 'AUTO_LOGIN_RESUME_FAILED', cursor: String(back.cursor && back.cursor.kind || '') } }] });
     FbmSync.runFail(state, 'AUTO_LOGIN_RESUME_FAILED', lost, { cursor: {} });
-    FbmSync.stateWrite(state);
     return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError };
   }
   FbmSync.stagePatchApply(state, { cursor: back.cursor, phase: back.phase || 'checking_session', entity: back.entity || '', message: 'Đăng nhập lại thành công; đang tiếp tục phiên đồng bộ...' });

@@ -41,7 +41,7 @@ FbmSync.createRejected = function (cursor) {
  */
 FbmSync.createRecoveryApply = function (state, cursor, candidate, ids) {
   var entity = String(candidate.entity || ''), id = String(candidate.id || '');
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả tra lại', build: function (local) {
+  var done = FbmSync.pushRowChange(state.runId, entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả tra lại', build: function (local) {
     return FbmSync.createRecoveryPatch(local, ids);
   } });
   if (done.status !== 'gone') {
@@ -66,7 +66,7 @@ FbmSync.finishCustomerCreateRecovery = function (state, response) {
   }
   if (!rows.length) { throw cursor.rejected ? FbmSync.createRejected(cursor) : new Error('CREATE_RECOVERY_NOT_EXACT: chưa thấy Customer vừa tạo; không gửi lại lệnh ghi, lượt sau tra lại.'); }
   // Đọc dòng, so và vá trong cùng một lần qua cửa; mọi lỗi ném ra từ hàm quyết thì cửa không ghi gì.
-  var done = FbmSync.pushRowChange('customer', id, { allowGone: true, release: true, must: 'chưa vá mã FBM', build: function (local) {
+  var done = FbmSync.pushRowChange(state.runId, 'customer', id, { allowGone: true, release: true, must: 'chưa vá mã FBM', build: function (local) {
     var incoming = FbmSync.customerRecord(rows[0], gate), localHash = FbmSync.hash(local, 'customer', gate), sentHash = FbmSync.hash(candidate.record || {}, 'customer', gate);
     if (incoming.incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
     return FbmSync.createdCustomerPatch(local, incoming);

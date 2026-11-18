@@ -7,9 +7,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 /**
  * Pha 1 của áp kết quả đẩy (`pushResultApply`): lệnh lưu đã trả thành công. Lấy ID FBM (thiếu thì ném `FBM_PUSH_RESPONSE_INCOMPLETE`), băm bản đã gửi rồi ghi dòng `đã đẩy chờ xác nhận`. Baseline chỉ đổi ở pha 2, sau bước đọc lại.
  * Hash đã gửi không ghi kho nào: bên gọi giữ trong dấu trang của chặng cho pha 2. Lượt chết trước pha 2 thì dòng `đã đẩy chờ xác nhận` đã có ID FBM, lần kéo về sau so ba chiều như mọi dòng; lệnh tạo không bao giờ bị phát lại vì dòng đã có ID.
- * `gate` là cổng danh mục của chặng. Trả `{ patch, sentHash }`: patch đã ghi lên dòng (có `fbmId` để mở form đọc lại).
+ * `gate` là cổng danh mục của chặng, `runId` là mã lượt người gọi đang chạy. Trả `{ patch, sentHash }`: patch đã ghi lên dòng (có `fbmId` để mở form đọc lại).
  */
-FbmSync.pushResultSent = function (candidate, response, operation, gate) {
+FbmSync.pushResultSent = function (candidate, response, operation, gate, runId) {
   var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
   data = data.d || data;
   var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: String(record.fbmHash || '').trim() };
@@ -24,7 +24,7 @@ FbmSync.pushResultSent = function (candidate, response, operation, gate) {
   }
   // Fingerprint Activity có `id` FBM nên phải tính sau khi gắn ID vừa nhận; tính trên bản ghi lúc tạo (chưa có ID) thì mọi lệnh tạo đọc xác nhận lệch thành xung đột giả (FBM-050).
   var sentHash = FbmSync.hash(Object.assign({}, record, { fbmId: patch.fbmId }), candidate.entity, gate);
-  FbmSync.pushRowChange(candidate.entity, record.id, { must: 'chưa ghi mã FBM vừa tạo, dòng giữ "đang đẩy" để lượt sau tra lại', build: function () { return { patch: patch }; } });
+  FbmSync.pushRowChange(runId, candidate.entity, record.id, { must: 'chưa ghi mã FBM vừa tạo, dòng giữ "đang đẩy" để lượt sau tra lại', build: function () { return { patch: patch }; } });
   return { patch: patch, sentHash: sentHash };
 };
 /** FBM báo lưu thành công mà không trả ID: không biết bản ghi nằm đâu trên FBM nên không đọc xác nhận được. */

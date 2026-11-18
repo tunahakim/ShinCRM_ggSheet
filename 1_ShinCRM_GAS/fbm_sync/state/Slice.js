@@ -24,6 +24,14 @@ FbmSync.runSlice = function (work, state) {
   if (failure) { throw failure; }
   return FbmSync.runLeftOpenClose(result);
 };
+/** Ghi các dòng Log đã gom trong lát (kể cả lát ném lỗi); `state` truyền vào thì dùng luôn, vì đọc lại kho lúc đó trả bản cũ và tốn một lần đọc. */
+FbmSync.recordIssuesFlush = function (state) {
+  return FbmSync.recordIssuesPending() ? FbmSync.logFlush(FbmSync.recordIssuesTake(state || FbmSync.stateRead())) : 0;
+};
+/** Ghi các dòng Log đã dựng đủ trường, đúng thứ tự. */
+FbmSync.logFlush = function (lines) {
+  return (lines || []).map(function (line) { logEvent(line); }).length;
+};
 /**
  * Ghi bản của lát xuống kho. Ghi hỏng khi lát chạy êm thì đưa lượt sang lỗi trên ô lượt trong kho rồi ném; lát đã lỗi sẵn thì chỉ thêm một dòng Log, lỗi gốc vẫn là lỗi được ném.
  */
@@ -224,17 +232,17 @@ FbmSync.stageRun = function (entry, state, rawResponse) {
 FbmSync.sliceIssue = function (state, request) {
   return request ? FbmSync.issueThroughGate(state, function () { return request; }) : null;
 };
-FbmSync.cursorIssue = function (state) {
-  return FbmSync.issueThroughGate(state, FbmSync.cursorRequest);
+FbmSync.cursorIssue = function (state, gateMessage) {
+  return FbmSync.issueThroughGate(state, FbmSync.cursorRequest, gateMessage);
 };
-FbmSync.issueThroughGate = function (state, build) {
+FbmSync.issueThroughGate = function (state, build, gateMessage) {
   FbmSync.stateWrite(state);
-  var envelope = FbmSync.issueEnvelope(state, build);
+  var envelope = FbmSync.issueEnvelope(state, build, gateMessage);
   // Phong bì vừa cấp ghi request đang chờ vào ô lượt; nhánh không phát (dừng, tạm dừng, chặn) tự ghi qua cổng của nó.
   if (envelope) { FbmSync.stateWrite(state); }
   return envelope;
 };
-FbmSync.issueEnvelope = function (state, build) {
+FbmSync.issueEnvelope = function (state, build, gateMessage) {
   var sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel !== 'relay');
   // Cổng sẽ mở thì request gửi đi là request hỏi phiên: không dựng request nghiệp vụ (có cursor chưa đủ dữ liệu để dựng trước khi phiên được xác minh).
   var gated = !sidebar && FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
@@ -248,7 +256,7 @@ FbmSync.issueEnvelope = function (state, build) {
   // Chạm trần thì tạm dừng với cursor nghiệp vụ còn nguyên (Log và Sidebar thấy đúng chỗ dừng), không mở chặng phiên chỉ để dừng.
   if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(state); }
   if (gated) {
-    FbmSync.stagePatchApply(state, FbmSync.sessionGateOpen(state, 'issue', 'Đang kiểm tra tab và tài khoản FBM...', false));
+    FbmSync.stagePatchApply(state, FbmSync.sessionGateOpen(state, 'issue', gateMessage || 'Đang kiểm tra tab và tài khoản FBM...', false));
     request = FbmSync.cursorRequest(state);
   }
   return FbmSync.requestIssue(state, request, Date.now());
@@ -274,7 +282,7 @@ FbmSync.stagePatchApply = function (state, patch) {
     if (key === 'metadata') { state.metadata = Object.assign(state.metadata || {}, value.metadata); return; }
     state[key] = value[key];
   });
-  (value.logs || []).forEach(function (line) { logEvent(Object.assign({ source: 'fbm_sync', cycleId: String(state.runId || '') }, line)); });
+  FbmSync.logFlush((value.logs || []).map(function (line) { return Object.assign({ source: 'fbm_sync', cycleId: String(state.runId || '') }, line); }));
   return FbmSync.stateWrite(state);
 };
 /**
@@ -302,7 +310,7 @@ FbmSync.sliceContinue = function (input, state) {
 
 /** Kết quả hay lỗi không thuộc request đang chờ (về muộn sau khi lượt đóng, hoặc của lượt trước): bỏ, không xử lý và không phát lại request nào, kể cả lệnh ghi. */
 FbmSync.staleReplyDrop = function (state, requestId, isError) {
-  FbmSync.logStaleResponse(state, requestId, isError ? 'transport_failure_stale' : 'stale_response');
+  FbmSync.logFlush([FbmSync.staleResponseLine(state, requestId, isError ? 'transport_failure_stale' : 'stale_response')]);
   var message = isError ? 'Lỗi cầu nối không còn thuộc request đang chờ.' : 'Response FBM đã cũ hoặc phiên đã bị dừng; không tiếp tục cursor.';
   return { ok: false, code: 'STALE_RESPONSE', request: null, error: message };
 };

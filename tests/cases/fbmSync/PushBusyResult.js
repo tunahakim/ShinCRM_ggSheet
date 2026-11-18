@@ -14,7 +14,7 @@ function chay(so) {
   hop.writeGateSave = (request) => { ghi.push(request); return { ok: true }; };
   giuBanGhi(hop, 'nguoidung', 'customer', 'C-1', 'Người dùng đang sửa dòng này');
   let ketQua = null, loi = '';
-  try { ketQua = F.pushResultSent({ entity: 'customer', record: { id: 'C-1', companyName: 'Công ty' } }, PHAN_HOI, 'customer_create_save', { map: {} }); } catch (error) { loi = String(error && error.message || error); }
+  try { ketQua = F.pushResultSent({ entity: 'customer', record: { id: 'C-1', companyName: 'Công ty' } }, PHAN_HOI, 'customer_create_save', { map: {} }, ''); } catch (error) { loi = String(error && error.message || error); }
   check(so, 'dòng đang bận: không ghi Sheet và không trả kết quả như đã ghi; lỗi nêu lý do bận',
     [ghi.length, ketQua, loi.indexOf('Người dùng đang sửa dòng này') >= 0],
     [0, null, true]);

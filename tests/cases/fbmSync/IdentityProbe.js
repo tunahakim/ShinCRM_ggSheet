@@ -20,13 +20,14 @@ function chay(so) {
   // Tới bước kết của chặng xác thực Customer thì phiên đã qua cổng (đã xác minh).
   let identityFlowState = { mode: 'check', scan: 'identity_check', runId: 'identity-check-run', phase: 'checking_session', cursor: { kind: 'authorize_customer' }, session: { cookie: '461020379855cFHN_CRM_App', userId: '2037', identityVerified: true, sessionId: 'phien-thu', identitySessionId: 'phien-thu' }, metadata: {} };
   builders.FbmSync.stateRead = () => identityFlowState;
+  // Như bản của lát: trả đúng đối tượng được ghi (bổ field thiếu từ mặc định tại chỗ), để công cụ đang cầm bản đó không thành bản cũ.
   builders.FbmSync.stateWrite = (next) => {
     var fallback = builders.FbmSync.stateDefault();
-    identityFlowState = Object.assign(fallback, next || {}, {
-      session: Object.assign(fallback.session, next && next.session || {}),
-      metadata: Object.assign(fallback.metadata, next && next.metadata || {}),
-      counts: Object.assign(fallback.counts, next && next.counts || {})
-    });
+    Object.keys(fallback).forEach((key) => { if (!(key in next)) { next[key] = fallback[key]; } });
+    next.session = Object.assign(fallback.session, next.session || {});
+    next.metadata = Object.assign(fallback.metadata, next.metadata || {});
+    next.counts = Object.assign(fallback.counts, next.counts || {});
+    identityFlowState = next;
     return identityFlowState;
   };
   const identityStarted = trongLat(builders.FbmSync, () => builders.FbmSync.authorizeEnd(identityFlowState, { entity: 'customer' }), identityFlowState);

@@ -9,12 +9,13 @@ FbmSync.PUSH_HOLD_REASON = 'Đồng bộ đang đẩy bản ghi này lên FBM.';
 FbmSync.recordSchemas = function () { return [DATA_SCHEMA, SYNC_SCHEMA]; };
 
 /**
- * Chạy một hàm quyết qua Cửa bản ghi với chủ `fbm`. Mục `save` thiếu `schemas` thì nhận schema đồng bộ.
+ * Chạy một hàm quyết qua Cửa bản ghi với chủ `fbm` và mã lượt `runId` do người gọi truyền (rỗng cho thay đổi ngoài lượt; công cụ không đọc ô lượt). Mục `save` thiếu `schemas` thì nhận schema đồng bộ.
  * Cửa ghi báo thất bại theo hai kiểu: lỗi hệ thống thì ném, trường không đạt hoặc bản ghi đã vắng thì trả `ok:false`. Kiểu thứ hai từng bị bỏ qua nên luồng đi tiếp như đã ghi (FBM-001, FBM-002, FBM-004); ở đây nó thành exception để `runSlice` chuyển phiên sang lỗi trước khi cursor tiến hoặc request ghi FBM được phát.
  */
-FbmSync.recordChange = function (decide) {
+FbmSync.recordChange = function (runId, decide) {
+  if (typeof runId !== 'string') { throw new Error('recordChange cần mã lượt (chuỗi, rỗng khi thay đổi ngoài lượt) do người gọi truyền vào.'); }
   var plan = null;
-  var result = recordGateRun({ by: FbmSync.RECORD_HOLDER, run: String(FbmSync.stateRead().runId || ''), decide: function (gate) {
+  var result = recordGateRun({ by: FbmSync.RECORD_HOLDER, run: runId, decide: function (gate) {
     plan = decide(gate) || {};
     (plan.save || []).forEach(function (item) { if (!item.schemas) { item.schemas = FbmSync.recordSchemas(); } });
     return plan;
@@ -50,9 +51,9 @@ FbmSync.recordSignature = function (record) { return JSON.stringify(record || nu
  * Thay đổi đúng một dòng của chiều đẩy: đọc lại dòng trong cửa rồi mới quyết. Trả `{ status, local, busy, value }`, `status` là `ok`, `gone` (dòng không còn), `changed` (khác `expect`) hoặc `busy` (chủ khác giữ).
  * `options`: `expect` chữ ký lúc chọn ứng viên (bỏ trống khi dòng đã do đồng bộ giữ); `build(local)` trả `{ patch, release, hold, value }`; `release` nhả mặc định; `releaseGone` nhả khi dòng đã vắng; `allowGone` không ném khi dòng vắng; `must` (câu nói việc chưa ghi được) cho chỗ bắt buộc phải ghi: dòng bận hoặc vừa đổi thì cửa ném luôn, người gọi không có đường bỏ qua kết quả.
  */
-FbmSync.pushRowChange = function (entity, id, options) {
+FbmSync.pushRowChange = function (runId, entity, id, options) {
   var opts = options || {};
-  var done = FbmSync.recordChange(function (gate) { return FbmSync.pushRowPlan(gate, entity, id, opts); }).value;
+  var done = FbmSync.recordChange(runId, function (gate) { return FbmSync.pushRowPlan(gate, entity, id, opts); }).value;
   if (opts.must && (done.status === 'busy' || done.status === 'changed')) {
     var why = done.status === 'busy' ? 'đang bị tiến trình khác giữ (' + String(done.busy && done.busy.reason || 'không rõ lý do') + ')' : 'vừa được sửa sau lúc chọn';
     throw new Error('Bản ghi ' + entity + ' ' + id + ' ' + why + '; ' + opts.must + '.');
@@ -85,9 +86,9 @@ FbmSync.pushRowPlan = function (gate, entity, id, opts) {
 /**
  * Ghi nhiều dòng của chiều đẩy trong MỘT lần qua cửa (một lần ghi Sheet cho mỗi entity). `items` là `[{ entity, id, expect, patch }]`; mỗi dòng được kiểm như `pushRowChange` (vắng thì `gone`, không ném) và dòng không `ok` thì không ghi gì. Trả trạng thái từng dòng theo đúng thứ tự `items`, dạng `{ status, local, busy }`.
  */
-FbmSync.pushRowsChange = function (items) {
+FbmSync.pushRowsChange = function (runId, items) {
   if (!items.length) { return []; }
-  return FbmSync.recordChange(function (gate) {
+  return FbmSync.recordChange(runId, function (gate) {
     var plans = items.map(function (item) { return FbmSync.pushRowPlan(gate, item.entity, item.id, { expect: item.expect, allowGone: true, build: function () { return { patch: item.patch }; } }); });
     var save = {};
     plans.forEach(function (plan) { (plan.save || []).forEach(function (part) { (save[part.entity] = save[part.entity] || { entity: part.entity, records: [], source: part.source }).records.push(part.records[0]); }); });

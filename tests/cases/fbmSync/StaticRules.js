@@ -29,8 +29,13 @@ const SESSION_SECRET_FILES = [
 
 /** Người điều phối (thiết kế 2.3): khung lượt, lệnh dừng, khung lát, lần hỏi của Extension, cửa lệnh và cửa relay cấp 1 (`EntryPoints.js`: `doPost`, `doGet`, `relayHandle`). Chỉ chúng được đọc/ghi state và ghi `logEvent`; chỗ gọi khác là ngoại lệ. */
 const STATE_ORCHESTRATORS = ['state/Run', 'state/RunStop', 'state/Slice', 'state/Heartbeat', 'control/ControlPort', 'transport/EntryPoints'].map((ten) => '1_ShinCRM_GAS/fbm_sync/' + ten + '.js');
-// Thêm bước đóng lời gọi `fbm_sync`, người điều phối các lệnh cài đặt và hàm chuyển cài đặt một lần.
-const LOG_WRITERS = STATE_ORCHESTRATORS.concat(['1_ShinCRM_GAS/server/service/FbmSyncService.js', '1_ShinCRM_GAS/fbm_sync/control/PushCommands.js', '1_ShinCRM_GAS/fbm_sync/control/SettingsCommands.js']);
+/**
+ * Người điều phối lệnh ngoài lượt (thiết kế 2.3, cấp 2) mà tệp chứa luôn công cụ của lệnh nên không tách riêng được: chỉ được đọc/ghi state, đọc một lần ở đầu lệnh rồi giao dữ liệu cho công cụ.
+ * `ConflictCommands`: hai lệnh xung đột; `ConnectionSave`: lệnh lưu kết nối (từ chối khi có lượt đang chạy); `StatusView`: lệnh `status` và đèn trạng thái lúc nạp Sidebar (đọc ô lượt một lần rồi dựng view thuần).
+ */
+const COMMAND_STATE_READERS = ['control/ConflictCommands', 'reconcile/ConnectionSave', 'report/StatusView'].map((ten) => '1_ShinCRM_GAS/fbm_sync/' + ten + '.js');
+// Thêm bước đóng lời gọi `fbm_sync`, người điều phối các lệnh cài đặt và hàm chuyển cài đặt một lần. `Trace.js` là chủ sổ bước nghiệp vụ: nó ghi dòng kết thúc bước ngay lúc đóng bước, kể cả khi `runClose` đóng cả lượt, chỗ không có kênh patch để đi.
+const LOG_WRITERS = STATE_ORCHESTRATORS.concat(['1_ShinCRM_GAS/server/service/FbmSyncService.js', '1_ShinCRM_GAS/fbm_sync/control/PushCommands.js', '1_ShinCRM_GAS/fbm_sync/control/SettingsCommands.js', '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js']);
 
 /** Tệp được ghi baseline (`fbmHash`): ba công cụ áp kết quả, mỗi chiều một tệp: áp trang kéo về (`Pull.js`), chốt xung đột (`Conflict.js`), áp kết quả đẩy (`PushApply.js`). */
 const BASELINE_WRITERS = ['1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js', '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js', '1_ShinCRM_GAS/fbm_sync/transport/PushApply.js'];
@@ -66,7 +71,7 @@ const RULES = [
     find: (file, src) => matchAll(src, /\bstate(?:Load|Store)\s*\(/, notDefinition)
   },
   {
-    id: 'stateReadWrite', title: 'đọc/ghi state chỉ ở người điều phối', scope: ['gas', 'client', 'ext'], allow: STATE_ORCHESTRATORS,
+    id: 'stateReadWrite', title: 'đọc/ghi state chỉ ở người điều phối', scope: ['gas', 'client', 'ext'], allow: STATE_ORCHESTRATORS.concat(COMMAND_STATE_READERS),
     find: (file, src) => matchAll(src, /\bstate(?:Read|Write)\s*\(/, notDefinition)
   },
   {
@@ -136,20 +141,8 @@ const RULES = [
 /** Danh sách ngoại lệ hiện có, mỗi quy tắc một bảng `tệp -> số vi phạm`. Chỉ được co lại. */
 const EXCEPTIONS = {
   stateReadWrite: {
-    '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 3,
-    // Bước kết của chặng (người điều phối của chặng): ghi ô lượt trước khi đóng lượt hoặc chọn request kế.
-    '1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 9,
-    // Lưu kết nối chạy trong khóa điều phối ngoài lượt: đọc ô lượt để từ chối khi đang có lượt.
-    '1_ShinCRM_GAS/fbm_sync/reconcile/ConnectionSave.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/PreflightPush.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
-    // Người đọc của status: đọc ô lượt một lần rồi giao cho bộ dựng thuần; bản nhẹ `toneView` lúc mở Sidebar đọc ô lượt một lần rồi giao cho `toneOf`.
-    '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 2,
-    // `recountStart` đọc/ghi ô lượt sau `start` để câu báo đếm lại đè câu của cổng phiên; làm rỗng ở C8.6.
-    '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 5,
-    '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
-    '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
+    // runTail: chờ 7B (đọc và ghi ô lượt để chèn bước đếm cuối lượt).
+    '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 2
   },
   silentError: {},
   typeofFunction: {
@@ -175,13 +168,7 @@ const EXCEPTIONS = {
   hardcodedNumber: {
     '2_ShinCRM_Extension/content_scripts/fbm_sync/executor.js': 1
   },
-  logEvent: {
-    '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2
-  },
+  logEvent: {},
   phaseClose: {},
   baselineWrite: {}
 };
@@ -208,7 +195,7 @@ function chay(so) {
   const clientAll = listFiles('1_ShinCRM_GAS/client', ['.html']).map((file) => ({ file: file, kind: 'client' }));
   check(so, 'cả thư mục client (không riêng màn đồng bộ) không có popup trình duyệt alert/confirm: hỏi qua uiDecisionOpen, báo qua noticeSet', scanRule(ruleById('popup'), clientAll, readSource), {});
 
-  [PHASE_OWNER].concat(PROPERTY_GATE_FILES, SESSION_SECRET_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
+  [PHASE_OWNER].concat(PROPERTY_GATE_FILES, SESSION_SECRET_FILES, STATE_ORCHESTRATORS, COMMAND_STATE_READERS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
     check(so, 'tệp được phép ' + file + ' có trong phạm vi quét', files.some((item) => item.file === file), true);
   });
 

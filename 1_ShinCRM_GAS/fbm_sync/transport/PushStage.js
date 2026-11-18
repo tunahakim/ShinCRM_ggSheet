@@ -228,7 +228,7 @@ FbmSync.pushNext = function (state, settings, logs, threshold) {
       request = candidate.kind === 'create' ? FbmSync.activityCreateRequest(candidate.record, context.categoryGate, settings) : FbmSync.activityEditOpenRequest(candidate.record.fbmId, settings);
     }
     // `09/04` bước 1: ghi `đang đẩy` và giữ bản ghi trong sổ bận trong cùng một lần qua cửa, chỉ khi dòng còn đúng như lúc chọn, rồi mới phát lệnh; ghi Sheet không được thì ném lỗi và lệnh ghi FBM không được phát (FBM-002). Ô lượt mang cursor chờ ghi được khung lát ghi cùng lần phát.
-    var started = FbmSync.pushRowChange(entity, candidate.id, { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, build: function () {
+    var started = FbmSync.pushRowChange(state.runId, entity, candidate.id, { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, build: function () {
       // Lệnh tạo ghi thêm mốc giờ vào cột Đồng bộ lúc: mất phản hồi thì lượt sau chỉ tra lại sau `recoverWaitMinutes` tính từ mốc này.
       return { patch: Object.assign({ id: candidate.id, syncStatus: FbmSync.SYNC_STATUS.pushing }, candidate.kind === 'create' ? { syncedAt: new Date() } : {}), hold: FbmSync.PUSH_HOLD_REASON };
     } });

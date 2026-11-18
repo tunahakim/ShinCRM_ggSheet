@@ -130,7 +130,6 @@ FbmSync.sessionEnd = function (state, end) {
   var stop = end.fail || end.pause;
   if (end.fail) { FbmSync.runFail(state, stop.code, stop.message, { cursor: {} }); }
   else { FbmSync.runClose(state, 'paused', { code: stop.code, message: stop.message, error: stop.message, cursor: stop.cursor, keepRecords: true }); }
-  FbmSync.stateWrite(state);
   return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError };
 };
 

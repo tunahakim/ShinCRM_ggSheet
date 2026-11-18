@@ -47,7 +47,6 @@ FbmSync.authorizeEnd = function (state, end) {
   if (FbmSync.needsFbmLookups(state)) { return FbmSync.openStageMove(state, { cursor: { kind: 'lookup' }, message: 'Đang kiểm tra danh mục FBM...' }); }
   var pullRequest = FbmSync.beginCustomerPull(state);
   FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: 0, errors: Number(state.metadata && state.metadata.categoryBlocks && state.metadata.categoryBlocks.length || 0) });
-  FbmSync.stateWrite(state);
   return FbmSync.runTail(FbmSync.openStageResult(state, pullRequest));
 };
 
@@ -65,11 +64,9 @@ FbmSync.identityUserGridStage = function (ctx) {
 FbmSync.identityUserGridEnd = function (state, end) {
   if (end.fail) {
     FbmSync.runFail(state, end.fail.code, end.fail.message);
-    FbmSync.stateWrite(state);
     return FbmSync.runTail({ ok: false, code: end.fail.code, request: null, error: end.fail.message });
   }
   FbmSync.runClose(state, 'done', { message: 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
-  FbmSync.stateWrite(state);
   return FbmSync.runTail({ ok: true, request: null });
 };
 
@@ -84,7 +81,6 @@ FbmSync.lookupStage = function (ctx) {
 FbmSync.lookupEnd = function (state) {
   var customerRequest = FbmSync.beginCustomerPull(state), categoryBlocks = state.metadata && state.metadata.categoryBlocks || [];
   FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: Number(FbmSync.SYNC_LOOKUPS.length || 0), errors: Number(categoryBlocks.length || 0) });
-  FbmSync.stateWrite(state);
   return FbmSync.runTail(FbmSync.openStageResult(state, customerRequest));
 };
 
@@ -103,11 +99,9 @@ FbmSync.identityCheckGridEnd = function (state, end) {
   FbmSync.identityCheckPage(state, eligible);
   FbmSync.progressCustomersDone(state, end.rows.length);
   if (FbmSync.customerNext(state, FbmSync.customerPageOf(end.rows, true), end.total)) {
-    FbmSync.stateWrite(state);
     return Object.assign(FbmSync.openStageResult(state, FbmSync.cursorRequest(state)), { imported: eligible.length });
   }
   FbmSync.identityCheckFinish(state);
   FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' });
-  FbmSync.stateWrite(state);
   return FbmSync.runTail({ ok: true, request: null, imported: eligible.length });
 };

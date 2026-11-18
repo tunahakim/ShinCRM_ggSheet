@@ -10,12 +10,12 @@ FbmSync.PREFLIGHT_ID_LIST_MAX = 8;
 
 /**
  * Kiểm tra trước phiên tách theo chi phí (tài liệu 09/02 Phần 3 "Thứ tự trong một kỳ"): phần rẻ (`preflightGates`) chạy trước mọi request FBM vì cấu hình sai thì không được chạm FBM; phần đắt (`preflightLocal`) đọc cả hai Sheet và tính hash, chỉ chạy khi chiều chạy cần và sau khi phiên FBM đã xác thực, để FBM lỗi thì không phí công tính.
- * Lệnh chẩn đoán gọi hàm này để chạy cả hai liền nhau.
+ * Lệnh chẩn đoán gọi hàm này để chạy cả hai liền nhau. `options.state` là ô lượt người gọi đang cầm (nguồn cài đặt dựng request của phần đắt); thiếu thì phần đắt báo `FBM_SETTINGS_READ_FAILED`.
  */
 FbmSync.runPreflight = function (options) {
   return FbmSync.withLocalSnapshot(function () {
     var gates = FbmSync.preflightGates(options);
-    return FbmSync.preflightNeedsLocal(options) ? FbmSync.preflightLocal(options, gates.issues) : gates;
+    return FbmSync.preflightNeedsLocal(options) ? FbmSync.preflightLocal(options, gates.issues, options && options.state) : gates;
   });
 };
 
@@ -53,20 +53,21 @@ FbmSync.preflightGates = function (options) {
 };
 
 /** Phần đắt; `issues` là vấn đề của phần rẻ để kết quả trả về đủ cả hai. Hai Sheet đọc đúng một lần qua `localScan` và mọi bước dùng chung bản đọc đó. */
-FbmSync.preflightLocal = function (options, issues) {
+FbmSync.preflightLocal = function (options, issues, state) {
   var mode = FbmSync.modeOf(options && options.mode), checkMode = FbmSync.canWriteFbm(mode) ? 'write' : mode, list = (issues || []).slice(), scan = null;
   try { scan = FbmSync.localScan(); scan.records('customer'); scan.records('activity'); } catch (localError) {
     FbmSync.preflightIssue(list, 'FBM_LOCAL_READ_FAILED', 'error', 'fbm_sync', 'Không đọc được Sheet Customer/Activity trước phiên: ' + String(localError && localError.message || localError), true);
     return FbmSync.preflightResult(mode, list, null);
   }
-  var report = FbmSync.preflightCandidates(list, checkMode, scan);
+  var report = FbmSync.preflightCandidates(list, checkMode, scan, state);
   if (report.review) { FbmSync.preflightPushPermissions(list, report.review); }
   return FbmSync.preflightResult(mode, list, { candidateCount: report.candidates.length, hashSummary: report.review ? FbmSync.preflightHashSummary(report.review.rows) : null, conflictPending: report.conflictPending });
 };
 
-FbmSync.logPreflight = function (result) {
+/** Dòng Log của kết quả preflight, chưa ghi: người điều phối ghi (một dòng cho mỗi mã vấn đề). */
+FbmSync.preflightLogLines = function (result) {
   // Một dòng cho mỗi mã vấn đề; thông điệp mang mã bản ghi nên gom theo mã để số dòng không tăng theo số bản ghi.
-  if (!result || !Array.isArray(result.issues) || !result.issues.length) { return 0; }
+  if (!result || !Array.isArray(result.issues) || !result.issues.length) { return []; }
   var groups = {}, order = [];
   result.issues.forEach(function (item) {
     var code = String(item && item.code || 'FBM_PREFLIGHT_ISSUE');
@@ -74,11 +75,10 @@ FbmSync.logPreflight = function (result) {
     groups[code].count += 1;
     if (groups[code].messages.length < FbmSync.RECORD_ISSUE_ID_LIMIT) { groups[code].messages.push(String(item && item.message || '')); }
   });
-  order.forEach(function (code) {
+  return order.map(function (code) {
     var group = groups[code], item = group.item;
-    logEvent({ source: 'fbm_sync', action: 'preflight_issue', outcome: item.blocking ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: String(item.scope || ''), reason: String(item.message || code) + (group.count > 1 ? ' (và ' + (group.count - 1) + ' vấn đề cùng loại)' : ''), detail: { code: code, blocking: !!item.blocking, count: group.count, messages: group.messages } });
+    return { source: 'fbm_sync', action: 'preflight_issue', outcome: item.blocking ? (typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error') : (typeof LOG_WARN !== 'undefined' ? LOG_WARN : 'warn'), entity: String(item.scope || ''), reason: String(item.message || code) + (group.count > 1 ? ' (và ' + (group.count - 1) + ' vấn đề cùng loại)' : ''), detail: { code: code, blocking: !!item.blocking, count: group.count, messages: group.messages } };
   });
-  return order.length;
 };
 
 /** Chiều lấy cần ngầm định hợp lệ cho mọi trường bắt buộc mà FBM không mang, ở cả khách và giao dịch, trước khi ghi bản ghi mới; thiếu thì dừng lượt, không ghi giá trị sai. Mỗi trường một vấn đề để lời báo nêu đúng tên trường. */

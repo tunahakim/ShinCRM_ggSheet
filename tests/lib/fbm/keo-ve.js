@@ -3,7 +3,7 @@
  */
 
 function ngCanhKeo(F) {
-  return { categoryGate: F.stateCategoryGate(F.stateRead()), accountName: typeof F.scriptSettings === 'function' ? F.scriptSettings(F.stateRead()).accountName : '', now: Date.now() };
+  return { categoryGate: F.stateCategoryGate(F.stateRead()), accountName: typeof F.scriptSettings === 'function' ? F.scriptSettings(F.stateRead()).accountName : '', now: Date.now(), runId: String(F.stateRead().runId || '') };
 }
 
 /** Bản ghi ca kiểm tự dựng (không qua `customerRecord`/`activityRecord`) thì tính dấu vân như hai hàm dựng, vì cửa ghi chỉ nhận bản ghi có sẵn dấu vân. */
@@ -19,11 +19,13 @@ function keoVe(F, entity, records) {
 
 /** Như lớp xả đọc áp một lô trên ô lượt trong kho: đọc, áp với `mode` của lần gọi, ghi lại. */
 function keoLo(F, entity, records, mode) {
-  const state = F.stateRead(), before = state.mode;
+  const state = F.stateRead(), before = state.mode, beforeRun = state.runId;
   state.mode = mode;
+  if (!state.runId) { state.runId = 'keo-lo'; }
   const ctx = ngCanhKeo(F);
   const result = F.pullBatchApply(state, entity, coDauVan(F, entity, records, ctx), ctx);
   state.mode = before;
+  state.runId = beforeRun;
   F.stateWrite(state);
   return result;
 }

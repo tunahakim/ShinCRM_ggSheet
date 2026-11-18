@@ -32,7 +32,7 @@ function makeSync() {
     ...TEP_KHUNG_LUOT, 'fbm_sync/state/RunPlan.js', 'fbm_sync/diagnostic/Trace.js', 'fbm_sync/state/PropertyBuffer.js',
     'fbm_sync/read/GridRead.js',
     'fbm_sync/reconcile/Fingerprint.js',
-    'fbm_sync/reconcile/Conflict.js', 'fbm_sync/reconcile/ConflictStage.js',
+    'fbm_sync/reconcile/Conflict.js', 'fbm_sync/control/ConflictCommands.js', 'fbm_sync/reconcile/ConflictStage.js',
     'fbm_sync/reconcile/Identity.js', 'fbm_sync/reconcile/RecordMap.js', 'fbm_sync/reconcile/ConnectionSave.js', 'fbm_sync/auth/LoginStores.js',
     'fbm_sync/reconcile/Pull.js',
     'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js',
@@ -96,7 +96,7 @@ const editCustomer = (x) => ({ id: 'CUS-' + x, fbmId: 'F-' + x, fbmCustomerCode:
 /** Giả lập FBM ghi thành công bản ghi đang mở: ghi Sheet trạng thái đã đồng bộ kèm dấu vân mới, sang mã kế và xin request kế. */
 const pushOk = (q) => {
   const st = q.F.stateRead(), id = st.cursor.candidate.id;
-  q.F.pushRowChange('customer', id, { release: true, build: (local) => ({ patch: { id, syncStatus: 'đã đồng bộ', fbmHash: q.F.hash(local, 'customer', q.F.stateCategoryGate(st)) } }) });
+  q.F.pushRowChange('', 'customer', id, { release: true, build: (local) => ({ patch: { id, syncStatus: 'đã đồng bộ', fbmHash: q.F.hash(local, 'customer', q.F.stateCategoryGate(st)) } }) });
   const after = q.F.stateRead(); after.cursor = q.F.pushCursorNext(after.cursor, true); after.current = ''; q.F.stateWrite(after);
   return trongLat(q.F, () => q.F.pushStageResume(q.F.stateRead()));
 };

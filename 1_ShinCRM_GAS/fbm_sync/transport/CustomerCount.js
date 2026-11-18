@@ -102,15 +102,12 @@ FbmSync.customerCountEnd = function (state, end) {
   var carry = { process: state.process, pollAt: state.pollAt, follows: state.runId };
   if (end.changed) { state.process = ''; }
   FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
-  FbmSync.stateWrite(state);
   if (!end.changed) { return { ok: true, request: null }; }
   return FbmSync.recountStart(tail.mode || state.mode, state.origin, carry, state);
 };
 
 /** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`, `follows` là mã lượt vừa đóng để Sidebar đang chờ lượt đó chờ tiếp lượt này); không đi qua công tắc tiến trình và không dời mốc lịch nào. */
 FbmSync.recountStart = function (mode, origin, carry, state) {
-  var started = FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false }, carry), state);
-  // Ghi câu sau `start`: cổng phiên mở trong `start` đặt câu của nó, câu này phải đè lên để Sidebar thấy vì sao lượt mới bắt đầu.
-  if (started && started.ok && started.request) { var running = FbmSync.stateRead(); running.message = FbmSync.RECOUNT_MESSAGE; FbmSync.stateWrite(running); }
-  return started;
+  // `openMessage` là câu đầu của lượt mới (cổng phiên lấy làm câu của nó), để Sidebar thấy vì sao lượt mới bắt đầu.
+  return FbmSync.start(Object.assign({ mode: mode, scan: 'full', pack: 'quick', origin: origin, manual: false, openMessage: FbmSync.RECOUNT_MESSAGE }, carry), state);
 };

@@ -190,7 +190,7 @@ function fbmScopeDefaultCustomer() {
 
 /** Ghi dữ liệu thử qua Cửa bản ghi; cửa buộc nguồn máy đọc trong khóa trước khi sửa. Chỉ DEV. */
 function fbmFixtureSave(entity, records, source) {
-  return FbmSync.recordChange(function (gate) {
+  return FbmSync.recordChange('', function (gate) {
     gate.read(entity, FbmSync.recordSchemas());
     return { save: [{ entity: entity, records: records, source: source }] };
   }).saves[0];

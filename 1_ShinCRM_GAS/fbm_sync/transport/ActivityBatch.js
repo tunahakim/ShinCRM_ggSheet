@@ -123,7 +123,7 @@ FbmSync.activityBatchCheck = function (reply, expected) {
  */
 FbmSync.gateFlagWrite = function (state, entity, flags) {
   if (!(flags || []).length) { return 0; }
-  return FbmSync.recordChange(function (gate) { return FbmSync.gateFlagDecide(gate, state, entity, flags); }).value;
+  return FbmSync.recordChange(state.runId, function (gate) { return FbmSync.gateFlagDecide(gate, state, entity, flags); }).value;
 };
 
 /** Hàm quyết của `gateFlagWrite`. */

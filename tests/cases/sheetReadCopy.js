@@ -187,18 +187,18 @@ function chay(so) {
   docKhach.n = 0;
   const sauGhiFbm = trongLanGoi(hf, () => hf.documentLockRun(() => {
     hf.FbmSync.readLocal('customer');
-    hf.FbmSync.recordChange((gate) => { gate.read('customer', hf.FbmSync.recordSchemas()); return { save: [{ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'pull' }] }; });
+    hf.FbmSync.recordChange('', (gate) => { gate.read('customer', hf.FbmSync.recordSchemas()); return { save: [{ entity: 'customer', records: [{ id: 'KH000001', phone: '0987000555' }], source: 'pull' }] }; });
     const truoc = docKhach.n;
     const phone = hf.FbmSync.readLocal('customer')[0].phone;
     return [String(phone).replace(/^'/, ''), docKhach.n - truoc];
   }));
-  check(so, 'cửa ghi FBM: đọc lại sau khi ghi thấy giá trị mới mà không đọc lại sheet', sauGhiFbm, ['0987000555', 0]);
+  check(so, 'cửa ghi FBM: đọc lại sau ghi thấy giá trị mới, không đọc sheet', sauGhiFbm, ['0987000555', 0]);
 
   ghiO(fbm, 'Customer', 5, hf.SYNC_SCHEMA.customer.syncStatus.code, '');
   docKhach.n = 0;
   const luu = trongLanGoi(hf, () => {
     const khoaTruoc = fbm.stubs._khoa.dem;
-    const ra = hf.FbmSync.recordChange((gate) => {
+    const ra = hf.FbmSync.recordChange('', (gate) => {
       const local = gate.readById('customer', hf.FbmSync.recordSchemas(), 'KH000002');
       return { save: [{ entity: 'customer', records: [{ id: local.id, phone: '0987000666' }], source: 'pull' }] };
     });

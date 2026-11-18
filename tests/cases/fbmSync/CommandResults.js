@@ -55,7 +55,7 @@ const CA = [
   { lenh: 'save_credential', ten: 'save_credential thiếu dữ liệu', payload: {} },
   { lenh: 'reset_state', ten: 'reset_state' },
   { lenh: 'retry_push_failures', ten: 'retry_push_failures không có lỗi đẩy' },
-  { lenh: 'retry_push_failures', ten: 'retry_push_failures mở lại nhóm lỗi', chuan: (F) => { F.pushFailuresWrite({ hashes: { 'customer:CUS-1': 'h1' }, details: {} }); F.recordChange = (plan) => plan({ read: (entity) => entity === 'customer' ? [{ id: 'CUS-1' }] : [], busy: () => ({}) }); } },
+  { lenh: 'retry_push_failures', ten: 'retry_push_failures mở lại nhóm lỗi', chuan: (F) => { F.pushFailuresWrite({ hashes: { 'customer:CUS-1': 'h1' }, details: {} }); F.recordChange = (runId, plan) => plan({ read: (entity) => entity === 'customer' ? [{ id: 'CUS-1' }] : [], busy: () => ({}) }); } },
   { lenh: 'client_error', ten: 'client_error', payload: { message: 'Sidebar báo lỗi thử.', action: 'sidebar_error' } },
   { lenh: 'relay_config', ten: 'relay_config', chuan: (F) => { F.relayUrlStored = () => 'https://script.test/exec'; } },
   { lenh: 'relay_rotate_key', ten: 'relay_rotate_key', chuan: (F) => { F.relayUrlStored = () => 'https://script.test/exec'; } },

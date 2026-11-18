@@ -51,7 +51,7 @@ FbmSync.compareFbmId = function (a, b) {
 
 /**
  * Kéo về một lô bản ghi FBM: quyết từng bản ghi và ghi Sheet trong một lần cầm khóa; chỉ ghi bản ghi mới hoặc đổi an toàn, không bao giờ xóa, không ghi đè thay đổi cục bộ (chỉ đánh dấu chờ đẩy hoặc xung đột).
- * `ctx`: `{ categoryGate, now, accountName }` do người điều phối truyền. Hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `incomingHash` (dấu vân FBM tính một lần lúc dựng); bước áp này là nơi duy nhất biến nó thành mốc `fbmHash` trên dòng, khóa `incomingHash` không có cột nên cửa ghi bỏ qua.
+ * `ctx`: `{ categoryGate, now, accountName, runId }` do người điều phối truyền (`runId` là mã lượt đang giữ bản ghi). Hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `incomingHash` (dấu vân FBM tính một lần lúc dựng); bước áp này là nơi duy nhất biến nó thành mốc `fbmHash` trên dòng, khóa `incomingHash` không có cột nên cửa ghi bỏ qua.
  * Không ghi ô lượt: khách bị chặn danh tính (`identityBlocks`) trả về cho người điều phối. Dòng `đã đẩy chờ xác nhận` (lượt đẩy chết trước bước đọc lại) so ba chiều như mọi dòng: FBM bằng ShinCRM là đã đồng bộ, FBM bằng mốc là đẩy không ăn, khác cả hai là xung đột.
  */
 FbmSync.pullPageApply = function (entity, records, ctx) {
@@ -61,7 +61,7 @@ FbmSync.pullPageApply = function (entity, records, ctx) {
   var orphaned = 0, identityBlocks = [];
   var categoryGate = ctx.categoryGate, syncedAt = new Date(ctx.now);
   // Đọc cục bộ, nối khách cha, so ba chiều và ghi trong một hàm quyết: một lần Lưu hay Xóa của người dùng không chen được vào giữa lúc đọc và lúc ghi.
-  var change = FbmSync.recordChange(function (gate) {
+  var change = FbmSync.recordChange(ctx.runId, function (gate) {
   var localRecords = gate.read(entity, FbmSync.recordSchemas());
   // Ngầm định chỉ đọc khi lô thật sự có bản ghi mới: lô chỉ cập nhật không cần, và không bị chặn vì thiếu ngầm định.
   var newDefaults = null;

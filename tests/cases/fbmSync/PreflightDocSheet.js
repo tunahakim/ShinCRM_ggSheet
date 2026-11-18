@@ -6,17 +6,13 @@ async function chay(so) {
   section("FBM sync — preflight đọc Sheet và Log");
   const { hop, ungVien, goc } = hopPreflight();
   // Log xung đột chỉ khi số đổi so với lượt trước.
-  const conflictLogs = [];
-  hop.logEvent = (event) => conflictLogs.push(event);
   const conflictState = { runId: 'r1', metadata: {} };
-  const conflictNotes = [2, 2, 2, 1, 0].map((count) => hop.FbmSync.conflictPendingNote(conflictState, count));
+  const conflictNotes = [2, 2, 2, 1, 0].map((count) => hop.FbmSync.conflictPendingNote(conflictState, count)), conflictLogs = conflictNotes.filter(Boolean);
   check(so, 'Log xung đột chỉ ghi khi số khác lượt trước (2, 2, 2, 1, 0), số hiện cho Sidebar luôn cập nhật',
-    [conflictNotes, conflictLogs.map((event) => event.detail.count), conflictState.metadata.conflictCount, conflictState.metadata.conflictLogged],
+    [conflictNotes.map(Boolean), conflictLogs.map((event) => event.detail.count), conflictState.metadata.conflictCount, conflictState.metadata.conflictLogged],
     [[true, false, false, true, true], [2, 1, 0], 0, 0]);
   const quiet = { runId: 'r2', metadata: {} };
-  conflictLogs.length = 0;
-  hop.FbmSync.conflictPendingNote(quiet, 0);
-  check(so, 'chưa từng có xung đột thì không ghi Log', conflictLogs.length, 0);
+  check(so, 'chưa từng có xung đột thì không có dòng Log', hop.FbmSync.conflictPendingNote(quiet, 0), null);
 
   // FBM-022: đọc Sheet lỗi thì preflight chặn có mã, không báo 0 bản ghi như Sheet trống; Sheet và hash chỉ tính một lần mỗi lượt preflight.
   const savedReadLocal = hop.FbmSync.readLocal, savedHash = hop.FbmSync.hash, savedIdentityPreflight = hop.FbmSync.identityPreflight;

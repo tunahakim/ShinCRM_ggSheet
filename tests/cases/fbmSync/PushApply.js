@@ -9,13 +9,13 @@ async function chay(so) {
   const pushLogs = [];
   push.logEvent = (event) => pushLogs.push(event);
   push.writeGateSave = (request) => { pushWriteRequest = request; pushPatch = request.records[0]; return { ok: true }; };
-  push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save', { map: {} });
+  push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-OLD', fbmId: 'A-OLD', fbmCustomerCode: 'ALT00010', fbmHash: 'BASE' } }, { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-OLD' }, { Name: 'ma_kh', Value: 'ALT00010' }] } }, 'customer_edit_save', { map: {} }, '');
   check(so, 'push thanh cong giu baseline cu cho ky xac nhan va dung source push',
     [pushPatch.fbmHash, pushWriteRequest.source],
     ['BASE', 'push']);
   check(so, 'push thành công không ghi Log từng record', pushLogs.length, 0);
   const createdActivity = { id: 'ACT-NEW', fbmId: '', content: 'Tạo từ ShinCRM', taskType: 'CV1', workDate: '2026-10-07' };
-  const createdSent = push.FbmSync.pushResultSent({ entity: 'activity', record: createdActivity }, { d: { InternalValues: [{ Name: 'id', Value: 174900 }] } }, 'activity_new_save', { map: {} });
+  const createdSent = push.FbmSync.pushResultSent({ entity: 'activity', record: createdActivity }, { d: { InternalValues: [{ Name: 'id', Value: 174900 }] } }, 'activity_new_save', { map: {} }, '');
   check(so, 'FBM-050: tạo Activity trả hash đã gửi kèm ID FBM vừa cấp, khớp bản đọc xác nhận',
     createdSent.sentHash,
     push.FbmSync.hash(Object.assign({}, createdActivity, { fbmId: '174900' }), 'activity', { map: {} }));
@@ -25,7 +25,7 @@ async function chay(so) {
   const orderResponse = { d: { InternalValues: [{ Name: 'stt_rec_kh', Value: 'A-THU-TU' }, { Name: 'ma_kh', Value: 'ALT00077' }] } };
   push.writeGateSave = () => { throw new Error('Sheet hỏng'); };
   let sheetFailure = '';
-  try { push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save', { map: {} }); } catch (error) { sheetFailure = String(error && error.message || error); }
+  try { push.FbmSync.pushResultSent({ entity: 'customer', record: { id: 'C-THU-TU', companyName: 'Thứ tự' } }, orderResponse, 'customer_create_save', { map: {} }, ''); } catch (error) { sheetFailure = String(error && error.message || error); }
   check(so, 'Pha 1: ghi Sheet ném lỗi sau khi FBM đã lưu thì lỗi nổi lên', sheetFailure !== '', true);
 }
 

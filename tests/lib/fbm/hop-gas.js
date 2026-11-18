@@ -104,7 +104,7 @@ function capSauNap(hopCat, duongDans) {
     napThieu('autoLoginOpen', ['fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js']);
     napThieu('authorizeStage', ['fbm_sync/transport/OpenStages.js']);
     // Kiểm trước lượt (`Preflight.js`) đọc cả hai Sheet và cài đặt ngầm định; hộp không nạp nó thì cổng luôn mở. Ca cần kiểm thật nạp `Preflight.js` và bản thật được giữ.
-    if (!hopCat.FbmSync.preflightGates) { Object.assign(hopCat.FbmSync, { preflightGates: () => ({ ok: true, issues: [], blocking: [], warnings: [] }), preflightNeedsLocal: () => false, logPreflight: () => 0 }); }
+    if (!hopCat.FbmSync.preflightGates) { Object.assign(hopCat.FbmSync, { preflightGates: () => ({ ok: true, issues: [], blocking: [], warnings: [] }), preflightNeedsLocal: () => false, preflightLogLines: () => [] }); }
   }
   // Bước phát request của lát mở chặng phiên khi cursor có cổng: hộp có khung lát thì có chặng phiên, như bản thật.
   if (duongDans.indexOf('fbm_sync/state/Slice.js') >= 0) { napThieu('sessionStage', ['fbm_sync/auth/SessionStage.js']); }

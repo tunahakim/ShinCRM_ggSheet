@@ -11,7 +11,7 @@ async function chay(so) {
   section('FBM sync — push: lỗi từng bản ghi');
   const hop = dungHopDay(), push = hop.push;
   push.logEvent = () => {};
-  const errorState = { counts: { error: 0 }, metadata: { pushFailures: {} } };
+  const errorState = { runId: 'R-ERR', counts: { error: 0 }, metadata: { pushFailures: {} } };
   push.FbmSync.markPushError(errorState, { entity: 'customer', id: 'C-ERR', record: { id: 'C-ERR', companyName: 'Lỗi' } }, 'FBM từ chối', 'customer_edit_save');
   check(so, 'push loi luu hash local de chan lap lai',
     push.FbmSync.pushFailuresRead().hashes['customer:C-ERR'],

@@ -14,30 +14,29 @@ FbmSync.recordIssueAdd = function (direction, entity, status, id, reason, outcom
   if (id && group.ids.length < FbmSync.RECORD_ISSUE_ID_LIMIT) { group.ids.push(String(id)); }
   return group;
 };
-/** Ghi mỗi nhóm thành một dòng Log rồi xóa bộ gom; gọi ở ranh giới lát, kể cả khi lát ném lỗi. */
-FbmSync.recordIssuesFlush = function (state) {
+/** Có nhóm vấn đề nào đang chờ nhả không: người điều phối hỏi trước để chỉ đọc ô lượt khi thật sự có dòng cần ghi. */
+FbmSync.recordIssuesPending = function () { return Object.keys(FbmSync.recordIssues).length > 0; };
+/** Lấy mỗi nhóm thành một dòng Log (mang mã lượt của state truyền vào) rồi xóa bộ gom; không ghi. Người điều phối ghi các dòng này ở ranh giới lát, kể cả khi lát ném lỗi. */
+FbmSync.recordIssuesTake = function (state) {
   var groups = FbmSync.recordIssues, keys = Object.keys(groups);
   FbmSync.recordIssues = {};
-  if (!keys.length) { return 0; }
-  // Gọi từ cửa ghi state thì nhận luôn state đang ghi: đọc lại kho lúc đó trả bản cũ và tốn một lần đọc.
-  state = state || FbmSync.stateRead();
+  if (!keys.length) { return []; }
   var cycleId = String(state.runId || state.metadata && state.metadata.businessRunId || '');
-  keys.forEach(function (key) {
+  return keys.map(function (key) {
     var group = groups[key], more = group.count - group.ids.length;
-    logEvent({ source: 'fbm_sync', action: group.direction + '_record_issue', outcome: group.outcome, entity: group.entity, recordId: group.count === 1 ? (group.ids[0] || '') : '', cycleId: cycleId, reason: group.reason + ' — ' + group.count + ' bản ghi' + (group.ids.length ? ': ' + group.ids.join(', ') : '') + (more > 0 ? ' và ' + more + ' bản ghi khác' : ''), detail: { status: group.status, count: group.count, ids: group.ids } });
+    return { source: 'fbm_sync', action: group.direction + '_record_issue', outcome: group.outcome, entity: group.entity, recordId: group.count === 1 ? (group.ids[0] || '') : '', cycleId: cycleId, reason: group.reason + ' — ' + group.count + ' bản ghi' + (group.ids.length ? ': ' + group.ids.join(', ') : '') + (more > 0 ? ' và ' + more + ' bản ghi khác' : ''), detail: { status: group.status, count: group.count, ids: group.ids } };
   });
-  return keys.length;
 };
 
 /**
  * Response bị bỏ vì không thuộc request đang chờ: không đổi state (lượt đang chạy vẫn là của request khác) nhưng phải có dòng Log, vì response bị bỏ lặp lại là lượt kẹt không ai thấy.
  * Response của request đang bay lúc người dùng dừng lượt (`closedRequestId`) là chuyện thường, ghi mức ok để Log không báo lỗi giả cho một lần dừng hợp lệ.
- * Chỉ ghi mã request, không ghi nội dung response.
+ * Chỉ mang mã request, không mang nội dung response. Trả dòng Log để người điều phối ghi.
  */
-FbmSync.logStaleResponse = function (state, responseRequestId, action) {
+FbmSync.staleResponseLine = function (state, responseRequestId, action) {
   var current = state || {};
   var closed = !!responseRequestId && String(responseRequestId) === String(current.closedRequestId || '');
-  logEvent(closed
+  return (closed
     ? { source: 'fbm_sync', action: 'closed_run_response_dropped', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Bỏ response FBM của lượt đã dừng; không ghi gì vào dữ liệu.', detail: { responseRequestId: String(responseRequestId) } }
     : { source: 'fbm_sync', action: action || 'stale_response', outcome: typeof LOG_ERROR !== 'undefined' ? LOG_ERROR : 'error', cycleId: String(current.runId || ''), reason: 'Bỏ response FBM vì không thuộc request đang chờ; lượt giữ nguyên cursor và chờ lần hỏi sau.', detail: { code: 'STALE_RESPONSE', runId: String(current.runId || ''), phase: String(current.phase || ''), cursor: String(current.cursor && current.cursor.kind || ''), activeRequestId: String(current.activeRequestId || ''), responseRequestId: String(responseRequestId || '') } });
 };

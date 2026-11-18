@@ -20,7 +20,7 @@ var FBM_PERF_FBM_FUNCTIONS = [
   'hash', 'threeWay', 'toFbmCodes',
   'businessStepStart', 'businessStepAdd', 'businessStepFinish',
   'customerScanStage', 'readReasonOf', 'customerNext', 'customerScanEnd', 'activityStagesContinue', 'finishPullRun', 'beginCustomerPull',
-  'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'logPreflight', 'identityPreflight', 'pushCandidates',
+  'runPreflight', 'preflightPushReview', 'preflightHashSummary', 'preflightCandidates', 'preflightPushPermissions', 'pushEligible', 'preflightLogLines', 'identityPreflight', 'pushCandidates',
   'transportRetryClear', 'applyTransportSession', 'authorizeStage', 'authorizeEnd', 'lookupPairs',
   'sessionStage', 'sessionEnd', 'sessionSuspectRun', 'autoLoginOpen', 'transportRecoverPlan', 'transportReissue', 'transportFailureRecord',
   'activityGridStage', 'activityBatchRequest', 'gateReadContinue', 'gateLookupContinue', 'gateFlagWrite', 'readListAdd', 'activityCustomerErrors',

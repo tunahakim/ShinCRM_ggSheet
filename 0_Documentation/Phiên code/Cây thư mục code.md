@@ -265,6 +265,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── transport\ActivityBatch.js Lô giao dịch nhiều khách một lần gọi GAS: kế hoạch lô trong cursor, vị trí trang ở khóa riêng, lỗi từng khách.
     ├── transport\EntryPoints.js Web App relay (doPost/doGet): kiểm khóa, Sheet, mã giao thức, lệnh relay rồi chuyển vào cửa lệnh; khóa relay và địa chỉ Web App.
     ├── control\ControlPort.js  Cửa lệnh duy nhất `controlDispatch`: bảng lệnh đóng (lệnh lạ trả COMMAND_UNKNOWN), khóa, danh sách lệnh relay, lọc kết quả theo danh sách trường.
+    ├── control\ConflictCommands.js  Hai lệnh xung đột (`open_conflict`, `confirm_conflict`): người điều phối gọi công cụ của Conflict.js.
     ├── control\PushCommands.js  Lệnh mở lại nhóm bản ghi lỗi đẩy (`retry_push_failures`), không mở lượt.
     ├── control\SettingsCommands.js Lệnh cài đặt của cửa lệnh (`save_settings`, `set_master`, `reset_settings`) và gói cài đặt cho màn đồng bộ, đều đi qua cổng cài đặt chung.
     ├── state\State.js            DocumentProperties, cursor và progress.

@@ -1,5 +1,5 @@
 /**
- * Các bước của một ứng viên trong chặng đẩy (`pushCandidateRun`, thiết kế 5.8) và các công cụ chúng dùng: mở form, so ba bản, lưu, áp kết quả hai pha (`pushResultSent`, `pushResultVerify`), dọn dấu `#SC`, quyết khi một bước lỗi (`pushErrorDecide`). Tra lại lệnh tạo mất phản hồi ở `PushRecover.js`.
+ * Các bước của một ứng viên trong chặng đẩy (`pushCandidateRun`): mở form, so ba bản, lưu, áp kết quả hai pha (`pushResultSent`, `pushResultVerify`), dọn dấu `#SC`, quyết khi một bước lỗi (`pushErrorDecide`). Tra lại lệnh tạo mất phản hồi ở `PushRecover.js`.
  * Mọi hàm ở đây sửa trên ô lượt của chặng (bản sao do khung lát cấp), không đọc hay ghi ô lượt, không dựng phong bì, không ghi Log thẳng (lỗi và bỏ qua vào bộ gom Log của lát). Người điều phối chặng ở `PushStage.js`.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
@@ -72,7 +72,7 @@ FbmSync.pushOpenDecision = function (entity, record, formValues, gate) {
  */
 FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValues, decision, gate) {
   var entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sync = FbmSync.SYNC_STATUS;
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả so với FBM', build: function (local) {
+  var done = FbmSync.pushRowChange(state.runId, entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả so với FBM', build: function (local) {
     return FbmSync.pushOpenResultPatch(local, entity, gate, decision);
   } });
   var outcome = done.status === 'gone' ? 'gone' : done.value, message;
@@ -107,7 +107,7 @@ FbmSync.pushResultVerify = function (state, response, settings) {
   var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(values.details);
   if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }
   var sync = FbmSync.SYNC_STATUS;
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, must: 'chưa ghi kết quả xác nhận', build: function (local) {
+  var done = FbmSync.pushRowChange(state.runId, entity, id, { allowGone: true, releaseGone: true, must: 'chưa ghi kết quả xác nhận', build: function (local) {
     return FbmSync.pushVerifyResultPatch(local, entity, gate, { incomingHash: incomingHash, sentHash: sentHash, markerLeft: markerLeft });
   } });
   if (done.status === 'gone') { throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
@@ -153,7 +153,7 @@ FbmSync.finishMarkerClean = function (state, cursor, candidate, failure) {
   } else {
     FbmSync.logPushRecord(candidate, 'activity_marker_clean', typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', 'Đã bỏ dấu nhận diện #SC khỏi nội dung giao dịch trên FBM.');
   }
-  FbmSync.pushRelease('activity', id);
+  FbmSync.pushRelease(state.runId, 'activity', id);
   state.cursor = FbmSync.pushCursorNext(cursor, true); state.current = ''; state.phase = 'push'; state.lastError = ''; state.message = failure ? 'Chưa bỏ được dấu nhận diện của giao dịch ' + id + '; đang xử lý bản ghi tiếp theo.' : 'Đã bỏ dấu nhận diện của giao dịch ' + id + '.';
 };
 
@@ -170,8 +170,8 @@ FbmSync.pushVerifyFailed = function (state, cursor, failure) {
 };
 
 /** Nhả bản ghi đồng bộ đang giữ khi bước cuối không ghi gì thêm (dọn dấu #SC). Bước cuối có ghi thì nhả trong cùng lần ghi đó. */
-FbmSync.pushRelease = function (entity, id) {
-  return FbmSync.recordChange(function () { return { release: [{ entity: entity, ids: [String(id)] }] }; });
+FbmSync.pushRelease = function (runId, entity, id) {
+  return FbmSync.recordChange(runId, function () { return { release: [{ entity: entity, ids: [String(id)] }] }; });
 };
 
 /** Chuẩn hóa lỗi để Sidebar/Log luôn giữ được mã và nguyên nhân, không giữ payload. */
@@ -206,7 +206,7 @@ FbmSync.markPushError = function (state, candidate, failure, operation) {
   // Lệnh tạo đã có thể tới FBM thì giữ `đang đẩy` để lượt sau tra theo khóa trước khi tạo lại (FBM-027); lỗi ở bước mở form thì lệnh lưu chưa phát, còn FBM từ chối rõ ràng mà tra không thấy thì chưa tạo gì, nên hai trường hợp này là lỗi thường.
   var waitingForMarker = detail.code !== FbmSync.PUSH_CREATE_REJECTED && (candidate.kind === 'recover' || (candidate.kind === 'create' && operation !== 'customer_create_open'));
   var failedStatus = detail.code === FbmSync.PUSH_RECORD_NOT_FOUND ? FbmSync.SYNC_STATUS.missing : FbmSync.SYNC_STATUS.error;
-  var done = FbmSync.pushRowChange(candidate.entity, String(candidate.id || ''), { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, releaseGone: true, build: function () {
+  var done = FbmSync.pushRowChange(state.runId, candidate.entity, String(candidate.id || ''), { expect: FbmSync.pushCandidateExpect(candidate), allowGone: true, releaseGone: true, build: function () {
     return { patch: { id: candidate.id, syncStatus: waitingForMarker ? FbmSync.SYNC_STATUS.pushing : failedStatus }, release: !waitingForMarker };
   } });
   // Lỗi đã vào sổ lỗi và số đếm ở trên nên mọi nhánh đều phải có Log; dòng chưa ghi được thì Log nói rõ vì sao và không khẳng định trạng thái dòng.
@@ -226,7 +226,7 @@ FbmSync.pushCandidateExpect = function (candidate) {
  * Đúng dòng thì cộng `progress` của dấu trang, số bỏ qua, số liệu bước, Log. `hold.reason` là câu cho người dùng (nêu mã bản ghi, vào `state.message`); `hold.cause` là câu chung cho cả nhóm không nêu mã, nên bộ gom Log ra một dòng mỗi nhóm kèm danh sách mã. Trả số dòng đã ghi.
  */
 FbmSync.markPushSkippedBatch = function (state, candidates) {
-  var results = FbmSync.pushRowsChange(candidates.map(function (candidate) {
+  var results = FbmSync.pushRowsChange(state.runId, candidates.map(function (candidate) {
     return { entity: candidate.entity, id: String(candidate.id || ''), expect: FbmSync.pushCandidateExpect(candidate), patch: { id: candidate.id, syncStatus: candidate.hold.status || FbmSync.SYNC_STATUS.skipped } };
   })), written = 0;
   candidates.forEach(function (candidate, index) {
@@ -243,7 +243,7 @@ FbmSync.markPushSkippedBatch = function (state, candidates) {
 
 /**
  * Một bước của ứng viên lỗi (`fromReply`: FBM trả lỗi; ngược lại bước xử lý response ném): không bao giờ phát lại lệnh đã gửi.
- * Đọc xác nhận lỗi thì dừng lượt (`pushVerifyFailed`); lệnh tạo khách báo lỗi thì có thể đã tạo nên tra theo MST ngay (FBM-027); lệnh tạo giao dịch FBM từ chối rõ ràng (lỗi nghiệp vụ, không còn xử lý trễ) thì tra theo dấu `#SC` ngay, lỗi khác để lượt sau tra sau khoảng chờ; dọn dấu `#SC` lỗi chỉ cảnh báo; còn lại ghi lỗi lên dòng (`markPushError`) rồi sang ứng viên kế. Trả `{ next }`, `{ end }` hoặc `{}` (dấu trang đã sang ứng viên kế).
+ * Đọc xác nhận lỗi thì dừng lượt (`pushVerifyFailed`); lệnh tạo khách báo lỗi thì có thể đã tạo nên tra theo MST ngay (FBM-027); lệnh tạo giao dịch FBM từ chối rõ ràng thì tra theo dấu `#SC` ngay, lỗi khác để lượt sau tra sau khoảng chờ; dọn dấu `#SC` lỗi chỉ cảnh báo; còn lại ghi lỗi lên dòng (`markPushError`) rồi sang ứng viên kế. Trả `{ next }`, `{ end }` hoặc `{}` (dấu trang đã sang ứng viên kế).
  */
 FbmSync.pushErrorDecide = function (state, failure, fromReply, settings) {
   var cursor = state.cursor || {};
@@ -359,7 +359,7 @@ FbmSync.pushOperationStep = function (state, response, cfg) {
     return { next: activitySaveRequest };
   }
   if (cursor.operation === 'activity_create' || cursor.operation === 'customer_create_save' || cursor.operation === 'customer_edit_save' || cursor.operation === 'activity_edit_save') {
-    var sent = FbmSync.pushResultSent(candidate, response, cursor.operation, gate);
+    var sent = FbmSync.pushResultSent(candidate, response, cursor.operation, gate, state.runId);
   } else {
     throw new Error('Không nhận diện được bước push: ' + cursor.operation);
   }
