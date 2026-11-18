@@ -21,6 +21,14 @@ Chỉ đọc tệp này khi phiên có chạm luồng đồng bộ FBM (code GAS
 - Chỉ tick `[x]` khi trỏ được tới tên test cụ thể kiểm đúng nhánh đó. Test có sẵn chỉ được làm bằng chứng nếu nó kiểm đúng nhánh đang xét, không phải chỉ vì cùng chủ đề.
 - Kết quả mong đợi phải cụ thể đến mức có thể sai được: nêu giá trị, trạng thái hoặc tên tài liệu và mục cụ thể. Cấm viết "hoạt động đúng" hay "theo hợp đồng".
 
+## Kiến trúc đồng bộ FBM
+
+- Kiến trúc đích và lý do nằm ở mục 11 (K1–K10) của `0_Documentation/Phiên code/[Đang xử lý] 2026.10.22 Refactor đồng bộ FBM/2. Thiết kế đích.md`; tài liệu 09 mô tả hành vi theo kiến trúc đó. Sửa luồng đồng bộ mà lệch K1–K10 thì phải trình chủ dự án trước.
+- Mọi thay đổi state FBM đi qua `FbmSync.controlDispatch` (`fbm_sync/control/ControlPort.js`); thêm lệnh là thêm một dòng vào bảng `FbmSync.COMMANDS`, không mở đường gọi thẳng từ Sidebar hay relay.
+- Luật kiến trúc của mã đồng bộ FBM được chốt bằng luật tĩnh ở `tests/cases/fbmSync/StaticRules.js` (đọc/ghi state và `logEvent` chỉ ở người điều phối, phase cuối chỉ trong `runClose`, baseline chỉ ở công cụ áp kết quả, ghi kho chỉ qua cổng kho, không dò hàm bằng `typeof`, không lỗi im lặng, không số nghiệp vụ cứng, Extension không rẽ nhánh theo loại việc). Danh sách ngoại lệ ở đó chỉ được giảm; vi phạm mới thì sửa code, không thêm ngoại lệ.
+- Hàm khai trong `fbm_sync/`, `client/sync/` và Extension mà không mã chạy thật nào gọi bị `tests/cases/fbmSync/UnusedFunctions.js` bắt; hàm chết thì xóa, không có ngoại lệ, test gọi nó không tính là dùng.
+- Test của luồng đồng bộ FBM dựng hộp qua khung `tests/lib/fbm/` và `tests/lib/gas/`, không tự dựng sandbox trong tệp ca (`tests/cases/testRules.js`, `tests/cases/fileSize.js`).
+
 ## Chạy thử trên FBM thật
 
 - FBM thật chỉ dùng `ALT00010` và không gửi request xóa; ghi thật chỉ chạy sau khi chủ dự án bật rõ cả chế độ lẫn cờ an toàn.
