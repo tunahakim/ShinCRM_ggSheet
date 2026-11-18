@@ -1,23 +1,34 @@
-/** Preflight: ngầm định Xác thực kéo từ FBM, cảnh báo và đếm theo từng bản ghi (ánh xạ danh mục, xung đột chờ quyết, quyền đẩy, đóng băng, ô Cho phép đồng bộ). */
+/** Preflight: ngầm định kéo từ FBM (Xác thực, Cho phép đồng bộ FBM của khách và giao dịch), cảnh báo và đếm theo từng bản ghi (ánh xạ danh mục, xung đột chờ quyết, quyền đẩy, đóng băng, ô Cho phép đồng bộ). */
 const { section, check } = require('../../lib/assert');
 const { hopPreflight } = require('../../lib/fbm/hop-preflight');
 
 async function chay(so) {
   section("FBM sync — preflight");
   const { hop, coreXacThuc } = hopPreflight();
-  const xacThucIssue = (mode) => hop.FbmSync.runPreflight({ mode: mode }).issues.filter((item) => /^FBM_VERIFY_STATUS_DEFAULT/.test(item.code)).map((item) => [item.code, item.blocking]);
+  const xacThucIssue = (mode) => hop.FbmSync.runPreflight({ mode: mode }).issues.filter((item) => /^FBM_PULL_DEFAULT/.test(item.code)).map((item) => [item.code, item.blocking]);
   check(so, 'ngầm định Xác thực kéo từ FBM hợp lệ thì preflight không chặn',
     [xacThucIssue('read'), xacThucIssue('write')],
     [[], []]);
   coreXacThuc.stored = '';
   check(so, 'chưa chọn ngầm định Xác thực kéo từ FBM thì preflight chặn chiều lấy và hai chiều, chiều đẩy không cần',
     [xacThucIssue('read'), xacThucIssue('write'), xacThucIssue('push')],
-    [[['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], [['FBM_VERIFY_STATUS_DEFAULT_MISSING', true]], []]);
+    [[['FBM_PULL_DEFAULT_MISSING', true]], [['FBM_PULL_DEFAULT_MISSING', true]], []]);
   coreXacThuc.stored = 'Tên cũ đã đổi';
   check(so, 'ngầm định Xác thực kéo từ FBM không còn trong Category thì preflight chặn trước khi ghi',
     xacThucIssue('read'),
-    [['FBM_VERIFY_STATUS_DEFAULT_INVALID', true]]);
+    [['FBM_PULL_DEFAULT_INVALID', true]]);
   coreXacThuc.stored = 'Chưa xác thực';
+  const loiQuyen = (mode) => hop.FbmSync.runPreflight({ mode: mode }).issues.filter((item) => /^FBM_PULL_DEFAULT/.test(item.code)).map((item) => [item.code, item.blocking, /Cho phép đồng bộ FBM/.test(item.message), /giao dịch/.test(item.message)]);
+  coreXacThuc.quyen.activity = '';
+  check(so, 'chưa chọn Cho phép đồng bộ FBM cho giao dịch kéo từ FBM thì preflight chặn chiều lấy, lời báo nêu tên trường và thực thể; chiều đẩy không cần',
+    [loiQuyen('read'), loiQuyen('push')],
+    [[['FBM_PULL_DEFAULT_MISSING', true, true, true]], []]);
+  coreXacThuc.quyen.activity = 'Cho phép';
+  coreXacThuc.quyen.customer = '';
+  check(so, 'chưa chọn Cho phép đồng bộ FBM cho khách kéo từ FBM thì preflight chặn, lời báo không nhắc giao dịch',
+    loiQuyen('write'),
+    [['FBM_PULL_DEFAULT_MISSING', true, true, false]]);
+  coreXacThuc.quyen.customer = 'Cho phép';
   const write = hop.FbmSync.runPreflight({ mode: 'write' });
   check(so, 'preflight write khong dung Config ten tai khoan cu lam cong chan',
     write.issues.some((item) => item.code === 'FBM_ACCOUNT_NAME_MISSING'),
@@ -35,7 +46,7 @@ async function chay(so) {
     write.issues.some((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING'),
     true);
   {
-    const allow = hop.FbmSync.pullDefaultPermission(), sync = hop.FbmSync.SYNC_STATUS, readBefore = hop.FbmSync.readLocal;
+    const allow = 'Cho phép', sync = hop.FbmSync.SYNC_STATUS, readBefore = hop.FbmSync.readLocal;
     hop.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [{ id: 'CUS-CHUYEN', fbmId: 'A1', fbmCustomerCode: 'ALT00012', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.transferred, companyName: 'Sửa' }, { id: 'CUS-YEN', fbmId: 'A2', fbmCustomerCode: 'ALT00013', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.synced }]
       : [{ id: 'ACT-MAT', customerId: 'CUS-YEN', fbmId: '200001', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, content: 'Sửa' }];

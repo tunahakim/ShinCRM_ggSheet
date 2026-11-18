@@ -19,7 +19,7 @@
  * Máy so khớp đúng từng chữ. Ô trống hoặc giá trị ngoài bảng thì không đẩy lên nhưng vẫn kéo về, và bị cảnh báo kèm mã bản ghi: đẩy lên FBM là ghi vào CRM chung không rút lại được, còn kéo về chỉ ghi vào sheet riêng. Ba giá trị cuối cùng nghĩa, chỉ khác nhãn để người dùng tự nhắc mình.
  */
 var FBM_SYNC_PERMISSION_OPTIONS = [
-  { value: 'Cho phép', push: true, pull: true, pullDefault: true },
+  { value: 'Cho phép', push: true, pull: true },
   { value: 'Chỉ lấy từ FBM', push: false, pull: true },
   { value: 'Chờ đồng bộ', push: false, pull: false },
   { value: 'Không đồng bộ', push: false, pull: false },

@@ -30,11 +30,11 @@ async function chay(so) {
   check(so, 'pushCandidates không nuốt lỗi đọc state: ném lỗi rõ thay vì coi sổ lỗi đẩy là rỗng', stateReadFailure, 'Không đọc được state');
   pushed.FbmSync.stateRead = () => ({ metadata: {} });
   pushed.FbmSync.readLocal = (entity) => entity === 'customer'
-    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission() }]
-    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: pushed.FbmSync.pullDefaultPermission(), taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
+    ? [{ id: 'CUS-PARENT', fbmId: 'FBM-PARENT', fbmCustomerCode: 'ALT-PARENT', fbmSyncPermission: 'Cho phép' }]
+    : [{ id: 'ACT-NEW', customerId: 'CUS-PARENT', fbmId: '', fbmSyncPermission: 'Cho phép', taskType: 'Goi', content: 'Noi dung', workDate: '2026-09-09' }];
   check(so, 'Activity moi co Customer cha lien ket duoc dua vao queue', ungVienDay(pushed.FbmSync, 'activity').length, 1);
   {
-    const allow = pushed.FbmSync.pullDefaultPermission(), savedScope = pushed.FbmSync.scope;
+    const allow = 'Cho phép', savedScope = pushed.FbmSync.scope;
     pushed.FbmSync.scope = () => ({ codes: ['ALT00010', 'CUS-NEW'], fbm: ['ALT00010'], shin: ['CUS-ALT', 'CUS-NEW'], notFound: [] });
     pushed.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [
@@ -54,7 +54,7 @@ async function chay(so) {
   }
   {
     // 09/05 Phần 9: bản ghi vắng hoặc đã chuyển cho người khác, và giao dịch của khách mang hai trạng thái đó, sửa trên Sheet cũng không được đẩy.
-    const allow = pushed.FbmSync.pullDefaultPermission(), sync = pushed.FbmSync.SYNC_STATUS;
+    const allow = 'Cho phép', sync = pushed.FbmSync.SYNC_STATUS;
     pushed.FbmSync.readLocal = (entity) => entity === 'customer'
       ? [
         { id: 'CUS-MAT', fbmId: 'FBM-MAT', fbmCustomerCode: 'ALT00011', fbmHash: 'cu', fbmSyncPermission: allow, syncStatus: sync.missing, companyName: 'Sửa khi vắng' },

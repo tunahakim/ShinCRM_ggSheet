@@ -11,8 +11,8 @@ async function chay(so) {
   // Năm giá trị cố định, so khớp đúng chữ; ô trống hoặc sai thì không đẩy, vẫn kéo về, và bị cảnh báo kèm mã.
   const quyen = (value, entity, parent) => { const r = F.syncPermission({ fbmSyncPermission: value }, entity || 'customer', parent); return [r.push, r.pull, r.invalid]; };
   check(so, 'Cho phép đồng bộ FBM: năm giá trị cố định cho đúng quyền đẩy/kéo; ô trống, sai chữ hoặc lệch hoa thường là không hợp lệ: không đẩy, vẫn kéo',
-    [quyen('Cho phép'), quyen('Chỉ lấy từ FBM'), quyen('Chờ đồng bộ'), quyen('Không đồng bộ'), quyen('Cấm đồng bộ'), quyen(''), quyen('cho phép'), quyen('Ngừng đồng bộ'), F.pullDefaultPermission()],
-    [[true, true, false], [false, true, false], [false, false, false], [false, false, false], [false, false, false], [false, true, true], [false, true, true], [false, true, true], 'Cho phép']);
+    [quyen('Cho phép'), quyen('Chỉ lấy từ FBM'), quyen('Chờ đồng bộ'), quyen('Không đồng bộ'), quyen('Cấm đồng bộ'), quyen(''), quyen('cho phép'), quyen('Ngừng đồng bộ')],
+    [[true, true, false], [false, true, false], [false, false, false], [false, false, false], [false, false, false], [false, true, true], [false, true, true], [false, true, true]]);
   check(so, 'Activity bị chặn theo Customer cha: cha chỉ lấy thì con không đẩy, cha cấm thì con không kéo',
     [quyen('Cho phép', 'activity', { fbmSyncPermission: 'Chỉ lấy từ FBM' }), quyen('Cho phép', 'activity', { fbmSyncPermission: 'Cấm đồng bộ' })], [[false, true, false], [false, false, false]]);
   check(so, 'ownerCheck: thiếu tên tài khoản là lỗi (không cho qua khi chưa biết); giao dịch chưa có người phụ trách thuộc tài khoản đang đẩy',

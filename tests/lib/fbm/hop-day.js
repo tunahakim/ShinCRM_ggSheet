@@ -42,7 +42,7 @@ function moQuetDay(hop, entity, them) {
 
 /** Ứng viên tạo Activity dùng chung cho ca dọn dấu #SC và ca cứu lệnh tạo mất phản hồi. */
 function activityMoi(F) {
-  return { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', fbmSyncPermission: F.pullDefaultPermission() } };
+  return { entity: 'activity', kind: 'create', id: 'ACT-NEW', position: 0, record: { id: 'ACT-NEW', fbmId: '', customerFbmCode: 'ALT00010', stt_rec: 'A-CUS', taskType: 'Gọi', content: 'Nội dung', workDate: '2026-09-09', fbmSyncPermission: 'Cho phép' } };
 }
 
 module.exports = { dungHopDay, moQuetDay, activityMoi };

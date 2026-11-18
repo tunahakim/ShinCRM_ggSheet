@@ -17,8 +17,9 @@ function capBangChoPhepDongBo(hopCat) {
   hopCat.fbmSyncPermissionValues = rieng.fbmSyncPermissionValues;
 }
 
-/** Giá trị Xác thực của khách mới kéo từ FBM trong tệp thử; test cần nhánh khác thì tự gán `FbmSync.pullDefaults` hoặc nạp `fbm_sync/state/PullDefaults.js` thật. */
+/** Ngầm định của bản ghi mới kéo từ FBM trong tệp thử (Xác thực, Cho phép đồng bộ FBM); test cần nhánh khác thì tự gán `FbmSync.pullDefaults` hoặc nạp `fbm_sync/state/PullDefaults.js` thật. */
 const XAC_THUC_MAC_DINH_THU = 'Chưa xác thực';
+const QUYEN_MAC_DINH_THU = 'Cho phép';
 
 /**
  * Tệp thật luôn có ngầm định kéo từ FBM (preflight chặn khi thiếu), nên hộp cát chỉ nạp vài tệp đồng bộ được cấp sẵn `FbmSync.pullDefaults` trả Xác thực thử và một `categoryReadAll` rỗng cho chỗ gọi nó. Hộp đã có hàm thật hoặc tự gán thì giữ nguyên; nạp `PullDefaults.js` sau thì bản thật thay vào.
@@ -26,7 +27,7 @@ const XAC_THUC_MAC_DINH_THU = 'Chưa xác thực';
 function capNgamDinhKeoThu(hopCat) {
   const F = hopCat.FbmSync;
   if (!F) { return; }
-  if (typeof F.pullDefaults !== 'function') { F.pullDefaults = (entity) => (entity === 'customer' ? { verifyStatus: XAC_THUC_MAC_DINH_THU } : {}); }
+  if (typeof F.pullDefaults !== 'function') { F.pullDefaults = (entity) => (entity === 'customer' ? { verifyStatus: XAC_THUC_MAC_DINH_THU, fbmSyncPermission: QUYEN_MAC_DINH_THU } : { fbmSyncPermission: QUYEN_MAC_DINH_THU }); }
   if (typeof hopCat.categoryReadAll !== 'function') { hopCat.categoryReadAll = () => ({}); }
 }
 
@@ -113,6 +114,6 @@ function capSauNap(hopCat, duongDans) {
 }
 
 /** Cổng cài đặt chung cùng phần cài đặt và phạm vi của đồng bộ: mọi hộp chạy lượt đồng bộ cần, vì công tắc, ngưỡng và khoảng nghỉ đọc qua cổng; dấu phạm vi (`scopeMark`) và dấu vân băm bằng `TextHash.js`. */
-const TEP_CAI_DAT_FBM = ['server/sheet/CellBudget.js', 'server/data/SettingsSections.js', 'server/settings/SettingsKinds.js', 'server/settings/SettingsGate.js', 'server/settings/SettingsService.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/reconcile/TextHash.js', 'fbm_sync/state/Scope.js'];
+const TEP_CAI_DAT_FBM = ['server/sheet/CellBudget.js', 'server/data/SettingsSections.js', 'server/settings/SettingsKinds.js', 'server/settings/SettingsGate.js', 'server/settings/SettingsService.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/schema/FbmFields.js', 'fbm_sync/state/FbmSettings.js', 'fbm_sync/reconcile/TextHash.js', 'fbm_sync/state/Scope.js'];
 
 module.exports = { capTruocTep, capSauTep, capSauNap, TEP_KHUNG_LUOT, TEP_CAI_DAT_FBM, TRANG_FBM_THU };

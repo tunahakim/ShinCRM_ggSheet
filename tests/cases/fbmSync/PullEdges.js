@@ -31,7 +31,7 @@ function chay(so) {
   const activityPull = keoVe(edges.FbmSync, 'activity', [newActivity]);
   check(so, 'Activity pull moi noi dung vao Customer noi bo va cho phep day',
     [activityPull.written, activityPullWrite.records[0].customerId, activityPullWrite.records[0].fbmId, activityPullWrite.records[0].fbmSyncPermission],
-    [1, 'CUS-ACT', 88, edges.FbmSync.pullDefaultPermission()]);
+    [1, 'CUS-ACT', 88, 'Cho phép']);
   edges.FbmSync.readLocal = (entity) => entity === 'customer' ? [{ id: 'CUS-ACT', fbmId: 'S14', fbmCustomerCode: 'ALT00014' }] : [];
   const orphanActivity = edges.FbmSync.activityRecord({ id: 89, ma_kh: 'ALT00014', ten_cv: 'Gọi', details: 'Mồ côi #SC-ACT-UNKNOWN', end_date: '/Date(1757386800000)/' }, gate, { sttRec: 'S14' });
   const orphanActivityResult = keoVe(edges.FbmSync, 'activity', [orphanActivity]);

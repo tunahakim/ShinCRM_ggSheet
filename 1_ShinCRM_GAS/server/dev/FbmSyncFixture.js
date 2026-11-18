@@ -21,14 +21,14 @@ function fbmPrepareAltTest() {
   return { ok: true, customerCode: 'ALT00010', deleted: false, writesToFbm: 0, cases: cases };
 }
 
-/** Chọn ngầm định Xác thực khi kéo từ FBM (ưu tiên giá trị "chưa xác thực" của danh mục DEV) qua đúng cổng lưu cài đặt, để chiều lấy trên DEV không bị preflight chặn. */
+/** Chọn ngầm định kéo từ FBM cho mọi trường bắt buộc FBM không mang: Xác thực của khách (ưu tiên giá trị "chưa xác thực" của danh mục DEV) và Cho phép đồng bộ FBM của khách và giao dịch ("Cho phép"), qua đúng cổng lưu cài đặt, để chiều lấy trên DEV không bị preflight chặn. */
 function fbmDevSetVerifyStatusDefault() {
   var values = categoryReadAll().categories[DATA_SCHEMA.customer.verifyStatus.source] || [];
   var value = values.filter(function (item) { return String(item).normalize('NFC').toLowerCase().indexOf('chưa'.normalize('NFC')) === 0; })[0] || values[0] || '';
   if (!value) { throw new Error('Category chưa có giá trị Xác thực nào để chọn làm ngầm định.'); }
-  var saved = settingsSave({ defaults_fbm_pull: { values: { customer: { verifyStatus: value } } } });
+  var saved = settingsSave({ defaults_fbm_pull: { values: { customer: { verifyStatus: value, fbmSyncPermission: FBM_SYNC_PERMISSION_OPTIONS[0].value }, activity: { fbmSyncPermission: FBM_SYNC_PERMISSION_OPTIONS[0].value } } } });
   if (!saved.ok) { throw new Error('Không lưu được ngầm định kéo FBM: ' + saved.problems.map(function (p) { return p.reason; }).join(' ')); }
-  return { ok: true, value: saved.values.defaults_fbm_pull.values.customer.verifyStatus };
+  return { ok: true, value: saved.values.defaults_fbm_pull.values.customer.verifyStatus, values: saved.values.defaults_fbm_pull.values };
 }
 
 /** Đặt ngưỡng chấp thuận đẩy về mặc định của code qua đúng cửa lưu cài đặt đồng bộ mà Sidebar dùng. */

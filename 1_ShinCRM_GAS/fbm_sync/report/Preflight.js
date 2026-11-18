@@ -48,7 +48,7 @@ FbmSync.preflightGates = function (options) {
     // Khách bị xóa khỏi Sheet sau khi lưu danh sách: lượt vẫn chạy cho phần còn lại nhưng phải báo, không bỏ qua im lặng.
     if (scope && scope.notFound.length) { FbmSync.preflightIssue(issues, 'FBM_SCOPE_CODE_NOT_FOUND', 'warn', 'fbm_sync', 'Mã khách ShinCRM trong danh sách khách chỉ định không còn trên Sheet Customer, lượt này bỏ qua: ' + scope.notFound.join(', ') + '.', false); }
   }
-  if (mode === 'read' || mode === 'write') { FbmSync.preflightVerifyStatus(issues, core.category); }
+  if (mode === 'read' || mode === 'write') { FbmSync.preflightPullDefaults(issues, core.category); }
   return FbmSync.preflightResult(mode, issues, null);
 };
 
@@ -81,10 +81,14 @@ FbmSync.logPreflight = function (result) {
   return order.length;
 };
 
-/** Chiều lấy cần giá trị Xác thực mặc định hợp lệ trước khi ghi khách mới; thiếu thì dừng lượt, không ghi giá trị sai. */
-FbmSync.preflightVerifyStatus = function (issues, category) {
-  var stored = (settingsValue('defaults_fbm_pull', 'values').customer || {}).verifyStatus;
-  var checked = (settingsDefaultsChecked('defaults_fbm_pull', category).customer || {}).verifyStatus;
-  if (!String(stored === undefined || stored === null ? '' : stored).trim()) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_MISSING', 'error', 'Cài đặt', 'Chưa chọn giá trị Xác thực cho khách mới kéo từ FBM. Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn giá trị rồi chạy lại.', true); return; }
-  if (!checked) { FbmSync.preflightIssue(issues, 'FBM_VERIFY_STATUS_DEFAULT_INVALID', 'error', 'Cài đặt', 'Giá trị Xác thực "' + stored + '" cho khách mới kéo từ FBM không còn trong danh mục Xác thực ở sheet Category. Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn lại rồi chạy lại.', true); }
+/** Chiều lấy cần ngầm định hợp lệ cho mọi trường bắt buộc mà FBM không mang, ở cả khách và giao dịch, trước khi ghi bản ghi mới; thiếu thì dừng lượt, không ghi giá trị sai. Mỗi trường một vấn đề để lời báo nêu đúng tên trường. */
+FbmSync.preflightPullDefaults = function (issues, category) {
+  var stored = settingsValue('defaults_fbm_pull', 'values') || {}, checked = settingsDefaultsChecked('defaults_fbm_pull', category);
+  Object.keys(FbmSync.LOCAL_FIELDS).forEach(function (entity) {
+    FbmSync.requiredLocalFields(entity).forEach(function (field) {
+      var raw = (stored[entity] || {})[field], label = DATA_SCHEMA[entity][field].label, who = FbmSync.PULL_ENTITY_LABELS[entity];
+      if (!String(raw === undefined || raw === null ? '' : raw).trim()) { FbmSync.preflightIssue(issues, 'FBM_PULL_DEFAULT_MISSING', 'error', 'Cài đặt', 'Chưa chọn giá trị "' + label + '" cho ' + who + ' mới kéo từ FBM. Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn giá trị rồi chạy lại.', true); return; }
+      if (!String(((checked[entity] || {})[field]) || '').trim()) { FbmSync.preflightIssue(issues, 'FBM_PULL_DEFAULT_INVALID', 'error', 'Cài đặt', 'Giá trị "' + label + '" "' + raw + '" cho ' + who + ' mới kéo từ FBM không hợp lệ (không còn trong danh mục ở sheet Category hoặc không thuộc các giá trị cho phép). Vào Cài đặt › Ngầm định khi kéo từ FBM, chọn lại rồi chạy lại.', true); }
+    });
+  });
 };

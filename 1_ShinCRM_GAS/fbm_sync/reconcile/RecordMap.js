@@ -28,7 +28,7 @@ FbmSync.findCustomerByIdentity = function (localById, localByCode, incoming, loc
 
 /** Đổi record Customer FBM sang schema nội bộ của Sheet. Dấu vân FBM tính một lần ở đây trên bản đã đổi, cùng cách tính với dòng trên Sheet; giờ đồng bộ do bên ghi đặt. */
 FbmSync.customerRecord = function (fbm, categoryGate) {
-  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  var record = { companyName: fbm.ten_kh || '', taxNumber: fbm.ma_so_thue || '', phone: fbm.dien_thoai || '', email: fbm.email || '', address: fbm.dc_lh || '', province: fbm.ten_dclh_tinh || fbm.dc_lh_tinh || '', website: fbm.website || '', contactPerson: fbm.ong_ba || '', leadSource: fbm.ten_nguon_dm || fbm.nguon_dm || '', fbmCustomerCode: fbm.ma_kh || '', fbmId: fbm.stt_rec_kh || '', syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(record, 'customer', categoryGate);
   return record;
 };
@@ -36,7 +36,7 @@ FbmSync.customerRecord = function (fbm, categoryGate) {
 FbmSync.activityRecord = function (fbm, categoryGate, parent) {
   var parentCode = fbm.ma_kh || (parent && (parent.ma_kh || parent.maKh)) || '';
   // `customerFbmId` là `stt_rec_kh` của khách vừa đọc, khóa nối khách cha; mã khách `ma_kh` chỉ để hiển thị vì có thể đổi hoặc trùng.
-  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, customerFbmId: String(parent && parent.sttRec || '').trim(), workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmSyncPermission: FbmSync.pullDefaultPermission(), fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
+  var details = fbm.details || '', record = { customerId: parentCode, customerFbmCode: parentCode, customerFbmId: String(parent && parent.sttRec || '').trim(), workDate: fbm.end_date || '', taskType: fbm.ten_cv || fbm.ma_cv || '', content: FbmSync.stripActivityMarker(details), markerId: FbmSync.activityMarkerId(details), owner: fbm.owner || '', enteredBy: fbm.owner || '', fbmId: fbm.id || '', syncStatus: FbmSync.SYNC_STATUS.synced };
   record.fbmHash = FbmSync.hash(record, 'activity', categoryGate);
   return record;
 };
@@ -68,11 +68,8 @@ FbmSync.linkActivityCustomers = function (records, customers) {
 
 /** Giữ trường chỉ thuộc ShinCRM khi FBM trả lại bản ghi đã tồn tại. */
 FbmSync.preserveLocalFields = function (entity, current, incoming) {
-  var fields = entity === 'customer'
-    ? ['note', 'fbmSyncPermission', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate']
-    : ['fbmSyncPermission', 'contractValue', 'priority', 'dueAt'];
   var merged = Object.assign({}, incoming);
-  fields.forEach(function (field) {
+  FbmSync.LOCAL_FIELDS[entity].forEach(function (field) {
     if (current && Object.prototype.hasOwnProperty.call(current, field)) { merged[field] = current[field]; }
     else { delete merged[field]; }
   });

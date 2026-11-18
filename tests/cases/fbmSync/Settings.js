@@ -148,9 +148,27 @@ function kiemKhoaHong(so) {
   check(so, 'sau khi đặt lại thì lưu bình thường', luu({ fbm_run: { approvalThreshold: '3' } }).ok, true);
 }
 
+/** Ngầm định kéo từ FBM chỉ nhận trường FBM không mang: trường FBM mang (kể cả điện thoại) bị cổng từ chối, trường chỉ của ShinCRM lưu được, và bảng trường cho phép chính là `FbmSync.LOCAL_FIELDS`. */
+function kiemNgamDinhKeo(so) {
+  const nen = dungHop({ sheets: ['Category', 'Log'], tep: TEP_NEN.concat(['fbm_sync/schema/FbmFields.js'], TEP_LENH_CAI_DAT) });
+  const hop = nen.hop, luu = (values) => trongLanGoi(hop, () => hop.settingsSave({ defaults_fbm_pull: { values: values } }));
+  const sai = luu({ customer: { phone: '0900000000' } });
+  check(so, 'ngầm định kéo từ FBM không cho đặt trường FBM mang (Điện thoại của khách): cổng từ chối, nêu tên trường',
+    [sai.ok, sai.problems.length, /Điện thoại/.test(sai.problems[0] && sai.problems[0].reason)],
+    [false, 1, true]);
+  const dung = luu({ customer: { fbmSyncPermission: 'Chỉ lấy từ FBM' }, activity: { fbmSyncPermission: 'Không đồng bộ' } });
+  check(so, 'ngầm định kéo từ FBM lưu được Cho phép đồng bộ FBM của khách và giao dịch ở mức bất kỳ, kể cả mức không kéo',
+    [dung.ok, dung.values.defaults_fbm_pull.values],
+    [true, { customer: { fbmSyncPermission: 'Chỉ lấy từ FBM' }, activity: { fbmSyncPermission: 'Không đồng bộ' } }]);
+  check(so, 'phần ngầm định kéo từ FBM cho đặt đúng bảng trường chỉ của ShinCRM',
+    hop.settingsSection('defaults_fbm_pull').fields.values.entities,
+    hop.FbmSync.LOCAL_FIELDS);
+}
+
 function chay(so) {
   section('FBM sync - cài đặt qua cổng chung');
   kiemLenhLuu(so);
+  kiemNgamDinhKeo(so);
   kiemTatTienTrinh(so);
   kiemNguongMayIm(so);
   kiemKhoaHong(so);

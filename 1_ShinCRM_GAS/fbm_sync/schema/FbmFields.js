@@ -106,9 +106,13 @@ FbmSync.SYNC_LOOKUPS = [
   { key: '@CAT_CONG_VIEC', controller: 'crJob' }
 ];
 
-/** Giá trị "Cho phép đồng bộ FBM" gán cho bản ghi mới kéo từ FBM về; bảng giá trị khai ở `FBM_SYNC_PERMISSION_OPTIONS` (DataSchema). */
-FbmSync.pullDefaultPermission = function () {
-  return FBM_SYNC_PERMISSION_OPTIONS.filter(function (option) { return option.pullDefault === true; })[0].value;
+/**
+ * Trường của DATA_SCHEMA mà FBM không mang theo mỗi thực thể: lượt kéo không bao giờ đưa giá trị vào, nên giữ nguyên ở bản ghi đã có và lấy từ ngầm định của kênh FBM (`defaults_fbm_pull`) ở bản ghi mới.
+ * Thêm trường vào DATA_SCHEMA mà FBM không có thì thêm vào đây; trường FBM mang thì không được ở đây vì ngầm định không bao giờ được dùng.
+ */
+FbmSync.LOCAL_FIELDS = {
+  customer: ['note', 'fbmSyncPermission', 'verifyStatus', 'customerGroup', 'searchAliases', 'bidClosingDate', 'product', 'parentCompanyName'],
+  activity: ['fbmSyncPermission', 'contractValue', 'priority', 'dueAt']
 };
 FbmSync.ACTIVITY_MARKER_RE = /\s+#SC-([A-Za-z0-9_-]+)\s*$/;
 

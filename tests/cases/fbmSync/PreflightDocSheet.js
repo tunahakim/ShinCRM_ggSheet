@@ -46,7 +46,7 @@ async function chay(so) {
     [localReads, hashCalls, scanned.hashSummary.localRecords, scanned.hashSummary.changed, scanned.hashSummary.newRecords, scanned.issues.filter((item) => item.code === 'FBM_RECORD_PUSH_PERMISSION_MISSING').length],
     [{ customer: 2, activity: 1 }, 3, 3, 2, 1, 1]);
   const sheetReads = { customer: 0, activity: 0 };
-  hop.DATA_SCHEMA = { customer: { verifyStatus: { source: '@CAT_XAC_THUC' } } }; hop.SYNC_SCHEMA = {};
+  hop.SYNC_SCHEMA = {};
   hop.entityReadAllCombined = (entity) => { sheetReads[entity] += 1; return { fields: ['id', 'fbmSyncPermission'], rows: [[entity === 'activity' ? 'ACT-1' : 'CUS-1', 'Cho phép']] }; };
   hop.FbmSync.readLocal = goc.readLocal;
   const candidateCalls = { read: 0, check: 0 };

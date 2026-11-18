@@ -17,7 +17,7 @@ function chay(so) {
   const newPullResult = keoVe(builders.FbmSync, 'customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-C', ma_kh: 'ALT00012', ten_kh: 'Khách mới', ma_so_thue: '001' }, gate)]);
   check(so, 'Customer pull mới ghi cả định danh baseline và quyền đẩy qua cửa ghi',
     [newPullResult.written, newPullWrite.source, newPullWrite.schemas.length, newPullWrite.records[0].fbmId, newPullWrite.records[0].fbmHash !== '', newPullWrite.records[0].parentCompanyName, newPullWrite.records[0].fbmSyncPermission, dirtyMarkCalls],
-    [1, 'pull', 2, 'NEW-C', true, '', builders.FbmSync.pullDefaultPermission(), 0]);
+    [1, 'pull', 2, 'NEW-C', true, '', 'Cho phép', 0]);
   check(so, 'Pull gộp nội dung và trạng thái vào một lượt cửa ghi', newPullCalls, 1);
   // Đổi tên giá trị ở Category rồi chọn lại trong Cài đặt: khách mới mang đúng tên mới, không còn chuỗi gõ cứng nào.
   xacThuc.value = 'Đã kiểm tra tên mới';
@@ -32,6 +32,15 @@ function chay(so) {
   check(so, 'khách đã có giữ giá trị Xác thực của mình khi lấy từ FBM',
     [newPullWrite && newPullWrite.records[0].companyName, newPullWrite && newPullWrite.records[0].verifyStatus],
     ['Cũ đổi tên', 'Đã xác minh tay']);
+  // Quyền đẩy của bản ghi mới đến từ ngầm định kênh FBM, người dùng chọn mức nào thì bản ghi mới mang mức đó (kể cả mức không đẩy).
+  xacThuc.value = 'Chưa xác thực';
+  xacThuc.permission = 'Chỉ lấy từ FBM';
+  builders.FbmSync.readLocal = () => [];
+  keoVe(builders.FbmSync, 'customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-P', ma_kh: 'ALT00016', ten_kh: 'Khách chọn quyền', ma_so_thue: '005' }, gate)]);
+  check(so, 'khách mới kéo từ FBM mang mức Cho phép đồng bộ FBM đang chọn trong Cài đặt, không gắn cứng "Cho phép"',
+    newPullWrite.records[0].fbmSyncPermission,
+    'Chỉ lấy từ FBM');
+  xacThuc.permission = undefined;
   xacThuc.value = '';
   builders.FbmSync.readLocal = () => [];
   newPullCalls = 0;
@@ -39,7 +48,7 @@ function chay(so) {
   try { keoVe(builders.FbmSync, 'customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'NEW-E', ma_kh: 'ALT00015', ten_kh: 'Khách thiếu cài đặt', ma_so_thue: '004' }, gate)]); } catch (error) { verifyMissing = error; }
   check(so, 'chưa chọn Xác thực kéo từ FBM thì chiều lấy dừng, không ghi khách mới',
     [verifyMissing && verifyMissing.code, newPullCalls],
-    ['FBM_VERIFY_STATUS_DEFAULT_MISSING', 0]);
+    ['FBM_PULL_DEFAULT_MISSING', 0]);
   xacThuc.value = 'Chưa xác thực';
   const pullLogs = [];
   builders.logEvent = (event) => pullLogs.push(event);

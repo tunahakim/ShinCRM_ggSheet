@@ -94,9 +94,9 @@ function fbmSettingsSections() {
       name: FbmSync.SETTING_SECTIONS.pullDefaults, owner: 'fbm_sync', label: 'Ngầm định khi kéo từ FBM',
       fields: {
         values: {
-          kind: 'fieldDefaults', label: 'Giá trị điền cho khách mới',
-          entities: { customer: ['verifyStatus'] },
-          hint: 'Giá trị gán cho khách mới kéo từ FBM; khách đã có giữ nguyên giá trị đang có. Chưa chọn Xác thực, hoặc giá trị không còn trong Category, thì lượt "Lấy từ FBM" bị chặn trước khi ghi.'
+          kind: 'fieldDefaults', label: 'Giá trị điền cho bản ghi mới',
+          entities: FbmSync.LOCAL_FIELDS,
+          hint: 'Giá trị điền vào khách và giao dịch mới kéo từ FBM, chỉ cho các trường FBM không có; bản ghi đã có giữ nguyên giá trị đang có. Trường bắt buộc mà chưa chọn, hoặc giá trị không còn hợp lệ, thì lượt "Lấy từ FBM" bị chặn trước khi ghi.'
         }
       }
     }
