@@ -13,7 +13,7 @@ async function chay(so) {
   const originalNow = protocol.Date.now;
   protocol.Date.now = () => fixedNow;
   // Request nào cũng đi theo cursor đang lưu (cổng phiên xét dòng bảng của cursor); dùng dòng không có cổng để chỉ kiểm phần cấp mã.
-  datState(protocol.FbmSync, { cursor: { kind: 'identity_user_grid' } });
+  datState(protocol.FbmSync, { runId: 'cap-ma', phase: 'checking_session', cursor: { kind: 'identity_user_grid' } });
   const first = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   const second = protocol.FbmSync.sliceIssue(protocol.FbmSync.stateRead(), { url: 'https://fbm.test/request', body: {}, meta: { kind: 'grid' } });
   protocol.Date.now = originalNow;

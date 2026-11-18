@@ -99,14 +99,11 @@ FbmSync.transportFailureRecord = function (state, code, message, action, cause, 
   FbmSync.stagePatchApply(state, { logs: [{ action: action || 'session_gate_error', outcome: LOG_ERROR, reason: reason, detail: detail }] });
   return state;
 };
-/** Lỗi nội bộ khi đọc chính sách hay dựng lại request phải dừng trước khi cấp envelope; mã lỗi gốc đi vào Log để còn điều tra. */
+/** Lỗi nội bộ khi đọc chính sách hay dựng lại request phải dừng trước khi cấp envelope: đóng lượt lỗi qua `runFail` (giữ sổ bận vì request trước có thể là lệnh ghi chưa rõ kết quả), mã lỗi gốc đi vào Log để còn điều tra. Dòng Log ghi sau khi đóng vẫn mang nhãn lượt vì `runId` còn trên ô. */
 FbmSync.transportFailClosed = function (state, cause) {
-  state.activeRequestId = '';
-  state.deadlineAt = 0;
-  state.phase = 'error';
-  state.retryable = false;
-  state.cursor = {};
-  FbmSync.transportFailureRecord(state, 'FBM_SESSION_GATE_EXCEPTION', 'Bước phát request FBM gặp lỗi nội bộ; request đã bị chặn an toàn.', 'transport_exception', cause);
+  var message = 'Bước phát request FBM gặp lỗi nội bộ; request đã bị chặn an toàn.';
+  FbmSync.runFail(state, 'FBM_SESSION_GATE_EXCEPTION', message, { cursor: {}, keepRecords: true });
+  FbmSync.transportFailureRecord(state, 'FBM_SESSION_GATE_EXCEPTION', message, 'transport_exception', cause);
   return null;
 };
 /**
@@ -158,15 +155,11 @@ FbmSync.transportRetryClear = function (state) {
   if (state && state.metadata && state.metadata.transportRetryId) { state.metadata.transportRetryId = ''; }
   return state;
 };
+/** Lát chạm trần thời gian GAS: đóng lượt tạm dừng có mã qua `runClose` (lượt nền tính là lỗi để dời giờ thử lại), giữ cursor để Log và Sidebar thấy đúng chỗ dừng, giữ sổ bận như mọi lần dừng giữa chừng. */
 FbmSync.pauseForRuntimeLimit = function (state) {
-  state.activeRequestId = '';
-  state.deadlineAt = 0;
-  state.phase = 'paused';
-  state.lastFailureCode = 'GAS_RUNTIME_LIMIT';
-  state.lastError = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.';
-  state.message = state.lastError;
-  state.retryable = true;
-  FbmSync.stagePatchApply(state, { logs: [{ action: 'slice_limit', outcome: LOG_ERROR, reason: state.lastFailureCode, detail: { runId: String(state.runId || ''), phase: String(state.phase || ''), cursor: state.cursor || {} } }] });
+  var message = 'Lát GAS đã chạm trần thời gian; đã dừng trước request kế tiếp và giữ cursor an toàn.', phase = String(state.phase || ''), cursor = state.cursor || {};
+  FbmSync.runClose(state, 'paused', { code: 'GAS_RUNTIME_LIMIT', message: message, error: message, retryable: true, cursor: cursor, keepRecords: true });
+  FbmSync.stagePatchApply(state, { logs: [{ action: 'slice_limit', outcome: LOG_ERROR, reason: 'GAS_RUNTIME_LIMIT', detail: { runId: String(state.runId || ''), phase: phase, cursor: cursor } }] });
   return null;
 };
 /**
@@ -179,6 +172,8 @@ FbmSync.issueContext = null;
  * Không quyết gửi hay không: cổng phiên, công tắc tổng và ngân sách do `issueThroughGate` xét trước.
  */
 FbmSync.requestIssue = function (state, request, now) {
+  // Mọi request thuộc một lượt đang mở: nhờ vậy mọi đường kết thúc (lỗi đường truyền, lệch hợp đồng, trần thời gian) đóng được qua `runClose`, không còn nhánh gán phase tay cho ô không có lượt.
+  if (!FbmSync.runInProgress(state)) { var noRun = new Error('Phát request FBM khi không có lượt đang chạy (runId ' + String(state && state.runId || 'trống') + ', phase ' + String(state && state.phase || '') + ').'); noRun.code = 'RUN_NOT_OPEN'; throw noRun; }
   (request.items || [request]).forEach(function (item) {
     var endpoint = FbmSync.protocol.validateEndpoint(item.url);
     if (!endpoint.ok) {

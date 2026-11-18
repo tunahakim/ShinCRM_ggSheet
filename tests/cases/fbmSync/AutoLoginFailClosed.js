@@ -11,7 +11,7 @@ async function chay(so) {
   const gateLogs = batLogCong(heartbeat);
   let gateFlushes = 0;
   heartbeat.flushLog = () => { gateFlushes += 1; };
-  datState(heartbeat.FbmSync, { runId: '', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
+  datState(heartbeat.FbmSync, { runId: 'valid-read', phase: 'checking_session', mode: 'read', cursor: { kind: 'authorize_customer' }, activeRequestId: '', deadlineAt: 0, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const validRead = heartbeat.FbmSync.sliceIssue(heartbeat.FbmSync.stateRead(), { url: 'https://fbm.test/read', body: { read: true }, meta: { kind: 'grid' } });
   datState(heartbeat.FbmSync, { activeRequestId: '', phase: 'push', mode: 'push', cursor: { kind: 'push_wait', operation: 'customer_edit_save' }, session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
   const validWrite = heartbeat.FbmSync.sliceIssue(heartbeat.FbmSync.stateRead(), { url: 'https://fbm.test/write', body: { write: true }, meta: { kind: 'customer_edit_save' } });

@@ -2,7 +2,7 @@
 const { section, check } = require('../../lib/assert');
 const { giuBanGhi } = require('../../lib/load-gas');
 const { ungVienDay } = require('../../lib/fbm/buoc-day');
-const { NO_CATEGORY, dongKhachFbm, luoiKhachXungDot, chotXungDot, giaTriFbmCua, giaTriShinCua, phienXongDaXacMinh, dungXungDot } = require('../../lib/fbm/ma-tran');
+const { NO_CATEGORY, dongKhachFbm, luoiKhachXungDot, chotXungDot, giaTriFbmCua, giaTriShinCua, phienXongDaXacMinh, dungXungDot, moXungDot } = require('../../lib/fbm/ma-tran');
 
 async function chay(so) {
   section('FBM sync — ma trận chốt xung đột (FBM-024)');
@@ -12,13 +12,13 @@ async function chay(so) {
   const nameDiff = (dto) => ((dto && dto.fields) || []).filter((item) => /Tên/.test(String(item.left)))[0] || {};
   phienXongDaXacMinh(CF);
   const cfNen = CF.stateRead(); cfNen.runId = 'nen-1'; cfNen.origin = 'background'; cfNen.phase = 'pull_customer'; cfNen.activeRequestId = 'nen-req'; CF.stateWrite(cfNen);
-  const cfBackground = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfBackground = moXungDot(CF);
   const cfAfterBackground = CF.stateRead();
   check(so, 'Mở xung đột giữa lượt nền trả mã để Sidebar hỏi dừng hay chờ, không phát request và không đụng lượt nền',
     [cfBackground.code, cfBackground.request, cfAfterBackground.runId, cfAfterBackground.activeRequestId, cfAfterBackground.metadata.manualPending || null],
     ['SYNC_BACKGROUND_RUNNING', undefined, 'nen-1', 'nen-req', null]);
   cfAfterBackground.runId = ''; cfAfterBackground.origin = 'manual'; cfAfterBackground.phase = 'done'; cfAfterBackground.activeRequestId = ''; CF.stateWrite(cfAfterBackground);
-  const cfOpen = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfOpen = moXungDot(CF);
   check(so, 'FBM-024: phiên mới không làm mất hàng đợi xung đột; mở chế độ xung đột chỉ phát request đọc bản ghi FBM đầu hàng đợi',
     [cfOpen.ok, cfOpen.remaining, cfOpen.request && cfOpen.request.meta.kind, cfOpen.request && cfOpen.request.meta.conflictId, JSON.stringify(CF.stateRead().cursor)],
     [true, 3, 'conflict_refresh_grid', 'CUS-000001', JSON.stringify({ kind: 'conflict_refresh', entity: 'customer', id: 'CUS-000001', fbmId: 'F-1' })]);
@@ -29,7 +29,7 @@ async function chay(so) {
   // Lệnh chốt không đọc lại FBM: Sidebar gửi lại giá trị FBM các trường lệch và ảnh chụp như màn đã hiện.
   const fbmValuesOf = (dto) => Object.fromEntries(((dto && dto.fields) || []).map((item) => [item.field, item.right]));
   const shinValuesOf = (dto) => Object.fromEntries(((dto && dto.fields) || []).map((item) => [item.field, item.left]));
-  const cfReopen = async (rows) => { const opened = CF.runSlice(() => CF.runConflictOpenCommand()); return CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(opened.request.id, rows))); };
+  const cfReopen = async (rows) => { const opened = moXungDot(CF); return CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(opened.request.id, rows))); };
   check(so, 'Chốt xung đột không phát request đọc lại FBM: lệnh chốt không còn hàm chuẩn bị đọc lại',
     typeof CF.prepareConflictResolution,
     'undefined');
@@ -84,7 +84,7 @@ async function chay(so) {
     [cfGone.code, cf.local.customer[0].companyName],
     ['CONFLICT_NOT_FOUND', 'Tên FBM mới hơn 1']);
 
-  const cfOpen2 = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfOpen2 = moXungDot(CF);
   const cfOpened2 = CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(cfOpen2.request.id, [dongKhachFbm('F-2', 'ALT00002', 'Tên FBM 2')])));
   // Màn hiện 'Tên Shin 2'; Sheet bị sửa giữa chừng, người dùng thấy popup và chọn giữ lựa chọn: ghi giá trị màn đang hiện, giá trị Sheet chỉ làm mốc.
   cf.local.customer[1].companyName = 'Tên Shin 2 sửa trên Sheet';
@@ -99,7 +99,7 @@ async function chay(so) {
     [cfShin.ok, cfOpen2.request.meta.conflictId, cfShinRow.companyName, cfShinRow.syncStatus, cfShinRow.fbmHash === CF.hash(CF.customerRecord(dongKhachFbm('F-2', 'ALT00002', 'Tên FBM 2'), NO_CATEGORY), 'customer', NO_CATEGORY), ungVienDay(CF, 'customer').map((item) => item.id)],
     [true, 'CUS-000002', 'Tên Shin 2', 'chờ đối soát', true, ['CUS-000002']]);
 
-  const cfOpen3 = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfOpen3 = moXungDot(CF);
   const cfOpened3 = CF.runSlice(((r) => () => CF.continue(r))(await gridResponse(cfOpen3.request.id, [dongKhachFbm('F-3', 'ALT00003', 'Tên FBM 3')])));
   const cfMergeField = nameDiff(cfOpened3.conflict).field;
   const cfManual = chotXungDot(CF, 'customer', 'CUS-000003', 'manual', { [cfMergeField]: { choice: 'manual', value: 'Tên tự nhập 3' } }, giaTriFbmCua(cfOpened3.conflict), giaTriShinCua(cfOpened3.conflict), cfOpened3.conflict.snapshot);
@@ -107,7 +107,7 @@ async function chay(so) {
   check(so, 'FBM-024 PA3: tùy chỉnh ghi giá trị tự nhập vào ShinCRM, trạng thái chờ đối soát; hết hàng đợi thì số đếm về 0 và không còn request đang chờ',
     [cfManual.ok, cf.local.customer[2].companyName, cf.local.customer[2].syncStatus, cfManual.remaining, cfManualState.metadata.conflictCount, (cfManualState.cursor.kind || null)],
     [true, 'Tên tự nhập 3', 'chờ đối soát', 0, 0, null]);
-  const cfEmpty = CF.runSlice(() => CF.runConflictOpenCommand());
+  const cfEmpty = moXungDot(CF);
   check(so, 'FBM-024: hàng đợi rỗng thì mở chế độ xung đột báo không còn xung đột, không phát request',
     [cfEmpty.empty, cfEmpty.request],
     [true, undefined]);

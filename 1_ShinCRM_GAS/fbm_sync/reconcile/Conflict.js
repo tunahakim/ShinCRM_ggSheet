@@ -46,8 +46,8 @@ FbmSync.conflictFail = function (code, message) {
 
 
 /**
- * Lệnh `open_conflict`: mở bản ghi đầu hàng đợi, chỉ phát request đọc bản ghi FBM; diff tính khi response về ở chặng `conflict_refresh`. Dấu trang mang đủ bản ghi đang chờ đọc, ô lượt không giữ bản người dùng xem.
- * Hàng đợi rỗng thì trả `{ empty: true }`, không phát request.
+ * Lệnh `open_conflict`: mở bản ghi đầu hàng đợi bằng một lượt một chặng `conflict_refresh` (nhãn Tay · Đọc lại bản xung đột) và chỉ phát request đọc bản ghi FBM; diff tính khi response về. Request phải thuộc một lượt đang mở để lỗi đường truyền hay lệch hợp đồng đóng được qua `runClose`; lượt mới xác minh phiên lại từ đầu nên cổng phiên có thể hỏi phiên trước. Dấu trang mang đủ bản ghi đang chờ đọc, ô lượt không giữ bản người dùng xem.
+ * Hàng đợi rỗng hoặc bản ghi đầu không có ID FBM thì không mở lượt, không phát request.
  */
 FbmSync.runConflictOpenCommand = function () {
   if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', message: 'Đồng bộ đang tắt; chưa thể xử lý conflict.' }; }
@@ -65,23 +65,26 @@ FbmSync.runConflictOpenCommand = function () {
   }
   var item = queue[0], request = FbmSync.conflictRefreshRequest(item.entity, item, FbmSync.scriptSettings(state));
   if (!request) { return FbmSync.conflictDropUnreadable(state, item.entity, item.id, 'không có ID FBM để đọc lại'); }
-  state.cursor = { kind: 'conflict_refresh', entity: item.entity, id: item.id, fbmId: String(item.fbmId || '') };
-  state.message = 'Đang đọc FBM để mở xung đột ' + item.id + '...';
-  FbmSync.stateWrite(state);
-  return { ok: true, request: FbmSync.sliceIssue(state, request), remaining: queue.length };
+  var opened = FbmSync.runOpen({ origin: 'manual', kindLabel: FbmSync.RUN_PLANS.conflict_refresh.label, cursor: { kind: 'conflict_refresh', entity: item.entity, id: item.id, fbmId: String(item.fbmId || '') }, message: 'Đang đọc FBM để mở xung đột ' + item.id + '...' });
+  opened.metadata.conflictCount = queue.length;
+  return { ok: true, request: FbmSync.sliceIssue(opened, request), remaining: queue.length };
 };
 
-/** Bước kết của chặng `conflict_refresh` trong bảng cursor: trả DTO cho Sidebar, hoặc làm việc ghi chặng đã quyết (tự đóng theo bản FBM, rời hàng đợi). */
+/** Bước kết của chặng `conflict_refresh` trong bảng cursor: đóng lượt một chặng trước (lượt chỉ đọc nên không giữ sổ bận), rồi trả DTO cho Sidebar hoặc làm việc ghi chặng đã quyết (tự đóng theo bản FBM, rời hàng đợi). Việc ghi đó không cần lượt: nó đi qua Cửa bản ghi như lệnh chốt. */
 FbmSync.conflictRefreshEnd = function (state, end) {
-  if (end.kind === 'view') { return { ok: true, conflict: end.view }; }
+  if (end.kind === 'fail') {
+    FbmSync.runFail(state, end.code, end.message);
+    FbmSync.stateWrite(state);
+    return FbmSync.conflictFail(end.code, end.message);
+  }
+  FbmSync.runClose(state, 'done', { message: end.kind === 'view' ? 'Đã mở xung đột ' + String(end.view && end.view.id || '') + '.' : '' });
+  if (end.kind === 'view') { FbmSync.stateWrite(state); return { ok: true, conflict: end.view }; }
   if (end.kind === 'settle') {
     var read = end.read, settled = FbmSync.conflictSettle(state, read, function (local, latest) { return FbmSync.preserveLocalFields(read.entity, local, latest); }, 'Xung đột ' + read.id + ' không còn trường lệch; đã tự đóng theo bản FBM.');
     return settled.ok ? Object.assign(settled, { conflict: null }) : settled;
   }
   if (end.kind === 'drop') { return FbmSync.conflictDropUnreadable(state, end.entity, end.id, end.reason); }
-  state.message = end.message;
-  FbmSync.stateWrite(state);
-  return FbmSync.conflictFail(end.code, end.message);
+  var unknown = new Error('Chặng conflict_refresh trả kết quả lạ "' + String(end.kind) + '".'); unknown.code = 'STAGE_RESULT_EMPTY'; throw unknown;
 };
 
 /**

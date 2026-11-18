@@ -199,19 +199,20 @@ async function chay(so) {
     pagedNames.some((text) => text.indexOf('không được về GAS') >= 0),
     false);
 
-  // Ghi Sheet lỗi ở bước ghi của lô đầu: cursor không tiến, lần sau dựng lại đúng lô đó và lượt vẫn đủ khách, không trùng.
+  // Ghi Sheet lỗi ở bước ghi của lô đầu: lượt đóng lỗi, cursor không tiến (dựng lại đúng lô đó), lượt sau vẫn đủ khách, không trùng.
   let failOnce = true;
   const writeFail = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 }, failWrite: (request) => request.entity === 'activity' && failOnce && !(failOnce = false) });
-  let retryRequest = null, firstBatch = null;
+  let retryRequest = null, firstBatch = null, failedPhase = '';
   const khoaLo = (request) => (request && request.items || []).map((item) => item.body.externalKey.map((k) => k.Name + '=' + k.Value).join('|'));
-  const writeFailEnd = await writeFail.run({
+  await writeFail.run({
     beforeSend: (request) => { if (request.meta.kind === 'batch' && !firstBatch) { firstBatch = request; } },
-    afterError: (F) => { retryRequest = F.cursorRequest(F.stateRead()); return { request: F.sliceIssue(F.stateRead(), retryRequest) }; }
+    afterError: (F) => { const st = F.stateRead(); failedPhase = st.phase; retryRequest = F.cursorRequest(st); return { request: null }; }
   });
+  const writeFailEnd = await writeFail.run();
   const writeFailIds = writeFail.local.customer.map((item) => item.fbmId), writeFailActs = writeFail.local.activity.map((item) => item.fbmId);
-  check(so, 'Ghi Sheet lỗi ở bước ghi của lô: cursor không tiến, request kế dựng lại đúng lô đó, lượt đủ 12 khách và 12 giao dịch không trùng', [
-    !!retryRequest && JSON.stringify(khoaLo(retryRequest)) === JSON.stringify(khoaLo(firstBatch)), writeFailEnd.status.phase, writeFailIds.length, new Set(writeFailIds).size, writeFailActs.length, new Set(writeFailActs).size
-  ], [true, 'done', 12, 12, 12, 12]);
+  check(so, 'Ghi Sheet lỗi ở bước ghi của lô: lượt đóng lỗi, cursor giữ đúng lô đó, lượt sau đủ 12 khách và 12 giao dịch không trùng', [
+    failedPhase, !!retryRequest && JSON.stringify(khoaLo(retryRequest)) === JSON.stringify(khoaLo(firstBatch)), writeFailEnd.status.phase, writeFailIds.length, new Set(writeFailIds).size, writeFailActs.length, new Set(writeFailActs).size
+  ], ['error', true, 'done', 12, 12, 12, 12]);
 
   // Mất response của một gói: GAS dựng lại request từ cursor là xin gói đang chờ từ RAM, không gọi lại FBM.
   const lost = scanHarness({ customers: 12, budget: { chunkTargetBytes: 6000 } });

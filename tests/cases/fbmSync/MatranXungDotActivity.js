@@ -4,7 +4,7 @@ const { datState } = require('../../lib/fbm/dat-state');
 const { taoHopCat, napServer } = require('../../lib/load-gas');
 const { makeSync } = require('../../lib/fbm/hang-day');
 const { keoVe, keoLo } = require('../../lib/fbm/keo-ve');
-const { luoiTheoTen, khachMau, chotXungDot } = require('../../lib/fbm/ma-tran');
+const { luoiTheoTen, khachMau, chotXungDot, moXungDot } = require('../../lib/fbm/ma-tran');
 
 async function chay(so) {
   section('FBM sync — ma trận xung đột giao dịch (G9)');
@@ -25,7 +25,7 @@ async function chay(so) {
   const acPull = keoLo(AC, 'activity', [AC.activityRecord(fbmActivity('Nội dung FBM', '/Date(1757473200000)/'), acGate, { sttRec: 'FBM-C1' })], 'read');
   const acDone = AC.stateRead(); acDone.phase = 'done'; AC.stateWrite(acDone);
   datState(AC, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
-  const acOpen = AC.runSlice(() => AC.runConflictOpenCommand());
+  const acOpen = moXungDot(AC);
   const acLatest = fbmActivity('Nội dung FBM', '/Date(1757473200000)/');
   const acOpened = AC.runSlice(((r) => () => AC.continue(r))(await activityGrid(acOpen.request && acOpen.request.id, [acLatest])));
   const acFields = ((acOpened.conflict && acOpened.conflict.fields) || []).map((item) => item.field);

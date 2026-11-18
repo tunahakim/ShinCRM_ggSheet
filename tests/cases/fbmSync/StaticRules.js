@@ -197,9 +197,7 @@ const EXCEPTIONS = {
   },
   // Còn lại: Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đóng, và đối tượng status (không phải ô lượt).
   phaseClose: {
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/transport/PullFlow.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/transport/TransportCore.js': 2
+    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3
   },
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,

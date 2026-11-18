@@ -233,9 +233,8 @@ FbmSync.contractGate = function (state, rawResponse) {
   var mismatch = FbmSync.protocol.contractMismatch(rawResponse);
   if (!mismatch) { return null; }
   var runId = String(state.runId || ''), closed = FbmSync.runFailCurrent(mismatch.message, mismatch.code), current = closed.state;
-  // Heartbeat và đăng nhập nền không có phiên đồng bộ nên `runFailCurrent` bỏ qua; vẫn phải nhả request đang chờ, không thì mọi lượt sau kẹt REQUEST_IN_FLIGHT.
-  if (!closed.failed) { current.phase = 'error'; current.lastFailureCode = mismatch.code; current.retryable = false; current.lastError = mismatch.message; current.message = mismatch.message; }
-  current.activeRequestId = ''; current.deadlineAt = 0;
+  // Request chỉ được phát trong lượt đang mở (`requestIssue`) và `runClose` bỏ request đang chờ, nên response được nhận mà không còn lượt là ô lượt hỏng: báo lỗi, không tự gán phase.
+  if (!closed.failed) { var orphan = new Error(mismatch.message + ' Response được nhận khi không có lượt đang chạy (runId ' + runId + ').'); orphan.code = 'RUN_NOT_OPEN'; throw orphan; }
   FbmSync.stagePatchApply(current, { logs: [{ action: 'extension_contract_mismatch', outcome: LOG_ERROR, cycleId: runId, reason: mismatch.message, detail: { code: mismatch.code, expected: mismatch.expected, received: mismatch.received || '(Extension không gửi mã)' } }] });
   return { ok: false, code: mismatch.code, request: null, error: mismatch.message };
 };

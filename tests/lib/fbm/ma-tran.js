@@ -9,6 +9,9 @@ const { keoVe } = require('./keo-ve');
 /** Cổng danh mục rỗng: dấu vân bắt buộc có cổng, bản ghi mẫu không có giá trị danh mục cần đổi mã. */
 const NO_CATEGORY = { map: {} };
 
+/** Lưới user FBM trả cho câu hỏi phiên: đúng tài khoản liên kết của hộp thử (2037, ANHLT, Le Tuan Anh). */
+const USER_BODY = '{"d":{"TotalRowCount":1,"Rows":[[2037,"ANHLT","Le Tuan Anh"]],"ViewPage":{"Fields":[{"AliasName":"id"},{"AliasName":"name"},{"AliasName":"ten"}]}}}';
+
 /** Cổng danh mục chỉ cho tỉnh Hà Nội, đủ để bản ghi mẫu qua cổng khi kéo về. */
 const CONG_HA_NOI = { map: {}, names: {}, valid: { '@CAT_TINH_THANH': { 'Hà Nội': true } }, warnings: [] };
 
@@ -56,6 +59,18 @@ function phienXongDaXacMinh(F) {
   datState(F, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
 }
 
+/**
+ * Lệnh mở xung đột như Sidebar chạy nó: lệnh mở một lượt mới nên cổng phiên hỏi phiên trước; hộp được liên kết tài khoản 2037 và câu hỏi phiên được trả bằng đúng tài khoản đó rồi trả kết quả mở kèm request đọc bản ghi xung đột (`probe` là request hỏi phiên, nếu có).
+ */
+function moXungDot(F) {
+  F.bindingRead = () => ({ spreadsheetId: F.currentSpreadsheetId(), userId: '2037', username: 'ANHLT', accountName: 'Le Tuan Anh' });
+  const opened = F.runSlice(() => F.runConflictOpenCommand());
+  if (!opened.request || opened.request.meta.kind !== 'session_probe') { return opened; }
+  const reply = { ok: true, status: 200, body: USER_BODY, transport: { contract: F.protocol.contract, trace: [{ requestId: opened.request.id, stage: 'fetch' }], captures: { pageUserId: '2037', pageAccountName: 'Le Tuan Anh' } } };
+  const next = F.runSlice(() => F.continue(reply));
+  return Object.assign({}, opened, { probe: opened.request, request: next.request, sessionReply: next });
+}
+
 /** Hộp có `ids.length` khách đã kéo về với tên gốc, rồi đổi tên Shin trên Sheet và kéo lại tên FBM khác: mọi dòng ở "xung đột chờ quyết". */
 function dungXungDot(ids, tenFbm) {
   const run = makeSync(), F = run.hop.FbmSync;
@@ -67,4 +82,4 @@ function dungXungDot(ids, tenFbm) {
   return { run, F, pull };
 }
 
-module.exports = { NO_CATEGORY, CONG_HA_NOI, COT_LUOI_KHACH, luoiTheoTen, khachMau, giaoDichMau, dongKhachFbm, luoiKhachXungDot, chotXungDot, giaTriFbmCua, giaTriShinCua, phienXongDaXacMinh, dungXungDot };
+module.exports = { NO_CATEGORY, CONG_HA_NOI, COT_LUOI_KHACH, luoiTheoTen, khachMau, giaoDichMau, dongKhachFbm, luoiKhachXungDot, chotXungDot, giaTriFbmCua, giaTriShinCua, phienXongDaXacMinh, dungXungDot, moXungDot };

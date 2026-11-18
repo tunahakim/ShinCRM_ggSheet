@@ -62,7 +62,7 @@ async function chay(so) {
     blockedByDeadline, deadlineState.phase, deadlineState.lastFailureCode, deadlineState.cursor.pageIndex, deadlineState.activeRequestId,
     deadlineLog.action, deadlineLog.detail && deadlineLog.detail.runId, deadlineLog.detail && deadlineLog.detail.phase, deadlineLog.detail && deadlineLog.detail.cursor && deadlineLog.detail.cursor.kind,
     deadlineUi.content.textContent.indexOf('Tạm dừng') >= 0
-  ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'slice_limit', 'runtime-limit', 'paused', 'customer_grid', true]);
+  ], [null, 'paused', 'GAS_RUNTIME_LIMIT', 4, '', 'slice_limit', 'runtime-limit', 'pull_customer', 'customer_grid', true]);
 
   const quotaData = {}, quotaLogs = [];
   let quotaFull = false;

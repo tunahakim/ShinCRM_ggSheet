@@ -308,8 +308,7 @@ FbmSync.staleReplyDrop = function (state, requestId, isError) {
 };
 
 /**
- * Extension không gửi được request tới tab FBM: qua `replyAdmit` (chỉ nhận lỗi của đúng request đang chờ), tra `transportRecoverPlan` rồi gọi công cụ cứu tương ứng; không cứu được thì đóng lượt lỗi với đúng mã Extension báo.
- * Giữ phiên chạy khi ô lượt chưa có mã lượt nên chưa đóng qua `runFail` được; nhánh đó đặt phase lỗi trực tiếp.
+ * Extension không gửi được request tới tab FBM: qua `replyAdmit` (chỉ nhận lỗi của đúng request đang chờ), tra `transportRecoverPlan` rồi gọi công cụ cứu tương ứng; không cứu được thì đóng lượt lỗi qua `runFail` với đúng mã Extension báo. Request chỉ phát trong lượt đang mở nên luôn có lượt để đóng; không có thì `runClose` ném `RUN_NOT_OPEN`.
  */
 FbmSync.transportFailureRun = function (payload) {
   var value = payload || {}, requestId = String(value.requestId || '');
@@ -329,11 +328,7 @@ FbmSync.transportFailureRun = function (payload) {
   state.lastProgressAt = Date.now();
   // Ghi Log khi lượt còn mở để dòng mang nhãn lượt; đóng lượt trước thì nhãn rơi về kênh gọi.
   FbmSync.transportFailureRecord(state, failureCode, failureMessage, 'transport_failure');
-  if (FbmSync.runInProgress(state)) {
-    FbmSync.runFail(state, failureCode, failureMessage, { cursor: {} });
-  } else {
-    Object.assign(state, { activeRequestId: '', deadlineAt: 0, lastFailureCode: failureCode, retryable: false, lastError: failureMessage, message: failureMessage, cursor: {}, phase: 'error' });
-  }
+  FbmSync.runFail(state, failureCode, failureMessage, { cursor: {} });
   FbmSync.stateWrite(state);
   return { ok: false, code: state.lastFailureCode, request: null, error: state.lastError };
 };
