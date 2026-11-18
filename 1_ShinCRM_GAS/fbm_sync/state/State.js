@@ -60,16 +60,6 @@ FbmSync.documentPropertySet = function (key, value, context) {
   failure.detail = detail;
   throw failure;
 };
-/** Đọc khóa gộp từ nhiều khóa cũ: khóa gộp chưa có mà còn khóa cũ thì ném mã chờ chuyển của hàm chuyển (`migrator`, mặc định `fbmStoresMigrate` với `FBM_STORES_MIGRATION_PENDING`), không đọc thành rỗng (rỗng thì lần ghi kế tiếp đè mất dữ liệu cũ). Hàm chuyển xóa khóa cũ. */
-FbmSync.mergedStoreRead = function (key, context, oldKeys, migrator) {
-  var stored = documentPropertyJson(FbmSync.props(), key, context, 'object');
-  if (stored) { return stored; }
-  var props = FbmSync.props(), left = oldKeys.filter(function (old) { return props.getProperty(old) !== null; });
-  var by = migrator || { name: 'fbmStoresMigrate', code: 'FBM_STORES_MIGRATION_PENDING' };
-  if (left.length) { var pending = new Error(context + ' chưa được chuyển từ ' + left.length + ' khóa cũ; chạy hàm chuyển ' + by.name + ' trước.'); pending.code = by.code; pending.detail = { keys: left }; throw pending; }
-  return null;
-};
-
 /** Khóa duy nhất của state/cursor đồng bộ (khóa script); không dùng DocumentLock vì WriteGate tự giữ khóa đó khi ghi Sheet. Không có khóa thay thế: thiếu khóa script thì lỗi to, không chạy không khóa. */
 FbmSync.orchestrationLock = function () { return LockService.getScriptLock(); };
 /** `waitMs` bỏ trống là hạn chờ chung; lệnh Dừng truyền 0 để không bao giờ chờ lát đang chạy. */

@@ -1,14 +1,14 @@
 /**
- * Cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu (ô gửi nguyên chuỗi, GAS kiểm, cả gói hoặc không gì), phạm vi khách chỉ định, xác nhận lịch dày, khóa hỏng có lối đặt về mặc định, hàm chuyển một lần từ khóa kho đời cũ.
+ * Cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu (ô gửi nguyên chuỗi, GAS kiểm, cả gói hoặc không gì), phạm vi khách chỉ định, xác nhận lịch dày, khóa hỏng có lối đặt về mặc định.
  *
- * Nhánh hỏng âm thầm được kiểm kỹ nhất: lưu không đạt mà vẫn ghi một phần, công tắc tổng đổi khi tham số phiên sai, khóa hỏng rơi về mặc định rồi bị lưu đè, hàm chuyển ghi nửa chừng hoặc đè cài đặt mới.
+ * Nhánh hỏng âm thầm được kiểm kỹ nhất: lưu không đạt mà vẫn ghi một phần, công tắc tổng đổi khi tham số phiên sai, khóa hỏng rơi về mặc định rồi bị lưu đè.
  */
 const { section, check } = require('../../lib/assert');
 const { dungHop, TEP_NEN } = require('../../lib/dung-hop');
 const { trongLanGoi } = require('../../lib/gas/lan-goi');
 const { docLog } = require('../../lib/gas/doc-log');
 
-const TEP_LENH_CAI_DAT = ['fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js', 'fbm_sync/state/FbmSettingsMigrate.js'];
+const TEP_LENH_CAI_DAT = ['fbm_sync/state/PropertyBuffer.js', 'fbm_sync/state/State.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/PullDefaults.js', 'fbm_sync/control/SettingsCommands.js', 'fbm_sync/auth/LoginStores.js', 'fbm_sync/auth/LoginTools.js', 'fbm_sync/auth/AutoLogin.js', 'fbm_sync/auth/LoginRun.js'];
 const KHACH_SHEET = [{ id: 'CUS-020061', fbmCustomerCode: 'ALT00010' }, { id: 'CUS-020062', fbmCustomerCode: '' }];
 
 /** Hộp có cổng cài đặt và phần cài đặt FBM thật; các việc đi kèm (dừng lượt, trạng thái) được thay bằng bản ghi lại thứ tự gọi. */
@@ -148,53 +148,12 @@ function kiemKhoaHong(so) {
   check(so, 'sau khi đặt lại thì lưu bình thường', luu({ fbm_run: { approvalThreshold: '3' } }).ok, true);
 }
 
-const KHOA_CU = {
-  FBM_SYNC_ENABLED: 'false',
-  FBM_SYNC_SETTINGS_V1: JSON.stringify({ approvalThreshold: 3, scopeLimited: false, scopeCodes: ['ALT00010'], requestGapMinSeconds: 1, requestGapMaxSeconds: 2 }),
-  FBM_ACCOUNT_SETTINGS_V1: JSON.stringify({ customerPrefix: 'ALT', customerCodeLength: '8' }),
-  FBM_SYNC_EXTENSION_CONFIG_V1: JSON.stringify({ pollMinutes: 7, runOnStartup: false }),
-  // Thiếu `activityFull`: code cũ đọc tiến trình thiếu là bật, nên giá trị chuyển sang phải là bật dù mặc định mới là tắt.
-  FBM_SYNC_BACKGROUND_SCHEDULE_V1: JSON.stringify({ enabled: false, direction: 'write', heartbeat: { enabled: true, minutes: 5, priority: 100 }, customerFull: { enabled: false, minutes: 90, priority: 10 }, detail: { enabled: true, minutes: 45, priority: 30, customersPerRun: 12 } }),
-  FBM_LOGIN_CONFIG_V1: JSON.stringify({ enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 15, credentialRef: 'ref-thu-1234', public: { usernameHint: 'nguoi-dung-thu' }, lastError: '' })
-};
-
-function kiemChuyenMotLan(so) {
-  const { nen, hop } = dungCaiDatFbm(Object.assign({}, KHOA_CU));
-  const kq = hop.fbmSettingsMigrate();
-  check(so, 'hàm chuyển: sáu khóa cũ sang sáu phần, giá trị hiệu lực giữ đúng cách code cũ đọc',
-    [kq.ok, kq.sources, kq.sections, hop.settingsValues('fbm_master'), hop.settingsValues('fbm_run'), hop.settingsValues('fbm_account'), hop.settingsValues('fbm_extension'), hop.settingsValues('fbm_login_policy')],
-    [true, 6, 6, { enabled: false }, { approvalThreshold: 3, scopeLimited: false, scopeCodes: ['ALT00010'], requestGapMinSeconds: 1, requestGapMaxSeconds: 2 }, { customerPrefix: 'ALT', customerCodeLength: 8 }, { pollMinutes: 7, runOnStartup: false }, { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 15 }]);
-  const nen2 = hop.settingsValues('fbm_background');
-  check(so, 'lịch nền: tiến trình thiếu trong kho cũ chuyển sang là bật, chu kỳ thiếu lấy mặc định',
-    [nen2.enabled, nen2.direction, nen2.customerFullEnabled, nen2.customerFullMinutes, nen2.activityFullEnabled, nen2.activityFullMinutes, nen2.detailMinutes, nen2.detailCustomersPerRun], [false, 'write', false, 90, true, 480, 45, 12]);
-  const dangNhap = JSON.parse(nen.props.FBM_LOGIN_CONFIG_V1);
-  check(so, 'xóa khóa cũ; cấu hình đăng nhập chỉ bỏ phần chính sách, giữ credential',
-    [['FBM_SYNC_ENABLED', 'FBM_SYNC_SETTINGS_V1', 'FBM_ACCOUNT_SETTINGS_V1', 'FBM_SYNC_EXTENSION_CONFIG_V1', 'FBM_SYNC_BACKGROUND_SCHEDULE_V1'].filter((k) => nen.props[k] !== undefined), Object.keys(dangNhap).sort()],
-    [[], ['credentialRef', 'lastError', 'public']]);
-  check(so, 'chạy lại khi không còn khóa cũ thì báo không có gì để chuyển',
-    /không có gì/.test(hop.fbmSettingsMigrate().report[0]),
-    true);
-
-  const sai = dungCaiDatFbm(Object.assign({}, KHOA_CU, { FBM_SYNC_EXTENSION_CONFIG_V1: JSON.stringify({ pollMinutes: 99 }) }));
-  let loiSai = '';
-  try { sai.hop.fbmSettingsMigrate(); } catch (err) { loiSai = err.message; }
-  check(so, 'một giá trị cũ không đạt thì không chuyển gì, khóa cũ còn nguyên, lỗi nêu đúng ô',
-    [/Nhịp hỏi GAS/.test(loiSai), Object.keys(sai.nen.props).filter((k) => k.indexOf('SETTINGS:fbm_') === 0), sai.nen.props.FBM_SYNC_SETTINGS_V1 === KHOA_CU.FBM_SYNC_SETTINGS_V1], [true, [], true]);
-
-  const daCo = dungCaiDatFbm(Object.assign({}, KHOA_CU, { 'SETTINGS:fbm_run': JSON.stringify({ approvalThreshold: 20 }) }));
-  let loiDaCo = '';
-  try { daCo.hop.fbmSettingsMigrate(); } catch (err) { loiDaCo = err.message; }
-  check(so, 'phần mới đã có giá trị khác thì chặn, không đè cài đặt người dùng vừa đặt ở màn mới',
-    [/kho mới đã có/.test(loiDaCo), daCo.nen.props['SETTINGS:fbm_run'], daCo.nen.props.FBM_SYNC_ENABLED], [true, JSON.stringify({ approvalThreshold: 20 }), 'false']);
-}
-
 function chay(so) {
   section('FBM sync - cài đặt qua cổng chung');
   kiemLenhLuu(so);
   kiemTatTienTrinh(so);
   kiemNguongMayIm(so);
   kiemKhoaHong(so);
-  kiemChuyenMotLan(so);
 }
 
 module.exports = { chay };

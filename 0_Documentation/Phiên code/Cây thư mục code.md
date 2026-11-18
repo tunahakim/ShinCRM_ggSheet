@@ -50,7 +50,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │   │   ├── SettingsKinds.js      Bộ kiểu trường cố định (select, number, text, columnTypes, sortLevels, fieldDefaults): giá trị rỗng, chuẩn hóa và kiểm thuần của từng kiểu.
 │   │   ├── SettingsGate.js       Công cụ đọc, kiểm, ghi, tra một phần cài đặt. Tệp duy nhất chạm khóa SETTINGS:. Chưa có khóa thì mặc định, JSON hỏng thì ném.
 │   │   ├── SettingsService.js    Người điều phối: settingsSave (khóa, đọc, phủ, kiểm, ghi, tín hiệu nạp lại), kiểm ngầm định theo kênh nhập (settings_stale), gói config cho Sidebar, đường chữa cháy shinSettingsShow/shinLogTraceOff.
-│   │   └── SettingsMigrate.js    Công cụ một lần: chuyển sheet Config đời cũ sang cổng cài đặt, đọc lại khớp mới xóa sheet. Xóa cùng server/dev/ trước production.
 │   ├── diagnostic\
 │   │   └── CorePreflight.js       Checker nền tảng dùng chung cho cài đặt/Category; trả hợp đồng lỗi chuẩn cho các module, không biết nghiệp vụ FBM.
 │   ├── data\
@@ -277,9 +276,6 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── state\PropertyBuffer.js   Phần riêng của đồng bộ FBM trên `server/state/DocumentStore.js`: `FbmSync.props()` ghi gộp trước khi nhả khóa điều phối, trace ghi một lần; `withLocalSnapshot` mở một lần gọi cho preflight chạy ngoài `runEntryPoint` (đọc Sheet đi qua bản đọc chung `server/sheet/SheetReadCopy.js`).
     ├── state\Scope.js           Phạm vi khách của lượt (`scope`, `scopeResolve`) và khoảng nghỉ giữa hai request FBM (`requestGapMs`); mọi tham số khác đọc qua cổng cài đặt chung.
     ├── state\FbmSettings.js     Khai các phần cài đặt của đồng bộ FBM (công tắc tổng, tham số phiên, tài khoản, Extension, lịch nền, tự đăng nhập) cho cổng cài đặt chung và dựng lịch nền dạng theo tiến trình.
-    ├── state\FbmSettingsMigrate.js Chuyển cài đặt FBM từ các khóa kho cũ sang khóa của cổng cài đặt chung, một lần.
-    ├── state\FbmStoresMigrate.js  Chuyển khóa lịch nền, mốc khách, con trỏ Vòng xoay và liên kết đời cũ sang sổ tiến trình và kho kết nối, một lần; xóa khóa cũ và kho làm việc còn sót.
-    ├── state\FbmLoginMigrate.js  Chuyển một lần khóa đăng nhập gộp đời cũ sang hai kho đăng nhập, đọc lại so khớp rồi xóa khóa cũ; công cụ một lần, xóa cùng `server/dev/`.
     ├── state\PullDefaults.js     Phần cài đặt defaults_fbm_pull của fbm_sync (ngầm định Xác thực khi kéo khách từ FBM) và công cụ lấy ngầm định đã kiểm cho bản ghi mới kéo về.
     ├── state\Scheduler.js        Sổ tiến trình nền một khóa (lần xong, lần lỗi, số khách mốc, con trỏ Vòng xoay; một cổng đọc, một cổng ghi) và công cụ tính tiến trình nào đến hạn, không mở lượt.
     ├── state\BackgroundMachine.js Kho máy chạy nền (một máy được giao), kiểm máy hỏi có được chạy nền không, tự nhận thay máy im, bản xem máy cho Sidebar.
@@ -406,7 +402,6 @@ tests\
     ├── creatorField.js           Cột Người tạo trên FBM ở cửa ghi: người dùng tạo mới lấy USER_NAME của Cài đặt, không gõ đè được; nguồn pull ghi thẳng người tạo FBM.
     ├── entityRead.js             Tra cột theo mã chứ không theo thứ tự, hàng trắng bị đếm, và không giá trị nào còn là Date.
     ├── categoryRead.js           Cái bẫy @CAT_CHO_PHEP_FBM, và mọi trường SELECT đều tìm được danh mục của mình.
-    ├── settingsMigrate.js        Chuyển sheet Config cũ: đạt thì đủ khóa và xóa sheet; có vấn đề hay kho hỏng thì không ghi khóa nào, sheet còn nguyên.
     ├── idGate.js                 Bộ đếm cấp mã ở Document Properties: chưa có khóa thì cấp từ 1, khóa đã có thì cấp tiếp, giá trị hỏng thì dừng chứ không về 0.
     ├── dirtyState.js             Khối trạng thái bẩn KHÔNG BAO GIỜ được ném, kể cả khi tệp thuộc tính hỏng hoặc đọc dở dang.
     ├── sheetReadCopy.js          Bản đọc Sheet chung: chỉ nhớ trong một lần gọi, bỏ khi cầm khóa, cửa ghi và cửa xóa bỏ để lần đọc sau thấy số dòng mới.
@@ -497,7 +492,7 @@ tests\
     │   ├── BatchDecide.js         Hàm quyết của lô đọc chi tiết chạy trên dữ liệu dựng tay với mọi cổng kho đều ném; người điều phối thiếu đầu vào lớp thì ném `FBM_BATCH_SOURCE_MISSING`.
     │   ├── PullApplyInput.js      Cửa ghi kéo về nhận sổ chờ đẩy qua `ctx.pending` (thiếu thì ném), bản ghi thiếu dấu vân bị chặn trước khi ghi, phân tích response không sửa đầu vào.
     │   ├── PushConfig.js          Kiểm chặn cấu hình chiều đẩy: thiếu tên tài khoản, tiền tố, độ dài mã khách; mã khách tự sinh sai khuôn; người phụ trách giao dịch khác tài khoản.
-    │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và trigger hẹn giờ cũ còn sót tự gỡ.
+    │   ├── LegacyTrigger.js       Kiểm lịch nền mặc định và code đồng bộ không cài trigger hẹn giờ nào.
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
@@ -627,10 +622,10 @@ Vai trò Extension chỉ là cầu nối (transport bridge) và mọi quyết đ
 
 ## 2_ShinCRM_Extension
 
-    tests/cases/fbmSync/Settings.js  Kiểm cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu, khóa hỏng, hàm chuyển một lần từ khóa đời cũ.
+    tests/cases/fbmSync/Settings.js  Kiểm cài đặt đồng bộ FBM qua cổng cài đặt chung: lệnh lưu, khóa hỏng.
     tests/cases/fbmSync/StateStore.js  Kiểm kho trạng thái phiên đồng bộ khi DocumentProperties đầy hoặc hỏng.
     tests/cases/fbmSync/Stores.js  Kiểm các kho bền đã gộp: sổ tiến trình nền, kho kết nối, kho làm việc của lượt, sổ chờ xác nhận, sổ lỗi đẩy, hàm chuyển khóa cũ.
-    tests/cases/fbmSync/LoginStores.js  Kiểm hai kho đăng nhập và hàm chuyển `fbmLoginMigrate`: tách đúng, chạy lại không đổi, lỗi giữa chừng giữ khóa cũ, ghi dấu lần thử không khôi phục credential đã xóa.
+    tests/cases/fbmSync/LoginStores.js  Kiểm hai kho đăng nhập: tách đúng, ghi dấu lần thử không khôi phục credential đã xóa.
     tests/cases/fbmSync/LoginTools.js   Kiểm công cụ thuần của lượt đăng nhập: request từng bước, salt, lựa chọn, khóa trang, khớp danh tính, bảng cổng tự đăng nhập
 ```
 2_ShinCRM_Extension/content_scripts/model/live_model_reader.js Đọc mã khách từ lưới live của Sheets trong MAIN world; mã cột do Sidebar truyền, lỗi thì đóng an toàn.

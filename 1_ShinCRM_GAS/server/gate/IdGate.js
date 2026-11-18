@@ -14,7 +14,7 @@ var ID_GATE_PREFIXES = { customer: 'CUS-', activity: 'ACT-' };
 /** Số chữ số của phần đuôi. Đổi con số này là đổi khuôn mã của toàn bộ dữ liệu cũ, nên nó nằm đây một mình để không ai đổi nhầm. */
 var ID_GATE_DIGITS = 6;
 
-/** Khóa Document Properties giữ bộ đếm của từng thực thể. Tên giữ như dòng tham số cũ của sheet `Config` để hàm chuyển một lần (`settingsMigrateFromConfig`) nhận đúng giá trị cũ. */
+/** Khóa Document Properties giữ bộ đếm của từng thực thể. */
 var ID_GATE_COUNTER_KEYS = { customer: 'ID_COUNTER_CUSTOMER', activity: 'ID_COUNTER_ACTIVITY' };
 
 function idGateCounterKey(entity) {
@@ -73,14 +73,6 @@ function idGateCounterRead(entity) {
     return { current: Number(raw), stored: true };
   }
   return { current: 0, stored: false };
-}
-
-/** Nhận bộ đếm từ nơi lưu đời cũ (hàm chuyển từ sheet `Config`), chỉ khi kho mới chưa có khóa; kho mới đã có thì giữ nguyên để không kéo bộ đếm lùi. */
-function idGateAdoptCounter(entity, value) {
-  var key = idGateCounterKey(entity), props = documentProps();
-  if (props.getProperty(key) !== null) { return false; }
-  props.setProperty(key, String(idGateNumberOf(value)));
-  return true;
 }
 
 /** Bộ đếm của cả hai thực thể cho hợp đồng RAM `config.counters`, thứ client dùng để vẽ mã xem trước lên form. */

@@ -160,7 +160,7 @@ function chay(so) {
     ], [false, false, false]);
   });
 
-  // Cổng cài đặt: chỉ `SettingsGate.js` chạm khóa kho `SETTINGS:`, và không còn đường đọc sheet Config cũ ngoài hàm chuyển một lần.
+  // Cổng cài đặt: chỉ `SettingsGate.js` chạm khóa kho `SETTINGS:`, và không còn đường đọc sheet Config cũ.
   check(so, 'chỉ cổng cài đặt chạm khóa kho SETTINGS:', files.filter((file) => file !== 'server/settings/SettingsGate.js' && /['"]SETTINGS:/.test(stripNonCode(read(file)))), []);
   check(so, 'không còn đường đọc tham số sheet Config cũ', files.filter((file) => !file.startsWith('server/dev/') && /(?:configGet|configParams|configReadAll|resetSettingsCache)\s*\(/.test(stripNonCode(read(file)))), []);
 

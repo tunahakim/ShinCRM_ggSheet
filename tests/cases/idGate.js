@@ -10,7 +10,7 @@ const { section, check, checkThrows } = require('../lib/assert');
 function chay(so) {
   section('Bộ đếm cấp mã ở Document Properties');
 
-  // Chưa có khóa: tệp mới cấp từ 1; bộ đếm đời cũ trong sheet Config được hàm chuyển một lần nhận vào kho (`tests/cases/settingsMigrate.js`).
+  // Chưa có khóa: tệp mới cấp từ 1.
   const moiTinh = dungHop({ sheets: ['Log', 'Customer'] });
   check(so, 'chưa có khóa thì cấp mã từ 1 rồi ghi khóa vào Document Properties',
     [moiTinh.hop.idGateIssue('customer', 2, moiTinh.hop.entityReadContext('customer')), moiTinh.props.ID_COUNTER_CUSTOMER], [['CUS-000001', 'CUS-000002'], '2']);

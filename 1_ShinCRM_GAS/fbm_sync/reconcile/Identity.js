@@ -3,10 +3,9 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 /** Kho kết nối một khóa `{ binding, clearedFrom }`: liên kết Spreadsheet ↔ tài khoản FBM và dấu tài khoản vừa gỡ (chặn liên kết sang tài khoản khác khi Sheet còn dữ liệu). Không lưu cookie hay mật khẩu. */
 FbmSync.CONNECTION_KEY = 'FBM_CONNECTION_V1';
-FbmSync.CONNECTION_OLD_KEYS = ['FBM_SYNC_BINDING_V1', 'FBM_SYNC_BINDING_CLEAR_V1'];
 /** Cổng đọc duy nhất của kho kết nối; hỏng thì ném có mã, không coi như chưa liên kết (trả rỗng mở đường đọc khách không lọc quyền và hiện sai "chưa liên kết"). */
 FbmSync.connectionRead = function () {
-  var stored = FbmSync.mergedStoreRead(FbmSync.CONNECTION_KEY, 'Kho kết nối tài khoản FBM', FbmSync.CONNECTION_OLD_KEYS) || {}, pick = function (value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; };
+  var stored = documentPropertyJson(FbmSync.props(), FbmSync.CONNECTION_KEY, 'Kho kết nối tài khoản FBM', 'object') || {}, pick = function (value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; };
   return { binding: pick(stored.binding), clearedFrom: pick(stored.clearedFrom) };
 };
 /** Cổng ghi duy nhất của kho kết nối: cả hai phần rỗng thì xóa khóa. */

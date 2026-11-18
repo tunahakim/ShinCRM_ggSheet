@@ -30,7 +30,7 @@ const SESSION_SECRET_FILES = [
 /** Người điều phối (thiết kế 2.3): khung lượt, lệnh dừng, khung lát, lần hỏi của Extension, cửa lệnh và cửa relay cấp 1 (`EntryPoints.js`: `doPost`, `doGet`, `relayHandle`). Chỉ chúng được đọc/ghi state và ghi `logEvent`; chỗ gọi khác là ngoại lệ. */
 const STATE_ORCHESTRATORS = ['state/Run', 'state/RunStop', 'state/Slice', 'state/Heartbeat', 'control/ControlPort', 'transport/EntryPoints'].map((ten) => '1_ShinCRM_GAS/fbm_sync/' + ten + '.js');
 // Thêm bước đóng lời gọi `fbm_sync`, người điều phối các lệnh cài đặt và hàm chuyển cài đặt một lần.
-const LOG_WRITERS = STATE_ORCHESTRATORS.concat(['1_ShinCRM_GAS/server/service/FbmSyncService.js', '1_ShinCRM_GAS/fbm_sync/control/PushCommands.js', '1_ShinCRM_GAS/fbm_sync/control/SettingsCommands.js', '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js', '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js', '1_ShinCRM_GAS/fbm_sync/state/FbmLoginMigrate.js']);
+const LOG_WRITERS = STATE_ORCHESTRATORS.concat(['1_ShinCRM_GAS/server/service/FbmSyncService.js', '1_ShinCRM_GAS/fbm_sync/control/PushCommands.js', '1_ShinCRM_GAS/fbm_sync/control/SettingsCommands.js']);
 
 /** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
 const BASELINE_WRITERS = [];
@@ -146,8 +146,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 1,
     // Người đọc của status: đọc ô lượt một lần rồi giao cho bộ dựng thuần; bản nhẹ `toneView` lúc mở Sidebar đọc ô lượt một lần rồi giao cho `toneOf`.
     '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 2,
-    // Hàm chuyển kho một lần là cửa vào riêng: đọc pha để chặn khi đang có lượt; xóa cùng server/dev/.
-    '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js': 1,
     // `recountStart` đọc/ghi ô lượt sau `start` để câu báo đếm lại đè câu của cổng phiên; làm rỗng ở C8.6.
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 5,
     '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
@@ -169,7 +167,6 @@ const EXCEPTIONS = {
   },
   propertyWrite: {
     '1_ShinCRM_GAS/fbm_sync/read/ActivityLayers.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/state/FbmSettingsMigrate.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/State.js': 2,
     '1_ShinCRM_GAS/fbm_sync/transport/EntryPoints.js': 2
   },
@@ -183,8 +180,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/diagnostic/Trace.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 2,
     '1_ShinCRM_GAS/fbm_sync/report/Preflight.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1
+    '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2
   },
   phaseClose: {},
   baselineWrite: {

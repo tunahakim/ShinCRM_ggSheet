@@ -21,13 +21,13 @@ var DEV_RUNNER_ALLOWED = [
   'smokeTest', 'setupSheets', 'verifySheets',
   'seedFakeData', 'seedFakeCategory', 'seedFakeCategoryMappings', 'wipeFakeData', 'fbmPrepareAltTest', 'fbmSeedStuckCustomer', 'fbmSeedStuckActivity', 'fbmCheckStuckCreate', 'fbmRestoreStuckCustomer', 'fbmDevOpenBackgroundRun', 'fbmDevProbeStopBackground', 'fbmDevProbeStartAfterStale', 'fbmDevReleaseUnsentRequest', 'fbmProbeAltState', 'fbmPerfOn', 'fbmPerfOff', 'fbmPerfReport', 'fbmPerfTestScopeOn', 'fbmPerfTestScopeOff', 'fbmDevSetVerifyStatusDefault', 'fbmDevResetApprovalThreshold', 'fbmProbePayloadBudget', 'fbmPerfDropScopeActivities', 'fbmProbeStuckState', 'fbmScopeCreatedCustomer', 'fbmScopeDefaultCustomer', 'fbmSeedFakeDeletedCustomer', 'fbmEndFakeDeletedCustomer', 'fbmSeedConflict', 'fbmSeedActivityConflict', 'fbmDevMarkConflict', 'fbmDevClearConflict', 'fbmDevEditAltWebsite', 'fbmSeedActivityPush', 'fbmProbeCreateCustomer', 'fbmAllowTestCreateCustomer', 'fbmRequeueCreateCustomerConflict', 'fbmRequeueCreateCustomerPush', 'fbmAuditAltState', 'fbmProbePropertySizes', 'fbmProbeStoreSnapshot', 'fbmProbeStoreCost', 'fbmProbeReadNewSize', 'fbmProbeCustomerActivities', 'fbmProbeConflicts', 'fbmProbeScheduleMarkers', 'fbmDevAlignSheetTimezone', 'fbmProbeServiceUrl', 'fbmProbeSettingsReads', 'fbmProbeHashCompat',
   'dumpColumnMap', 'dumpSheetGrid', 'dumpNamedRanges', 'wipeNamedRanges', 'dumpCoreSheetHead', 'dumpRecentLog', 'probeBookBinding',
-  'devLogTraceOn', 'devLogTraceOff', 'settingsMigrateFromConfig', 'fbmSettingsMigrate', 'fbmStoresMigrate', 'fbmLoginMigrate', 'shinSettingsShow', 'shinLogTraceOff',
+  'devLogTraceOn', 'devLogTraceOff', 'shinSettingsShow', 'shinLogTraceOff',
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig',
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming', 'probeClientError',
   'probeSaveGate', 'probeHardDeleteGuards', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent',
   'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
-  'fbmDevStatus', 'fbmDevCancel', 'fbmDevTrace', 'fbmSyncStateProbe', 'fbmSupervisorTrigger'
+  'fbmDevStatus', 'fbmDevCancel', 'fbmDevTrace', 'fbmSyncStateProbe'
 ];
 
 /**

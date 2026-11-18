@@ -6,10 +6,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.CREDENTIAL_KEY = 'FBM_CREDENTIAL_V1';
 FbmSync.LOGIN_ATTEMPT_KEY = 'FBM_LOGIN_ATTEMPT_V1';
-/** Khóa đời cũ gộp cả hai kho; còn khóa này mà chưa có khóa mới thì cổng đọc ném, hàm chuyển `fbmLoginMigrate` tách và xóa. `FBM_LOGIN_CONFIG_V1` còn được hàm chuyển cài đặt cũ đọc. */
-FbmSync.LOGIN_CONFIG_KEY = 'FBM_LOGIN_CONFIG_V1';
-FbmSync.LOGIN_OLD_KEYS = [FbmSync.LOGIN_CONFIG_KEY, 'FBM_AUTO_LOGIN_LAST_ATTEMPT_V1'];
-FbmSync.LOGIN_MIGRATOR = { name: 'fbmLoginMigrate', code: 'FBM_LOGIN_MIGRATION_PENDING' };
 
 /** Dạng chuẩn của bản credential; thiếu ref hoặc bản mã thì là chưa cấu hình. */
 FbmSync.credentialShape = function (stored) {
@@ -24,7 +20,7 @@ FbmSync.credentialShape = function (stored) {
 };
 /** Cổng đọc duy nhất của kho credential. */
 FbmSync.credentialRead = function () {
-  return FbmSync.credentialShape(FbmSync.mergedStoreRead(FbmSync.CREDENTIAL_KEY, 'Kho credential đăng nhập FBM', FbmSync.LOGIN_OLD_KEYS, FbmSync.LOGIN_MIGRATOR));
+  return FbmSync.credentialShape(documentPropertyJson(FbmSync.props(), FbmSync.CREDENTIAL_KEY, 'Kho credential đăng nhập FBM', 'object'));
 };
 /** Cổng ghi duy nhất của kho credential. Chưa cấu hình thì ghi bản trống thay vì xóa khóa: xóa khóa là một lần gọi riêng sau `setProperties`, hỏng giữa hai lần thì liên kết đã đổi mà credential cũ còn. */
 FbmSync.credentialWrite = function (credential) {
@@ -38,7 +34,7 @@ FbmSync.loginAttemptShape = function (stored) {
 };
 /** Cổng đọc duy nhất của kho dấu lần thử. */
 FbmSync.loginAttemptRead = function () {
-  return FbmSync.loginAttemptShape(FbmSync.mergedStoreRead(FbmSync.LOGIN_ATTEMPT_KEY, 'Kho dấu lần thử đăng nhập FBM', FbmSync.LOGIN_OLD_KEYS, FbmSync.LOGIN_MIGRATOR));
+  return FbmSync.loginAttemptShape(documentPropertyJson(FbmSync.props(), FbmSync.LOGIN_ATTEMPT_KEY, 'Kho dấu lần thử đăng nhập FBM', 'object'));
 };
 /**
  * Công cụ tính (thuần): dấu lần thử sau một sự kiện. `attempt` lúc lượt đăng nhập bắt đầu: ghi sẵn lý do đường truyền, vì lượt hỏng giữa đường không về tới bước ghi lý do mà khóa chờ đã đặt. `success`: phiên xác minh được là bằng chứng mới nhất nên gỡ mọi khóa, kể cả sai mật khẩu. `failure`: `halt` khi FBM đã từ chối mà thử lại cũng không khá hơn. `saved`: lưu mật khẩu mới thì gỡ khóa ngừng và lý do, giữ hạn thử lại. `cleared`: credential bị xóa thì bỏ cả hạn thử lại, giữ mốc giờ.

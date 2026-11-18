@@ -9,8 +9,6 @@ if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
  */
 FbmSync.PROCESS_BOOK_KEY = 'FBM_SYNC_PROCESS_BOOK_V1';
 FbmSync.PROCESS_KINDS = ['customerFull', 'activityFull', 'detail', 'heartbeat'];
-/** Khóa cũ trước khi gộp sổ; còn khóa nào mà sổ chưa có thì cổng đọc ném, không đọc thành sổ rỗng (lịch nền chạy lại hết, mốc khách mất). */
-FbmSync.PROCESS_BOOK_OLD_KEYS = ['FBM_SYNC_DONE_CUSTOMER_FULL_SCAN', 'FBM_SYNC_DONE_ACTIVITY_FULL_SCAN', 'FBM_SYNC_DONE_DETAIL_SCAN', 'FBM_SYNC_DONE_HEARTBEAT', 'FBM_SYNC_RETRY_CUSTOMER_FULL_SCAN', 'FBM_SYNC_RETRY_ACTIVITY_FULL_SCAN', 'FBM_SYNC_RETRY_DETAIL_SCAN', 'FBM_SYNC_RETRY_HEARTBEAT', 'FBM_SYNC_CUSTOMER_BASELINE_V1', 'FBM_SYNC_DETAIL_CURSOR_V1'];
 /** Chuẩn hóa sổ đã lưu (thiếu mục nào thì mục đó là "chưa từng chạy"). Hàm thuần. */
 FbmSync.processBookShape = function (stored) {
   var book = {}, source = stored || {}, count = function (value) { var n = Number(value); return isFinite(n) && n > 0 ? n : 0; };
@@ -27,7 +25,7 @@ FbmSync.processBookShape = function (stored) {
 };
 /** Cổng đọc duy nhất của sổ. Đọc một lần mỗi lời gọi rồi truyền cho các công cụ tính. */
 FbmSync.processBookRead = function () {
-  return FbmSync.processBookShape(FbmSync.mergedStoreRead(FbmSync.PROCESS_BOOK_KEY, 'Sổ tiến trình nền', FbmSync.PROCESS_BOOK_OLD_KEYS));
+  return FbmSync.processBookShape(documentPropertyJson(FbmSync.props(), FbmSync.PROCESS_BOOK_KEY, 'Sổ tiến trình nền', 'object'));
 };
 /** Cổng ghi duy nhất của sổ. */
 FbmSync.processBookWrite = function (book) { return FbmSync.propertyJsonWrite(FbmSync.PROCESS_BOOK_KEY, FbmSync.processBookShape(book)); };
@@ -110,27 +108,3 @@ FbmSync.scheduleNextAt = function (schedule, book) {
   var times = FbmSync.PROCESS_KINDS.filter(function (kind) { return schedule[kind].enabled; }).map(function (kind) { return FbmSync.processDueAt(kind, schedule, book); });
   return times.length ? Math.min.apply(null, times) : 0;
 };
-
-/**
- * Handler của các trigger hẹn giờ phía GAS ở thiết kế cũ. Nhịp nền nay chỉ do alarm `gas_poll` của Extension (09/02), GAS không cài trigger hẹn giờ nào cho đồng bộ.
- * Google không tự gỡ trigger đã cài khi code đổi, nên tên hàm phải còn: trigger sót gọi tới thì tự xóa mọi trigger cũ và ghi Log, không làm việc nghiệp vụ nào. Bỏ tên hàm thì trigger sót báo lỗi "không tìm thấy hàm" mãi.
- */
-FbmSync.LEGACY_TRIGGER_HANDLERS = ['fbmHeartbeatTrigger', 'fbmCustomerScanTrigger', 'fbmActivityScanTrigger', 'fbmSupervisorTrigger'];
-FbmSync.removeLegacyTriggers = function () {
-  var removed = [];
-  ScriptApp.getProjectTriggers().forEach(function (trigger) {
-    var handler = trigger.getHandlerFunction();
-    if (FbmSync.LEGACY_TRIGGER_HANDLERS.indexOf(handler) >= 0) { ScriptApp.deleteTrigger(trigger); removed.push(handler); }
-  });
-  if (removed.length) {
-    logEvent({ source: 'fbm_sync', action: 'legacy_trigger_removed', outcome: typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', reason: 'Đã gỡ ' + removed.length + ' trigger hẹn giờ của thiết kế cũ (' + removed.join(', ') + '); nhịp nền chỉ còn do Extension hỏi GAS.' });
-  }
-  return { ok: true, removed: removed };
-};
-function fbmLegacyTriggerEntry(name) {
-  return runEntryPoint(name, 'fbm_sync', function () { return FbmSync.removeLegacyTriggers(); });
-}
-function fbmHeartbeatTrigger() { return fbmLegacyTriggerEntry('fbmHeartbeatTrigger'); }
-function fbmCustomerScanTrigger() { return fbmLegacyTriggerEntry('fbmCustomerScanTrigger'); }
-function fbmActivityScanTrigger() { return fbmLegacyTriggerEntry('fbmActivityScanTrigger'); }
-function fbmSupervisorTrigger() { return fbmLegacyTriggerEntry('fbmSupervisorTrigger'); }
