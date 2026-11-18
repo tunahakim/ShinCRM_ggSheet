@@ -157,15 +157,21 @@ function selectionIsFreeSheet(sheetName) {
   return !!name && name.charAt(0) !== '!' && [ENTITY_SHEETS.customer, ENTITY_SHEETS.activity, 'Category'].indexOf(name) < 0;
 }
 
-/** Cột mã khách của sheet xem tự do, từ đúng một lần đọc hàng 1: `@CUS_MA_KH` trước, thiếu thì `@ACT_MA_KH`. Mã thiếu hoặc bị nhân đôi thì bỏ, không đoán. Chỉ dùng khi không có Extension đọc. */
-function selectionFreeSheetColumn(sheet) {
+/**
+ * Cột mã khách cho ô đang chọn trên sheet xem tự do, từ đúng một lần đọc hàng 1. Sheet tự do được chứa nhiều danh sách cạnh nhau, mỗi danh sách mở đầu bằng một cột mã.
+ * Một luật, quyết bằng vị trí: cột mã gần nhất bên trái ô (kể cả chính nó); ô trước cột mã đầu tiên thuộc cột mã đầu tiên. Sidebar áp cùng luật ở `sheetLinkFreeSheetCodeColumn`; test giữ hai nơi cho cùng kết quả. Chỉ dùng khi không có Extension đọc.
+ */
+function selectionFreeSheetColumn(sheet, column) {
   var header = sheetReadHeader(sheet);
   var codes = [DATA_SCHEMA.customer.id.code, DATA_SCHEMA.activity.customerId.code];
-  for (var i = 0; i < codes.length; i++) {
-    var first = header.indexOf(codes[i]);
-    if (first >= 0 && header.indexOf(codes[i], first + 1) < 0) { return first + 1; }
+  var first = 0;
+  var left = 0;
+  for (var i = 0; i < header.length; i++) {
+    if (codes.indexOf(header[i]) < 0) { continue; }
+    if (!first) { first = i + 1; }
+    if (i + 1 <= column) { left = i + 1; }
   }
-  return 0;
+  return left || first;
 }
 
 /** Kế hoạch đọc thô: Extension chỉ đọc đúng địa chỉ và trả giá trị, không biết token có ý nghĩa gì. */
@@ -288,7 +294,7 @@ function selectionCustomerCell(context, snapshot) {
   } else if (snapshot.sheetName === ENTITY_SHEETS.activity) {
     column = selectionColumnIndex(context.sheet, DATA_SCHEMA.activity.customerId.code);
   } else if (selectionIsFreeSheet(snapshot.sheetName)) {
-    column = selectionFreeSheetColumn(context.sheet);
+    column = selectionFreeSheetColumn(context.sheet, snapshot.col);
   }
   if (!column) { return { read: true, value: '' }; }
   var cell = sheetGridReadBlock(context.sheet, snapshot.row, 1, 1, column);

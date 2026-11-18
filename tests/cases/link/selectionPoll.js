@@ -157,7 +157,7 @@ async function chay(so) {
   free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(1, 4) });
   check(so, 'sheet tự do lần đầu: plan có khóa đúng tên sheet chép từ mẫu !, 0 lời hỏi GAS, 0 hẹn giờ, không băng cảnh báo',
     [free.sheetLinkPlanForSheet('Bao cao'), free._calls.length, chayHenGio(free, 1000), free._banner.hidden], [mauView, 0, null, true]);
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(2, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, value: 'CUS-000005' }] }) });
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(2, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, valueAddress: 'C5', value: 'CUS-000005' }] }) });
   check(so, 'sheet tự do có hàng 1: plan chỉ giữ mã có thật, đúng cột theo hàng 1; mẫu ! không đổi; mở đúng khách, 0 lời hỏi',
     [free.sheetLinkPlanForSheet('Bao cao'), free.SHEET_LINK_READ_PLAN['!'], pickedFree, free._calls.length],
     [[{ token: '!:@CUS_MA_KH', headerAddress: 'C1', expectedValue: '@CUS_MA_KH', valueAddressTemplate: 'C{row}' }], mauView, ['CUS-000005'], 0]);
@@ -175,7 +175,7 @@ async function chay(so) {
   // Lời hỏi rẻ: Extension đang đọc được ở sheet hiện tại thì Sidebar bảo GAS khỏi mở bảng tính.
   const hoiRe = () => { free._calls = []; free.SHEET_LINK_SELECTION_PENDING = null; free.sheetLinkProbeSelectionAndReload('signal', { silent: true }); return free._calls[0].args[0].skipPosition; };
   const reKhongMa = hoiRe();
-  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(6, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, value: 'CUS-000005' }] }) });
+  free.sheetLinkOnMessage({ origin: free.SHEET_LINK_ORIGIN, data: freeContext(6, 5, { readStatus: 'ok', readReason: '', rawHeaderRow: [{ address: 'C1', column: 3, value: '@CUS_MA_KH' }], reads: [{ token: '!:@CUS_MA_KH', status: 'ok', matched: true, valueAddress: 'C5', value: 'CUS-000005' }] }) });
   const reDocDuoc = hoiRe();
   free._clock.now = 5001 + 60000;
   const reExtChet = hoiRe();

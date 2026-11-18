@@ -277,8 +277,12 @@ function chay(so) {
     hop.probeSelectionAndReload({}).customerId,
     'CUS-000041');
   state.sheetName = 'Trung ma';
-  const trung = hop.probeSelectionAndReload({});
-  check(so, 'sheet tự do có @CUS_MA_KH bị nhân đôi: không đoán cột, dùng @ACT_MA_KH', trung.customerId, 'CUS-000043');
+  const trungTrai = hop.probeSelectionAndReload({}).customerId;
+  Object.assign(state, { col: 2, colEnd: 2 });
+  const trungGiua = hop.probeSelectionAndReload({}).customerId;
+  Object.assign(state, { col: 1, colEnd: 1 });
+  check(so, 'sheet tự do nhiều cột mã (nhiều danh sách): mỗi ô đọc cột mã gần nhất bên trái, qua đường GAS đầy đủ',
+    [trungTrai, trungGiua], ['CUS-000001', 'CUS-000002']);
   state.sheetName = 'Khong ma';
   const khongMa = hop.probeSelectionAndReload({});
   check(so, 'sheet tự do không có cột mã: mã rỗng, không lấy nhầm ô trông giống mã', khongMa.customerId, '');

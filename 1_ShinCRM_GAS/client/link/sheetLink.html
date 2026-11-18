@@ -135,12 +135,16 @@ function sheetLinkRefreshViewReadPlan(context) {
   var dynamic = current;
   if (headers.length) {
     var template = free ? SHEET_LINK_READ_PLAN['!'] : current;
-    dynamic = template.map(function (item) {
-      var match = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); })[0];
-      if (!match) { return free ? null : item; }
-      var letters = sheetLinkColumnLetters(match.column);
-      return Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: letters + '{row}' });
-    }).filter(Boolean);
+    dynamic = [];
+    template.forEach(function (item) {
+      var matches = headers.filter(function (header) { return String(header.value || '').trim() === String(item.expectedValue || '').trim(); });
+      // Sheet tự do được chứa nhiều danh sách, mỗi danh sách một cột mã: đọc mọi cột mã của hàng, `sheetLinkFreeSheetCodeColumn` chọn ô. Sheet `!` do GAS vẽ, chỉ một cột mỗi mã.
+      if (!free) { matches = matches.slice(0, 1); }
+      if (!matches.length) { if (!free) { dynamic.push(item); } return; }
+      matches.forEach(function (match) {
+        dynamic.push(Object.assign({}, item, { headerAddress: match.address, valueAddressTemplate: sheetLinkColumnLetters(match.column) + '{row}' }));
+      });
+    });
   }
   if (free && !SHEET_LINK_FREE_SHEETS[name]) { SHEET_LINK_FREE_SHEETS[name] = true; }
   else if (JSON.stringify(dynamic) === JSON.stringify(SHEET_LINK_READ_PLAN[key])) { return; }
@@ -652,6 +656,13 @@ function sheetLinkSelectionCode(ctx) {
   }
   if (ctx.readReason === 'LIVE_GRID_CONFLICT') { return null; }
   var cells = ctx.reads.filter(function (read) { return read && read.valueAddress && read.matched === true; });
+  var target = sheetLinkFreeSheetCodeColumn(ctx);
+  if (target === 0) { return ''; }
+  if (target > 0) {
+    cells = cells.filter(function (read) { return sheetLinkAddressColumn(read.valueAddress) === target; });
+    // Cột đích có ở hàng 1 mà chưa có ô đọc: plan chưa kịp theo hàng 1, chờ Extension đọc lại thay vì lấy ô của danh sách khác.
+    if (!cells.length) { return null; }
+  }
   // Không có ô mã nào: Extension đọc trọn (`ok`) thì chỗ này không có cột mã; đọc hỏng thì chưa biết.
   if (!cells.length) { return ctx.readStatus === 'ok' ? '' : null; }
   var absentIsEmpty = sheetLinkIsFreeSheet(ctx.sheetName);
@@ -671,7 +682,43 @@ function sheetLinkSelectionMiss(ctx) {
   return code ? { kind: 'notFound', code: code } : { kind: 'empty' };
 }
 
+/** Số cột của địa chỉ ô kiểu `AB7`; không phải địa chỉ thì 0. */
+function sheetLinkAddressColumn(address) {
+  var match = String(address || '').trim().toUpperCase().match(/^([A-Z]+)[0-9]+$/);
+  if (!match) { return 0; }
+  var result = 0;
+  for (var i = 0; i < match[1].length; i++) { result = result * 26 + match[1].charCodeAt(i) - 64; }
+  return result;
+}
+
+/**
+ * Cột mã của ô đang chọn trên sheet xem tự do, quyết từ hàng 1 Extension gửi chứ không từ các ô đã đọc (plan có thể chưa theo kịp hàng 1 và thiếu đúng cột cần).
+ * Cùng luật với `selectionFreeSheetColumn` của GAS: cột mã gần nhất bên trái ô (kể cả chính nó); ô trước cột mã đầu tiên thuộc cột mã đầu tiên.
+ * Trả -1 khi luật không áp (không phải sheet tự do, hoặc chưa có hàng 1), 0 khi hàng 1 không có cột mã nào.
+ */
+function sheetLinkFreeSheetCodeColumn(ctx) {
+  var headers = Array.isArray(ctx && ctx.rawHeaderRow) ? ctx.rawHeaderRow : [];
+  if (!headers.length || !sheetLinkIsFreeSheet(ctx.sheetName)) { return -1; }
+  var codes = (SHEET_LINK_READ_PLAN['!'] || []).map(function (item) { return String(item.expectedValue || '').trim(); });
+  var coordinates = sheetLinkParseNameBox(ctx.cellRef);
+  var selected = coordinates ? coordinates.col : Number(ctx.col) || 0;
+  var first = 0;
+  var left = 0;
+  headers.forEach(function (header) {
+    var column = Number(header && header.column) || 0;
+    if (!column || codes.indexOf(String(header.value || '').trim()) < 0) { return; }
+    if (!first || column < first) { first = column; }
+    if (column <= selected && column > left) { left = column; }
+  });
+  return left || first;
+}
+
 function sheetLinkCustomerIdFromContext(ctx) {
+  // Sheet tự do có thể có nhiều cột mã trong một hàng: chỉ ô do luật chọn mới là khách của hàng.
+  if (sheetLinkFreeSheetCodeColumn(ctx) >= 0) {
+    var picked = sheetLinkSelectionCode(ctx);
+    return picked && Store.hasCustomer(picked) ? picked : '';
+  }
   var reads = Array.isArray(ctx && ctx.reads) ? ctx.reads : [];
   for (var i = 0; i < reads.length; i++) {
     var read = reads[i] || {};
