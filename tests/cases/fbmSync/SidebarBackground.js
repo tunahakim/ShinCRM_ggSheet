@@ -76,7 +76,7 @@ async function testNutXMoiThaoTac(so) {
   const tuDien = await ban(() => {}, (hop) => hop.fbmSyncAutoFill());
   const xungDot = await ban((hop) => {
     hop.FBM_SYNC_CLIENT.conflict = null; hop.FBM_SYNC_CLIENT.conflictOpening = false;
-    hop.FBM_SYNC_CLIENT.lastStatus = statusGas({ phase: 'conflict', metadata: { conflictCount: 2 } });
+    hop.FBM_SYNC_CLIENT.lastStatus = statusGas({ phase: 'done', metadata: { conflictCount: 2 } });
     hop.FBM_SYNC_CLIENT.resultsTab = 'conflict';
   }, (hop) => hop.fbmSyncConflictTabLoad());
   check(so, 'Nút X: màn quay về như vừa mở và vẽ bằng status thật GAS, chỉ một lần gọi lệnh gốc (kiểm liên kết, tự điền, tab Xung đột)',

@@ -11,7 +11,7 @@ const { compareExceptions } = require('../../lib/quet/ngoai-le');
 const { listFiles, collectFiles, readSource } = require('../../lib/quet/pham-vi-fbm');
 
 /** Tên phase lấy từ `fbm_sync/state/State.js` (ACTIVE_PHASES, TERMINAL_PHASES, `idle`, `awaiting_approval`); chỉ tệp đó được giữ danh sách phase. */
-const PHASE_NAMES = ['idle', 'checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'awaiting_approval', 'done', 'error', 'paused', 'conflict'];
+const PHASE_NAMES = ['idle', 'checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'awaiting_approval', 'done', 'error', 'paused'];
 const PHASE_OWNER = '1_ShinCRM_GAS/fbm_sync/state/State.js';
 
 /** Tệp cổng kho DocumentProperties của luồng FBM: chỉ nó được `setProperty`/`deleteProperty` trực tiếp. */
@@ -115,7 +115,7 @@ const RULES = [
   {
     // Mọi đường kết thúc lượt đi qua `runClose`/`runFail`: đặt thẳng phase cuối thì bỏ qua việc đóng bước, nhả sổ bận và loại request đang bay.
     id: 'phaseClose', title: 'phase cuối chỉ đặt trong runClose', scope: ['gas'], allow: STATE_ORCHESTRATORS,
-    find: (file, src) => matchAll(src, /\.phase\s*=\s*'(?:done|error|paused|conflict)'/)
+    find: (file, src) => matchAll(src, /\.phase\s*=\s*'(?:done|error|paused)'/)
   },
   {
     id: 'baselineWrite', title: 'baseline (fbmHash) chỉ được ghi ở ba công cụ áp kết quả', scope: ['gas'], allow: BASELINE_WRITERS,
@@ -186,10 +186,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2,
     '1_ShinCRM_GAS/fbm_sync/state/Scheduler.js': 1
   },
-  // Còn lại: Giữ phiên và đăng nhập tự động chạy ngoài lượt (B6 viết thành heartbeatRun mở lượt riêng), chuyển trạng thái xung đột sau khi lượt đóng, và đối tượng status (không phải ô lượt).
-  phaseClose: {
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 3
-  },
+  phaseClose: {},
   baselineWrite: {
     '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js': 6,

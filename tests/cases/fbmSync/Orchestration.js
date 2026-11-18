@@ -41,8 +41,7 @@ async function chay(so) {
     ['identity check chi quet Customer va doi soat lien ket', { mode: 'check', scan: 'identity_check', phase: 'pull_customer', cursor: { kind: 'customer_grid' } }, 'identity_check', ['done', 'current', 'pending']],
     ['login test sau login chuyen sang kiem tra phien', { mode: 'read', scan: 'full', phase: 'checking_session', cursor: { kind: 'login', step: 'authorize' } }, 'login_test', ['done', 'current', 'pending']],
     ['preflight loi khong tu nhan bat ky buoc FBM nao da xong', { mode: 'read', scan: 'full', phase: 'error', cursor: {} }, 'read', ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']],
-    ['tam dung o Activity giu dung cac buoc da xong', { mode: 'read', scan: 'full', phase: 'paused', cursor: { kind: 'activity_grid' } }, 'read', ['done', 'done', 'done', 'paused', 'pending', 'pending']],
-    ['xung dot dung tai doi soat va khong hoan tat Sheet', { mode: 'read', scan: 'full', phase: 'conflict', cursor: {} }, 'read', ['done', 'done', 'done', 'done', 'error', 'pending']]
+    ['tam dung o Activity giu dung cac buoc da xong', { mode: 'read', scan: 'full', phase: 'paused', cursor: { kind: 'activity_grid' } }, 'read', ['done', 'done', 'done', 'paused', 'pending', 'pending']]
   ].forEach((item) => {
     const pipeline = orchestration.FbmSync.pipelineView(item[1]);
     check(so, 'ma tran pipeline ' + item[0],
@@ -51,7 +50,7 @@ async function chay(so) {
   });
   // State V1 cũ còn danh sách conflict và khóa sync: phiên mới bỏ cả hai, chỉ giữ số đếm; hàng đợi thật nằm trên Sheet (FBM-024).
   const legacyConflict = orchestration.FbmSync.stateRead();
-  legacyConflict.phase = 'conflict';
+  legacyConflict.phase = 'done';
   legacyConflict.metadata.conflicts = [{ entity: 'activity', id: 'ACT-KEEP', fields: [{ field: 'details', left: 'x'.repeat(500), right: 'y'.repeat(500) }] }];
   legacyConflict.metadata.conflictCount = 1;
   legacyConflict.counts.conflict = 1;
@@ -65,13 +64,13 @@ async function chay(so) {
     [false, false, 1, 0, false]);
   orchestration.FbmSync.readLocal = () => [];
   const restartFromConflict = orchestration.FbmSync.stateRead();
-  restartFromConflict.phase = 'conflict';
+  restartFromConflict.phase = 'done';
   restartFromConflict.metadata.conflictCount = 1;
   restartFromConflict.counts.conflict = 1;
   orchestration.FbmSync.stateWrite(restartFromConflict);
    datState(orchestration.FbmSync, { session: { expired: false, sessionId: 'verified-session', identityVerified: true, identitySessionId: 'verified-session' } });
    const restartedConflict = orchestration.FbmSync.runSlice(() => orchestration.FbmSync.start({ mode: 'read' }, orchestration.FbmSync.stateRead())); restartedConflict.status = orchestration.FbmSync.statusView();
-   check(so, 'bam Dong bo ngay khi phase conflict phai probe lai phien; so xung dot ton dong van hien',
+   check(so, 'bam Dong bo ngay khi con xung dot ton dong phai probe lai phien; so xung dot ton dong van hien',
      [restartedConflict.ok, restartedConflict.request.meta.kind, restartedConflict.status.metadata.conflictCount, restartedConflict.status.counts.conflict],
      [true, 'session_probe', 1, 0]);
   orchestration.FbmSync.stateWrite(orchestration.FbmSync.runOpen({ phase: 'idle' }));

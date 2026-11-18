@@ -44,7 +44,6 @@ FbmSync.runOpen = function (spec) {
  */
 FbmSync.RUN_VERDICTS = {
   done: { phase: 'done' },
-  conflict: { phase: 'conflict' },
   paused: { phase: 'paused' },
   cancelled: { phase: 'paused', message: 'Đã dừng lượt đồng bộ theo yêu cầu; kết quả và log của lượt này vẫn được giữ để xem lại.', reason: 'dừng theo yêu cầu người dùng' },
   stopped: { phase: 'paused', message: 'Đã dừng đồng bộ nền theo yêu cầu; có thể chạy lượt thủ công.', reason: 'dừng lượt nền theo yêu cầu người dùng' },
@@ -90,12 +89,12 @@ FbmSync.runClose = function (state, verdict, detail) {
  */
 FbmSync.RUN_CLOSE_MARKS = ['customerTotal', 'customerScope', 'rotationCursor'];
 /**
- * Kết quả lượt nền vừa đóng với tiến trình của nó: `done` (xong, kể cả dừng ở xung đột vì phần đọc đã chạy hết), `failed` (lỗi, hoặc tạm dừng có mã), `dropped` (dừng không phải lỗi: người dùng dừng lượt nền để chạy lượt tay, tiến trình chạy lại ở lần hỏi sau). Lượt còn chạy hoặc không phải lượt nền của tiến trình nào thì `''`.
+ * Kết quả lượt nền vừa đóng với tiến trình của nó: `done` (xong; lượt không dừng vì xung đột), `failed` (lỗi, hoặc tạm dừng có mã), `dropped` (dừng không phải lỗi: người dùng dừng lượt nền để chạy lượt tay, tiến trình chạy lại ở lần hỏi sau). Lượt còn chạy hoặc không phải lượt nền của tiến trình nào thì `''`.
  */
 FbmSync.processOutcome = function (state) {
   if (!state || state.origin !== 'background' || !state.process || FbmSync.runInProgress(state)) { return ''; }
   var phase = String(state.phase || '');
-  if (phase === 'done' || phase === 'conflict') { return 'done'; }
+  if (phase === 'done') { return 'done'; }
   if (phase === 'error') { return 'failed'; }
   if (phase === 'paused') { return state.lastFailureCode ? 'failed' : 'dropped'; }
   return '';

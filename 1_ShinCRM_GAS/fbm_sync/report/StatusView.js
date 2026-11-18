@@ -76,7 +76,7 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
   }
   if (phase === 'pull_customer') { return available.customer ? 'customer' : ''; }
   if (phase === 'pull_activity') { return available.activity ? 'activity' : ''; }
-  if (phase === 'reconcile' || phase === 'conflict') { return available.reconcile ? 'reconcile' : ''; }
+  if (phase === 'reconcile') { return available.reconcile ? 'reconcile' : ''; }
   if (phase === 'push') { return available.record ? 'record' : ''; }
   if (phase === 'checking_session') { return available.login && kind === 'login' ? 'login' : 'session'; }
   return '';
@@ -85,12 +85,12 @@ FbmSync.pipelineCurrentStep = function (state, definition) {
 FbmSync.pipelineView = function (state) {
   var value = state || {}, phase = String(value.phase || 'idle'), definition = FbmSync.pipelineDefinition(value), current = FbmSync.pipelineCurrentStep(value, definition), currentIndex = -1;
   (definition.steps || []).forEach(function (step, index) { if (step.id === current) { currentIndex = index; } });
-  var title = phase === 'idle' ? 'Pipeline sẽ chạy' : phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : phase === 'conflict' ? 'Pipeline dừng để xử lý xung đột' : 'Pipeline đang chạy';
+  var title = phase === 'idle' ? 'Pipeline sẽ chạy' : phase === 'done' ? 'Pipeline đã hoàn tất' : phase === 'error' ? 'Pipeline dừng vì lỗi' : phase === 'paused' ? 'Pipeline đã tạm dừng' : 'Pipeline đang chạy';
   return {
     kind: definition.kind,
     title: title,
     steps: (definition.steps || []).map(function (step, index) {
-      var stepState = phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' || phase === 'conflict' ? 'error' : phase === 'paused' ? 'paused' : 'current') : 'pending';
+      var stepState = phase === 'done' ? 'done' : index < currentIndex ? 'done' : index === currentIndex ? (phase === 'error' ? 'error' : phase === 'paused' ? 'paused' : 'current') : 'pending';
       return { id: step.id, label: step.label, state: stepState };
     })
   };
@@ -120,7 +120,7 @@ FbmSync.toneOf = function (state, enabled, now) {
   if (enabled !== true) { return 'off'; }
   if (FbmSync.staleRunCheck(state, now)) { return 'error'; }
   if (FbmSync.ACTIVE_PHASES.indexOf(phase) >= 0) { return 'running'; }
-  return phase === 'paused' || phase === 'conflict' ? 'paused' : phase === 'error' ? 'error' : 'idle';
+  return phase === 'paused' ? 'paused' : phase === 'error' ? 'error' : 'idle';
 };
 /** Bản nhẹ lúc mở Sidebar: chỉ `tone` và `updatedAt` để Sidebar bỏ được bản cũ hơn tin relay về trước. Kho state hỏng thì `tone` lỗi và một dòng Log như `statusReadSafe`, không làm hỏng lượt nạp lõi. */
 FbmSync.toneView = function () {

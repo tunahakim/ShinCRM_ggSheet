@@ -6,7 +6,7 @@ FbmSync.STALE_RUN_MS = 2 * 60 * 1000;
 /** Phiên bản logic của state trong cùng khóa kho. State thiếu số này là bản cũ: lượt đang dở của nó bị dừng ở `staleRunCheck`, không chạy tiếp mù trên cấu trúc cũ. */
 FbmSync.STATE_SCHEMA_VERSION = 3;
 FbmSync.ACTIVE_PHASES = ['checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push'];
-FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused', 'conflict'];
+FbmSync.TERMINAL_PHASES = ['done', 'error', 'paused'];
 /** Lượt còn dở (phase không phải `idle` hay trạng thái cuối); chờ chấp thuận không phải đang chạy vì lượt chạm ngưỡng kết thúc bình thường. Lượt đã kết thúc ở bất kỳ trạng thái cuối nào, kể cả tạm dừng vì tự đăng nhập bị từ chối, không chặn lịch nền mở lượt mới. */
 FbmSync.runInProgress = function (state) { return !!(state && state.runId) && ['idle'].concat(FbmSync.TERMINAL_PHASES).indexOf(String(state.phase || '')) < 0; };
 FbmSync.DONE_MESSAGE = 'Đồng bộ hoàn tất.';

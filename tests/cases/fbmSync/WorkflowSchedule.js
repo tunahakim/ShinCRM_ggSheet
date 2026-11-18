@@ -90,12 +90,6 @@ async function chay(so) {
       datLichNen(GH, { customerFull: { enabled: true, minutes: '10' } });
       check(so, 'Lịch nền: lưu cài đặt không đụng giờ chạy xong; đổi chu kỳ có hiệu lực ngay tính từ lần chạy xong cũ',
         [sau60, G.processDue(T + 10 * PHUT, docLichNen(GH), G.processBookRead(), 0)], [[T, []], ['customerFull']]);
-      datState(G, { runId: 'conflict-run', origin: 'background', phase: 'pull_customer', cursor: { kind: 'customer_grid' }, process: 'customerFull', pollAt: Date.now() });
-      vaSoNen(G, { customerFull: { doneAt: 1 } });
-      G.stateWrite(G.runClose(G.stateRead(), 'conflict', { message: 'Có xung đột cần người dùng xử lý.' }));
-      trongLat(G, () => G.backgroundTail({ ok: true, request: null }));
-      check(so, 'Lịch nền: lượt nền dừng ở xung đột vẫn tính là chạy xong (không chạy lại mỗi lần hỏi), chuỗi dừng chờ người dùng',
-        [G.processBookRead().customerFull.doneAt > 1, G.stateRead().runId, G.stateRead().phase], [true, 'conflict-run', 'conflict']);
     }
     check(so, 'Chu kỳ 0: ghi giờ chạy xong, lần hỏi kế tiếp đến hạn ngay',
       [F.processBookRead().heartbeat.doneAt, F.processDue(now + 1, docLichNen(H), F.processBookRead(), 0).indexOf('heartbeat') >= 0], [now, true]);

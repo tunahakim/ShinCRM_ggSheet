@@ -27,7 +27,7 @@ async function chay(so) {
   check(so, 'đã bấm dừng: lượt tay thành Đang dừng, lượt nền thành Đang dừng nền, nút chạy khóa',
     [dung(dangChay, { stopFlag: co }).actions.run, dung(Object.assign({}, dangChay, { origin: 'background' }), { stopFlag: co }).actions.run, dung(dangChay, { stopFlag: co }).actions.runDisabled, dung(dangChay, { stopFlag: { runId: 'khac', verdict: 'cancelled' } }).actions.run],
     ['stopping', 'stoppingBackground', true, 'cancel']);
-  check(so, 'lượt lỗi, tạm dừng và xung đột có tone riêng', [dung({ phase: 'error' }).tone, dung({ phase: 'paused' }).tone, dung({ phase: 'conflict' }).tone], ['error', 'paused', 'paused']);
+  check(so, 'lượt lỗi và tạm dừng có tone riêng', [dung({ phase: 'error' }).tone, dung({ phase: 'paused' }).tone], ['error', 'paused']);
   const cho = { status: 'pending', count: 3, fingerprint: 'dau-1' };
   check(so, 'tập đẩy chờ duyệt: nút Duyệt chỉ mở khi không có lượt chạy',
     [dung({ phase: 'paused' }, { gate: cho }).pendingApproval, dung({ phase: 'paused' }, { gate: cho }).actions.approve, dung(dangChay, { gate: cho }).actions.approve],

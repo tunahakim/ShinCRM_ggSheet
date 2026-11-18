@@ -56,7 +56,6 @@ FbmSync.runConflictOpenCommand = function () {
   var queue = FbmSync.conflictQueue(FbmSync.localScan());
   state.metadata.conflictCount = queue.length;
   if (!queue.length) {
-    if (state.phase === 'conflict') { state.phase = 'done'; }
     state.message = 'Không còn xung đột chờ quyết.';
     FbmSync.stateWrite(state);
     return { ok: true, empty: true, remaining: 0 };
@@ -101,7 +100,6 @@ FbmSync.conflictDropUnreadable = function (state, entity, id, reason) {
   FbmSync.recordIssuesFlush();
   var remaining = FbmSync.conflictQueue(FbmSync.localScan()).length;
   state.metadata.conflictCount = remaining;
-  if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = 'Bản ghi ' + id + ' ' + reason + '. Đã chuyển sang "' + FbmSync.SYNC_STATUS.missing + '" và rời hàng đợi; kiểm tra bản ghi này trên FBM. Còn ' + remaining + ' xung đột.';
   FbmSync.stateWrite(state);
   return { ok: false, code: 'CONFLICT_RECORD_UNREADABLE', message: state.message, remaining: remaining };
@@ -203,7 +201,6 @@ FbmSync.conflictSettle = function (state, read, build, message) {
   var remaining = FbmSync.conflictQueue(FbmSync.localScan()).length;
   state.metadata.conflictCount = remaining;
   FbmSync.pushFailuresRemove([entity + ':' + read.id]);
-  if (state.phase === 'conflict' && !remaining) { state.phase = 'done'; }
   state.message = message;
   FbmSync.stateWrite(state);
   return { ok: true, remaining: remaining };

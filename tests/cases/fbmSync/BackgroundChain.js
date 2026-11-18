@@ -95,14 +95,14 @@ async function chay(so) {
   const moThangLan = await moThang.hoi(60);
   check(so, 'Chỉ Quét nhanh đến hạn: request đầu tiên của lần hỏi là request của lượt Quét nhanh, không có request Giữ phiên nào', [moThangLan.xong, moThang.trace.kinds[0] !== 'heartbeat', moThang.trace.kinds.indexOf('heartbeat') < 0], [['customerFull'], true, true]);
 
-  // Lượt trước đã kết thúc ở trạng thái tạm dừng (tự đăng nhập bị FBM từ chối) hoặc xung đột: lần hỏi sau vẫn mở chuỗi mới (09/06: chạy nền tự thử lại theo chu kỳ).
+  // Lượt trước đã kết thúc ở trạng thái tạm dừng (tự đăng nhập bị FBM từ chối): lần hỏi sau vẫn mở chuỗi mới (09/06: chạy nền tự thử lại theo chu kỳ).
   const ketThuc = [];
-  for (const phase of ['paused', 'conflict']) {
+  for (const phase of ['paused']) {
     const dung = chuoiHarness({ heartbeat: { enabled: false }, customerFull: { enabled: true, minutes: 60 }, activityFull: { enabled: false }, detail: { enabled: false } });
     datState(dung.F, { runId: 'luot-truoc', phase, origin: 'background', cursor: {}, activeRequestId: '', deadlineAt: 0, lastFailureCode: 'AUTO_LOGIN_FAILED' });
     ketThuc.push((await dung.hoi(60)).xong);
   }
-  check(so, 'Lượt trước dừng ở "tạm dừng" hoặc "xung đột": lần hỏi sau vẫn chạy Quét nhanh đến hạn, không bị coi là lượt đang chạy', ketThuc, [['customerFull'], ['customerFull']]);
+  check(so, 'Lượt trước dừng ở "tạm dừng": lần hỏi sau vẫn chạy Quét nhanh đến hạn, không bị coi là lượt đang chạy', ketThuc, [['customerFull']]);
 
   // Lượt trước tự đăng nhập bị từ chối nên còn dấu "phiên hết hạn"; người dùng đã tự đăng nhập trên tab FBM. Chuỗi mới phải hỏi FBM trước, không gửi thẳng lệnh đăng nhập (09/06: không đăng nhập lại khi phiên còn hợp lệ).
   const tuDangNhap = chuoiHarness({ heartbeat: { enabled: true, minutes: 5 }, customerFull: { enabled: false }, activityFull: { enabled: false }, detail: { enabled: false } });
