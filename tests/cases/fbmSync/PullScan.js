@@ -68,13 +68,13 @@ async function chay(so) {
     customerFields.map((field) => ({ stt_rec_kh: 'A000079388', ngay_gd: '/Date(1787101200000)/', datetime0: '/Date(1787156031523)/', xorder: '000000000345' })[field] || ''),
     customerFields.map((field) => ({ stt_rec_kh: 'A000080085', ngay_gd: '/Date(1790532000000)/', datetime0: '/Date(1790298817497)/', xorder: '000000000311' })[field] || '')
   ], 1312));
-  check(so, 'mô tả trang đang đứng gửi FBM khớp đúng chuỗi giao diện FBM gửi khi chuyển trang Customer', builders.FbmSync.customerPageItems(dongFbm.rows, dongFbm.total),
-    { firstPageItem: '2026081920260819000000000345A000079388', lastPageItem: '2026092820260925000000000311A000080085', lastRowCount: 1312 });
+  check(so, 'mô tả trang đang đứng gửi FBM khớp đúng chuỗi giao diện FBM gửi khi chuyển trang Customer', (({ firstItem, lastItem }) => [firstItem, lastItem])(builders.FbmSync.customerPageOf(dongFbm.rows, false)),
+    ['2026081920260819000000000345A000079388', '2026092820260925000000000311A000080085']);
   // Khách chưa có giao dịch FBM trả ngày 01/01/1999 là 915123600000; giao diện FBM gửi lại 915148800000 (cộng 7 giờ, bắt 2026-10-08). Gửi nguyên thì FBM trả trang rỗng ở khách thứ 1.000/1.312.
   const dongChuaGd = builders.FbmSync.rowsToRecords('customer', await luoiDaCat(builders.FbmSync, 'customer', customerFields, [
     customerFields.map((field) => ({ stt_rec_kh: 'A000069569', ngay_gd: '/Date(915123600000)/', datetime0: '/Date(1751273601493)/', xorder: '000000010624' })[field] || '')
   ], 1312)).rows[0];
-  check(so, 'khóa trang Customer cộng 7 giờ vào ngày như giao diện FBM gửi, chuỗi mô tả trang vẫn là ngày Việt Nam', [builders.FbmSync.customerPageValue(dongChuaGd), builders.FbmSync.customerPageItems([dongChuaGd], 1312).lastPageItem],
+  check(so, 'khóa trang Customer cộng 7 giờ vào ngày như giao diện FBM gửi, chuỗi mô tả trang vẫn là ngày Việt Nam', [builders.FbmSync.customerPageValue(dongChuaGd), builders.FbmSync.customerPageItem(dongChuaGd)],
     [['/Date(915148800000)/', '/Date(1751298801493)/', '000000010624', 'A000069569'], '1999010120250630000000010624A000069569']);
   // Lượt dừng sớm (phân trang Customer hỏng) mà vẫn xét khách vắng thì mọi khách chưa quét tới bị coi là vắng (gặp thật: 1.262/1.312 khách).
   const marked = [];

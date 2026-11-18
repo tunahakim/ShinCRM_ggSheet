@@ -72,10 +72,6 @@ FbmSync.pushResponseIncomplete = function (message) {
   return error;
 };
 
-/** Kiểm tra response mở form có đủ trường fingerprint trước khi xác nhận. */
-FbmSync.verifyFormValues = function (response, entity) {
-  return FbmSync.requireFormFields(FbmSync.extractFormValues(response, entity), entity);
-};
 /** Giá trị form thiếu trường fingerprint thì hash bản FBM sai, nên không được dùng để so hay dựng lệnh lưu. */
 FbmSync.requireFormFields = function (values, entity) {
   var required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
@@ -140,7 +136,7 @@ FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValu
 FbmSync.pushResultVerify = function (state, response, settings) {
   var cursor = state.cursor || {}, candidate = cursor.candidate || {}, entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sentHash = String(cursor.sentHash || '').trim(), gate = FbmSync.stateCategoryGate(state);
   if (!sentHash) { throw new Error('FBM_VERIFY_STATE_MISSING: dấu trang không còn hash của lần ghi cần xác nhận.'); }
-  var values = FbmSync.verifyFormValues(response, entity), incomingHash = FbmSync.hash(values, entity, gate);
+  var values = FbmSync.requireFormFields(FbmSync.extractFormValues(response, entity), entity), incomingHash = FbmSync.hash(values, entity, gate);
   // Lệnh sửa không mang dấu mà FBM vẫn còn dấu: coi là đẩy không ăn để không xếp dọn lại mỗi lượt (G12).
   var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(values.details);
   if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }

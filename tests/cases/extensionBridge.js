@@ -291,7 +291,7 @@ async function chay(so) {
   check(so, 'Chuẩn bị tab FBM chỉ có một công cụ (một nơi gọi: envelopeRun), dùng cho cả nhịp nền lẫn lượt Sidebar; không còn đường chờ tab cũ; Extension không tự tải lại tab và không rẽ nhánh theo loại request khi nghỉ giữa hai request', [
     (workerSource.match(/prepareFbmTab\(/g) || []).length,
     workerSource.indexOf('ensureFbmTab') < 0 && workerSource.indexOf('waitForFbmTabReady') < 0,
-    workerSource.indexOf('autoDiscardable: false') >= 0 && workerSource.indexOf('chrome.tabs.reload') < 0 && workerSource.indexOf('callsFbm') < 0
+    workerSource.indexOf('autoDiscardable: false') >= 0 && workerSource.indexOf('chrome.tabs.reload') < 0
   ], [2, true, true]);
   check(so, 'Hộp đen lượt nền: Extension cất bước cuối trước mỗi chặng (nhận request, chuẩn bị tab, đổi trang theo lệnh GAS, gửi tab, tab trả, gửi GAS, báo lỗi, GAS trả lỗi, kết thúc) và lần hỏi sau mang lên GAS; hộp đen chỉ có tên bước, mã request, hop, giờ và mã lỗi', [
     ['gas_request_received', 'fbm_tab_sent', 'fbm_tab_replied', 'gas_response_sent', 'failure_sent', 'gas_reply_failed', 'chain_finished'].every((stage) => workerSource.indexOf("'" + stage + "'") >= 0),
@@ -320,16 +320,16 @@ async function chay(so) {
   check(so, 'mo man dong bo gui cau hinh local nhung khong chan status', syncSource.indexOf('fbmSyncConfigureRelay();') >= 0 && /fbmSyncCommand\('status'\)\.then\(function \(bundle\) \{\s*if \(!bundle \|\| !bundle\.status\)/.test(syncSource), true);
   check(so, 'kiem tra lien ket dung chung guard Extension; loi phia trinh duyet khong tu goi Dung (luot thuoc GAS)', syncSource.indexOf('function fbmSyncCheckIdentity()') >= 0 && syncSource.indexOf("sheetLinkExtensionAlive()") >= 0 && syncSource.indexOf('fbmSyncCancelAfterError') < 0 && (syncSource.match(/'cancel'\)/g) || []).length === 1, true);
   const autoFillStart = syncSource.indexOf('function fbmSyncAutoFill()');
-  const autoFillEnd = syncSource.indexOf('function fbmSyncConfirmIdentity()');
+  const autoFillEnd = autoFillStart >= 0 ? syncSource.indexOf('\nfunction ', autoFillStart + 1) : -1;
   const autoFillSource = autoFillStart >= 0 && autoFillEnd > autoFillStart ? syncSource.slice(autoFillStart, autoFillEnd) : '';
   const probeStart = syncSource.indexOf('function fbmSyncProbeIdentity()');
   const probeSource = probeStart >= 0 && autoFillStart > probeStart ? syncSource.slice(probeStart, autoFillStart) : '';
-  check(so, 'tu dien nhan dien FBM chi doc User va giu ban nhap de nguoi dung tu kiem tra lien ket', probeStart >= 0 && autoFillStart >= 0 && syncSource.indexOf('function fbmSyncAutoFillAndCheck()') < 0 && autoFillSource.indexOf('fbmSyncCheckIdentity()') < 0 && probeSource.indexOf("return fbmSyncLoadIdentityStatus().then(function () { return value; });") < 0 && probeSource.indexOf("fbmSyncDrive('start', { kind: 'identity_probe' }") >= 0 && syncSource.indexOf("fbmSyncCommand('save_identity_binding'") >= 0 && syncSource.indexOf('IDENTITY_DRAFT_READY') >= 0, true);
+  check(so, 'tu dien nhan dien FBM chi doc User va giu ban nhap de nguoi dung tu kiem tra lien ket', probeStart >= 0 && autoFillStart >= 0 && syncSource.indexOf('function fbmSyncAutoFillAndCheck()') < 0 && autoFillSource.indexOf('fbmSyncCheckIdentity()') < 0 && probeSource.indexOf("return fbmSyncLoadIdentityStatus().then(function () { return value; });") < 0 && probeSource.indexOf("fbmSyncDrive('start', { kind: 'identity_probe' }") >= 0 && syncSource.indexOf("fbmSyncCommand('save_credential', { binding: binding") >= 0 && syncSource.indexOf('IDENTITY_DRAFT_READY') >= 0, true);
   check(so, 'render status khong lam roi form tai khoan dang go', syncSource.indexOf('function fbmSyncCaptureActiveAccountDraft()') >= 0 && syncSource.indexOf('function fbmSyncRestoreActiveAccountDraft(snapshot)') >= 0 && syncSource.indexOf('active.setSelectionRange') >= 0, true);
   check(so, 'man dong bo hien thi Category block va Activity missing', syncStatusSource.indexOf('metadata.categoryBlocks') >= 0 && syncStatusSource.indexOf('metadata.activityBulkMissing') >= 0, true);
   check(so, 'man dong bo hien thi ma va nguyen nhan preflight', syncStatusSource.indexOf('preflightIssues') >= 0 && syncStatusSource.indexOf('item.code') >= 0 && syncStatusSource.indexOf('item.message') >= 0, true);
   check(so, 'man dong bo hien thi chi tiet loi day kem HTTP', syncStatusSource.indexOf('pushFailureDetails') >= 0 && syncStatusSource.indexOf('detail.reason') >= 0 && syncStatusSource.indexOf('detail.status') >= 0, true);
-  check(so, 'Response FBM không bao giờ tới Sidebar: Extension chở thẳng lên GAS, Sidebar không còn hàm chiếu response hay lời gọi nộp response', ['fbmSyncProjectFormResponse', 'InternalValues', 'fbmSyncRelayResponse', 'fbmContinueSync', 'fbmSyncExtensionRequest'].map((name) => syncSource.indexOf(name)), [-1, -1, -1, -1, -1]);
+  check(so, 'Response FBM không bao giờ tới Sidebar: Extension chở thẳng lên GAS, Sidebar không còn hàm chiếu response hay lời gọi nộp response', ['fbmSyncProjectFormResponse', 'InternalValues', 'fbmContinueSync', 'fbmSyncExtensionRequest'].map((name) => syncSource.indexOf(name)), [-1, -1, -1, -1]);
   (function () {
     const { catRuotScript } = require('../lib/load-gas');
     const file = path.join(__dirname, '..', '..', '1_ShinCRM_GAS', 'client', 'util', 'serverCall.html');

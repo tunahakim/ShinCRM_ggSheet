@@ -158,14 +158,14 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/StatusView.js': 2,
     // Hàm chuyển kho một lần là cửa vào riêng: đọc pha để chặn khi đang có lượt; xóa cùng server/dev/.
     '1_ShinCRM_GAS/fbm_sync/state/FbmStoresMigrate.js': 1,
-    // `recountStart` đọc/ghi ô lượt sau `start` (trước đây giấu sau `statePatch` đã xóa); làm rỗng ở C8.6.
+    // `recountStart` đọc/ghi ô lượt sau `start` để câu báo đếm lại đè câu của cổng phiên; làm rỗng ở C8.6.
     '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 5,
     '1_ShinCRM_GAS/fbm_sync/transport/OpenStages.js': 6,
     '1_ShinCRM_GAS/fbm_sync/write/SheetSave.js': 1
   },
   silentError: {},
   typeofFunction: {
-    '1_ShinCRM_GAS/client/sync/fbmSync.html': 52,
+    '1_ShinCRM_GAS/client/sync/fbmSync.html': 50,
     '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 10,
     '1_ShinCRM_GAS/client/sync/fbmSyncSettingsScreen.html': 1,
     '1_ShinCRM_GAS/client/sync/fbmSyncShell.html': 2,

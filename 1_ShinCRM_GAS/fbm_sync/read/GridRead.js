@@ -214,10 +214,6 @@ FbmSync.fbmDayKey = function (value) {
  * FBM chỉ trả trang Customer kế khi request mô tả trang đang đứng: dòng đầu, dòng cuối (ngày giao dịch + ngày tạo dạng `yyyyMMdd`, `xorder`, `stt_rec_kh`) và tổng số dòng; thiếu thì FBM trả trang rỗng.
  * Kiểm trên FBM thật 2026-10-08 bằng request bắt từ giao diện FBM.
  */
-FbmSync.customerPageItems = function (rows, total) {
-  var list = rows || [];
-  return { firstPageItem: FbmSync.customerPageItem(list[0]), lastPageItem: FbmSync.customerPageItem(list[list.length - 1]), lastRowCount: Number(total || 0) };
-};
 FbmSync.customerPageItem = function (row) { var value = row || {}; return FbmSync.fbmDayKey(value.ngay_gd) + FbmSync.fbmDayKey(value.datetime0) + String(value.xorder || '') + String(value.stt_rec_kh || ''); };
 /** Lấy AliasName metadata; fallback tên field để tránh hardcode schema. */
 FbmSync.gridFields = function (response) {

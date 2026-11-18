@@ -46,7 +46,6 @@ function fbmSyncIdentityBlock(status) {
   var schema = FBM_SYNC_ACCOUNT_SCHEMA, messages = schema.identity.messages;
   return FBM_SYNC_ACCOUNT_UI.layout.identity({ summary: fbmSyncIdentitySummaryBlocks(), form: fbmSyncIdentityFormBlocks(), actions: fbmSyncIdentityActionBlocks(), actionStatus: FBM_SYNC_CLIENT.identityAction ? [Text({ className: FBM_SYNC_ACCOUNT_UI.classes.actionStatus, text: FBM_SYNC_CLIENT.identityAction === 'check' ? messages.actionCheck : messages.actionProbe })] : [], notice: fbmSyncAccountNoticeBlocks('identity') });
 }
-function fbmSyncPaintIdentityBlock(panel, active, status) { return fbmSyncAppendBlock(panel, fbmSyncIdentityBlock(status)); }
 function fbmSyncPatchIdentityBlock(panel, active, status) {
   var regions = FBM_SYNC_ACCOUNT_SCHEMA.regions, messages = FBM_SYNC_ACCOUNT_SCHEMA.identity.messages;
   if (!panel || !RENDER_INDEX.nodes[regions.identitySummary]) { return false; }

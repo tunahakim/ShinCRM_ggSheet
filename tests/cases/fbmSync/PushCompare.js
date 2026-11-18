@@ -45,7 +45,7 @@ async function chay(so) {
 
   // 1. Hash tính từ form phải bằng hash tính từ lưới cho cùng một bản FBM; lệch thì mọi lần đẩy thành xung đột giả.
   const khachFbm = { stt_rec_kh: 'A000050753', ma_kh: 'ALT00010', ten_kh: 'Test', ma_so_thue: '00', ong_ba: 'Tên người liên hệ test', dien_thoai: '0000000000', email: 'Email test', website: 'Website test', nguon_dm: 'KDTUTIM', dc_lh: 'Địa chỉ\r\ndòng hai ', dc_lh_tinh: 'HNI' };
-  const khachForm = F.verifyFormValues(formKhach(khachFbm), 'customer');
+  const khachForm = F.requireFormFields(F.extractFormValues(formKhach(khachFbm), 'customer'), 'customer');
   const khachFields = F.GRID_FIELDS.customer.slice(), khachRow = khachFields.map(() => '');
   const datKhach = (name, value) => { khachRow[khachFields.indexOf(name)] = value; };
   ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'website'].forEach((name) => datKhach(name, khachFbm[name]));
@@ -55,7 +55,7 @@ async function chay(so) {
   check(so, 'Khách: hash từ form mở sửa = hash từ lưới khách = hash dòng Sheet kéo về từ lưới', [F.hash(khachForm, 'customer', GATE), F.hash(khachSheet, 'customer', GATE)], [F.hash(khachLuoi, 'customer', GATE), F.hash(khachLuoi, 'customer', GATE)]);
 
   const gdFbm = { id: 174813, ma_cv: 'GD', end_date: new Date('2026-09-09T10:30:00+07:00'), details: 'Gọi khách\r\nhẹn tuần sau #SC-ACT-008600', owner: 'Owner' };
-  const gdForm = F.verifyFormValues(formGiaoDich(gdFbm), 'activity');
+  const gdForm = F.requireFormFields(F.extractFormValues(formGiaoDich(gdFbm), 'activity'), 'activity');
   const gdFields = F.GRID_FIELDS.activity.slice(), gdRow = gdFields.map(() => '');
   const datGd = (name, value) => { gdRow[gdFields.indexOf(name)] = value; };
   datGd('id', 174813); datGd('ten_cv', 'Gọi điện'); datGd('details', 'Gọi khách\nhẹn tuần sau'); datGd('end_date', '/Date(' + new Date('2026-09-09T08:00:00+07:00').getTime() + ')/'); datGd('owner', 'Owner');
