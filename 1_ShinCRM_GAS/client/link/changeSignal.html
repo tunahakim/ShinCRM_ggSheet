@@ -29,8 +29,7 @@ var CHANGE_SIGNAL = {
 };
 
 function changeSignalDelays() {
-  var delays = typeof SETTINGS !== 'undefined' && SETTINGS && Array.isArray(SETTINGS.CHANGE_SIGNAL_DELAYS_MS) ? SETTINGS.CHANGE_SIGNAL_DELAYS_MS : [];
-  return delays.map(function (value) { return Math.max(0, Number(value) || 0); });
+  return sheetLinkSetting('CHANGE_SIGNAL_DELAYS_MS').map(function (value) { return Math.max(0, Number(value) || 0); });
 }
 
 function changeSignalAsk(reason) {
@@ -131,7 +130,7 @@ function changeSignalSilentWhileHidden(now) {
   var at = now === undefined ? Date.now() : now, hiddenAt = CHANGE_SIGNAL.hiddenAt;
   CHANGE_SIGNAL.hiddenAt = 0;
   if (!hiddenAt || !CHANGE_SIGNAL.lastRealFrameAt) { return true; }
-  return Math.max(CHANGE_SIGNAL.hiddenGapMax, at - CHANGE_SIGNAL.lastRealFrameAt) > sheetLinkMs('CHANNEL_SILENCE_MS', 180000);
+  return Math.max(CHANGE_SIGNAL.hiddenGapMax, at - CHANGE_SIGNAL.lastRealFrameAt) > sheetLinkMs('CHANNEL_SILENCE_MS');
 }
 
 /** Gọi theo nhịp bắt tay. Thời gian tab ẩn, mất mạng hoặc vắng Extension không tính vào khoảng im. */
@@ -144,7 +143,7 @@ function changeSignalWatchdog(now) {
     CHANGE_SIGNAL.lastFrameAt = at;
     return;
   }
-  if (CHANGE_SIGNAL.dead || at - CHANGE_SIGNAL.lastFrameAt <= sheetLinkMs('CHANNEL_SILENCE_MS', 180000)) { return; }
+  if (CHANGE_SIGNAL.dead || at - CHANGE_SIGNAL.lastFrameAt <= sheetLinkMs('CHANNEL_SILENCE_MS')) { return; }
   CHANGE_SIGNAL.dead = true;
   if (typeof selectionPollPaint === 'function') { selectionPollPaint(); }
   if (typeof selectionPollResetSafety === 'function') { selectionPollResetSafety(); }

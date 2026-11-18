@@ -43,7 +43,7 @@ async function chay(so) {
     [safety._calls[0].name, safety._calls[0].options.silent],
     ['probeSelectionAndReload', false]);
 
-  const safetyVisibleProbe = dungHopLienKet(); batDauLienKet(safetyVisibleProbe); safetyVisibleProbe.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = false;
+  const safetyVisibleProbe = dungHopLienKet(); batDauLienKet(safetyVisibleProbe); safetyVisibleProbe.SIDEBAR_SERVER_DATA.link.SHOW_PROBE_PROGRESS_DEBUG = false;
   safetyVisibleProbe._calls = [];
   safetyVisibleProbe.callServer = (name, args, options) => { safetyVisibleProbe._calls.push({ name, args, options }); return syncValue({ ok: true, reload: { revision: 0 }, selection: { spreadsheetId: 'sheet-1', gid: '1', sheetName: 'Customer', row: 4, col: 1, rowEnd: 4, colEnd: 1, customerId: '' } }); };
   const visibleSafetyTimer = Array.from(safetyVisibleProbe._timers.values()).find((item) => item.delay === 60000);

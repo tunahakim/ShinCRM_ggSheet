@@ -155,7 +155,7 @@ const EXCEPTIONS = {
   },
   silentError: {},
   typeofFunction: {
-    '1_ShinCRM_GAS/client/sync/fbmSync.html': 50,
+    '1_ShinCRM_GAS/client/sync/fbmSync.html': 49,
     '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 10,
     '1_ShinCRM_GAS/client/sync/fbmSyncSettingsScreen.html': 1,
     '1_ShinCRM_GAS/client/sync/fbmSyncShell.html': 2,

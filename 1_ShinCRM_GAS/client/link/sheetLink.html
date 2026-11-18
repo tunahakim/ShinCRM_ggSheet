@@ -44,9 +44,9 @@ var SHEET_LINK_LAST_SEEN_REVISION = 0;
 var SHEET_LINK_PING_TIMER = null;
 var SHEET_LINK_EXTENSION_READ = { status: '', reason: '' };
 var SHEET_LINK_READER_FAILURE_REPORTED = false;
-/** Công tắc `SETTINGS.SHOW_PROBE_PROGRESS_DEBUG`; chưa nạp `SETTINGS` thì chạy im lặng. */
+/** Công tắc `SHOW_PROBE_PROGRESS_DEBUG`: bật thì lời hỏi nền cũng hiện thanh tiến trình. */
 function sheetLinkShowProbeProgress() {
-  return typeof SETTINGS !== 'undefined' && !!SETTINGS && SETTINGS.SHOW_PROBE_PROGRESS_DEBUG === true;
+  return sheetLinkSetting('SHOW_PROBE_PROGRESS_DEBUG') === true;
 }
 var sheetLinkInstalled = false;
 
@@ -58,10 +58,15 @@ function sheetLinkNonceMake() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-/** Số mili giây cho các nhịp bắt tay và ngưỡng kết luận vắng mặt, đọc từ `SETTINGS` máy chủ gửi về; chưa về thì dùng số ngầm định. */
-function sheetLinkMs(ten, ngamDinh) {
-  if (typeof SETTINGS === 'undefined' || !SETTINGS || !SETTINGS[ten]) { return ngamDinh; }
-  return Number(SETTINGS[ten]) || ngamDinh;
+/** Nhịp của tầng liên kết, GAS chèn lúc dựng trang (`SIDEBAR_SERVER_DATA.link`) vì nhịp chạy trước khi RAM nạp về; thiếu khóa thì ném, không giữ số dự phòng. */
+function sheetLinkSetting(ten) {
+  var value = SIDEBAR_SERVER_DATA.link[ten];
+  if (value === undefined) { throw new Error('Thiếu cài đặt liên kết ' + ten + ' trong SIDEBAR_SERVER_DATA.link.'); }
+  return value;
+}
+
+function sheetLinkMs(ten) {
+  return Number(sheetLinkSetting(ten));
 }
 
 function sheetLinkInstall() {
@@ -70,7 +75,7 @@ function sheetLinkInstall() {
   SHEET_LINK_NONCE = sheetLinkNonceMake();
   window.addEventListener('message', sheetLinkOnMessage);
   sheetLinkHandshakePing();
-  SHEET_LINK_PING_TIMER = setInterval(sheetLinkHandshakePing, sheetLinkMs('HANDSHAKE_PING_MS', 1000));
+  SHEET_LINK_PING_TIMER = setInterval(sheetLinkHandshakePing, sheetLinkMs('HANDSHAKE_PING_MS'));
 }
 
 /** Gán id tệp sheet sau lượt nạp lõi, để tầng lọc thứ ba có gì mà lọc. */
@@ -85,7 +90,7 @@ function sheetLinkHandshakeMessage() {
     nonce: SHEET_LINK_NONCE,
     spreadsheetId: SHEET_LINK_SPREADSHEET_ID,
     readPlan: SHEET_LINK_READ_PLAN,
-    channelAliveMs: sheetLinkMs('CHANNEL_ALIVE_RELAY_MS', 0)
+    channelAliveMs: sheetLinkMs('CHANNEL_ALIVE_RELAY_MS')
   };
 }
 
@@ -187,7 +192,7 @@ function sheetLinkReaderFailureInput() {
 /** Extension còn sống không: ACK về trong ngưỡng, tính từ nhịp ping gần nhất. */
 function sheetLinkExtensionAlive(now) {
   if (!SHEET_LINK_LAST_ACK) { return false; }
-  return (now === undefined ? Date.now() : now) - SHEET_LINK_LAST_ACK < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000);
+  return (now === undefined ? Date.now() : now) - SHEET_LINK_LAST_ACK < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS');
 }
 
 function sheetLinkHandshakePing() {
@@ -366,7 +371,7 @@ function sheetLinkScheduleWake() {
   SHEET_LINK_WAKE_TIMER = setTimeout(function () {
     SHEET_LINK_WAKE_TIMER = null;
     sheetLinkProbeSelectionAndReload('position', { needsSelection: true });
-  }, sheetLinkMs('POSITION_WAKE_MS', 1000));
+  }, sheetLinkMs('POSITION_WAKE_MS'));
   return SHEET_LINK_WAKE_TIMER;
 }
 

@@ -225,7 +225,7 @@ function fbmSyncWaitForBridge() {
       var waiters = FBM_SYNC_BRIDGE_WAITERS.splice(0, FBM_SYNC_BRIDGE_WAITERS.length);
       FBM_SYNC_BRIDGE_WAIT_TIMER = null;
       waiters.forEach(function (waiter) { waiter(false); });
-    }, typeof sheetLinkMs === 'function' ? sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS', 3000) : 3000);
+    }, sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS'));
   });
 }
 /** Cổng Extension chung của mọi nút khởi chạy phiên. Nhịp ping bị Chrome làm chậm khi tab ẩn nên ACK cũ chưa chắc là Extension vắng: ping ngay và chờ ACK rồi mới kết luận. Vắng thật thì ném lỗi để nơi gọi báo qua `fbmSyncReportError` (không vẽ status giả: GAS chưa được gọi nên status GAS vẫn đúng). */

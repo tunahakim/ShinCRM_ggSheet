@@ -437,7 +437,7 @@ tests\
     ├── actions.js                Bảng mười lăm hành động: một tên rơi khỏi bảng là nút bấm không làm gì, ba cửa mở form phải khóa khi khách đã xóa mềm, và việc chặng sau phải ném lỗi đọc được chứ không im.
     ├── extensionBridge.js        Nonce của cầu nối Extension phải đi trọn từ bắt tay tới CRM_CONTEXT; origin lạ không được chiếm kênh đang dùng.
     ├── link.js                   Điều phối ba tệp kiểm tầng liên kết của Sidebar.
-    ├── link\                     selectionPoll.js (luật ACK, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây), changeSignal.js (lịch hỏi sau tín hiệu kênh, watchdog kênh im), viewSync.js (đồng bộ sheet quản trị từ Sidebar).
+    ├── link\                     selectionPoll.js (luật ACK, bốn điều kiện dừng, chống vòng chồng, thang nhịp 2/6 giây), changeSignal.js (lịch hỏi sau tín hiệu kênh, watchdog kênh im), viewSync.js (đồng bộ sheet quản trị từ Sidebar), probeError.js, serverData.js (số nhịp tầng liên kết GAS gửi lúc dựng trang khớp khóa Sidebar đọc).
     ├── bindWatcher.js            XHR giả khóa bộ lọc danh sách đen khung /bind, chỉ bắt GET /bind và con trỏ không đọc lại.
     ├── triggers.js               Trigger sửa sheet quản trị làm mới ngay; sửa kho đánh dấu mọi sheet quản trị cần làm mới.
     ├── menu.js                   Trigger đơn chỉ dựng menu; trigger cài đặt mở Sidebar, không tạo trùng và không bật alert khi lỗi.

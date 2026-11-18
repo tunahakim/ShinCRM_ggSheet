@@ -62,7 +62,8 @@ function dungHopLienKet() {
     clearInterval: (id) => intervals.delete(id),
     Prefs: { followSelection: true }, SAVE_FLOW: { dangGui: false },
     ScreenState: { screen: 'view', currentCustomerId: '' }, SCREEN_VIEW: 'view',
-    SETTINGS: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, POSITION_WAKE_MS: 1000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000, RELOAD_SAFETY_POLL_DEAD_MS: 15000, CHANGE_SIGNAL_DELAYS_MS: [4000, 12000], CHANNEL_ALIVE_RELAY_MS: 20000, CHANNEL_SILENCE_MS: 180000 },
+    // Số nhịp riêng của hộp (không phải số của `Settings.js`) để phép kiểm tìm hẹn giờ theo độ trễ; khóa phải khớp `SHEET_LINK_SETTING_KEYS` (`tests/cases/link/serverData.js`).
+    SIDEBAR_SERVER_DATA: { link: { SELECTION_POLL_MS: 2000, SELECTION_POLL_IDLE_MS: 6000, POSITION_WAKE_MS: 1000, HANDSHAKE_PING_MS: 1000, EXTENSION_ACK_TIMEOUT_MS: 3000, RELOAD_SAFETY_POLL_MS: 60000, RELOAD_SAFETY_POLL_DEAD_MS: 15000, CHANGE_SIGNAL_DELAYS_MS: [4000, 12000], CHANNEL_ALIVE_RELAY_MS: 20000, CHANNEL_SILENCE_MS: 180000, SHOW_PROBE_PROGRESS_DEBUG: true } },
     ACTIONS: { setCurrentCustomer: () => null }, screenViewSetSelectionMiss: () => null
   });
   hop.Store = { hasCustomer: () => false };
@@ -84,8 +85,6 @@ function dungHopLienKet() {
   hop._errorLogs = [];
   hop.callServerErrorLog = (err, action) => { hop._errorLogs.push([action, err && err.message]); return syncValue(err && err.inLog ? 'server' : 'logged'); };
   napTheoSidebar(['client/ram/refresh.html', 'client/ui/notices.html', 'client/ui/actionError.html', 'client/link/sheetLink.html', 'client/link/selectionPoll.html', 'client/link/changeSignal.html'], hop);
-  // Các phép kiểm request giữ hợp đồng bàn giao im lặng; bản chạy DEV trực quan bật cờ này ở runtime.
-  hop.SETTINGS.SHOW_PROBE_PROGRESS_DEBUG = true;
   return hop;
 }
 

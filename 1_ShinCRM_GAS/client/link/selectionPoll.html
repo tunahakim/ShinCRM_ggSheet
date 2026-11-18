@@ -31,15 +31,11 @@ var SELECTION_POLL = {
   intervalMs: 2000
 };
 
-function selectionPollMs(name, fallback) {
-  return sheetLinkMs(name, fallback);
-}
-
 /** `checking` giữ thời gian ân hạn, để lần mở sidebar không nháy cảnh báo sai trước khi Extension kịp đáp. */
 function selectionPollExtensionState(now) {
   var luc = now === undefined ? Date.now() : now;
   if (sheetLinkExtensionAlive(luc)) { return 'present'; }
-  if (!SHEET_LINK_LAST_ACK && luc - SELECTION_POLL.bootAt < selectionPollMs('EXTENSION_ACK_TIMEOUT_MS', 3000)) { return 'checking'; }
+  if (!SHEET_LINK_LAST_ACK && luc - SELECTION_POLL.bootAt < sheetLinkMs('EXTENSION_ACK_TIMEOUT_MS')) { return 'checking'; }
   return 'missing';
 }
 
@@ -104,13 +100,13 @@ function selectionPollTick() {
     if (key !== SELECTION_POLL.lastPosition) {
       SELECTION_POLL.lastPosition = key;
       SELECTION_POLL.stableCount = 0;
-      SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+      SELECTION_POLL.intervalMs = sheetLinkMs('SELECTION_POLL_MS');
       return result;
     }
 
     SELECTION_POLL.stableCount += 1;
     if (SELECTION_POLL.stableCount >= SELECTION_POLL_STABLE_LIMIT) {
-      SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_IDLE_MS', 6000);
+      SELECTION_POLL.intervalMs = sheetLinkMs('SELECTION_POLL_IDLE_MS');
     }
     return null;
   }).then(function (result) {
@@ -128,7 +124,7 @@ function selectionPollTick() {
 /** Tín hiệu đánh thức fallback: vị trí đổi, tab hiện lại hoặc sidebar focus. */
 function selectionPollWake() {
   SELECTION_POLL.stableCount = 0;
-  SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+  SELECTION_POLL.intervalMs = sheetLinkMs('SELECTION_POLL_MS');
   if (selectionPollEligible() && !SELECTION_POLL.inFlight) { selectionPollSchedule(SELECTION_POLL.intervalMs); }
 }
 
@@ -142,7 +138,7 @@ function selectionPollClearSafety() {
 /** Kênh `/bind` sống thì nhịp an toàn chỉ vớt thứ kênh bỏ sót; kênh chết thì nhịp này thay kênh nên phải ngắn. */
 function selectionPollSafetyMs() {
   var dead = typeof changeSignalChannelDead === 'function' && changeSignalChannelDead();
-  return dead ? selectionPollMs('RELOAD_SAFETY_POLL_DEAD_MS', 15000) : selectionPollMs('RELOAD_SAFETY_POLL_MS', 60000);
+  return dead ? sheetLinkMs('RELOAD_SAFETY_POLL_DEAD_MS') : sheetLinkMs('RELOAD_SAFETY_POLL_MS');
 }
 
 function selectionPollScheduleSafety() {
@@ -244,7 +240,7 @@ function selectionPollInstall() {
   if (SELECTION_POLL.installed) { return; }
   SELECTION_POLL.installed = true;
   SELECTION_POLL.bootAt = Date.now();
-  SELECTION_POLL.intervalMs = selectionPollMs('SELECTION_POLL_MS', 2000);
+  SELECTION_POLL.intervalMs = sheetLinkMs('SELECTION_POLL_MS');
   document.addEventListener('visibilitychange', selectionPollVisibilityChanged);
   window.addEventListener('focus', selectionPollWake);
   selectionPollPaint();

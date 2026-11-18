@@ -3,7 +3,8 @@ const NHOM = [
   require('./link/selectionPoll'),
   require('./link/probeError'),
   require('./link/changeSignal'),
-  require('./link/viewSync')
+  require('./link/viewSync'),
+  require('./link/serverData')
 ];
 
 async function chay(so) {

@@ -314,3 +314,15 @@ function viewProbeSelection() {
     return report;
   });
 }
+
+/** Khóa `SETTINGS` mà tầng liên kết Sidebar (`client/link/`) đọc qua `sheetLinkSetting`; khai một chỗ để Sidebar không giữ bản sao số. */
+var SHEET_LINK_SETTING_KEYS = ['SELECTION_POLL_MS', 'SELECTION_POLL_IDLE_MS', 'POSITION_WAKE_MS', 'HANDSHAKE_PING_MS', 'EXTENSION_ACK_TIMEOUT_MS', 'CHANGE_SIGNAL_DELAYS_MS', 'CHANNEL_ALIVE_RELAY_MS', 'CHANNEL_SILENCE_MS', 'RELOAD_SAFETY_POLL_MS', 'RELOAD_SAFETY_POLL_DEAD_MS', 'SHOW_PROBE_PROGRESS_DEBUG'];
+var SIDEBAR_SERVER_DATA_PROVIDERS = typeof SIDEBAR_SERVER_DATA_PROVIDERS !== 'undefined' ? SIDEBAR_SERVER_DATA_PROVIDERS : {};
+SIDEBAR_SERVER_DATA_PROVIDERS.link = function () {
+  var out = {};
+  SHEET_LINK_SETTING_KEYS.forEach(function (key) {
+    if (SETTINGS[key] === undefined) { throw new Error('SETTINGS thiếu khóa ' + key + ' mà tầng liên kết Sidebar cần.'); }
+    out[key] = SETTINGS[key];
+  });
+  return out;
+};
