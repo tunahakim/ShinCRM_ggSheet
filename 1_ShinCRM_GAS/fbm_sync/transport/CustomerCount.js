@@ -1,5 +1,5 @@
 /**
- * Bước "Đếm khách" (09/02 Phần 3 "Chuỗi trong một lần hỏi", Phần 8): một request đếm và một số khách mốc, dùng ở cuối mọi lượt có ghi Sheet và làm thân của Giữ phiên.
+ * Bước "Đếm khách" (09/02 Phần 3 "Chuỗi trong một lần hỏi", Phần 8): một request đếm và một số khách mốc, là chặng cuối dãy của mọi lượt có ghi Sheet (`customer_count` trong `RUN_PLANS`) và là thân của Giữ phiên.
  * Số mốc chỉ do lượt lấy danh sách toàn bộ khách ghi, bằng đúng `TotalRowCount` của request đó; request đếm dựng bằng cùng hàm nên hai số khớp khi FBM không đổi và Quét nhanh không lặp vô ích.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
@@ -38,28 +38,18 @@ FbmSync.customerCountChanged = function (total, baseline) {
 FbmSync.customerCountApplies = function (mode) { return FbmSync.canWriteSheet(mode); };
 
 /**
- * Đánh dấu đầu lượt: chỉ lượt nghiệp vụ có ghi Sheet mới đếm cuối lượt; lượt đăng nhập thử, kiểm tra liên kết dùng chung state nhưng không mang dấu này.
- * Chiều đếm ghi vào dấu: lượt Giữ phiên chạy mode `push` nhưng đếm và Quét nhanh bù theo chiều lịch nền (`scheduleMode`), không thì Hai chiều mất bước phát hiện khách mới.
+ * Chiều đếm của lượt: lượt Giữ phiên chạy mode `push` nhưng đếm và Quét nhanh bù theo chiều lịch nền (`scheduleMode`), không thì Hai chiều mất bước phát hiện khách mới; lượt khác đếm theo chiều của chính nó.
+ * Chặng `customer_count` có trong dãy hay không là do `RUN_STAGE_APPLIES` xét theo chiều này; lượt Giữ phiên mở thẳng ở chặng đếm (để giữ phiên) thì chỉ đếm, không Quét nhanh khi chiều này không ghi Sheet.
  */
-FbmSync.countTailMark = function (state) {
-  var scan = String(state.scan || ''), mode = scan === 'keepalive' ? state.scheduleMode : state.mode;
-  if (['full', 'activity_bulk', 'detail', 'keepalive'].indexOf(scan) >= 0 && FbmSync.customerCountApplies(mode)) { state.metadata = state.metadata || {}; state.metadata.countTail = { pending: true, mode: mode }; }
-};
+FbmSync.customerCountMode = function (state) { return state.scan === 'keepalive' ? state.scheduleMode : state.mode; };
 
-/**
- * Cuối lượt: lượt nghiệp vụ vừa xong (`done`, không còn request) thì chèn bước đếm trước khi trả kết quả. Mọi đường kết thúc lượt đều đi qua `start`/`continue` nên chỉ cần một chỗ này.
- * Lượt dừng lỗi, tạm dừng hay xung đột không đếm: chưa xong việc chính thì chưa có gì để đối chiếu.
- */
-FbmSync.runTail = function (result) {
-  if (!result || result.request) { return result; }
-  var state = FbmSync.stateRead();
-  if (!FbmSync.countTailPending(state)) { return result; }
-  var tail = state.metadata.countTail;
-  state.metadata.countTail = { pending: false, mode: tail.mode, message: String(state.message || '') };
+/** Mở chặng đếm cuối dãy: `closeMessage` là lời đóng lượt dựng từ kết quả chặng trước (`tail`: `suffix`), rồi trả request đếm. */
+FbmSync.customerCountOpen = function (state, tail) {
+  state.metadata = state.metadata || {};
+  state.metadata.closeMessage = FbmSync.runDoneMessage(state) + String(tail && tail.suffix || '');
   state.phase = 'pull_customer'; state.entity = 'customer'; state.cursor = { kind: 'customer_count' };
   state.message = 'Đang đếm lại số khách FBM...';
-  FbmSync.stateWrite(state);
-  return Object.assign({}, result, { ok: true, request: FbmSync.cursorIssue(state) });
+  return FbmSync.cursorRequest(state);
 };
 
 /** Đầu vào của chặng đếm, đọc qua cổng chủ: số khách mốc, dấu phạm vi lúc lấy mốc và dấu phạm vi của request đếm này. */
@@ -83,17 +73,17 @@ FbmSync.customerCountStage = function (ctx) {
   }
   // Mốc lấy ở phạm vi khác (hoặc mốc cũ chưa có dấu) không so được dù số bằng nhau: coi như chưa có mốc.
   var other = ctx.inputs.baseline !== null && ctx.inputs.baselineScope !== ctx.inputs.scope, baseline = other ? null : ctx.inputs.baseline;
-  var tail = ctx.state.metadata && ctx.state.metadata.countTail || {}, changed = FbmSync.customerCountChanged(total, baseline) && tail.recount !== false;
+  var changed = FbmSync.customerCountChanged(total, baseline) && FbmSync.customerCountApplies(FbmSync.customerCountMode(ctx.state));
   var patch = changed ? { logs: [{ action: 'customer_count_changed', outcome: LOG_OK, reason: other ? 'Số khách mốc lấy ở phạm vi khác phạm vi đang chạy; chạy Quét nhanh để lấy mốc mới.' : baseline === null ? 'Chưa có số khách mốc; chạy Quét nhanh để lấy mốc.' : 'Số khách FBM đổi từ ' + baseline + ' thành ' + total + '; chạy Quét nhanh ngay.', detail: { baseline: baseline, total: total } }] } : {};
   return { patch: patch, end: { total: total, baseline: baseline, changed: changed } };
 };
 
 /**
- * Bước kết của chặng đếm (người điều phối): đóng lượt với thông báo cũ; lệch mốc thì mở ngay một lượt Quét nhanh cùng chiều (mang tiến trình nền của lượt vừa xong), lượt đó lại kết thúc bằng bước đếm.
- * Dấu đếm có `recount: false` (Giữ phiên ở chiều không ghi Sheet) thì chỉ đếm để giữ phiên. Lượt Giữ phiên ghi giờ giữ phiên cuối.
+ * Bước kết của chặng đếm (người điều phối): đóng lượt với lời đóng đã dựng lúc mở chặng (`closeMessage`); lệch mốc thì mở ngay một lượt Quét nhanh cùng chiều (mang tiến trình nền của lượt vừa xong), lượt đó lại kết thúc bằng chặng đếm.
+ * Chiều không ghi Sheet (Giữ phiên ở chiều Chỉ đẩy) thì không bao giờ lệch: chỉ đếm để giữ phiên. Lượt Giữ phiên ghi giờ giữ phiên cuối.
  */
 FbmSync.customerCountEnd = function (state, end) {
-  var tail = state.metadata && state.metadata.countTail || {};
+  var mode = FbmSync.customerCountMode(state), closeMessage = String(state.metadata && state.metadata.closeMessage || '');
   if (state.scan === 'keepalive') {
     state.session.lastHeartbeatAt = Date.now();
     FbmSync.scheduleTrace('heartbeat_ok', 'Giữ phiên FBM OK, FBM báo ' + end.total + ' khách' + (end.changed ? '; số khách lệch nên chạy Quét nhanh.' : '.'), { customers: end.total });
@@ -101,9 +91,9 @@ FbmSync.customerCountEnd = function (state, end) {
   // Lệch mốc: tiến trình nền của lượt chưa xong mà chuyển sang lượt Quét nhanh, nên trao tên tiến trình cho lượt đó thay vì để `runClose` ghi xong.
   var carry = { process: state.process, pollAt: state.pollAt, follows: state.runId };
   if (end.changed) { state.process = ''; }
-  FbmSync.runClose(state, 'done', { message: tail.message || FbmSync.runDoneMessage(state) });
+  FbmSync.runClose(state, 'done', { message: closeMessage || FbmSync.runDoneMessage(state) });
   if (!end.changed) { return { ok: true, request: null }; }
-  return FbmSync.recountStart(tail.mode || state.mode, state.origin, carry, state);
+  return FbmSync.recountStart(mode, state.origin, carry, state);
 };
 
 /** Quét nhanh do bước đếm gọi: chiều đếm của lượt vừa xong, cùng nguồn và cùng tiến trình nền (`carry`: `process`, `pollAt`, `follows` là mã lượt vừa đóng để Sidebar đang chờ lượt đó chờ tiếp lượt này); không đi qua công tắc tiến trình và không dời mốc lịch nào. */

@@ -66,9 +66,9 @@ async function chay(so) {
   };
   {
     const two = keepaliveFlow('write'), view = two.F.statusView();
-    check(so, 'C2: Giữ phiên Hai chiều chưa có dấu lần đẩy sạch: mở lượt Chỉ đẩy nền keepalive (request đầu là kiểm phiên), mang cổng đã quyết, đánh dấu đếm cuối lượt theo chiều Hai chiều; màn trạng thái hiện chiều lịch nền và nhãn Giữ phiên',
-      [two.result.ok, two.result.request && two.result.request.meta.kind, two.state.origin, two.state.mode, two.state.scan, two.state.scheduleMode, two.state.pushGate, two.state.metadata.countTail, two.state.process, view.direction, view.scanLabel],
-      [true, 'session_probe', 'background', 'push', 'keepalive', 'write', { open: true, reason: 'no_gate' }, { pending: true, mode: 'write' }, 'heartbeat', 'Hai chiều', 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)']);
+    check(so, 'C2: Giữ phiên Hai chiều chưa có dấu lần đẩy sạch: mở lượt Chỉ đẩy nền keepalive (request đầu là kiểm phiên), mang cổng đã quyết, chặng đếm cuối dãy chạy theo chiều Hai chiều; màn trạng thái hiện chiều lịch nền và nhãn Giữ phiên',
+      [two.result.ok, two.result.request && two.result.request.meta.kind, two.state.origin, two.state.mode, two.state.scan, two.state.scheduleMode, two.state.pushGate, two.F.customerCountMode(two.state), two.F.runPlanAfter(two.state, 'record_push'), two.state.process, view.direction, view.scanLabel],
+      [true, 'session_probe', 'background', 'push', 'keepalive', 'write', { open: true, reason: 'no_gate' }, 'write', 'customer_count', 'heartbeat', 'Hai chiều', 'Giữ phiên FBM (chỉ đẩy bản ghi vừa sửa)']);
     const viaChain = keepaliveFlow('write', { viaChain: true });
     check(so, 'C2: đường đuôi chuỗi (tiến trình kế trong cùng lần hỏi) và đường hỏi nền đi qua cùng một chỗ quyết, ra cùng lượt keepalive',
       [viaChain.state.scan, viaChain.state.mode, viaChain.result.request && viaChain.result.request.meta.kind],
@@ -80,7 +80,7 @@ async function chay(so) {
     check(so, 'Quét nhanh bù mang câu mở lượt trong lệnh mở, không ghi đè sau khi mở', recountInputs, [[two.F.RECOUNT_MESSAGE, 'quick', 'run-truoc']]);
     const recountModes = [];
     two.F.recountStart = (mode, origin) => { recountModes.push([mode, origin]); return { ok: true, request: null }; };
-    const counted = two.F.stateRead(); counted.metadata.countTail = { pending: false, mode: 'write', message: 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.' }; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);
+    const counted = two.F.stateRead(); counted.metadata.closeMessage = 'Đồng bộ hoàn tất; không có bản ghi nào được đẩy.'; counted.phase = 'pull_customer'; counted.cursor = { kind: 'customer_count' }; two.F.stateWrite(counted);
     trongLat(two.F, () => two.F.stageRun(two.F.CURSOR_TABLE.customer_count, two.F.stateRead(), JSON.stringify({ d: { TotalRowCount: 999 } })));
     check(so, 'C2: số khách lệch sau lượt Giữ phiên có đẩy thì Quét nhanh bù chạy theo chiều lịch nền (Hai chiều), không theo mode push của lượt',
       recountModes,
@@ -89,7 +89,7 @@ async function chay(so) {
   {
     const pushOnly = keepaliveFlow('push');
     check(so, 'C2: Giữ phiên Chỉ đẩy cổng mở thì mở lượt keepalive nhưng không đếm cuối lượt (chiều không ghi Sheet); màn trạng thái hiện ShinCRM → FBM',
-      [pushOnly.state.scan, pushOnly.state.mode, pushOnly.state.scheduleMode, !!(pushOnly.state.metadata && pushOnly.state.metadata.countTail), pushOnly.F.statusView().direction], ['keepalive', 'push', 'push', false, 'ShinCRM → FBM']);
+      [pushOnly.state.scan, pushOnly.state.mode, pushOnly.state.scheduleMode, pushOnly.F.customerCountMode(pushOnly.state) === 'push' && pushOnly.F.customerCountApplies('push'), pushOnly.F.statusView().direction], ['keepalive', 'push', 'push', false, 'ShinCRM → FBM']);
   }
   {
     const closed = keepaliveFlow('write', { cleanMark: true });

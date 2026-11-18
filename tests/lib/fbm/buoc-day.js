@@ -5,8 +5,12 @@
 
 const { trongLat } = require('./hop-dong-bo');
 
+/** Các ca này kiểm chặng đẩy: chặng đếm khách cuối dãy có test riêng nên tắt điều kiện của nó để lượt đóng ngay sau chặng đẩy. */
+const tatChangDem = (F) => { F.customerCountApplies = () => false; };
+
 /** Một response về cho request đang chờ của chặng đẩy. Trả request kế (chưa bọc phong bì) hoặc `null` khi lượt đã chốt. */
 function buocDay(F, reply) {
+  tatChangDem(F);
   return trongLat(F, () => {
     const state = F.stateRead();
     const out = F.stageCall(state, (copy) => F.pushStage({ state: copy, reply, inputs: F.pushInputs(), settings: F.scriptSettings(copy), now: Date.now() }));
@@ -17,6 +21,7 @@ function buocDay(F, reply) {
 
 /** Bước của ứng viên đang đẩy lỗi (`fromReply`: FBM trả lỗi; ngược lại bước xử lý response ném). Trả `{ ok, request }` như lời trả của lát: request kế đã bọc phong bì (`nextEnvelope` ghi mã request đang chờ), nên ca kiểm đưa thẳng response của nó vào `continue` được. */
 function buocDayLoi(F, failure, fromReply) {
+  tatChangDem(F);
   return trongLat(F, () => buocDayLoiTrongLat(F, failure, fromReply));
 }
 function buocDayLoiTrongLat(F, failure, fromReply) {

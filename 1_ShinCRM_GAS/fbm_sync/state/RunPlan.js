@@ -1,18 +1,18 @@
 /**
  * Dãy chặng của từng kiểu lượt: dữ liệu khai một chỗ, `runPlanOf` chỉ tra bảng. Kiểu hay mức quét không có trong bảng thì ném `SYNC_UNKNOWN_SCAN`, không rơi về một dãy mặc định (lỗi gõ không được biến thành một lượt khác).
  * `activity` là các lớp của chặng Giao dịch theo thứ tự: `list` xả danh sách đọc, `top` quét từ khách mới nhất xuống, `bulk` quét lớp 1, `rotation` vòng xoay chi tiết. `list` cuối vét khách các lớp trước mới đánh dấu.
- * Chặng cũ còn tự nối nhau; bảng hiện quyết mức quét hợp lệ và các lớp của chặng Giao dịch.
+ * `stages` là dãy chặng đầy đủ của kiểu lượt; chặng kế sau một chặng do `runPlanAfter` chọn (chỗ duy nhất), có chặng chỉ chạy khi chiều chạy cho phép (`RUN_STAGE_APPLIES`). Giữ phiên khai cả `record_push` và `customer_count` vì lượt nền chỉ đẩy khi cổng mở và chỉ đếm khách ở chiều lịch nền (`customerCountMode`); chặng kết thúc dãy thì `runStageNext` đóng lượt.
  * `label` là tên kiểu lượt duy nhất: nhãn lượt trong Log, tên tiến trình nền, menu `Mức quét` và lịch nền của Sidebar (nhận qua `runNames`) đều đọc ở đây.
  */
 if (typeof FbmSync === 'undefined' || !FbmSync) { FbmSync = {}; }
 
 FbmSync.RUN_PLANS = {
-  keepalive: { label: 'Giữ phiên FBM', stages: ['session'] },
+  keepalive: { label: 'Giữ phiên FBM', stages: ['session', 'record_push', 'customer_count'] },
   'sync:full:quick': { label: 'Quét nhanh', stages: ['session', 'customer_scan', 'activity', 'record_reconcile', 'record_push', 'customer_count'], activity: ['list', 'top', 'list'] },
   'sync:full:deep': { label: 'Quét kỹ', stages: ['session', 'customer_scan', 'activity', 'record_reconcile', 'record_push', 'customer_count'], activity: ['list', 'top', 'bulk', 'list'] },
   'sync:full:all': { label: 'Quét toàn bộ', stages: ['session', 'customer_scan', 'activity', 'record_reconcile', 'record_push', 'customer_count'], activity: ['list'] },
-  'sync:activity_bulk': { label: 'Lấy toàn bộ giao dịch', stages: ['session', 'activity', 'record_reconcile', 'record_push'], activity: ['bulk', 'list'] },
-  'sync:detail': { label: 'Vòng xoay giao dịch', stages: ['session', 'activity', 'record_reconcile', 'record_push'], activity: ['rotation', 'list'] },
+  'sync:activity_bulk': { label: 'Lấy toàn bộ giao dịch', stages: ['session', 'activity', 'record_reconcile', 'record_push', 'customer_count'], activity: ['bulk', 'list'] },
+  'sync:detail': { label: 'Vòng xoay giao dịch', stages: ['session', 'activity', 'record_reconcile', 'record_push', 'customer_count'], activity: ['rotation', 'list'] },
   conflict_refresh: { label: 'Đọc lại bản xung đột', stages: ['session', 'conflict_read'] },
   login_test: { label: 'Đăng nhập thử', stages: ['login'] },
   login_force: { label: 'Hủy phiên cũ', stages: ['login'] },
@@ -55,8 +55,31 @@ FbmSync.runNames = function () {
 };
 var SIDEBAR_SERVER_DATA_PROVIDERS = typeof SIDEBAR_SERVER_DATA_PROVIDERS !== 'undefined' ? SIDEBAR_SERVER_DATA_PROVIDERS : {};
 SIDEBAR_SERVER_DATA_PROVIDERS.fbm_sync = function () { return FbmSync.runNames(); };
-/** Vị trí kế sau `index` trong một dãy chặng (`-1` là chưa bắt đầu); hết dãy thì `-1`. */
+/** Vị trí kế sau `index` trong một dãy (`-1` là chưa bắt đầu); hết dãy thì `-1`. Dùng cho dãy chặng và dãy lớp của chặng Giao dịch. */
 FbmSync.runPlanNext = function (sequence, index) {
   var next = Number(index) + 1;
   return next < (sequence || []).length ? next : -1;
+};
+/**
+ * Điều kiện chạy của từng chặng theo ô lượt (chiều chạy): chặng không đủ điều kiện thì bị bỏ qua, không có chỗ nào khác rẽ nhánh theo chiều. `session` là chặng mở đầu nên luôn đủ điều kiện.
+ * Chặng đọc (`customer_scan`, `activity`) bỏ khi chiều Chỉ đẩy; `record_push` chỉ khi chiều ghi được FBM; `customer_count` chỉ khi chiều đếm ghi được Sheet. `record_reconcile` chưa là chặng riêng (đối soát làm theo từng trang trong chặng đọc) nên chưa mở.
+ */
+FbmSync.RUN_STAGE_APPLIES = {
+  session: function () { return true; },
+  customer_scan: function (state) { return state.mode !== 'push'; },
+  activity: function (state) { return state.mode !== 'push'; },
+  record_reconcile: function () { return false; },
+  record_push: function (state) { return FbmSync.canWriteFbm(state.mode); },
+  customer_count: function (state) { return FbmSync.customerCountApplies(FbmSync.customerCountMode(state)); }
+};
+/** Chặng kế sau `stage` trong dãy của lượt, đã bỏ chặng không đủ điều kiện; `''` khi hết dãy. Thuần: không đọc kho, không mở gì. */
+FbmSync.runPlanAfter = function (state, stage) {
+  var stages = FbmSync.runPlanOfState(state).stages, at = stages.indexOf(stage);
+  if (at < 0) { var missing = new Error('Chặng "' + stage + '" không nằm trong dãy chặng của lượt "' + String(state.scan || '') + '".'); missing.code = 'RUN_STAGE_UNKNOWN'; throw missing; }
+  for (var index = FbmSync.runPlanNext(stages, at); index >= 0; index = FbmSync.runPlanNext(stages, index)) {
+    var applies = FbmSync.RUN_STAGE_APPLIES[stages[index]];
+    if (!applies) { var unknown = new Error('Chặng "' + stages[index] + '" không có điều kiện trong RUN_STAGE_APPLIES.'); unknown.code = 'RUN_STAGE_UNKNOWN'; throw unknown; }
+    if (applies(state)) { return stages[index]; }
+  }
+  return '';
 };

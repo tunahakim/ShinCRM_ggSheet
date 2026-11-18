@@ -68,7 +68,7 @@ FbmSync.customerScanFinish = function (state, scan, patch, scope) {
 
 /** Bước kết của chặng: mở chặng đọc kế của lượt; lượt xong ngay thì nối bước đếm khách như mọi lượt có ghi Sheet. */
 FbmSync.customerScanEnd = function (state) {
-  return FbmSync.runTail(FbmSync.activityStagesContinue(state, {}));
+  return FbmSync.runStageResult(state, 'customer_scan', {});
 };
 
 /** Thiếu tổng hoặc nhận chưa đủ số FBM báo ở trang đầu: trả chữ lỗi; đủ thì `null`. Lượt dừng sớm vì phân trang hỏng mà vẫn xét vắng thì mọi khách chưa quét tới bị coi là vắng (gặp thật 2026-10-07: 1.262/1.312 khách). */

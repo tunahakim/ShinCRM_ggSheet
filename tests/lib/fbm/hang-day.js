@@ -82,6 +82,8 @@ function pushQueue(customers, activities) {
   F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Le Tuan Anh', userId: '2037', customerPrefix: 'ALT', customerCodeLength: 8 });
   F.categoryGateCheck = () => [];
   F.sliceIssue = (state, request) => request;
+  // Hộp kiểm hàng đợi đẩy: chặng đếm khách cuối dãy có test riêng nên tắt điều kiện của nó để lượt đóng ngay sau chặng đẩy.
+  F.customerCountApplies = () => false;
   const st = F.runOpen({ phase: 'push' });
   st.mode = 'write'; st.phase = 'push'; 
   st.cursor = { kind: 'push_scan', entity: 'customer', index: 0 };

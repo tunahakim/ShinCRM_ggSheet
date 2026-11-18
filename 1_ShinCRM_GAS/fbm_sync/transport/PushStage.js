@@ -33,14 +33,15 @@ FbmSync.pushStage = function (ctx) {
 /** Đầu vào của chặng đọc qua cổng chủ: ngưỡng chấp thuận (cổng cài đặt). */
 FbmSync.pushInputs = function () { return { threshold: settingsValue(FbmSync.SETTING_SECTIONS.run, 'approvalThreshold') }; };
 
-/** Bước kết của chặng trong bảng cursor: chốt lượt rồi nối bước đếm khách. */
+/** Bước kết của chặng trong bảng cursor: chốt chặng đẩy rồi phát request của chặng kế qua cổng phát. */
 FbmSync.pushEnd = function (state, end) {
-  return FbmSync.runTail(FbmSync.pushEndApply(state, end));
+  var result = FbmSync.pushEndApply(state, end);
+  return Object.assign({}, result, { request: FbmSync.sliceIssue(state, result.request) });
 };
 
 /**
- * Chốt lượt khi chặng đẩy kết thúc, một chỗ cho mọi lối ra: xóa danh sách đẩy (lượt sau quét lại); lần quét vừa rồi sạch (`mark`) thì ghi cổng `clean` và gỡ thông báo chờ duyệt.
- * Bản ghi còn giữ trong sổ bận lúc này là bản ghi mất phản hồi khi ghi (bản ghi xong đã nhả cùng lần ghi), nên `keepRecords` giữ chúng tới lượt mở sau.
+ * Chốt chặng đẩy, một chỗ cho mọi lối ra: xóa danh sách đẩy (lượt sau quét lại); lần quét vừa rồi sạch (`mark`) thì ghi cổng `clean` và gỡ thông báo chờ duyệt. Lỗi và tạm dừng đóng lượt tại đây; xong thì `runStageNext` chọn chặng kế.
+ * `keepRecords` giữ bản ghi mất phản hồi khi ghi tới lượt sau. Trả `{ ok, request }`, request thô của chặng kế chưa phát (`null` khi lượt đã đóng).
  */
 FbmSync.pushEndApply = function (state, end) {
   FbmSync.pushListClear();
@@ -55,7 +56,7 @@ FbmSync.pushEndApply = function (state, end) {
   if (end.kind === 'pause') {
     FbmSync.runClose(state, 'paused', end.code ? { code: end.code, message: end.message, error: end.message } : { message: end.message });
   } else {
-    FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) + (end.remaining ? ' Còn ' + end.remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '') + (end.note || ''), keepRecords: true });
+    return { ok: true, request: FbmSync.runStageNext(state, 'record_push', { suffix: (end.remaining ? ' Còn ' + end.remaining + ' bản ghi chưa đẩy xong; lượt sau làm tiếp.' : '') + (end.note || ''), keepRecords: true }) };
   }
   return { ok: true, request: null };
 };
@@ -63,7 +64,7 @@ FbmSync.pushEndApply = function (state, end) {
 /** Một chỗ mở chặng đẩy cho mọi chiều (người điều phối của chiều đọc gọi): dấu trang chưa có danh sách nên bước đầu tiên quét cả hai sheet. Trả request đầu tiên, hoặc `null` khi lượt đã chốt. */
 FbmSync.pushStageOpen = function (state) {
   // Cổng do `preflightLocalStep` quyết một lần cho lượt; thiếu nghĩa là mở. Đóng thì giữ nguyên dấu cổng, vì nó vẫn đúng.
-  if (state.pushGate && state.pushGate.open === false) { FbmSync.pushEndApply(state, { kind: 'done', remaining: 0 }); return null; }
+  if (state.pushGate && state.pushGate.open === false) { return FbmSync.pushEndApply(state, { kind: 'done', remaining: 0 }).request; }
   state.phase = 'push'; state.entity = 'customer'; state.current = ''; state.cursor = FbmSync.pushCursor({});
   state.message = 'Đang chuẩn bị các bản ghi ShinCRM cần đẩy lên FBM...';
   return FbmSync.pushStageResume(state);
@@ -74,8 +75,7 @@ FbmSync.pushStageResume = function (state) {
   var settings = FbmSync.scriptSettings(state), threshold = FbmSync.pushInputs().threshold;
   var out = FbmSync.stageCall(state, function (copy) { var logs = [], step = FbmSync.pushNext(copy, settings, logs, threshold); return Object.assign({ patch: FbmSync.pushPatch(copy, logs) }, step); });
   if (out.next) { return out.next; }
-  FbmSync.pushEndApply(state, out.end);
-  return null;
+  return FbmSync.pushEndApply(state, out.end).request;
 };
 
 /**

@@ -6,9 +6,8 @@ FbmSync.backgroundRunningResult = function () {
   return { ok: false, code: 'SYNC_BACKGROUND_RUNNING', message: 'Một lượt đồng bộ nền đang chạy.' };
 };
 
-/** Mở lượt và trả request đầu tiên; lượt xong ngay ở bước mở vẫn kết thúc bằng bước đếm. `current` là ô lượt người gọi đang cầm (bản của lát). */
-FbmSync.start = function (options, current) { return FbmSync.runTail(FbmSync.startRun(options, current)); };
-FbmSync.startRun = function (options, current) {
+/** Mở lượt và trả request đầu tiên. `current` là ô lượt người gọi đang cầm (bản của lát). */
+FbmSync.start = function (options, current) {
   // Mỗi call chỉ trả một request; ngữ cảnh nhiều bước nằm trong DocumentProperties.
   var opt = options || {};
   // Tra dãy chặng trước mọi việc: mức quét lạ ném `SYNC_UNKNOWN_SCAN` khi lượt cũ chưa bị đụng tới.
@@ -54,7 +53,6 @@ FbmSync.startRun = function (options, current) {
   state.pushGate = opt.pushGate || null;
   // Lời duyệt chỉ sống trong lượt tay do nút Chấp thuận mở; lượt nền không bao giờ mang nó nên không tự đẩy tập chạm ngưỡng.
   state.approvedFingerprint = state.origin === 'manual' ? String(opt.approvedFingerprint || '') : '';
-  FbmSync.countTailMark(state);
   if (state.origin === 'background') { state.detailCustomerLimit = state.scan === 'detail' ? Math.max(1, Math.floor(opt.detail && opt.detail.customersPerRun || settingsValue(FbmSync.SETTING_SECTIONS.background, 'detailCustomersPerRun'))) : 0; }
   // Chỉ phần kiểm tra rẻ chạy trước request FBM đầu tiên; phần đọc và hash cả hai Sheet chạy sau khi phiên FBM đã xác thực (`preflightLocalStep`).
   var gates = FbmSync.withLocalSnapshot(function () { return FbmSync.preflightGates({ mode: state.mode, origin: state.origin, scan: state.scan }); });
@@ -169,53 +167,74 @@ FbmSync.progressCustomersDone = function (state, count) {
   state.progress.done = Number(state.progress.done || 0) + Number(count || 0);
 };
 
-/** Kết thúc lượt đọc: cờ vắng mặt đã do cửa ghi gắn theo từng lô nên ở đây chỉ chốt lượt và xóa danh sách đọc của lượt. */
-FbmSync.finishPullRun = function (state) {
-  FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) });
-  return true;
+/**
+ * Chặng kế của lượt, người điều phối chung của mọi chỗ "xong một chặng": `runPlanAfter` chọn chặng kế theo dãy của lượt, `RUN_STAGES` mở nó. Chặng không có việc (không request) thì sang chặng sau; hết dãy thì đóng lượt `done`.
+ * `ended` là chặng vừa xong (tên trong `stages`); chặng Giao dịch gồm nhiều lớp nên xong một lớp thì mở lớp kế trước. `tail`: `suffix` lời nối cuối thông báo đóng lượt, `keepRecords` giữ bản ghi bận (chỉ khi đóng thẳng; chặng đếm đóng lượt không giữ).
+ * Trả request thô chưa phát, hoặc `null` khi lượt đã đóng (hết dãy, hoặc chặng tự đóng lượt: đẩy tạm dừng hay lỗi).
+ */
+FbmSync.runStageNext = function (state, ended, tail) {
+  var closing = tail || {}, layer = FbmSync.RUN_STAGES[ended], request = layer && layer.layered ? layer.open(state, closing) : null;
+  if (request) { return request; }
+  for (var stage = FbmSync.runPlanAfter(state, ended); stage; stage = FbmSync.runPlanAfter(state, stage)) {
+    request = FbmSync.RUN_STAGES[stage].open(state, closing);
+    if (request) { return request; }
+    if (FbmSync.RUN_STAGES[stage].settles) { return null; }
+  }
+  FbmSync.runClose(state, 'done', { message: FbmSync.runDoneMessage(state) + String(closing.suffix || ''), keepRecords: closing.keepRecords === true });
+  return null;
+};
+/**
+ * Cách mở từng chặng của dãy (`open(state, tail)` trả request đầu hoặc `null` khi chặng không có việc). `layered`: chặng gồm nhiều lớp, `open` gọi lại để lấy lớp kế. `settles`: chặng tự kết thúc qua `runStageNext` (đẩy), nên `open` trả `null` nghĩa là lượt đã được xử lý hết, không sang chặng sau lần nữa.
+ * Tra tên lúc gọi để chỗ thay thế (test, bản vá) có hiệu lực.
+ */
+FbmSync.RUN_STAGES = {
+  customer_scan: {
+    open: function (state) {
+      FbmSync.seenStoreBegin('customer', FbmSync.readLocal('customer'));
+      FbmSync.scanJobOpen(state, { entity: 'customer', type: 0, pageIndex: -1, pageValue: null, pageItems: null, count: FbmSync.BUDGET.scanCustomerRows, seen: 0 });
+      state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
+      return FbmSync.scanJobRequest(state, FbmSync.scriptSettings(state), FbmSync.scope());
+    }
+  },
+  activity: { layered: true, open: function (state) { return FbmSync.activityStageNext(state); } },
+  record_push: {
+    settles: true,
+    // Lượt Hai chiều đẩy sau khi đọc: danh sách đọc của lượt xóa và các bước Lấy đóng trước khi mở bước đẩy. Chiều Chỉ đẩy chưa đọc gì nên không có gì để dọn.
+    open: function (state) {
+      if (FbmSync.canWriteSheet(state.mode)) {
+        FbmSync.readListClear();
+        FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity));
+      }
+      return FbmSync.pushStageOpen(state);
+    }
+  },
+  // Các bước nghiệp vụ đóng trước (dòng Log kết thúc đứng trước kết quả đếm) và mốc số khách của lượt ghi bền trước khi đối chiếu: lượt hỏng ở chặng đếm vẫn giữ mốc của dữ liệu đã ghi.
+  customer_count: {
+    open: function (state, tail) {
+      FbmSync.businessFinishOpenSteps(state, 'done', { error: '' });
+      FbmSync.runMarksCommit(state);
+      return FbmSync.customerCountOpen(state, tail);
+    }
+  }
+};
+/** Kết quả của `continue` khi một chặng vừa xong: request kế đã phát qua cổng phát của lát (hoặc `null` khi lượt đóng), kèm `extra` của chặng. */
+FbmSync.runStageResult = function (state, ended, extra) {
+  return Object.assign({ ok: true, status: null }, extra || {}, { request: FbmSync.sliceIssue(state, FbmSync.runStageNext(state, ended)) });
 };
 
-/** Mở chặng đọc kế của lượt; hết chặng thì chốt lượt hoặc sang chiều đẩy. Trả kết quả của `continue`. */
-FbmSync.activityStagesContinue = function (state, extra) {
-  var request = FbmSync.activityStageNext(state);
-  if (request) { return Object.assign({ ok: true, request: FbmSync.sliceIssue(state, request) }, extra || {}); }
-  return FbmSync.pullFinishOrPush(state, extra);
-};
-
-/** Chuyển từ lookup sang grid Customer, kể cả khi lookup chỉ đọc bị lỗi. */
+/** Chuyển từ lookup sang chặng đọc đầu của dãy, kể cả khi lookup chỉ đọc bị lỗi. Chiều Chỉ đẩy không đọc nên không mở sổ đọc. */
 FbmSync.beginCustomerPull = function (state) {
   var categoryLogs = [];
   FbmSync.prepareCategoryGate(state, categoryLogs);
   FbmSync.stagePatchApply(state, { logs: categoryLogs });
-  if (state.mode === 'push') { return FbmSync.pushStageOpen(state); }
-  if (state.scan === 'full') {
-    FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
-    FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
+  if (state.mode !== 'push') {
+    if (state.scan === 'full') {
+      FbmSync.businessStepStart(state, 'pull_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
+      FbmSync.businessStepStart(state, 'reconcile_customer', { mode: state.mode, scan: state.scan, entity: 'customer' });
+    }
+    FbmSync.activityLayersBegin();
   }
-  FbmSync.activityLayersBegin();
-  if (state.scan === 'detail' || state.scan === 'activity_bulk') {
-    var stageRequest = FbmSync.activityStageNext(state);
-    if (!stageRequest) { FbmSync.finishPullRun(state); }
-    return stageRequest;
-  }
-  FbmSync.seenStoreBegin('customer', FbmSync.readLocal('customer'));
-  FbmSync.scanJobOpen(state, { entity: 'customer', type: 0, pageIndex: -1, pageValue: null, pageItems: null, count: FbmSync.BUDGET.scanCustomerRows, seen: 0 });
-  state.phase = 'pull_customer'; state.entity = 'customer'; state.message = 'Đang đọc khách hàng từ FBM...';
-  return FbmSync.scanJobRequest(state, FbmSync.scriptSettings(state), FbmSync.scope());
-};
-
-/** Sau khi đọc xong mọi chặng: chế độ hai chiều chuyển sang đẩy, chế độ lấy chốt lượt. Danh sách đọc của lượt xóa trước khi sang đẩy. */
-FbmSync.pullFinishOrPush = function (state, extra) {
-  var result = Object.assign({ ok: true, status: null }, extra || {});
-  if (FbmSync.canWriteSheet(state.mode) && FbmSync.canWriteFbm(state.mode)) {
-    FbmSync.readListClear();
-    FbmSync.businessFinishSteps(state, FbmSync.BUSINESS_PULL_STEPS.customer.concat(FbmSync.BUSINESS_PULL_STEPS.activity));
-    result.request = FbmSync.sliceIssue(state, FbmSync.pushStageOpen(state));
-    return result;
-  }
-  FbmSync.finishPullRun(state);
- 
-  return result;
+  return FbmSync.runStageNext(state, 'session');
 };
 
 /** Tiếp tục đúng một bước từ response Extension và lưu cursor trước khi trả về. */

@@ -140,10 +140,7 @@ const RULES = [
 
 /** Danh sách ngoại lệ hiện có, mỗi quy tắc một bảng `tệp -> số vi phạm`. Chỉ được co lại. */
 const EXCEPTIONS = {
-  stateReadWrite: {
-    // runTail: chờ 7B (đọc và ghi ô lượt để chèn bước đếm cuối lượt).
-    '1_ShinCRM_GAS/fbm_sync/transport/CustomerCount.js': 2
-  },
+  stateReadWrite: {},
   silentError: {},
   typeofFunction: {
     '1_ShinCRM_GAS/client/sync/fbmSync.html': 49,

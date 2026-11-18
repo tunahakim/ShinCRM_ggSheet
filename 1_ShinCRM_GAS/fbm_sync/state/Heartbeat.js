@@ -31,7 +31,7 @@ FbmSync.pushGateDue = function (state, direction) {
 FbmSync.keepaliveCountOpen = function (direction, carry) {
   var state = FbmSync.runOpen({ origin: 'background', mode: direction, scan: 'keepalive', phase: 'pull_customer', entity: 'customer', cursor: { kind: 'customer_count' }, message: 'Đang giữ phiên FBM...', process: carry.process, pollAt: carry.pollAt });
   state.scheduleMode = FbmSync.modeOf(direction);
-  state.metadata.countTail = { pending: false, mode: state.scheduleMode, message: 'Giữ phiên FBM OK.', recount: FbmSync.customerCountApplies(direction) };
+  state.metadata.closeMessage = 'Giữ phiên FBM OK.';
   return { ok: true, request: FbmSync.cursorIssue(state) };
 };
 

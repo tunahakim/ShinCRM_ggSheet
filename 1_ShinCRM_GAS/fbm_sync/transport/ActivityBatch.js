@@ -219,7 +219,7 @@ FbmSync.activityGridStage = function (ctx) {
 
 /** Bước kết của chặng: mở lớp đọc kế của lượt; hết lớp thì chốt lượt hoặc sang chiều đẩy, lượt xong thì nối bước đếm khách. */
 FbmSync.activityGridEnd = function (state, end) {
-  return FbmSync.runTail(FbmSync.activityStagesContinue(state, { imported: end.imported }));
+  return FbmSync.runStageResult(state, 'activity', { imported: end.imported });
 };
 
 /**

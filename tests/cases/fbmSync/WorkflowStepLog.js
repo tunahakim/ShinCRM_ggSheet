@@ -54,7 +54,7 @@ async function chay(so) {
   const sangDay = soBuoc('write');
   ['pull_activity', 'reconcile_activity'].forEach((key) => sangDay.F.businessStepStart(sangDay.st, key, {}));
   sangDay.F.pushNext = (state) => { sangDay.F.businessStepStart(state, 'push_customer', {}); return { end: { kind: 'done', remaining: 0 } }; };
-  trongLat(sangDay.F, () => sangDay.F.pullFinishOrPush(sangDay.st, {}), sangDay.st);
+  trongLat(sangDay.F, () => sangDay.F.runStageResult(sangDay.st, 'record_reconcile', {}), sangDay.st);
   check(so, 'Log sổ bước: lượt hai chiều đóng mọi bước Lấy trước khi mở bước đẩy',
     ['pull_customer_finished', 'reconcile_customer_finished', 'pull_activity_finished', 'reconcile_activity_finished'].every((action) => viTri(sangDay.nhatKy, action) >= 0 && viTri(sangDay.nhatKy, action) < viTri(sangDay.nhatKy, 'push_customer_started')),
     true);

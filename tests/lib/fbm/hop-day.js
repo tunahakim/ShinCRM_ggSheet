@@ -19,7 +19,8 @@ function dungHopDay() {
   const F = push.FbmSync;
   datState(F, { session: PHIEN });
   const dieuKienThat = F.pushEligibilityErrors;
-  // Hộp này kiểm hàng đợi đẩy; lịch kiểm lại danh mục có test riêng.
+  // Hộp này kiểm hàng đợi đẩy: chặng đếm khách cuối dãy có test riêng nên tắt điều kiện của nó để lượt đóng ngay sau chặng đẩy; lịch kiểm lại danh mục cũng có test riêng.
+  F.customerCountApplies = () => false;
   F.pushLookupDue = () => false;
   F.scriptSettings = () => ({ cookie: '', customerAuthorized: '', activityAuthorized: '', accountName: 'Lê Tuấn Anh' });
   datUngVienDay(push, () => [{ kind: 'edit', id: 'C-1', position: 0, record: { id: 'C-1', fbmId: 'A-1', fbmHash: 'h1' } }]);

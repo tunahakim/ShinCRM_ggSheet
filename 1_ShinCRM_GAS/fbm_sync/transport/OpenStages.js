@@ -47,7 +47,7 @@ FbmSync.authorizeEnd = function (state, end) {
   if (FbmSync.needsFbmLookups(state)) { return FbmSync.openStageMove(state, { cursor: { kind: 'lookup' }, message: 'Đang kiểm tra danh mục FBM...' }); }
   var pullRequest = FbmSync.beginCustomerPull(state);
   FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: 0, errors: Number(state.metadata && state.metadata.categoryBlocks && state.metadata.categoryBlocks.length || 0) });
-  return FbmSync.runTail(FbmSync.openStageResult(state, pullRequest));
+  return FbmSync.openStageResult(state, pullRequest);
 };
 
 /** Đầu vào chặng grid User: mã bảng tính đang mở (cổng Spreadsheet). */
@@ -64,10 +64,10 @@ FbmSync.identityUserGridStage = function (ctx) {
 FbmSync.identityUserGridEnd = function (state, end) {
   if (end.fail) {
     FbmSync.runFail(state, end.fail.code, end.fail.message);
-    return FbmSync.runTail({ ok: false, code: end.fail.code, request: null, error: end.fail.message });
+    return { ok: false, code: end.fail.code, request: null, error: end.fail.message };
   }
   FbmSync.runClose(state, 'done', { message: 'Đã đọc nhận diện phiên FBM; chờ người dùng xác nhận lưu.' });
-  return FbmSync.runTail({ ok: true, request: null });
+  return { ok: true, request: null };
 };
 
 /** Chặng nạp danh mục đầu lượt (chế độ ghi cần danh mục trước khi dựng payload; chiều đẩy nạp lại giữa các lô ở `push_lookup`). Cả lô lỗi đường truyền thì dừng lượt (không đi tiếp với danh mục rỗng); phần tử nghi phiên thì nhường chặng phiên, cursor còn nguyên nên dựng lại đúng lô. */
@@ -81,7 +81,7 @@ FbmSync.lookupStage = function (ctx) {
 FbmSync.lookupEnd = function (state) {
   var customerRequest = FbmSync.beginCustomerPull(state), categoryBlocks = state.metadata && state.metadata.categoryBlocks || [];
   FbmSync.businessStepFinish(state, 'category', 'ok', { lookups: Number(FbmSync.SYNC_LOOKUPS.length || 0), errors: Number(categoryBlocks.length || 0) });
-  return FbmSync.runTail(FbmSync.openStageResult(state, customerRequest));
+  return FbmSync.openStageResult(state, customerRequest);
 };
 
 /** Chặng grid Customer của lượt kiểm tra liên kết: đọc một trang (sắp theo `stt_rec_kh`), bỏ khách tạm; bước kết đối chiếu với Sheet và chọn trang kế. */
@@ -103,5 +103,5 @@ FbmSync.identityCheckGridEnd = function (state, end) {
   }
   FbmSync.identityCheckFinish(state);
   FbmSync.runClose(state, 'done', { message: 'Đã kiểm tra liên kết Customer FBM.' });
-  return FbmSync.runTail({ ok: true, request: null, imported: eligible.length });
+  return { ok: true, request: null, imported: eligible.length };
 };

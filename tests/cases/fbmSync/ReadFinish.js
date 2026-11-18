@@ -34,7 +34,8 @@ function chay(so) {
     }
   });
   napServer(readFinish, 'fbm_sync/state/Run.js', 'fbm_sync/state/RunStop.js', 'fbm_sync/state/Slice.js', 'fbm_sync/state/RunPlan.js', 'fbm_sync/state/PropertyBuffer.js', 'fbm_sync/reconcile/CategoryGate.js', 'fbm_sync/reconcile/CategoryLookup.js', 'fbm_sync/reconcile/SyncPermission.js', 'fbm_sync/transport/Budget.js', 'fbm_sync/transport/PullFlow.js', 'fbm_sync/transport/ScanJob.js', 'fbm_sync/read/CustomerScan.js', 'fbm_sync/transport/CustomerCount.js', 'fbm_sync/state/Scheduler.js', 'fbm_sync/state/BackgroundMachine.js', 'fbm_sync/state/Heartbeat.js', 'fbm_sync/transport/ActivityBatch.js', 'fbm_sync/read/ActivityLayers.js', 'fbm_sync/transport/ActivityScan.js', 'fbm_sync/write/SheetSave.js');
-  // Chỉ kiểm chặng chính của lượt; bước đếm cuối lượt có test riêng.
+  // Chỉ kiểm chặng chính của lượt; chặng đếm cuối dãy có test riêng nên tắt điều kiện của nó để lượt dừng ở đây.
+  readFinish.FbmSync.customerCountApplies = () => false;
   readFinish.FbmSync.customerAbsentMark = () => { readFinishMissing += 1; };
   readFinish.FbmSync.readListClear = () => {};
   readFinish.FbmSync.workStoreClear = () => 0;

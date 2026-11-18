@@ -54,9 +54,9 @@ async function chay(so) {
   // Bấm chạy khi lượt vừa dừng giữa chừng: cursor khai `resumable: false` thì báo bận; đang ở chặng phiên thì gửi lại chính request hỏi phiên, không mở chặng phiên lồng. Lượt đăng nhập thử ở mức bước mở lượt: qua `runSlice` thì lượt không request nào chờ bị đóng RUN_LEFT_OPEN như mọi lượt bỏ ngỏ.
   const dangNhap = hopLuot(ghi.loginCursorOpen({ purpose: 'auto', afterLogin: { cursor: LUOI_KHACH } }), { phase: 'checking_session' });
   const phien = hopLuot({ kind: 'session', cause: 'issue', resume: { cursor: LUOI_KHACH, phase: 'pull_customer', entity: 'customer' }, replay: false, probeRetried: false, pageReloaded: false }, { phase: 'checking_session' });
-  const phienLai = phien.runSlice(() => phien.startRun({ origin: 'manual', manual: true, mode: 'read' }, phien.stateRead()));
+  const phienLai = phien.runSlice(() => phien.start({ origin: 'manual', manual: true, mode: 'read' }, phien.stateRead()));
   check(so, 'nối lượt dở: lượt đăng nhập không nối mù; chặng phiên gửi lại request hỏi phiên với nguyên chỗ quay về', [
-    trongLat(dangNhap, () => dangNhap.startRun({ origin: 'manual', manual: true, mode: 'read' }, dangNhap.stateRead())).code, phienLai.ok, phienLai.request && phienLai.request.meta.kind, phien.stateRead().cursor.kind, phien.stateRead().cursor.resume.cursor.kind
+    trongLat(dangNhap, () => dangNhap.start({ origin: 'manual', manual: true, mode: 'read' }, dangNhap.stateRead())).code, phienLai.ok, phienLai.request && phienLai.request.meta.kind, phien.stateRead().cursor.kind, phien.stateRead().cursor.resume.cursor.kind
   ], ['SYNC_BUSY', true, 'session_probe', 'session', 'customer_grid']);
   // Đăng xuất FBM giữa lượt làm tab đổi trang nên request đọc đang chạy chết giữa đường: gửi lại phải qua chặng phiên (hỏi phiên trước), không đi thẳng tới FBM.
   const dutKenh = (options) => {

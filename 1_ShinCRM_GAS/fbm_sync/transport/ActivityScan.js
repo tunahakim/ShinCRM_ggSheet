@@ -173,5 +173,5 @@ FbmSync.activityBulkAbsent = function (input, windows) {
 
 /** Bước kết của chặng: mở chặng đọc kế của lượt. */
 FbmSync.activityScanEnd = function (state, end) {
-  return FbmSync.runTail(FbmSync.activityStagesContinue(state, { imported: end.imported }));
+  return FbmSync.runStageResult(state, 'activity', { imported: end.imported });
 };

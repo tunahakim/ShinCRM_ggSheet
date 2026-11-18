@@ -100,35 +100,35 @@ FbmSync.processOutcome = function (state) {
   return '';
 };
 
-/** Lượt vừa đóng `done` mà còn bước đếm khách cuối lượt (`countTail` đặt lúc mở lượt): `runTail` sẽ mở lại chính lượt đó cho bước đếm, nên lượt chưa thật sự xong. Thuần. */
-FbmSync.countTailPending = function (state) {
-  var tail = state.metadata && state.metadata.countTail;
-  return state.phase === 'done' && !!tail && tail.pending === true;
-};
 /** Mã đóng lượt nghĩa là tài khoản FBM đang mở không phải tài khoản đã liên kết: lượt nền gặp mã này thì nền dừng hẳn tới khi liên kết đổi, không thử lại theo lịch (thử lại chỉ chạy tiếp trên tài khoản sai). */
 FbmSync.IDENTITY_STOP_CODES = ['SESSION_IDENTITY_MISMATCH', 'LOGIN_IDENTITY_MISMATCH'];
-/**
- * Bước ghi sổ tiến trình của `runClose`, một lần đọc và nhiều nhất một lần ghi sổ cho mọi đường đóng lượt (xong, lỗi, dừng, bỏ dở): mốc bền của lượt `done`; kết quả tiến trình của lượt nền (`processOutcome`: xong ghi giờ chạy xong, lỗi dời giờ thử lại, dừng không tính); dấu dừng nền khi lệch danh tính (`identityStop` = giờ dừng).
- * Mốc luôn xóa khỏi metadata để lần đóng lượt kế (đuôi đếm khách) không ghi lại. Ô lượt giữ `process` sau khi đóng: đuôi chuỗi nền đọc kết quả từ đó, lượt mở sau ghi đè. Bên đóng lượt mà trao tiến trình cho lượt mở tiếp (bước đếm lệch mốc mở Quét nhanh) thì bỏ `process` trước khi đóng.
- */
-FbmSync.runBookCommit = function (state, now) {
-  var metadata = state.metadata || {}, marks = {}, found = 0, done = state.phase === 'done';
+/** Lấy các mốc chờ ra khỏi metadata của lượt (luôn xóa khỏi metadata); `keep` thì trả chúng để ghi bền, không thì bỏ. Trả `null` khi không có mốc nào để ghi. */
+FbmSync.runMarksTake = function (state, keep) {
+  var metadata = state.metadata || {}, marks = {};
   FbmSync.RUN_CLOSE_MARKS.forEach(function (key) {
-    if (done && (typeof metadata[key] === 'number' || typeof metadata[key] === 'string')) { marks[key] = metadata[key]; found += 1; }
+    if (keep && (typeof metadata[key] === 'number' || typeof metadata[key] === 'string')) { marks[key] = metadata[key]; }
     delete metadata[key];
   });
-  // Còn bước đếm khách thì kết quả tiến trình ghi ở lần đóng của bước đếm, không ghi hai lần.
-  var outcome = FbmSync.countTailPending(state) ? '' : FbmSync.processOutcome(state), kind = String(state.process || '');
-  if (!found && !outcome) { return; }
+  return Object.keys(marks).length ? marks : null;
+};
+/** Ghi bền các mốc chờ khi mọi chặng làm việc của lượt đã xong, trước chặng đếm khách: chặng đếm đối chiếu với mốc này, và lượt hỏng ở chặng đếm vẫn giữ mốc của dữ liệu đã ghi. */
+FbmSync.runMarksCommit = function (state) { var marks = FbmSync.runMarksTake(state, true); if (marks) { FbmSync.processBookWrite(FbmSync.processBookMarks(FbmSync.processBookRead(), marks)); } };
+/**
+ * Bước ghi sổ tiến trình của `runClose`, một lần đọc và nhiều nhất một lần ghi sổ cho mọi đường đóng lượt (xong, lỗi, dừng, bỏ dở): mốc bền của lượt `done`; kết quả tiến trình của lượt nền (`processOutcome`: xong ghi giờ chạy xong, lỗi dời giờ thử lại, dừng không tính); dấu dừng nền khi lệch danh tính (`identityStop` = giờ dừng).
+ * Mốc luôn xóa khỏi metadata sau khi ghi (mốc đã ghi từ chặng đếm khách thì không còn ở đây, `runMarksCommit`). Ô lượt giữ `process` sau khi đóng: đuôi chuỗi nền đọc kết quả từ đó, lượt mở sau ghi đè. Bên đóng lượt mà trao tiến trình cho lượt mở tiếp (chặng đếm lệch mốc mở Quét nhanh) thì bỏ `process` trước khi đóng.
+ */
+FbmSync.runBookCommit = function (state, now) {
+  var marks = FbmSync.runMarksTake(state, state.phase === 'done'), outcome = FbmSync.processOutcome(state), kind = String(state.process || '');
+  if (!marks && !outcome) { return; }
   var book = FbmSync.processBookRead(), mark = null;
-  if (found) { book = FbmSync.processBookMarks(book, marks); }
+  if (marks) { book = FbmSync.processBookMarks(book, marks); }
   if (outcome === 'done' || outcome === 'failed') {
     mark = FbmSync.processBookMark(book, kind, outcome, now);
     book = mark.book;
     var mismatch = outcome === 'failed' && FbmSync.IDENTITY_STOP_CODES.indexOf(String(state.lastFailureCode)) >= 0;
     book.identityStop = mismatch ? now : outcome === 'done' ? 0 : book.identityStop;
   }
-  if (found || mark) { FbmSync.processBookWrite(book); }
+  if (marks || mark) { FbmSync.processBookWrite(book); }
   if (outcome) { state.nextRunAt = FbmSync.scheduleNextAt(FbmSync.scheduleShape(settingsValues(FbmSync.SETTING_SECTIONS.background)), book); }
   if (outcome !== 'failed') { return; }
   var label = FbmSync.scheduleLabel(kind), code = state.lastFailureCode ? ' (mã ' + state.lastFailureCode + ')' : '';

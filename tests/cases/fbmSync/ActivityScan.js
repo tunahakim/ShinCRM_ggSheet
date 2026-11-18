@@ -96,7 +96,9 @@ async function chay(so) {
   const nenState = nenLoi.F.runOpen({ phase: 'pull_activity' });
   Object.assign(nenState, { mode: 'read', scan: 'activity_bulk', origin: 'background' });
   nenState.metadata.customerErrors = { total: 2, recent: [] };
-  trongLat(nenLoi.F, () => nenLoi.F.finishPullRun(nenState), nenState);
+  nenState.metadata.activityStage = 1;
+  nenLoi.F.customerCountApplies = () => false;
+  trongLat(nenLoi.F, () => nenLoi.F.runStageNext(nenState, 'activity'), nenState);
   const nenXong = nenLoi.F.stateRead();
   check(so, 'Lượt nền lấy toàn bộ giao dịch có khách lỗi khi đọc: thông báo cuối lượt trên Sidebar nêu số khách lỗi, không chỉ ghi ở Log', [nenXong.phase, String(nenXong.message || '').indexOf('2 khách lỗi khi đọc giao dịch') >= 0], ['done', true]);
 
