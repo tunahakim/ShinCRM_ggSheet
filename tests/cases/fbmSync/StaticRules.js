@@ -125,6 +125,11 @@ const RULES = [
   {
     // Phiên chỉ được đánh dấu đã xác minh sau phép quyết danh tính chung (`identityMatchDecide`): ở chặng phiên (cổng trước request nghiệp vụ) và ở bước cuối của lượt đăng nhập.
     id: 'sessionVerify', title: 'xác minh phiên chỉ ở chặng phiên và chặng đăng nhập', scope: ['gas'], allow: ['1_ShinCRM_GAS/fbm_sync/auth/SessionStage.js', '1_ShinCRM_GAS/fbm_sync/auth/LoginRun.js'], find: (file, src) => matchAll(src, /\bsessionIdentityVerify\s*\(/, notDefinition)
+  },
+  {
+    // Gọi cửa ghi dòng như một câu lệnh (vứt kết quả) mà không gắn `must` thì dòng bận vẫn được coi như đã ghi; `must` phải đứng trước `build` trong tùy chọn.
+    id: 'rowResultDropped', title: 'gọi pushRowChange vứt kết quả phải gắn must', scope: ['gas'], allow: [],
+    find: (file, src) => matchAll(src, /^[ \t]*(?:FbmSync\.)?pushRowChange\s*\([^{;]*\{[^{}]*/m, (m) => !/\bmust\s*:/.test(m[0]))
   }
 ];
 
@@ -258,6 +263,7 @@ function chay(so) {
   check(so, 'ghi baseline bằng khóa literal và phép gán bị bắt, đọc, so sánh và khai báo schema thì không', hits('baselineWrite', 'f.js', "w.push({ fbmHash: h }); r.fbmHash = h; if (r.fbmHash === h) {} var x = r.fbmHash || ''; var s = { fbmHash: { code: 'A' } };"), 2);
   check(so, 'stateWrite bị bắt, khai báo hàm thì không', hits('stateReadWrite', 'f.js', 'FbmSync.stateWrite({}); var s = stateRead(); function stateWrite(x) {}'), 2);
   check(so, 'logEvent và gọi sessionIdentityVerify bị bắt, khai báo thì không', [hits('logEvent', 'f.js', "logEvent({ a: 1 });"), hits('sessionVerify', 'f.js', 'F.sessionIdentityVerify(s, i); F.sessionIdentityVerify = function (s, i) {};')], [1, 1]);
+  check(so, 'gọi pushRowChange vứt kết quả mà thiếu must bị bắt, gán kết quả hoặc có must thì không', hits('rowResultDropped', 'f.js', "FbmSync.pushRowChange('c', id, { build: function () { return {}; } });\n  pushRowChange('c', id, { must: 'x', build: f });\n  var d = F.pushRowChange('c', id, { build: f });"), 1);
   check(so, 'đặt phase cuối ngoài runClose bị bắt', [hits('phaseClose', 'f.js', "state.phase = 'done';"), hits('phaseClose', 'f.js', "if (state.phase === 'done') {}")], [1, 0]);
 
   section('Quét quy tắc kiến trúc FBM — phép so ngoại lệ chỉ cho co lại');

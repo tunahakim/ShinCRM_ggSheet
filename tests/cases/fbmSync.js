@@ -68,6 +68,7 @@ const NHOM = [
   require("./fbmSync/PushActivityForm"),
   require("./fbmSync/PushMarker"),
   require("./fbmSync/PushCreateRecover"),
+  require("./fbmSync/PushBusyResult"),
   require("./fbmSync/PushCompare"),
   require("./fbmSync/Audit"),
   require("./fbmSync/SidebarGasStatus"),

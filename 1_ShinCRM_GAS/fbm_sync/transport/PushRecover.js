@@ -41,10 +41,9 @@ FbmSync.createRejected = function (cursor) {
  */
 FbmSync.createRecoveryApply = function (state, cursor, candidate, ids) {
   var entity = String(candidate.entity || ''), id = String(candidate.id || '');
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, build: function (local) {
+  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả tra lại', build: function (local) {
     return { patch: Object.assign({ id: local.id, syncStatus: FbmSync.SYNC_STATUS.pending }, ids ? Object.assign({ fbmHash: '' }, ids) : {}) };
   } });
-  if (done.status === 'busy') { throw new Error(entity + ' ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa ghi kết quả tra lại.'); }
   if (done.status !== 'gone') {
     FbmSync.pushFailuresRemove([entity + ':' + id]);
     FbmSync.businessStepAdd(state, 'push_' + entity, { written: 1, sheetWriteBatches: 1 });
@@ -67,13 +66,12 @@ FbmSync.finishCustomerCreateRecovery = function (state, response) {
   }
   if (!rows.length) { throw cursor.rejected ? FbmSync.createRejected(cursor) : new Error('CREATE_RECOVERY_NOT_EXACT: chưa thấy Customer vừa tạo; không gửi lại lệnh ghi, lượt sau tra lại.'); }
   // Đọc dòng, so và vá trong cùng một lần qua cửa; mọi lỗi ném ra từ hàm quyết thì cửa không ghi gì.
-  var done = FbmSync.pushRowChange('customer', id, { allowGone: true, release: true, build: function (local) {
+  var done = FbmSync.pushRowChange('customer', id, { allowGone: true, release: true, must: 'chưa vá mã FBM', build: function (local) {
     var incoming = FbmSync.customerRecord(rows[0], gate), localHash = FbmSync.hash(local, 'customer', gate), incomingHash = FbmSync.hash(incoming, 'customer', gate), sentHash = FbmSync.hash(candidate.record || {}, 'customer', gate);
     if (incomingHash !== sentHash || localHash !== sentHash) { throw new Error('CREATE_RECOVERY_MISMATCH: Customer tìm thấy không khớp chính xác dữ liệu đã gửi.'); }
     return { patch: { id: local.id, fbmId: incoming.fbmId, fbmCustomerCode: incoming.fbmCustomerCode, fbmHash: incomingHash, syncStatus: FbmSync.SYNC_STATUS.synced, syncedAt: new Date() } };
   } });
   if (done.status === 'gone') { throw new Error('CREATE_RECOVERY_NOT_EXACT: không xác định duy nhất Customer vừa tạo; không gửi lại request ghi.'); }
-  if (done.status === 'busy') { throw new Error('Customer ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa vá mã FBM.'); }
   FbmSync.pushFailuresRemove(['customer:' + id]);
   state.counts.pushed += 1;
   FbmSync.businessStepAdd(state, 'push_customer', { verified: 1, pushed: 1, written: 1, sheetWriteBatches: 1 });

@@ -48,10 +48,16 @@ FbmSync.recordSignature = function (record) { return JSON.stringify(record || nu
 
 /**
  * Thay đổi đúng một dòng của chiều đẩy: đọc lại dòng trong cửa rồi mới quyết. Trả `{ status, local, busy, value }`, `status` là `ok`, `gone` (dòng không còn), `changed` (khác `expect`) hoặc `busy` (chủ khác giữ).
- * `options`: `expect` chữ ký lúc chọn ứng viên (bỏ trống khi dòng đã do đồng bộ giữ); `build(local)` trả `{ patch, release, hold, value }`; `release` nhả mặc định; `releaseGone` nhả khi dòng đã vắng; `allowGone` không ném khi dòng vắng.
+ * `options`: `expect` chữ ký lúc chọn ứng viên (bỏ trống khi dòng đã do đồng bộ giữ); `build(local)` trả `{ patch, release, hold, value }`; `release` nhả mặc định; `releaseGone` nhả khi dòng đã vắng; `allowGone` không ném khi dòng vắng; `must` (câu nói việc chưa ghi được) cho chỗ bắt buộc phải ghi: dòng bận hoặc vừa đổi thì cửa ném luôn, người gọi không có đường bỏ qua kết quả.
  */
 FbmSync.pushRowChange = function (entity, id, options) {
-  return FbmSync.recordChange(function (gate) { return FbmSync.pushRowPlan(gate, entity, id, options || {}); }).value;
+  var opts = options || {};
+  var done = FbmSync.recordChange(function (gate) { return FbmSync.pushRowPlan(gate, entity, id, opts); }).value;
+  if (opts.must && (done.status === 'busy' || done.status === 'changed')) {
+    var why = done.status === 'busy' ? 'đang bị tiến trình khác giữ (' + String(done.busy && done.busy.reason || 'không rõ lý do') + ')' : 'vừa được sửa sau lúc chọn';
+    throw new Error('Bản ghi ' + entity + ' ' + id + ' ' + why + '; ' + opts.must + '.');
+  }
+  return done;
 };
 
 /**

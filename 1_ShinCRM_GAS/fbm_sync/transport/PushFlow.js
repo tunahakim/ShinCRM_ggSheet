@@ -62,7 +62,7 @@ FbmSync.pushResultSent = function (candidate, response, operation, gate) {
   }
   // Fingerprint Activity có `id` FBM nên phải tính sau khi gắn ID vừa nhận; tính trên bản ghi lúc tạo (chưa có ID) thì mọi lệnh tạo đọc xác nhận lệch thành xung đột giả (FBM-050).
   var sentHash = FbmSync.hash(Object.assign({}, record, { fbmId: patch.fbmId }), candidate.entity, gate);
-  FbmSync.pushRowChange(candidate.entity, record.id, { build: function () { return { patch: patch }; } });
+  FbmSync.pushRowChange(candidate.entity, record.id, { must: 'chưa ghi mã FBM vừa tạo, dòng giữ "đang đẩy" để lượt sau tra lại', build: function () { return { patch: patch }; } });
   return { patch: patch, sentHash: sentHash };
 };
 /** FBM báo lưu thành công mà không trả ID: không biết bản ghi nằm đâu trên FBM nên không đọc xác nhận được. */
@@ -102,13 +102,12 @@ FbmSync.pushOpenDecision = function (entity, record, formValues, gate) {
  */
 FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValues, decision, gate) {
   var entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sync = FbmSync.SYNC_STATUS;
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, build: function (local) {
+  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả so với FBM', build: function (local) {
     if (FbmSync.hash(local, entity, gate) !== decision.hSHIN) { return { patch: { id: local.id, syncStatus: sync.pending }, value: 'changed' }; }
     if (decision.action === 'settled') { return { patch: { id: local.id, fbmHash: decision.hFBM, syncStatus: sync.synced, syncedAt: new Date() }, value: 'settled' }; }
     if (decision.action === 'conflict') { return { patch: { id: local.id, syncStatus: sync.conflict }, value: 'conflict' }; }
     return { patch: { id: local.id, syncStatus: sync.synced }, value: 'fbmOnly' };
   } });
-  if (done.status === 'busy') { throw new Error('Bản ghi ' + entity + ' ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa ghi kết quả so với FBM.'); }
   var outcome = done.status === 'gone' ? 'gone' : done.value, message;
   if (outcome !== 'gone' && outcome !== 'changed') { FbmSync.pushFailuresRemove([entity + ':' + id]); }
   if (outcome !== 'gone') { FbmSync.businessStepAdd(state, 'push_' + entity, { written: 1, sheetWriteBatches: 1 }); }
@@ -141,7 +140,7 @@ FbmSync.pushResultVerify = function (state, response, settings) {
   var markerLeft = entity === 'activity' && !!FbmSync.activityMarkerId(values.details);
   if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }
   var sync = FbmSync.SYNC_STATUS;
-  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, build: function (local) {
+  var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, must: 'chưa ghi kết quả xác nhận', build: function (local) {
     var localHash = FbmSync.hash(local, entity, gate), previousHash = String(local.fbmHash || '').trim();
     if (incomingHash === sentHash) {
       var status = localHash === sentHash ? sync.synced : sync.pending, cleaning = markerLeft && status === sync.synced;
@@ -154,7 +153,6 @@ FbmSync.pushResultVerify = function (state, response, settings) {
     return { patch: { id: local.id, syncStatus: sync.conflict }, release: true, value: { outcome: 'conflict' } };
   } });
   if (done.status === 'gone') { throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
-  if (done.status === 'busy') { throw new Error('Bản ghi ' + entity + ' ' + id + ' đang bị tiến trình khác giữ (' + done.busy.reason + '); chưa ghi kết quả xác nhận.'); }
   var local = done.local, outcome = done.value;
   if (outcome.outcome === 'confirmed') {
     FbmSync.logPushRecord(candidate, cursor.operation, typeof LOG_OK !== 'undefined' ? LOG_OK : 'ok', outcome.status === sync.synced ? 'FBM đã xác nhận đúng dữ liệu vừa ghi.' : 'FBM đã xác nhận; ShinCRM đã sửa tiếp nên chờ lượt đẩy mới.', { hPUSH: sentHash, hFBM: incomingHash, syncStatus: outcome.status });
