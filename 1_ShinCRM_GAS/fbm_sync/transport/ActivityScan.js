@@ -112,7 +112,7 @@ FbmSync.activityBulkAccept = function (rows, seenIds, input) {
   input.local.forEach(function (record) { var fbmId = String(record.fbmId || '').trim(); if (fbmId && tracked(record)) { byFbmId[fbmId] = record; } });
   rows.filter(function (row) { return !FbmSync.isTemporaryRecord('activity', row); }).forEach(function (row) {
     var fbmId = String(row.id || '').trim(), record = byFbmId[fbmId];
-    if (record && (FbmSync.readAgainStatus(record) || String(record.fbmHash || '') !== FbmSync.activityRecord(row, input.gate, null).fbmHash)) { marked.push(parents[fbmId]); }
+    if (record && (FbmSync.readAgainStatus(record) || String(record.fbmHash || '') !== FbmSync.activityRecord(row, input.gate, null).incomingHash)) { marked.push(parents[fbmId]); }
   });
   FbmSync.seenStoreMark(FbmSync.ACTIVITY_BULK_STORE, input.local, rows.concat((seenIds || []).map(function (id) { return { id: id }; })));
   return FbmSync.readListAdd(marked);

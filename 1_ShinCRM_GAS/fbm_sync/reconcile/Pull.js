@@ -51,12 +51,12 @@ FbmSync.compareFbmId = function (a, b) {
 
 /**
  * Kéo về một lô bản ghi FBM: quyết từng bản ghi và ghi Sheet trong một lần cầm khóa; chỉ ghi bản ghi mới hoặc đổi an toàn, không bao giờ xóa, không ghi đè thay đổi cục bộ (chỉ đánh dấu chờ đẩy hoặc xung đột).
- * `ctx`: `{ categoryGate, now, accountName }` do người điều phối truyền. Hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `fbmHash` (dấu vân FBM tính một lần lúc dựng).
+ * `ctx`: `{ categoryGate, now, accountName }` do người điều phối truyền. Hàm không đọc ô lượt, không tự lấy giờ hay cài đặt. Bản ghi vào phải do `customerRecord`/`activityRecord` dựng, mang sẵn `incomingHash` (dấu vân FBM tính một lần lúc dựng); bước áp này là nơi duy nhất biến nó thành mốc `fbmHash` trên dòng, khóa `incomingHash` không có cột nên cửa ghi bỏ qua.
  * Không ghi ô lượt: khách bị chặn danh tính (`identityBlocks`) trả về cho người điều phối. Dòng `đã đẩy chờ xác nhận` (lượt đẩy chết trước bước đọc lại) so ba chiều như mọi dòng: FBM bằng ShinCRM là đã đồng bộ, FBM bằng mốc là đẩy không ăn, khác cả hai là xung đột.
  */
 FbmSync.pullPageApply = function (entity, records, ctx) {
   if (!records || !records.length) { return { ok: true, written: 0, conflicts: 0, conflictsKept: 0, conflictsCleared: 0, skipped: 0, sheetWriteBatches: 0, identityBlocks: [] }; }
-  var unhashed = records.filter(function (record) { return !String(record && record.fbmHash || ''); })[0];
+  var unhashed = records.filter(function (record) { return !String(record && record.incomingHash || ''); })[0];
   if (unhashed) { var error = new Error('Bản ghi ' + entity + ' FBM ' + String(unhashed.fbmId || '') + ' chưa có dấu vân FBM; chỉ bản ghi dựng qua customerRecord/activityRecord mới được kéo về.'); error.code = 'PULL_RECORD_UNHASHED'; throw error; }
   var orphaned = 0, identityBlocks = [];
   var categoryGate = ctx.categoryGate, syncedAt = new Date(ctx.now);
@@ -149,7 +149,7 @@ FbmSync.pullPageApply = function (entity, records, ctx) {
       if (categoryErrors.length) { skipped += 1; FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; chưa tạo bản ghi mới.'); return; }
       // Chỉ bản ghi mới nhận các giá trị mặc định này; record đã có không bị xóa quan hệ cha và giữ Xác thực của mình.
       newDefaults = newDefaults || FbmSync.pullDefaults(entity, categoryReadAll());
-      writes.push(Object.assign(entity === 'customer' ? { parentCompanyName: '' } : {}, incoming, newDefaults, { syncedAt: syncedAt }));
+      writes.push(Object.assign(entity === 'customer' ? { parentCompanyName: '' } : {}, incoming, newDefaults, { fbmHash: String(incoming.incomingHash), syncedAt: syncedAt }));
       FbmSync.logPullRecord(entity, incoming, null, FbmSync.SYNC_STATUS.synced, 'Tạo bản ghi mới từ FBM; cửa ghi sẽ cấp mã nội bộ và ngày tạo.');
       return;
     }
@@ -159,7 +159,7 @@ FbmSync.pullPageApply = function (entity, records, ctx) {
       FbmSync.logPullRecord(entity, incoming, current, FbmSync.SYNC_STATUS.unknownCategory, 'Mã danh mục lạ; giữ nguyên nội dung nội bộ.');
       return;
     }
-    var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = String(incoming.fbmHash);
+    var localHash = FbmSync.hash(current, entity, categoryGate), incomingHash = String(incoming.incomingHash);
     // Trường FBM sở hữu đứng ngoài fingerprint nên hash không lộ khi chúng đổi; ghi đè riêng: ma_kh để Activity mới còn nối được Customer cha (FBM-054), người tạo để hiện đúng người tạo trên FBM.
     (FbmSync.PULL_OVERWRITE_FIELDS[entity] || []).forEach(function (field) {
       var value = String(incoming[field] || '').trim();

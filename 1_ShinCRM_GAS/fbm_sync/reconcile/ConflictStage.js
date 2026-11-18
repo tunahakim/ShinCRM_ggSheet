@@ -33,7 +33,7 @@ FbmSync.conflictRefreshParse = function (entity, id, local, reply, gate) {
   var latest = (FbmSync.rowsToRecords(entity, reply).rows || [])[0];
   if (!latest) { return null; }
   var latestRecord = entity === 'customer' ? FbmSync.customerRecord(latest, gate) : FbmSync.activityRecord(latest, gate);
-  return { entity: entity, id: id, local: local, latest: latestRecord, latestHash: String(latestRecord.fbmHash || FbmSync.hash(latestRecord, entity, gate)), gate: gate };
+  return { entity: entity, id: id, local: local, latest: latestRecord, latestHash: String(latestRecord.incomingHash || FbmSync.hash(latestRecord, entity, gate)), gate: gate };
 };
 
 /**

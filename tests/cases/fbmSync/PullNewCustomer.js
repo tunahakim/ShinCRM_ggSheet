@@ -26,7 +26,7 @@ function chay(so) {
     newPullWrite.records[0].verifyStatus,
     'Đã kiểm tra tên mới');
   const oldVerify = builders.FbmSync.customerRecord({ stt_rec_kh: 'OLD-V', ma_kh: 'ALT00014', ten_kh: 'Cũ', ma_so_thue: '003' }, gate);
-  builders.FbmSync.readLocal = () => [Object.assign({}, oldVerify, { id: 'CUS-OLD', fbmHash: oldVerify.fbmHash, syncStatus: 'đã đồng bộ', verifyStatus: 'Đã xác minh tay' })];
+  builders.FbmSync.readLocal = () => [Object.assign({}, oldVerify, { id: 'CUS-OLD', fbmHash: oldVerify.incomingHash, syncStatus: 'đã đồng bộ', verifyStatus: 'Đã xác minh tay' })];
   newPullWrite = null;
   keoVe(builders.FbmSync, 'customer', [builders.FbmSync.customerRecord({ stt_rec_kh: 'OLD-V', ma_kh: 'ALT00014', ten_kh: 'Cũ đổi tên', ma_so_thue: '003' }, gate)]);
   check(so, 'khách đã có giữ giá trị Xác thực của mình khi lấy từ FBM',

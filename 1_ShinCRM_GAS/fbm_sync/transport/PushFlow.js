@@ -42,36 +42,6 @@ FbmSync.logPushRecord = function (candidate, operation, outcome, reason, detail)
   if (!outcome || outcome === ok) { return null; }
   return FbmSync.recordIssueAdd('push', String(candidate && candidate.entity || ''), String(detail && detail.syncStatus || ''), String(candidate && candidate.id || ''), reason, outcome);
 };
-/**
- * Pha 1 của áp kết quả đẩy (`pushResultApply`): lệnh lưu đã trả thành công. Lấy ID FBM (thiếu thì ném `FBM_PUSH_RESPONSE_INCOMPLETE`), băm bản đã gửi rồi ghi dòng `đã đẩy chờ xác nhận`. Baseline chỉ đổi ở pha 2, sau bước đọc lại.
- * Hash đã gửi không ghi kho nào: bên gọi giữ trong dấu trang của chặng cho pha 2. Lượt chết trước pha 2 thì dòng `đã đẩy chờ xác nhận` đã có ID FBM, lần kéo về sau so ba chiều như mọi dòng; lệnh tạo không bao giờ bị phát lại vì dòng đã có ID.
- * `gate` là cổng danh mục của chặng. Trả `{ patch, sentHash }`: patch đã ghi lên dòng (có `fbmId` để mở form đọc lại).
- */
-FbmSync.pushResultSent = function (candidate, response, operation, gate) {
-  var record = candidate.record || {}, values = FbmSync.extractInternalValues(response), data = FbmSync.protocol.parse(response) || {};
-  data = data.d || data;
-  var patch = { id: record.id, syncStatus: FbmSync.SYNC_STATUS.pushed, fbmHash: String(record.fbmHash || '').trim() };
-  if (candidate.entity === 'customer') {
-    patch.fbmId = String(values.stt_rec_kh || values.stt_rec_kh0 || record.fbmId || '').trim();
-    patch.fbmCustomerCode = String(values.ma_kh || record.fbmCustomerCode || candidate.autoCode || '').trim();
-    if (!patch.fbmId || !patch.fbmCustomerCode) { throw FbmSync.pushResponseIncomplete('FBM không trả đủ stt_rec_kh/ma_kh sau khi ghi Customer.'); }
-  } else {
-    var activityId = values.id || (data && data.id) || record.fbmId || '';
-    patch.fbmId = String(activityId).trim();
-    if (!patch.fbmId) { throw FbmSync.pushResponseIncomplete('FBM không trả id sau khi ghi Activity.'); }
-  }
-  // Fingerprint Activity có `id` FBM nên phải tính sau khi gắn ID vừa nhận; tính trên bản ghi lúc tạo (chưa có ID) thì mọi lệnh tạo đọc xác nhận lệch thành xung đột giả (FBM-050).
-  var sentHash = FbmSync.hash(Object.assign({}, record, { fbmId: patch.fbmId }), candidate.entity, gate);
-  FbmSync.pushRowChange(candidate.entity, record.id, { must: 'chưa ghi mã FBM vừa tạo, dòng giữ "đang đẩy" để lượt sau tra lại', build: function () { return { patch: patch }; } });
-  return { patch: patch, sentHash: sentHash };
-};
-/** FBM báo lưu thành công mà không trả ID: không biết bản ghi nằm đâu trên FBM nên không đọc xác nhận được. */
-FbmSync.pushResponseIncomplete = function (message) {
-  var error = new Error(message);
-  error.code = 'FBM_PUSH_RESPONSE_INCOMPLETE';
-  return error;
-};
-
 /** Giá trị form thiếu trường fingerprint thì hash bản FBM sai, nên không được dùng để so hay dựng lệnh lưu. */
 FbmSync.requireFormFields = function (values, entity) {
   var required = entity === 'activity' ? ['id', 'ma_cv', 'details', 'end_date'] : ['stt_rec_kh', 'ma_kh', 'ten_kh', 'ma_so_thue', 'ong_ba', 'dien_thoai', 'email', 'dc_lh'];
@@ -103,10 +73,7 @@ FbmSync.pushOpenDecision = function (entity, record, formValues, gate) {
 FbmSync.finishPushOpenWithoutSave = function (state, cursor, candidate, formValues, decision, gate) {
   var entity = String(cursor.entity || candidate.entity || ''), id = String(candidate.id || ''), sync = FbmSync.SYNC_STATUS;
   var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, release: true, must: 'chưa ghi kết quả so với FBM', build: function (local) {
-    if (FbmSync.hash(local, entity, gate) !== decision.hSHIN) { return { patch: { id: local.id, syncStatus: sync.pending }, value: 'changed' }; }
-    if (decision.action === 'settled') { return { patch: { id: local.id, fbmHash: decision.hFBM, syncStatus: sync.synced, syncedAt: new Date() }, value: 'settled' }; }
-    if (decision.action === 'conflict') { return { patch: { id: local.id, syncStatus: sync.conflict }, value: 'conflict' }; }
-    return { patch: { id: local.id, syncStatus: sync.synced }, value: 'fbmOnly' };
+    return FbmSync.pushOpenResultPatch(local, entity, gate, decision);
   } });
   var outcome = done.status === 'gone' ? 'gone' : done.value, message;
   if (outcome !== 'gone' && outcome !== 'changed') { FbmSync.pushFailuresRemove([entity + ':' + id]); }
@@ -141,16 +108,7 @@ FbmSync.pushResultVerify = function (state, response, settings) {
   if (incomingHash === sentHash && markerLeft && candidate.kind !== 'create') { incomingHash = ''; }
   var sync = FbmSync.SYNC_STATUS;
   var done = FbmSync.pushRowChange(entity, id, { allowGone: true, releaseGone: true, must: 'chưa ghi kết quả xác nhận', build: function (local) {
-    var localHash = FbmSync.hash(local, entity, gate), previousHash = String(local.fbmHash || '').trim();
-    if (incomingHash === sentHash) {
-      var status = localHash === sentHash ? sync.synced : sync.pending, cleaning = markerLeft && status === sync.synced;
-      return { patch: { id: local.id, fbmHash: incomingHash, syncStatus: status, syncedAt: new Date() }, release: !cleaning, value: { outcome: 'confirmed', status: status, cleaning: cleaning } };
-    }
-    if ((previousHash && incomingHash === previousHash) || (markerLeft && !incomingHash)) {
-      return { patch: { id: local.id, syncStatus: sync.notApplied }, release: true, value: { outcome: 'notApplied' } };
-    }
-    // Sheet là nguồn của hàng đợi xung đột nên ghi trạng thái cùng lần nhả: dòng `xung đột chờ quyết` đã bị khóa đồng bộ.
-    return { patch: { id: local.id, syncStatus: sync.conflict }, release: true, value: { outcome: 'conflict' } };
+    return FbmSync.pushVerifyResultPatch(local, entity, gate, { incomingHash: incomingHash, sentHash: sentHash, markerLeft: markerLeft });
   } });
   if (done.status === 'gone') { throw new Error('FBM_VERIFY_RECORD_MISSING: bản ghi không còn tồn tại trong ShinCRM.'); }
   var local = done.local, outcome = done.value;

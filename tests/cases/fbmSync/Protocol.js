@@ -49,10 +49,10 @@ async function chay(so) {
   const local = Object.assign({}, same, { id: 'CUS-1' }), hc = (r) => hop.FbmSync.hash(r, 'customer', gate0);
   check(so, 'hash FBM va local dung cung khong gian', hop.FbmSync.hash(fbm, 'customer', gate0), hop.FbmSync.hash(local, 'customer', gate0));
   check(so, 'doi dinh danh FBM khong bi coi la doi noi dung Customer', hop.FbmSync.hash(Object.assign({}, fbm, { stt_rec_kh: 'A2', ma_kh: 'ALT00011' }), 'customer', gate0), hop.FbmSync.hash(fbm, 'customer', gate0));
-  check(so, 'ba chieu khong doi', hop.FbmSync.threeWay(same.fbmHash, hc(local), hc(same)).unchanged, true);
-  check(so, 'ba chieu bat conflict hai phia', hop.FbmSync.threeWay(same.fbmHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(Object.assign({}, same, { companyName: 'fbm' }))).conflict, true);
-  check(so, 'chi Shin thay doi', hop.FbmSync.threeWay(same.fbmHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(same)).shinChanged, true);
-  check(so, 'chi FBM thay doi', hop.FbmSync.threeWay(same.fbmHash, hc(local), hc(Object.assign({}, same, { companyName: 'fbm' }))).fbmChanged, true);
+  check(so, 'ba chieu khong doi', hop.FbmSync.threeWay(same.incomingHash, hc(local), hc(same)).unchanged, true);
+  check(so, 'ba chieu bat conflict hai phia', hop.FbmSync.threeWay(same.incomingHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(Object.assign({}, same, { companyName: 'fbm' }))).conflict, true);
+  check(so, 'chi Shin thay doi', hop.FbmSync.threeWay(same.incomingHash, hc(Object.assign({}, local, { companyName: 'shin' })), hc(same)).shinChanged, true);
+  check(so, 'chi FBM thay doi', hop.FbmSync.threeWay(same.incomingHash, hc(local), hc(Object.assign({}, same, { companyName: 'fbm' }))).fbmChanged, true);
   check(so, 'parse malformed tra loi co cau truc', !!hop.FbmSync.protocol.parse('{').parseError, true);
 }
 

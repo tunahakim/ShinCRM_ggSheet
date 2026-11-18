@@ -47,7 +47,7 @@ async function chay(so) {
     [acPull.conflicts, acFields],
     [1, ['details', 'end_date']]);
   check(so, 'G9.3: PA3 Activity ghi giá trị tự nhập vào content, lấy end_date FBM vào workDate, giữ liên kết Customer, chờ đối soát và hết hàng đợi',
-    [acManual.ok, acRow.content, acRow.workDate, acRow.customerId, acRow.syncStatus, acRow.fbmHash === AC.activityRecord(acLatest, acGate).fbmHash, acManual.remaining],
+    [acManual.ok, acRow.content, acRow.workDate, acRow.customerId, acRow.syncStatus, acRow.fbmHash === AC.activityRecord(acLatest, acGate).incomingHash, acManual.remaining],
     // Ngày FBM về dạng chữ ISO như màn xung đột đã hiện; cửa ghi thật đổi sang ngày (`textToDate`), hộp test để DATA_SCHEMA rỗng nên giữ chữ.
     [true, 'Nội dung tự nhập', '2025-09-10', 'CUS-000001', 'chờ đối soát', true, 0]);
 }

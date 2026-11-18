@@ -252,7 +252,8 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
     ├── protocol\Protocol.js     Envelope và parse response.
     ├── transport\Budget.js       Ngân sách thời gian và kích thước kênh GAS–Sidebar–Extension (một nơi giữ con số).
     ├── transport\TransportCore.js Hợp đồng request (`requestIssue` cấp mã, deadline, chữ ký), retry đọc an toàn và bảng lỗi đường truyền (`transportRecoverPlan`, `transportReissue`: GAS quyết tải lại trang hay mở tab, Extension không tự tải lại); cổng phiên không còn ở đây mà ở bước phát request của lát và chặng phiên.
-    ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, đọc xác nhận, dọn dấu), hai pha áp kết quả và quyết lỗi đẩy.
+    ├── transport\PushFlow.js    Các bước của một ứng viên đẩy (mở form, lưu, đọc xác nhận, dọn dấu) và quyết lỗi đẩy.
+    ├── transport\PushApply.js   Áp kết quả chiều đẩy lên dòng Sheet: pha 1 `pushResultSent` và các hàm dựng patch ghi mốc `fbmHash` (nơi duy nhất của chiều đẩy ghi mốc).
     ├── transport\PushRecover.js    Tra lại lệnh tạo mất phản hồi theo khóa (khách theo MST, giao dịch theo dấu `#SC`) rồi nối id FBM hoặc cho tạo lại.
     ├── transport\PushStage.js   Người điều phối chặng đẩy theo hợp đồng chung: nhận response, quét lại và cổng chấp thuận, xét từng mã, chốt lượt.
     ├── transport\PullFlow.js    Mở lượt đọc (`startRun`: nối lượt dở theo cột `resumable` của bảng cursor, luôn kiểm lại phiên trước), preflight, đọc Customer và đọc Activity.

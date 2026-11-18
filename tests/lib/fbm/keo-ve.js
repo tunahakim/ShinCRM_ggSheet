@@ -8,7 +8,7 @@ function ngCanhKeo(F) {
 
 /** Bản ghi ca kiểm tự dựng (không qua `customerRecord`/`activityRecord`) thì tính dấu vân như hai hàm dựng, vì cửa ghi chỉ nhận bản ghi có sẵn dấu vân. */
 function coDauVan(F, entity, records, ctx) {
-  return (records || []).map((record) => (record && record.fbmHash || typeof F.hash !== 'function' ? record : Object.assign({}, record, { fbmHash: String(F.hash(record, entity, ctx.categoryGate)) })));
+  return (records || []).map((record) => (record && record.incomingHash || typeof F.hash !== 'function' ? record : Object.assign({}, record, { incomingHash: String(F.hash(record, entity, ctx.categoryGate)) })));
 }
 
 /** Như `pullPageApply` với ngữ cảnh người điều phối truyền. */

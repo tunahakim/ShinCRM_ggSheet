@@ -32,8 +32,8 @@ const STATE_ORCHESTRATORS = ['state/Run', 'state/RunStop', 'state/Slice', 'state
 // Thêm bước đóng lời gọi `fbm_sync`, người điều phối các lệnh cài đặt và hàm chuyển cài đặt một lần.
 const LOG_WRITERS = STATE_ORCHESTRATORS.concat(['1_ShinCRM_GAS/server/service/FbmSyncService.js', '1_ShinCRM_GAS/fbm_sync/control/PushCommands.js', '1_ShinCRM_GAS/fbm_sync/control/SettingsCommands.js']);
 
-/** Tệp được ghi baseline (`fbmHash`): tương lai chỉ pushResultApply, pullPageApply, conflictSettle; hiện để trống. */
-const BASELINE_WRITERS = [];
+/** Tệp được ghi baseline (`fbmHash`): ba công cụ áp kết quả, mỗi chiều một tệp: áp trang kéo về (`Pull.js`), chốt xung đột (`Conflict.js`), áp kết quả đẩy (`PushApply.js`). */
+const BASELINE_WRITERS = ['1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js', '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js', '1_ShinCRM_GAS/fbm_sync/transport/PushApply.js'];
 
 function lineAt(source, index) { return source.slice(0, index).split('\n').length; }
 
@@ -183,13 +183,7 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/fbm_sync/report/Report.js': 2
   },
   phaseClose: {},
-  baselineWrite: {
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Conflict.js': 1,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/Pull.js': 6,
-    '1_ShinCRM_GAS/fbm_sync/reconcile/RecordMap.js': 2,
-    '1_ShinCRM_GAS/fbm_sync/transport/PushFlow.js': 3,
-    '1_ShinCRM_GAS/fbm_sync/transport/PushRecover.js': 2
-  }
+  baselineWrite: {}
 };
 
 /** Chạy một quy tắc trên mọi tệp thuộc phạm vi của nó; trả `{ tệp: [vi phạm] }` chỉ gồm tệp có vi phạm và không nằm trong danh sách được phép. */

@@ -18,7 +18,7 @@ async function chay(so) {
   const dongDaDay = (extra) => { F.readLocal = (entity) => (entity === 'customer' ? [Object.assign({}, incoming, { id: 'CUS-1', fbmHash: 'hash-cu', syncStatus: F.SYNC_STATUS.pushed }, extra || {})] : []); };
 
   dongDaDay();
-  const khongDauVan = Object.assign({}, incoming, { fbmHash: '' });
+  const khongDauVan = Object.assign({}, incoming, { incomingHash: '' });
   check(so, 'Bản ghi thiếu dấu vân FBM thì ném PULL_RECORD_UNHASHED, không ghi Sheet', [thrownCode(() => F.pullPageApply('customer', [khongDauVan], ctx)), ghiSheet], ['PULL_RECORD_UNHASHED', 0]);
 
   const khop = F.pullPageApply('customer', [incoming], ctx);
@@ -28,7 +28,7 @@ async function chay(so) {
   const xungDot = F.pullPageApply('customer', [incoming], ctx);
   check(so, 'Dòng "đã đẩy chờ xác nhận" khác bản FBM và khác mốc cũ thì là xung đột, không ghi đè', xungDot.conflicts, 1);
 
-  dongDaDay({ companyName: 'Sửa tiếp sau khi đẩy', fbmHash: incoming.fbmHash });
+  dongDaDay({ companyName: 'Sửa tiếp sau khi đẩy', fbmHash: incoming.incomingHash });
   const khongAn = F.pullPageApply('customer', [incoming], ctx);
   check(so, 'FBM vẫn trả đúng mốc cũ sau lần đẩy thì "đẩy không ăn", không xung đột', [khongAn.conflicts, khongAn.skipped], [0, 1]);
 

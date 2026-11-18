@@ -167,7 +167,7 @@ FbmSync.activityReadMark = function (read, fresh) {
 FbmSync.activityFreshIndex = function () {
   var known = {};
   FbmSync.readLocal('activity').forEach(function (record) { var id = String(record && record.fbmId || '').trim(); if (id) { known[id] = String(record.fbmHash || ''); } });
-  return function (records) { return records.some(function (record) { var id = String(record.fbmId || '').trim(); return !Object.prototype.hasOwnProperty.call(known, id) || known[id] !== String(record.fbmHash || ''); }); };
+  return function (records) { return records.some(function (record) { var id = String(record.fbmId || '').trim(); return !Object.prototype.hasOwnProperty.call(known, id) || known[id] !== String(record.incomingHash || ''); }); };
 };
 
 /** Đầu vào của lớp 3 cho một lần lấp lô: thứ tự khách mới nhất, khách đủ điều kiện theo vị trí trong danh sách đọc, tập đã đọc, đã đọc đủ và có giao dịch mới. */

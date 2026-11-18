@@ -25,7 +25,7 @@ function hopQuyet() {
   F.rowsToRecords = (entity, grid) => ({ rows: grid.rows, total: grid.total, sourceFields: grid.fields || null });
   F.isTemporaryRecord = (entity, row) => !!row.tam;
   F.customerRecord = (row) => ({ id: 'CUS-' + row.stt_rec_kh, fbmId: row.stt_rec_kh });
-  F.activityRecord = (item, gate, owner) => ({ fbmId: item.id, customerFbmId: owner.sttRec, fbmHash: item.hash || 'h' });
+  F.activityRecord = (item, gate, owner) => ({ fbmId: item.id, customerFbmId: owner.sttRec, incomingHash: item.hash || 'h' });
   F.activityPageNext = (page, rows) => (rows[0] && rows[0].ket ? null : { pageIndex: Number(page && page.pageIndex || 0) + 1 });
   F.ownerLookupParse = (item) => item.lookup;
   F.inScope = (customer, scope) => scope.ids.indexOf(customer.id) >= 0;
@@ -51,7 +51,7 @@ function chay(so) {
     ok({ rows: [] }),
     ok({ rows: [{ id: '800041' }, { id: '800042' }, { id: '800043' }], total: 5 })
   ];
-  const isFresh = (records) => records.some((record) => record.fbmHash === 'moi');
+  const isFresh = (records) => records.some((record) => record.incomingHash === 'moi');
   const batch = F.batchRecordsOf(checks, cursor, { categoryGate: {}, isFresh });
   check(so, 'batchRecordsOf: khách, giao dịch, lỗi từng khách, trang kế và tên cột gốc',
     [batch.customerRecords.map((r) => r.fbmId), batch.activityRecords.map((r) => r.fbmId), batch.failed.map((f) => f.customer + ':' + f.code), Object.keys(batch.readOk), Object.keys(batch.nextPages), batch.pagedNew, batch.outcomes, batch.customerFields, batch.activityFields],
