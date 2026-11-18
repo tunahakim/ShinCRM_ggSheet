@@ -140,12 +140,12 @@ const PIPELINE_CATALOG = [
 ].map(function (item) {
   var group = item[0].charAt(0);
   var testModules = {
-    A: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/AutoLoginChuKy.js', 'tests/cases/fbmSync/AutoLoginGiuPhien.js', 'tests/cases/fbmSync/AutoLoginProbe.js', 'tests/cases/fbmSync/AutoLoginFailClosed.js', 'tests/cases/fbmSync/AutoLoginThatBai.js', 'tests/cases/fbmSync/AutoLoginThu.js', 'tests/cases/fbmSync/AutoLoginKhoaCho.js', 'tests/cases/fbmSync/AutoLoginSauXoa.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
-    B: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/PullScan.js', 'tests/cases/fbmSync/Reconcile.js'],
-    C: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
-    D: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Builders.js'],
-    E: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Push.js', 'tests/cases/fbmSync/Reconcile.js'],
-    F: ['tests/cases/fbmSync/Workflow.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/Audit.js']
+    A: ['tests/cases/fbmSync/WorkflowIdentity.js', 'tests/cases/fbmSync/WorkflowSchedule.js', 'tests/cases/fbmSync/AutoLoginChuKy.js', 'tests/cases/fbmSync/AutoLoginGiuPhien.js', 'tests/cases/fbmSync/AutoLoginProbe.js', 'tests/cases/fbmSync/AutoLoginFailClosed.js', 'tests/cases/fbmSync/AutoLoginThatBai.js', 'tests/cases/fbmSync/AutoLoginThu.js', 'tests/cases/fbmSync/AutoLoginKhoaCho.js', 'tests/cases/fbmSync/AutoLoginSauXoa.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/extensionBridge.js'],
+    B: ['tests/cases/fbmSync/WorkflowPipeline.js', 'tests/cases/fbmSync/WorkflowPipelinePaging.js', 'tests/cases/fbmSync/WorkflowPipelineFault.js', 'tests/cases/fbmSync/WorkflowReadContract.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/PullScan.js', 'tests/cases/fbmSync/Reconcile.js'],
+    C: ['tests/cases/fbmSync/WorkflowWorker.js', 'tests/cases/fbmSync/WorkflowBackground.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/extensionBridge.js'],
+    D: ['tests/cases/fbmSync/WorkflowCategoryPush.js', 'tests/cases/fbmSync/WorkflowPushState.js', 'tests/cases/fbmSync/WorkflowCompactPush.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/PushRequest.js', 'tests/cases/fbmSync/PushMarker.js', 'tests/cases/fbmSync/PushCreateRecover.js', 'tests/cases/fbmSync/Builders.js'],
+    E: ['tests/cases/fbmSync/WorkflowStopStale.js', 'tests/cases/fbmSync/WorkflowBudget.js', 'tests/cases/fbmSync/WorkflowCompactLookup.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Orchestration.js', 'tests/cases/fbmSync/PushFailure.js', 'tests/cases/fbmSync/Reconcile.js'],
+    F: ['tests/cases/fbmSync/WorkflowStepLog.js', 'tests/cases/fbmSync/WorkflowStopStale.js', 'tests/cases/fbmSync/WorkflowCharter.js', 'tests/cases/fbmSync/UserJourneys.js', 'tests/cases/fbmSync/Sidebar.js', 'tests/cases/fbmSync/Audit.js']
   }[group] || [];
   return {
     id: item[0], name: item[1], trigger: item[2], expect: item[3], source: 'Tài liệu 09 và hợp đồng log', testModules: testModules,

@@ -121,16 +121,16 @@ function chay(so) {
       ['NO_PROCESS_DUE', null, true, '']);
   }
 
-  // Máy được giao im quá ngưỡng: giờ giao lùi quá số phút im tính theo nhịp hỏi.
-  const datMayIm = (hop) => {
-    const F = hop.FbmSync, silent = F.machineSilentMinutes(hop.settingsValues(F.SETTING_SECTIONS.extension));
+  // Máy A được giao nhưng im quá ngưỡng (giờ giao lùi quá số phút im tính theo nhịp hỏi); `tuNhan` là công tắc tự nhận; mật khẩu đã lưu với khóa `cred-1`.
+  const hopMayIm = (tuNhan) => {
+    const dung = hopNen(), F = dung.F, silent = F.machineSilentMinutes(dung.hop.settingsValues(F.SETTING_SECTIONS.extension));
     F.backgroundMachineWrite(F.machineAssigned(MAY_A, 'Máy A', Date.now() - (silent + 60) * 60000));
+    datPhan(dung.hop, 'background', { machineAutoTakeover: tuNhan });
+    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
+    return dung;
   };
   {
-    const { hop, F, logs, notices, hoi } = hopNen();
-    datMayIm(hop);
-    datPhan(hop, 'background', { machineAutoTakeover: true });
-    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
+    const { F, logs, notices, hoi } = hopMayIm(true);
     const taken = hoi(MAY_B, 'alarm', { keyRefs: ['fbmCredentialVault:khac', 'cred-1'] }), machine = F.backgroundMachineRead(), view = F.statusView().backgroundMachine;
     const log = maCua(logs, 'background_machine_takeover'), topics = loaiThongBao();
     check(so, 'tự nhận bật, máy được giao im quá ngưỡng, máy hỏi có khóa giải mã mật khẩu đã lưu: máy hỏi thành máy nền, Log BACKGROUND_MACHINE_TAKEOVER, thông báo chung loại bấm ✕ mới hết nói nhận thay máy nào (không hẹn giờ trong khối máy nền), chạy tiếp việc đến hạn',
@@ -138,20 +138,14 @@ function chay(so) {
       [MAY_B, 1, 'BACKGROUND_MACHINE_TAKEOVER', ['fbm_machine_takeover'], true, 'dismiss', null, 'session_probe']);
   }
   {
-    const { hop, F, logs, hoi } = hopNen();
-    datMayIm(hop);
-    datPhan(hop, 'background', { machineAutoTakeover: false });
-    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
+    const { F, logs, hoi } = hopMayIm(false);
     const refused = hoi(MAY_B, 'alarm', { keyRefs: ['cred-1'] }), view = F.statusView().backgroundMachine;
     check(so, 'tự nhận tắt, máy được giao im: máy hỏi không nhận việc, chỉ có thông báo máy nền im trên màn trạng thái',
       [refused.code, F.backgroundMachineRead().machineId, maCua(logs, 'background_machine_takeover').length, view.silent, view.notice && view.notice.code],
       ['MACHINE_NOT_ASSIGNED', MAY_A, 0, true, 'MACHINE_SILENT']);
   }
   {
-    const { hop, F, logs, hoi } = hopNen();
-    datMayIm(hop);
-    datPhan(hop, 'background', { machineAutoTakeover: true });
-    F.credentialRead = () => ({ configured: true, credentialRef: 'cred-1', ciphertext: null, public: {} });
+    const { F, logs, hoi } = hopMayIm(true);
     const noKey = hoi(MAY_B, 'alarm', { keyRefs: ['cred-khac'] });
     F.credentialRead = () => ({ configured: false, credentialRef: '', ciphertext: null, public: {} });
     const noSaved = hoi(MAY_B, 'alarm', { keyRefs: [] });
@@ -178,7 +172,9 @@ function chay(so) {
       [F.processBookRead().customerFull.failures, retry.length, retry[0] && /HTTP_500/.test(retry[0].reason), F.stateRead().process], [1, 1, true, 'customerFull']);
     hoi(MAY_A, 'config');
     hoi(MAY_A, 'config');
-    check(so, 'các lần hỏi sau không ghi lại lần lỗi đã ghi', [F.processBookRead().customerFull.failures, maCua(logs, 'schedule_retry_later').length], [1, 1]);
+    check(so, 'các lần hỏi sau không ghi lại lần lỗi đã ghi',
+      [F.processBookRead().customerFull.failures, maCua(logs, 'schedule_retry_later').length],
+      [1, 1]);
   }
   {
     const { F, hoi } = hopNen();
@@ -194,7 +190,9 @@ function chay(so) {
     moNen(F, 'run-nen-3', 'customerFull');
     const truoc = F.processBookRead().customerFull.doneAt;
     F.stateWrite(F.runClose(F.stateRead(), 'paused', { message: 'Đã dừng.' }));
-    check(so, 'người dùng dừng lượt nền (tạm dừng không mã lỗi): không tính là lỗi, không dời mốc chạy xong, không hẹn thử lại', [F.processBookRead().customerFull.failures, F.processBookRead().customerFull.doneAt === truoc, maCua(logs, 'schedule_retry_later').length], [0, true, 0]);
+    check(so, 'người dùng dừng lượt nền (tạm dừng không mã lỗi): không tính là lỗi, không dời mốc chạy xong, không hẹn thử lại',
+      [F.processBookRead().customerFull.failures, F.processBookRead().customerFull.doneAt === truoc, maCua(logs, 'schedule_retry_later').length],
+      [0, true, 0]);
   }
 }
 

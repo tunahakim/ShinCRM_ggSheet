@@ -350,12 +350,17 @@ tests\
 │   ├── fbm\
 │   │   ├── hop-buoc.js           Hộp cát của sổ bước nghiệp vụ: một lượt đang mở ở bước kéo khách, để kiểm mỗi đường đóng lượt đóng đúng bước.
 │   │   ├── hop-gas.js            Phần cấp sẵn riêng của đồng bộ FBM mà bộ nạp gọi trước, sau từng tệp và sau cùng (bảng cho phép, phiên giả, đầu dãy sạch); `TEP_KHUNG_LUOT` là bộ tệp khung lượt mọi hộp đồng bộ nạp.
+│   │   ├── hop-day.js            Hộp GAS thử chặng đẩy dùng chung cho các ca `Push*`: phiên đã xác thực, ứng viên và cài đặt định sẵn, mở lượt quét, ứng viên tạo Activity.
+│   │   ├── hop-preflight.js      Hộp cát chung của các ca preflight: nạp tệp GAS, Core giả, nền mặc định, hàm dựng ứng viên.
+│   │   ├── ma-tran.js            Khung dùng chung của ma trận FBM: bản ghi mẫu, lưới FBM qua executor thật, lệnh chốt xung đột, hộp ba khách xung đột.
 │   │   ├── dat-state.js          Dựng ô lượt cho test qua cổng đọc và ghi state của GAS (GAS không có cửa vá state riêng).
 │   │   ├── cai-dat-thu.js        Dựng và đọc cài đặt đồng bộ của hộp thử qua đúng cổng `settingsSave`, kể cả đổi lịch nền dạng theo tiến trình sang phần thay đổi.
 │   │   ├── keo-ve.js             Gọi chặng kéo về như lớp xả đọc gọi (`keoVe` qua cửa ghi `pullPageApply`, `keoLo` qua `pullBatchApply` trên ô lượt): dựng ngữ cảnh lời gọi và xóa mục chờ xác nhận đã khớp như người điều phối.
 │   │   ├── ung-vien-day.js       Định sẵn ứng viên chặng đẩy trong hộp thử (`datUngVienDay`, `boUngVienDay`).
 │   │   ├── hop-keo.js            Hộp cát cho chặng kéo về (`hopKeoVe` đủ chặng quét, `hopKeoBien` chỉ cửa ghi kéo về) và bảng danh mục thử `congDanhMucThu`.
 │   │   ├── tab-fbm-gia.js        Tab FBM giả chạy executor thật của Extension (`tabGia`), cùng hàm dựng response lưới và trả lời giả cho phần tử cửa ghi.
+│   │   ├── luot-day-du.js        Lượt đồng bộ Khách + Giao dịch đầy đủ với FBM giả phân trang (`chayLuotDayDu`), dùng chung cho các ca `WorkflowPipeline*`.
+│   │   ├── worker-nhip.js        Service worker thật với Chrome giả cho nhịp nền, đếm tìm tab, mở tab và tin gửi.
 │   │   ├── tab-nap.js            Cầu nối iframe (`bridgeNap`) và executor trong tab FBM (`executorNap`) của Extension thật chạy trong hộp với Chrome giả.
 │   │   ├── chuoi-dang-nhap.js    Chuỗi đăng nhập thật ba phía cho test K8: GAS hộp cát ↔ worker thật ↔ executor thật trong tab FBM giả ghi lại mọi request nhận được.
 │   │   ├── trang-login.js        Câu trả lời mặc định của FBM giả cho từng bước trang Login và cách nộp lần lượt các bước đó (`quaTrangLogin`).
@@ -371,6 +376,7 @@ tests\
 │       ├── bang-md.js            Đọc bảng markdown trong tài liệu thành hàng ô kèm số dòng, để test đối chiếu tài liệu với code.
 │       ├── khai-bao.js           Tên khai báo ở cột 0 của mã GAS (tên toàn cục), bỏ bảng khai mở.
 │       ├── liet-tep.js           Liệt kê tệp trong dự án GAS hoặc thư mục bất kỳ của repo, đi cả thư mục con, bỏ node_modules và thư mục chấm.
+│       ├── pham-vi-fbm.js        Phạm vi mã nguồn đồng bộ FBM dùng chung cho luật cứng và phép dò hàm không ai gọi.
 │       ├── lop-css.js            Mọi tên lớp có luật trong một đoạn CSS.
 │       └── ngoai-le.js           So vi phạm với danh sách ngoại lệ chỉ được co lại.
 ├── tools\
@@ -495,6 +501,9 @@ tests\
     │   ├── ExecutorScan.js        Kiểm executor trong tab FBM: cắt gói dưới trần, chỉ giữ dòng GAS xin, báo mất việc khi tab tải lại.
     │   ├── Reconcile.js           Kiểm identity, MST, hash, conflict và trạng thái đồng bộ.
     │   ├── Preflight.js            Kiểm cổng điều kiện trước khi cấp request push và identity probe.
+    │   ├── PreflightPhamVi.js      Kiểm liên kết tài khoản FBM trước lượt (REBIND_REQUIRED, kiểm và dò liên kết) và phạm vi giới hạn theo danh sách khách.
+    │   ├── PreflightUngVien.js     Kiểm ứng viên đẩy (mã khách mới, Activity lệch owner) và lỗi chung chặn phiên ghi (cài đặt hỏng, sổ lỗi đẩy hỏng, cổng Category không dựng được).
+    │   ├── PreflightDocSheet.js    Kiểm Log xung đột chỉ ghi khi số đổi, đọc Sheet lỗi, số lần đọc Sheet và tính hash trong một lượt, chiều Lấy không dựng ứng viên đẩy.
     │   ├── PushEligible.js         Kiểm phép xét đẩy một dòng, quyền đồng bộ, người phụ trách, và preflight đếm đúng tập chặng đẩy dựng.
     │   ├── Fingerprint.js          Kiểm dấu vân giữ giá trị cố định, băm hai đường ra cùng kết quả, chuẩn hóa ngày, threeWay, cổng danh mục.
     │   ├── Identity.js            Kiểm liên kết tài khoản FBM với Sheet: xem trạng thái không đọc Sheet, hủy liên kết bị chặn khi request đang bay.
@@ -503,7 +512,22 @@ tests\
     │   ├── Orchestration.js       Kiểm state, cursor, resume, luồng nhiều lát, chặn cấu hình đẩy, trigger hẹn giờ cũ còn sót.
     │   ├── StatusView.js          Kiểm bộ dựng status cho Sidebar: tone, nút, tiến độ, cảnh báo, câu kiểm liên kết, phạm vi, username theo bảng ca; dựng thuần; cửa lệnh gắn status đủ trường.
     │   ├── PropertyBuffer.js      Kiểm bộ đệm DocumentProperties: thấy lượt khác ghi trong lúc chờ khóa, lỗi giữa chừng vẫn lưu phần đã ghi.
-    │   ├── Workflow.js             Chạy contract xuyên GAS -> executor Extension -> GAS với fixture FBM, cùng các cổng fail-closed cấp pipeline.
+    │   ├── WorkflowCharter.js      Hiến chương 14 use case và ma trận 44 pipeline phải trỏ tới tệp test thật, cùng phân quyền ghi theo mode.
+    │   ├── WorkflowIdentity.js     Tự điền danh tính, kiểm liên kết, Đăng nhập thử và xóa liên kết, đi qua GAS, executor thật rồi GAS.
+    │   ├── WorkflowSchedule.js     Cài đặt lịch nền: công tắc, chu kỳ, chiều, số khách mỗi phiên, kiểm ô, cách tính đến hạn.
+    │   ├── WorkflowBackground.js   Máy nền chọn tiến trình đến hạn, lượt nền không mở lần hai, Giữ phiên có đẩy.
+    │   ├── WorkflowWorker.js       Service worker thật trả lời nhịp nền: không tìm tab, nộp lỗi tab, mở tab theo lệnh GAS.
+    │   ├── WorkflowCategoryPush.js Chiều đẩy đọc lại danh mục FBM giữa các lô; tên đổi, mất danh mục hoặc chạm trần lỗi đẩy thì dừng paused.
+    │   ├── WorkflowCompactLookup.js  Danh mục FBM lớn không chép vào state, mã bị chặn vào Log, state cũ còn bản sao map vẫn ghi được.
+    │   ├── WorkflowCompactPush.js  State chặng đẩy giữ gọn (preview, payload ứng viên), dựng lại ứng viên từ Sheet, probe state.
+    │   ├── WorkflowPushState.js    Ghi ô lượt hoặc Sheet hỏng ở chặng đẩy thì không phát lệnh ghi FBM.
+    │   ├── WorkflowBudget.js       Khoảng nghỉ giữa request, hạn envelope, trần lát GAS, DocumentProperties đầy.
+    │   ├── WorkflowPipeline.js     Lượt đầy đủ Customer + Activity, nạp danh mục một lô, chi phí kho cố định theo lát và theo lô.
+    │   ├── WorkflowPipelineFault.js  Lô giao dịch lỗi giữa lượt: khách lỗi, nghi phiên, id lạ hoặc thiếu phần tử, yêu cầu khách chung hỏng.
+    │   ├── WorkflowPipelinePaging.js  Phân trang theo khóa, cột lệch, chạy lại cùng lô và đường truyền đứt được gửi lại.
+    │   ├── WorkflowReadContract.js Lượt Lấy phiên rỗng, Extension lệch mã hợp đồng, trang danh sách khách chỉ đánh dấu.
+    │   ├── WorkflowStopStale.js    Dừng hoặc tắt khi request đang bay, response cũ, HTML lỗi, lỗi cầu nối tay, DTO không lộ bí mật, lượt kẹt.
+    │   ├── WorkflowStepLog.js      State do bản cũ ghi giữa lượt và thứ tự sổ bước trong Log.
     │   ├── ScanJob.js              Kiểm việc quét: cắt gói dưới trần, chuyển trang, gói trùng/lạ, mất response, mất tab, ghi lỗi, lượt thiếu dòng; harness chạy lượt tay và lần hỏi nền qua FBM giả.
     │   ├── ActivityScan.js         Kiểm lấy toàn bộ giao dịch: giữ id, gắn cờ chỉ khi đủ, chia khoảng không chồng ngày biên, đọc lại theo id, executor dừng đọc khi quá trần.
     │   ├── CustomerCount.js        Kiểm bước đếm khách: FBM không đổi thì dừng sau một lần đếm, tổng tăng thì Quét nhanh đúng một lần, chưa có mốc thì Quét nhanh.
@@ -530,12 +554,27 @@ tests\
     │   ├── SidebarMachine.js       Kiểm khối máy chạy nền ở Cài đặt phiên, lệnh giao/gỡ máy, đánh thức Extension lý do config, lời báo máy nền và nhịp hỏi GAS khi máy không chở lượt.
     │   ├── EntryPointGate.js       Kiểm cửa ra của mọi hàm fbm* về Sidebar không mang cookie/token phiên, và lệnh start giữ nguyên identity nháp của Kiểm liên kết.
     │   ├── StaticRules.js          Quét mã FBM theo quy tắc kiến trúc cứng (state, lỗi im lặng, typeof hàm, phase, DocumentProperties, popup, kind, số cứng, logEvent, baseline) với danh sách ngoại lệ chỉ được co lại.
-    │   ├── Push.js                Kiểm chặng đẩy: phát request ghi, sổ bận, áp kết quả hai pha, lỗi từng bản ghi, form sửa/tạo Activity, dọn dấu #SC, cứu lệnh tạo mất phản hồi.
+    │   ├── UnusedFunctions.js      Hàm khai trong mã đồng bộ FBM mà không mã chạy thật nào nhắc tới là mã chết; không có danh sách ngoại lệ.
+    │   ├── PushRequest.js         Kiểm phát request ghi: sổ bận, hoãn ứng viên đã bị sửa, xung đột giữa lượt không dừng chiều đẩy, báo khi không có gì để đẩy.
+    │   ├── PushApply.js           Kiểm áp kết quả hai pha: baseline cũ, hash Activity tạo mới, ghi Sheet hỏng sau khi FBM đã lưu.
+    │   ├── PushFailure.js         Kiểm sổ lỗi từng bản ghi: mở lại bản ghi lỗi, một lỗi không dừng bản ghi kế, dừng phiên nhả sổ bận, HTTP lỗi và hết phiên.
+    │   ├── PushGuard.js           Kiểm cửa chặn trước request đẩy: trường bắt buộc, giới hạn độ dài, sai owner, không thấy bản ghi FBM.
+    │   ├── PushHold.js            Kiểm bản ghi bị giữ lại: chỉ tăng đếm, Log gom một dòng mỗi lát, lô giữ chỉ tốn một lần ghi Sheet.
+    │   ├── PushActivityForm.js    Kiểm form sửa Activity gửi FBM: id, ngày .NET theo ngày Việt Nam, fileticket, ô nullable.
+    │   ├── PushMarker.js          Kiểm tạo và sửa Activity qua dấu #SC: đọc xác nhận khớp hash, lệnh dọn dấu và đẩy không ăn.
+    │   ├── PushCreateRecover.js   Kiểm cứu lệnh tạo mất phản hồi: Customer đọc lại lưới theo MST, Activity giữ trạng thái đang đẩy.
     │   ├── RunStartProbe.js       Kiểm mở lượt: request đầu là probe phiên FBM, chế độ chạy tách quyền ghi, lượt hỏng hay lượt cũ chạy lại từ probe, trạng thái hiện đúng chiều.
     │   ├── PushCandidateList.js   Kiểm danh sách ứng viên đẩy: quyền đồng bộ, dòng vừa thành xung đột, lỗi đọc state, khách cha, phạm vi giới hạn, bản ghi đóng băng.
     │   ├── PushCompare.js         Kiểm so ba bản trước khi lưu FBM: hash form bằng hash lưới, bản FBM đổi sau mốc không bị ghi đè, xung đột không dừng phiên.
     │   ├── Audit.js               Kiểm log, báo cáo, fixture an toàn và các ranh giới không ghi/xóa.
-    │   ├── ProductionMatrix.js    Ma trận nhiều Customer/Activity, phân trang, cắt lô missing, retry mạng và idempotency.
+    │   ├── MatranKeoCursor.js      Ma trận kéo về: nhiều khách và giao dịch không tạo trùng, requestId không trùng, cursor nhiều trang, ghi cờ hàng loạt, phạm vi chỉ định, phiên rỗng.
+    │   ├── MatranDayKhoiPhuc.js    Ma trận đẩy: khôi phục lệnh tạo không biết kết quả (tra theo dấu #SC hoặc MST).
+    │   ├── MatranDayDanhSach.js    Ma trận chặng đẩy theo danh sách mã: quét lại, chia khóa, khóa hỏng, trần vòng.
+    │   ├── MatranXungDotKeo.js     Ma trận xung đột phía kéo về: so lại mỗi kỳ, gỡ xung đột, bộ đếm, cờ không thấy bên FBM.
+    │   ├── MatranXungDotChot.js    Ma trận chốt xung đột: mở giữa lượt nền, lệnh chốt thiếu hoặc lệch bị từ chối, bận, lấy FBM, lấy ShinCRM, tùy chỉnh.
+    │   ├── MatranXungDotDoc.js     Ma trận đọc xung đột: nhiều xung đột không làm state phình.
+    │   ├── MatranKhoThuocTinh.js   Ma trận kho thuộc tính: JSON hỏng hoặc dịch vụ lỗi ném lỗi có mã, thông báo không lộ bí mật.
+    │   ├── MatranXungDotActivity.js  Ma trận xung đột giao dịch: MST chỉ chọn một bên, phương án tùy chỉnh ghi đúng nội dung và ngày.
     │   ├── PushGate.js            Cổng chặng đẩy: phép quyết bỏ chặng, ngưỡng chấp thuận và dấu tập; lượt nền khớp dấu không đọc Sheet; chạm ngưỡng thì chờ lời duyệt gắn đúng dấu tập.
     │   ├── writeGateAudit.js      Quét mọi mutator Sheet trong runtime và bảo đảm không bỏ sót cửa ghi chung.
     │   ├── testRules.js           Luật tĩnh cho chính bộ test: chỉ tests/lib dựng môi trường giả, không định nghĩa lại tên khung, tệp ca không lấy khung từ tệp ca khác; ngoại lệ chỉ co lại.

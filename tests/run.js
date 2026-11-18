@@ -108,7 +108,14 @@ const NHOM_CA = [
   require('./cases/fbmSync/SidebarReport'),
   require('./cases/fbmSync/Components'),
   require('./cases/fbmSync/ComponentSpacing'),
-  require('./cases/fbmSync/ProductionMatrix')];
+  require('./cases/fbmSync/MatranKeoCursor'),
+  require('./cases/fbmSync/MatranDayKhoiPhuc'),
+  require('./cases/fbmSync/MatranDayDanhSach'),
+  require('./cases/fbmSync/MatranXungDotKeo'),
+  require('./cases/fbmSync/MatranXungDotChot'),
+  require('./cases/fbmSync/MatranXungDotDoc'),
+  require('./cases/fbmSync/MatranKhoThuocTinh'),
+  require('./cases/fbmSync/MatranXungDotActivity')];
 
 console.log('ShinCRM — bộ kiểm thử offline');
 console.log('='.repeat(60));
