@@ -127,6 +127,7 @@ Ba điều phải biết về thư mục này, cả ba đều đã từng gây l
 │       │   └── ReloadPayloadProbe.js Đánh dấu một mã Customer có sẵn rồi hỏi như Sidebar để kiểm nạp lại cùng response; không ghi ô nào.
 │       ├── DevToken.js           Thẻ bí mật của cửa trên. Không vào git, nhưng CÓ đẩy lên Google.
 │       ├── Smoke.js              Phép thử nhanh: mở được tệp Sheet không, đọc được gì.
+│       ├── FreeSheetFixture.js   Dựng hai sheet xem tự do (Kanban ba danh sách, một cột mã nằm giữa) để nghiệm thu luật cột mã bằng tay.
 │       ├── DumpGrid.js           Đo lưới từng sheet: bao nhiêu hàng, bao nhiêu cột, còn chỗ ghi thêm bao nhiêu hàng.
 │       ├── SheetIoProbe.js        Cố tình làm hỏng rồi khôi phục một mã hàng 1 để nghiệm thu readColumnMap; chỉ ghi trên DEV.
 │       ├── TriggerErrorProbe.js  Cho trigger sửa ô ném lỗi thử để nghiệm thu lỗi trigger thành thông báo và hiện ở Sidebar đang mở.

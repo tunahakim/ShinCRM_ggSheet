@@ -25,7 +25,7 @@ var DEV_RUNNER_ALLOWED = [
   'probeBadColumnCode', 'probeLogGate', 'probeDateText', 'probeSheetGrid', 'probeCellBudget',
   'probeEntityRead', 'probeCategoryRead', 'probeDirtyState', 'getReloadState', 'probeSelectionAndReload', 'reloadRecords', 'reloadConfig',
   'probeNoticeGate', 'probeTriggerErrorPending', 'probeEntryPoint', 'probeLoadAll', 'probeSidebarTemplate', 'probeClientTiming', 'probeClientError',
-  'probeSaveGate', 'probeHardDeleteGuards', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent',
+  'probeSaveGate', 'probeHardDeleteGuards', 'probeIdGate', 'viewProbeSelection', 'viewProbeRenderCurrent', 'devSeedFreeSheets',
   'probeTriggerState', 'triggersEnsure', 'probePropertiesBehavior', 'reloadMatrixProbe', 'reloadPayloadProbe',
   'fbmDevStatus', 'fbmDevCancel', 'fbmDevTrace', 'fbmSyncStateProbe'
 ];

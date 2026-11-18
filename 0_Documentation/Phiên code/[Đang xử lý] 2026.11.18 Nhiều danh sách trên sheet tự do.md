@@ -14,4 +14,4 @@ Vai trò dữ liệu: Extension đọc thô hàng 1 và các ô mã của hàng 
 - [x] Test GAS, Sidebar, và test hai nơi cho cùng kết quả trên cùng bộ ca.
 - [x] Tài liệu 07 Phần 4A.
 - [x] Sidebar: sheet `!` có mã nhân đôi thì plan bỏ mã đó, khớp GAS.
-- [ ] Nghiệm thu trên Sheet DEV: sheet ba khối, nhấp từng khối.
+- [x] Nghiệm thu trên Sheet DEV (dựng bằng `devSeedFreeSheets`): Kanban C4, D5 (cột trống), F5, I4, J4 (ngoài mép phải) mở đúng khách, F6 (ô mã trống) báo hàng không có khách; Một cột thử A3 (trái mã), D4 (phải mã) mở đúng khách.
