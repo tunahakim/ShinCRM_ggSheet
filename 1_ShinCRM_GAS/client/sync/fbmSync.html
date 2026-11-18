@@ -11,12 +11,6 @@ var FBM_SYNC_TONE_LOOK = { running: { cls: 'statusRunning', aria: ' — đang ch
 /** Tên việc của người dùng trong popup "Đồng bộ nền đang chạy". */
 var FBM_SYNC_BACKGROUND_TASKS = { run: 'chạy đồng bộ', identity: 'kiểm tra liên kết', conflict: 'mở xung đột', login: 'đăng nhập thử' };
 
-function fbmSyncClientTrace(stage, request, extra) {
-  var meta = request && request.meta && request.meta.trace || {}, event = Object.assign({ at: Date.now(), stage: stage, runId: String(meta.runId || ''), requestId: String(meta.requestId || ''), operation: String(request && request.meta && request.meta.kind || ''), entity: String(request && request.meta && request.meta.entity || ''), recordId: String(request && request.meta && (request.meta.id || request.meta.shinId || request.meta.stt_rec_kh) || '') }, extra || {});
-  FBM_SYNC_CLIENT.traceEvents.push(event);
-  if (FBM_SYNC_CLIENT.traceEvents.length > 20) { FBM_SYNC_CLIENT.traceEvents.shift(); }
-  return event;
-}
 
 
 /** Cất màn hiện tại trước khi FBM dùng chung bốn vùng render của Sidebar. */
@@ -1162,10 +1156,6 @@ function fbmSyncSetToggleState(id, enabled, disabled) {
   }
   if (disabled !== undefined) { state.disabled = disabled; }
   return fbmSyncSetTargetState(id, state);
-}
-function fbmSyncToggleValue(id) {
-  var node = document.getElementById(id);
-  return !!node && node.getAttribute('aria-pressed') === 'true';
 }
 function fbmSyncControlValue(id) {
   var node = document.getElementById(id);

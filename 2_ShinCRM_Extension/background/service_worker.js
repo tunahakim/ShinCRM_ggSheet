@@ -158,16 +158,6 @@ var FBM_EXECUTOR_VERSION = chrome.runtime.getManifest().version;
 // Mã phiên bản hợp đồng GAS–Extension (tests/contracts/gasExtensionContract.js). Chỉ trả về cho GAS; GAS quyết định dừng khi lệch mã.
 var FBM_CONTRACT_VERSION = '7365fcc02c03';
 
-function addWorkerTrace(reply, request, stage, extra) {
-  var event = Object.assign({ at: Date.now(), stage: stage, requestId: String(request && request.id || '') }, extra || {});
-  if (reply && reply.result && typeof reply.result === 'object') {
-    reply.result.transport = reply.result.transport || {};
-    reply.result.transport.trace = (reply.result.transport.trace || []).concat([event]);
-  } else if (reply && typeof reply === 'object') {
-    reply.trace = (reply.trace || []).concat([event]);
-  }
-  return reply;
-}
 
 /** Đặt đúng một alarm kỹ thuật; GAS mới biết lịch nghiệp vụ nào đến hạn. */
 var GAS_POLL_ALARM = 'gas_poll';

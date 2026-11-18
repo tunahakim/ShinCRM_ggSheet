@@ -82,7 +82,8 @@ const NHOM = [
   require("./fbmSync/EntryPointGate"),
   require("./fbmSync/RelayResend"),
   require("./fbmSync/PushGate"),
-  require("./fbmSync/StaticRules")
+  require("./fbmSync/StaticRules"),
+  require("./fbmSync/UnusedFunctions")
 ];
 
 async function chay(so) { for (const nhom of NHOM) { await nhom.chay(so); } }

@@ -67,29 +67,6 @@ function testPipelineVaTienDo(so) {
     ['Tiến trình: 2/10 (20%)', 'Tiến trình: 7/10 (70%) · đang chờ phản hồi']);
 }
 
-function testVaTaiCho(so) {
-  const { hop, content } = taoBoGoc();
-  const truoc = statusGas({ phase: 'done', mode: 'read', runId: 'r0' });
-  ve(hop, content, hop.fbmSyncRenderRun, truoc);
-  content.setAttribute('data-fbm-sync-screen', 'run');
-  const cu = content.querySelector('.shin-sync-pipeline');
-  const tiep = statusGas(stateDangChay({ phase: 'checking_session', runId: 'r1' }));
-  const vaDuoc = hop.fbmSyncPatchLiveStatus(content, tiep, 'run');
-  const dau = Array.from(content.querySelectorAll('.shin-sync-pipeline-marker')).map((node) => node.textContent);
-  check(so, 'lượt mới vá lại cả pipeline cũ đã hoàn tất, không để chặng kiểm tra đi với sáu dấu hoàn tất',
-    [vaDuoc, content.querySelector('.shin-sync-pipeline') === cu, content.querySelector('.shin-sync-pipeline-title').textContent, dau.join('')],
-    [true, true, 'Pipeline đang chạy', hop.FBM_SYNC_RUN_SCHEMA.pipeline.marker.current + hop.FBM_SYNC_RUN_SCHEMA.pipeline.marker.pending.repeat(5)]);
-  ve(hop, content, hop.fbmSyncRenderRun, statusGas(stateDangChay({ progress: { total: 10, done: 2 } })));
-  const vaTienDo = hop.fbmSyncPatchLiveStatus(content, statusGas(stateDangChay({ progress: { total: 10, done: 7 } })), 'run');
-  check(so, 'vá trạng thái đang chạy cũng cập nhật thanh tiến độ, không giữ số đếm cũ',
-    [vaTienDo, content.querySelector('.shin-sync-progress-label').textContent, content.querySelector('#fbm-sync-progress-track').getAttribute('aria-valuenow'), content.querySelector('#fbm-sync-progress-fill').style.width],
-    [true, 'Tiến trình: 7/10 (70%)', '70', '70%']);
-  const dau0 = content.children[0];
-  hop.fbmSyncPatchLiveStatus(content, statusGas(stateDangChay({ phase: 'reconcile', counts: { completed: 4, succeeded: 3 } })), 'run');
-  check(so, 'trạng thái đang chạy cập nhật tại chỗ, không dựng lại màn hình',
-    [content.children[0] === dau0, content.textContent.indexOf('Đang đối chiếu') >= 0],
-    [true, true]);
-}
 
 function testKhoaOChon(so) {
   const { hop, content } = taoBoGoc();
@@ -182,7 +159,6 @@ async function chay(so) {
   try { taoBoGoc(); } catch (error) { return ghiLoiNap(so, 'nạp renderer Sidebar Đồng bộ FBM', error); }
   testNutChay(so);
   testPipelineVaTienDo(so);
-  testVaTaiCho(so);
   testKhoaOChon(so);
   testMucQuet(so);
   testBangPhamViVaNut(so);

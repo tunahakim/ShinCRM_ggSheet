@@ -41,17 +41,6 @@ function fbmSyncStatusBlocks(status, count) {
   if (status.message) { elements.push(Text({ className: status.phase === 'error' ? classes.error : classes.message, text: String(status.message) })); }
   return [FBM_SYNC_STATUS_UI.layout.card(elements)];
 }
-function fbmSyncPatchStatusBlocks(panel, status, targetId) {
-  var id = targetId || FBM_SYNC_STATUS_SCHEMA.regions.liveStatus;
-  if (!panel || !RENDER_INDEX.nodes[id]) { return false; }
-  fbmSyncRenderTarget(id, fbmSyncStatusBlocks(status, status && status.counts || {}));
-  return true;
-}
-function fbmSyncPatchLiveStatus(panel, status, screen) {
-  if (!panel || String(panel.getAttribute('data-fbm-sync-screen') || '') !== String(screen || '') || (screen !== 'run' && screen !== 'results')) { return false; }
-  if (screen === 'run' && typeof fbmSyncPatchLivePipeline === 'function' && !fbmSyncPatchLivePipeline(panel, status)) { return false; }
-  return fbmSyncPatchStatusBlocks(panel, status);
-}
 </script>
 <script>
 function fbmSyncRecordIssueBlocks(metadata) {

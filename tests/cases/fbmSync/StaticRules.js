@@ -5,25 +5,10 @@
  * Bỏ comment trước khi quét, giữ số dòng và chuỗi ký tự (nhiều quy tắc đọc chuỗi).
  */
 
-const fs = require('fs');
-const path = require('path');
 const { section, check } = require('../../lib/assert');
 const { stripComments } = require('../../lib/strip-comments');
 const { compareExceptions } = require('../../lib/quet/ngoai-le');
-
-const REPO = path.join(__dirname, '..', '..', '..');
-
-/** Phạm vi quét, tính từ gốc repo. `kind` quyết định quy tắc nào áp: gas, client hoặc ext. */
-const SCOPE = [
-  { kind: 'gas', dir: '1_ShinCRM_GAS/fbm_sync', exts: ['.js'] },
-  { kind: 'gas', file: '1_ShinCRM_GAS/server/service/FbmSyncService.js' },
-  { kind: 'client', dir: '1_ShinCRM_GAS/client/sync', exts: ['.html', '.js'] },
-  { kind: 'client', dir: '1_ShinCRM_GAS/client/schema/sync', exts: ['.html', '.js'] },
-  { kind: 'ext', file: '2_ShinCRM_Extension/background/service_worker.js' },
-  { kind: 'ext', file: '2_ShinCRM_Extension/background/credential_vault.js' },
-  { kind: 'ext', dir: '2_ShinCRM_Extension/content_scripts/fbm_sync', exts: ['.js'] },
-  { kind: 'ext', file: '2_ShinCRM_Extension/content_scripts/bridge/iframe_bridge.js' }
-];
+const { listFiles, collectFiles, readSource } = require('../../lib/quet/pham-vi-fbm');
 
 /** Tên phase lấy từ `fbm_sync/state/State.js` (ACTIVE_PHASES, TERMINAL_PHASES, `idle`, `awaiting_approval`); chỉ tệp đó được giữ danh sách phase. */
 const PHASE_NAMES = ['idle', 'checking_session', 'waiting_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'awaiting_approval', 'done', 'error', 'paused', 'conflict'];
@@ -169,7 +154,6 @@ const EXCEPTIONS = {
     '1_ShinCRM_GAS/client/sync/fbmSyncConfigEditor.html': 10,
     '1_ShinCRM_GAS/client/sync/fbmSyncSettingsScreen.html': 1,
     '1_ShinCRM_GAS/client/sync/fbmSyncShell.html': 2,
-    '1_ShinCRM_GAS/client/sync/fbmSyncStatusScreen.html': 1,
     '1_ShinCRM_GAS/client/sync/fbmSyncUiSchema.html': 1,
     '1_ShinCRM_GAS/fbm_sync/SyncSchema.js': 1,
     '1_ShinCRM_GAS/fbm_sync/reconcile/CategoryGate.js': 3,
@@ -222,29 +206,6 @@ const EXCEPTIONS = {
   }
 };
 
-function listFiles(root, exts, prefix) {
-  const files = [];
-  fs.readdirSync(root, { withFileTypes: true }).forEach((entry) => {
-    const relative = prefix + '/' + entry.name;
-    if (entry.isDirectory()) { files.push(...listFiles(path.join(root, entry.name), exts, relative)); }
-    else if (entry.isFile() && exts.indexOf(path.extname(entry.name)) >= 0) { files.push(relative); }
-  });
-  return files;
-}
-
-/** Mọi tệp trong phạm vi, kèm `kind`; trả thêm danh sách đường dẫn cấu hình mà không tồn tại. */
-function collectFiles() {
-  const files = [];
-  const missing = [];
-  SCOPE.forEach((entry) => {
-    const target = entry.dir || entry.file;
-    if (!fs.existsSync(path.join(REPO, target))) { missing.push(target); return; }
-    if (entry.file) { files.push({ file: entry.file, kind: entry.kind }); }
-    else { listFiles(path.join(REPO, entry.dir), entry.exts, entry.dir).forEach((file) => files.push({ file: file, kind: entry.kind })); }
-  });
-  return { files: files, missing: missing };
-}
-
 /** Chạy một quy tắc trên mọi tệp thuộc phạm vi của nó; trả `{ tệp: [vi phạm] }` chỉ gồm tệp có vi phạm và không nằm trong danh sách được phép. */
 function scanRule(rule, files, readSource) {
   const out = {};
@@ -264,8 +225,7 @@ function chay(so) {
   const { files, missing } = collectFiles();
   check(so, 'mọi đường dẫn trong phạm vi quét đều tồn tại', missing, []);
   check(so, 'phạm vi quét có tệp để quét', files.length > 0, true);
-  const readSource = (file) => fs.readFileSync(path.join(REPO, file), 'utf8');
-  const clientAll = listFiles(path.join(REPO, '1_ShinCRM_GAS/client'), ['.html'], '1_ShinCRM_GAS/client').map((file) => ({ file: file, kind: 'client' }));
+  const clientAll = listFiles('1_ShinCRM_GAS/client', ['.html']).map((file) => ({ file: file, kind: 'client' }));
   check(so, 'cả thư mục client (không riêng màn đồng bộ) không có popup trình duyệt alert/confirm: hỏi qua uiDecisionOpen, báo qua noticeSet', scanRule(ruleById('popup'), clientAll, readSource), {});
 
   [PHASE_OWNER].concat(PROPERTY_GATE_FILES, SESSION_SECRET_FILES, STATE_ORCHESTRATORS, LOG_WRITERS, BASELINE_WRITERS).forEach((file) => {
@@ -314,4 +274,4 @@ function chay(so) {
   check(so, 'chèn một catch rỗng vào bản sao State.js thật thì quét đỏ', injectedProblems.length === 1 && injectedProblems[0].indexOf(PHASE_OWNER) >= 0, true);
 }
 
-module.exports = { chay, RULES, EXCEPTIONS, collectFiles, scanRule, stripComments, compareExceptions };
+module.exports = { chay };

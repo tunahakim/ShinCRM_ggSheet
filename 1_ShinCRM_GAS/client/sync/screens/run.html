@@ -76,12 +76,6 @@ function fbmSyncRunDetailsBlocks(status) {
   if (!fbmSyncRunHasSnapshot(status)) { return reset; }
   return reset.concat([fbmSyncPipelineBlock(status, FBM_SYNC_RUN_SCHEMA.regions.pipeline), FBM_SYNC_RUN_UI.layout.liveStatus(FBM_SYNC_RUN_SCHEMA.regions.liveStatus, fbmSyncStatusBlocks(status, status.counts || {}))]);
 }
-function fbmSyncPatchLivePipeline(panel, status) {
-  if (!panel || !RENDER_INDEX.nodes[FBM_SYNC_RUN_SCHEMA.regions.pipeline]) { return false; }
-  var next = fbmSyncPipelineBlock(status);
-  fbmSyncRenderTarget(FBM_SYNC_RUN_SCHEMA.regions.pipeline, next.elements);
-  return true;
-}
 function fbmSyncRenderRun(panel, status) {
   status = status || {};
   return fbmSyncAppendBox(panel, FBM_SYNC_RUN_UI.rootClass, FBM_SYNC_RUN_SCHEMA.rootId, FBM_SYNC_RUN_UI.layout.screen({
