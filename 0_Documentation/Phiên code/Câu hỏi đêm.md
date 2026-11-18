@@ -8,11 +8,6 @@ Cách viết một mục: một đầu đề ngắn, rồi tối đa vài câu.
 
 ## Đang mở
 
-### Dọn đồng bộ FBM (C8.6): các mục còn chờ
-
-1. Giá trị ngầm định khi nhập dữ liệu (Chờ dọn 6, thay `pullDefaultPermission`): chủ dự án muốn Sidebar cho đặt ngầm định gần như mọi trường, mỗi nguồn nhập (Sidebar, đồng bộ FBM, Zalo bot...) có ngầm định riêng, nghiêng về mỗi nguồn một màn hình. Chưa chốt thiết kế (một màn hình chung hay mỗi nguồn một màn hình, ô nào được đặt ngầm định); tới khi chốt giữ `pullDefaultPermission` như cũ.
-2. Chờ dọn 7 (viết lại lớn: `pushResultApply` và `incomingHash`, `runPlanNext` đọc `RUN_PLANS.stages`, rỗng ngoại lệ luật 1 và 9, `recountStart`) chưa làm: đổi lõi lượt đẩy và cần nghiệm thu trên FBM thật, không nên làm khi không ai nghiệm thu.
-
 ### Thu hẹp bảng khóa Block: `elements` và `label` không còn là khóa chung
 
 Phép kiểm mới `tests/cases/blockKeys.js` bắt được bốn cặp vai–khóa mà bản khai nhận rồi bỏ đi: `label` trên `box`, `card`, `row`, `text`. Tự quyết: dời `elements` xuống ba vai chứa con và `label` xuống bốn vai có chữ, nên `Card({ label: 'GHI CHÚ' })` từ nay hét lên và chỉ dẫn sang `title`. Không dòng khai nào trong code hiện tại bị ảnh hưởng. Đã thêm một câu về luật phạm vi vào tài liệu 04 Phần 4.
