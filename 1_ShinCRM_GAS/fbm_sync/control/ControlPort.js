@@ -24,12 +24,11 @@ FbmSync.COMMANDS = {
   save_settings: { lock: true, run: function (input) { return FbmSync.settingsSaveCommand(input); } },
   reset_settings: { lock: true, run: function (input) { return FbmSync.settingsResetCommand(input); } },
   set_master: { run: function (input) { return FbmSync.masterSwitchCommand(input.enabled === true); } },
-  save_identity_binding: { lock: true, run: function (input) { return FbmSync.connectionSave({ binding: input.binding || {} }); } },
   save_credential: { lock: true, run: function (input) { return FbmSync.connectionSave(input); } },
   reset_state: { lock: true, run: function () { return FbmSync.controlResetState(); } },
   retry_push_failures: { lock: true, run: function () { return FbmSync.pushFailuresClearCommand(); } },
   // Lỗi Sidebar chỉ ghi Log: lượt chỉ đóng qua `continue` mang lỗi của Extension, một nút bấm hỏng không được đóng lượt.
-  client_error: { lock: true, reply: true, run: function (input) { FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace); clientErrorLog(input.action, String(input.message || 'Sidebar báo lỗi không kèm lý do.')); return { ok: true }; } },
+  client_error: { lock: true, reply: true, run: function (input) { clientErrorLog(input.action, String(input.message || 'Sidebar báo lỗi không kèm lý do.')); return { ok: true }; } },
   relay_config: { lock: true, view: false, run: function () { return FbmSync.relayConfig(false); } },
   relay_rotate_key: { lock: true, view: false, run: function () { return FbmSync.relayConfig(true); } },
   relay_switch_log: { view: false, run: function (input) { return FbmSync.relaySwitchDecisionLog(input.decision === 'switch' ? 'switch' : 'keep', input.fromSpreadsheetId); } },
@@ -176,7 +175,6 @@ FbmSync.commandStart = function (input) {
     unknown.code = 'SYNC_START_KIND_UNKNOWN';
     throw unknown;
   }
-  FbmSync.traceImport(FbmSync.stateRead(), input.clientTrace);
   // Lượt nền bị Dừng khi khóa bận còn chờ đóng: đóng trước, ngoài lát, để lát của lượt mới không áp nhầm cờ rồi trả "đã dừng" thay cho mở lượt.
   FbmSync.stopPendingApply();
   var spec = FbmSync.START_KINDS[kind], run = function () { return spec.run(input); };

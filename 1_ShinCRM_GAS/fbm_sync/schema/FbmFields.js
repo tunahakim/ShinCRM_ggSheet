@@ -8,7 +8,6 @@ FbmSync.ENDPOINTS = {
   dir: '/AppService/FastBusiness.ReportExtenderService.asmx/GetDirViewPage',
   completion: '/FastBusiness.DataService.asmx/GetCompletionList'
 };
-FbmSync.PHASES = ['idle', 'checking_session', 'pull_customer', 'pull_activity', 'reconcile', 'push', 'paused', 'conflict', 'error', 'done'];
 FbmSync.SYNC_STATUS = {
   notPushed: 'chưa đẩy', pending: 'chờ đối soát', pushing: 'đang đẩy', pushed: 'đã đẩy chờ xác nhận', synced: 'đã đồng bộ',
   missing: 'không thấy bên FBM', transferred: 'đã chuyển cho người khác', conflict: 'xung đột chờ quyết', error: 'đẩy lỗi', notApplied: 'đẩy không ăn',

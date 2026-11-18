@@ -1,6 +1,6 @@
 <script>
 /* Sidebar chỉ hiển thị tiến độ; GAS là nguồn state duy nhất. */
-var FBM_SYNC_CLIENT = { installed: false, commandPending: '', conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, traceEvents: [], subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null, tone: { tone: '', updatedAt: 0 } };
+var FBM_SYNC_CLIENT = { installed: false, commandPending: '', conflictNote: '', active: false, rpcWaiters: {}, runWaiter: null, statusReady: false, mode: 'read', pack: 'quick', openedAt: 0, returnScreen: 'view', returnUi: null, relayConfigured: false, relayOpenId: 0, viewEpoch: 0, statusRequestSeq: 0, lastServerUpdatedAt: 0, conflict: null, subscreen: 'run', navOpen: false, resultsTab: 'summary', resultPages: {}, lastStatus: null, identityStatus: null, identityAction: '', identityLastAction: '', identityProbeSignature: '', identityInvalid: {}, identityDraft: { spreadsheetId: '', userId: '', username: '', accountName: '' }, accountSettingsDraft: {}, accountSettingsInvalid: {}, loginStatus: null, loginDraft: { username: '' }, loginPasswordMode: 'saved', loginPasswordFocused: false, loginPasswordTimer: null, pendingLoginEnvelope: null, configEdits: {}, accountNotices: { identity: null, accountSettings: null, login: null }, settingsNotices: { module: null, relay: null, extension: null, background: null, machine: null, login: null }, syncSettings: null, localMachine: null, machineBusy: false, watchTimer: null, tone: { tone: '', updatedAt: 0 } };
 /** Hạn chờ Extension trả lời một lệnh qua cầu nối (mã máy, nhận lượt, mã hóa, lưu cấu hình); các lệnh này không gọi FBM nên trả lời gần như ngay. */
 var FBM_SYNC_EXTENSION_RPC_MS = 5000;
 /** Extension im lâu hơn mức này trong lượt tay thì Sidebar hỏi GAS một lần xem lượt còn chạy không, để lượt không treo khi Chrome tắt worker giữa chừng. */
@@ -1045,7 +1045,7 @@ function fbmSyncRetryPushFailures() {
 /** Ghi Log một lỗi Sidebar gặp; không đóng lượt nào (lượt chỉ đóng qua `continue` kèm lỗi của Extension). Ghi Log hỏng thì trả lý do để nơi gọi báo cùng lỗi gốc. Lỗi nhập sai của người dùng không đi qua đây. */
 function fbmSyncLogClientError(error, fallback, action) {
   var reason = String(error && error.message || error || fallback || 'Thao tác đồng bộ thất bại.').slice(0, 500);
-  return fbmSyncCommand('client_error', { message: reason, clientTrace: (FBM_SYNC_CLIENT.traceEvents || []).slice(), action: String(action || 'sidebar_error') }, { silent: true }).then(function () { return { ok: true }; }, function (logError) {
+  return fbmSyncCommand('client_error', { message: reason, action: String(action || 'sidebar_error') }, { silent: true }).then(function () { return { ok: true }; }, function (logError) {
     return { ok: false, code: 'GAS_LOG_FAILED', message: 'Không ghi được Log lên GAS: ' + String(logError && logError.message || logError) };
   });
 }
@@ -1078,7 +1078,6 @@ function fbmSyncCheckIdentity() {
   FBM_SYNC_CLIENT.identityAction = 'check';
   FBM_SYNC_CLIENT.identityLastAction = 'check';
   FBM_SYNC_CLIENT.mode = 'check';
-  FBM_SYNC_CLIENT.traceEvents = [];
   return fbmSyncRequireBridge().then(function () {
     return fbmSyncDrive('start', { kind: 'identity_check', identity: identityTarget }, 'identity');
   }).then(function (value) {
@@ -1099,7 +1098,6 @@ function fbmSyncProbeIdentity() {
   FBM_SYNC_CLIENT.identityLastAction = 'probe';
   FBM_SYNC_CLIENT.identityProbeSignature = '';
   FBM_SYNC_CLIENT.mode = 'check';
-  FBM_SYNC_CLIENT.traceEvents = [];
   return fbmSyncRequireBridge().then(function () {
     return fbmSyncDrive('start', { kind: 'identity_probe' }, 'identity');
   }).then(function (value) {
@@ -1504,10 +1502,9 @@ function fbmSyncAskBackgroundRunning(status, task) {
 /** Mở phiên mới. Chặn bấm đúp bằng khóa nút trên DOM ở cửa nhận bấm (`fbmSyncHoldButton`); có cho mở hay không là việc của GAS (`actions`, mã lỗi của `start`). */
 function fbmSyncRun(mode, extra) {
   if (!fbmSyncStatusReady()) { return Promise.resolve(null); }
-  FBM_SYNC_CLIENT.traceEvents = [];
   var chosen = mode || 'read';
   return fbmSyncRequireBridge().then(function () {
-    return fbmSyncDrive('start', Object.assign({}, extra || {}, { kind: 'sync', mode: chosen, pack: fbmSyncRunPack(chosen), clientTrace: FBM_SYNC_CLIENT.traceEvents.slice() }), 'run');
+    return fbmSyncDrive('start', Object.assign({}, extra || {}, { kind: 'sync', mode: chosen, pack: fbmSyncRunPack(chosen)}), 'run');
   }).then(function (result) {
     if (result && result.code === 'SYNC_BACKGROUND_SKIPPED') { return result; }
     if (!result || !result.status) { throw new Error('GAS không trả kết quả đồng bộ.'); }

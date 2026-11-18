@@ -169,7 +169,6 @@ const EXCEPTIONS = {
     '2_ShinCRM_Extension/content_scripts/fbm_sync/response_shape.js': 3
   },
   phaseList: {
-    '1_ShinCRM_GAS/fbm_sync/schema/FbmFields.js': 1,
     '1_ShinCRM_GAS/fbm_sync/transport/ActivityBatch.js': 1
   },
   propertyWrite: {

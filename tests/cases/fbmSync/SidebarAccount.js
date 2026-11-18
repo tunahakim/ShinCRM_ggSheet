@@ -55,7 +55,7 @@ async function testLayNhanDien(so) {
   };
   const probe = { spreadsheetId: 'sheet-1', userId: 'u-1', username: 'an', accountName: 'An FBM' };
   const duoc = await chay({ ok: true, status: statusGas({ phase: 'done', metadata: { identityProbe: probe } }) });
-  check(so, 'tự điền đủ ô: thẻ báo thành công, trả IDENTITY_DRAFT_READY, chưa lưu liên kết (không gọi lệnh save_identity_binding)',
+  check(so, 'tự điền đủ ô: thẻ báo thành công, trả IDENTITY_DRAFT_READY, chưa lưu liên kết (không gọi lệnh lưu kết nối save_credential)',
     [duoc.ket && duoc.ket.code, theLienKet(duoc.hop)],
     ['IDENTITY_DRAFT_READY', ['success', 'Đã lấy thông tin thành công và điền vào form.']]);
   const thieu = await chay({ ok: true, status: statusGas({ phase: 'done', metadata: { identityProbe: { spreadsheetId: 'sheet-1', userId: '', username: 'an', accountName: '' } } }) });

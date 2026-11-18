@@ -52,7 +52,6 @@ const CA = [
   { lenh: 'save_settings', phan: 'loginPolicy', ten: 'lưu chính sách tự đăng nhập', payload: { patches: { fbm_login_policy: { enabled: false, autoOpenTab: true, retryEnabled: true, retryMinutes: 30 } } } },
   { lenh: 'reset_settings', phan: 'run', ten: 'đặt tham số phiên về mặc định', payload: { section: 'fbm_run' } },
   { lenh: 'set_master', ten: 'set_master', payload: { enabled: true } },
-  { lenh: 'save_identity_binding', ten: 'save_identity_binding', payload: { binding: {} } },
   { lenh: 'save_credential', ten: 'save_credential thiếu dữ liệu', payload: {} },
   { lenh: 'reset_state', ten: 'reset_state' },
   { lenh: 'retry_push_failures', ten: 'retry_push_failures không có lỗi đẩy' },
@@ -72,7 +71,7 @@ const CO_MONG_DOI = {
   start: 'lock drives', continue: 'lock slice reply relay', heartbeat: 'lock relay',
   assign_background_machine: 'lock', release_background_machine: 'lock', cancel: '', stop_background: '',
   open_conflict: 'lock slice drives', confirm_conflict: 'lock', save_settings: 'lock', reset_settings: 'lock', set_master: '',
-  save_identity_binding: 'lock', save_credential: 'lock', reset_state: 'lock', retry_push_failures: 'lock', client_error: 'lock reply',
+  save_credential: 'lock', reset_state: 'lock', retry_push_failures: 'lock', client_error: 'lock reply',
   relay_config: 'lock noview', relay_rotate_key: 'lock noview', relay_switch_log: 'noview', status: 'noview', trace_read: 'noview'
 };
 const coCua = (spec) => ['lock', 'slice', 'reply', 'relay', 'drives'].filter((co) => spec[co] === true).concat(spec.view === false ? ['noview'] : []).join(' ');

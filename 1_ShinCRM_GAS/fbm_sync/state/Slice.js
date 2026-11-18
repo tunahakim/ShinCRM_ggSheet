@@ -293,7 +293,6 @@ FbmSync.replyAdmit = function (state, requestId, rawResponse) {
  * Relay chỉ nộp khi công tắc tổng còn bật. Lượt đang mở đã được đóng ở đầu lát (`runSlice` áp điều kiện dừng), nên nhánh này chỉ còn chặn response của lượt đã đóng.
  */
 FbmSync.sliceContinue = function (input, state) {
-  FbmSync.traceImport(state, input.clientTrace);
   if (FbmSync.submitResubmitted(state, input.response ? FbmSync.responseRequestId(input.response) : String(input.error.requestId || ''))) { return FbmSync.envelopeResubmit(state); }
   if (input.error) { return FbmSync.transportFailureRun(input.error); }
   if (input.source === 'relay' && !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { return { ok: false, code: 'SYNC_DISABLED', request: null }; }

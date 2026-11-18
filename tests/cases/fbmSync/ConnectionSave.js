@@ -36,13 +36,13 @@ function chay(so) {
   const thay = g.luu({ binding: LIEN_KET_A, credential: banMa('cred-a-999999', 'USERA') });
   check(so, 'thay credential bằng mã tham chiếu mới thì trả mã khóa cũ để Extension xóa', [thay.ok, g.F.credentialRead().credentialRef, thay.keyRefRemove], [true, 'cred-a-999999', 'cred-a-123456']);
   const giu = g.luu({ binding: LIEN_KET_A, credential: { username: 'USERA' } });
-  const giuLienKet = g.F.controlDispatch('save_identity_binding', { binding: LIEN_KET_A }, 'sidebar');
+  const giuLienKet = g.F.controlDispatch('save_credential', { binding: LIEN_KET_A }, 'sidebar');
   check(so, 'liên kết không đổi: form giữ username (không mật khẩu) hoặc lệnh chỉ lưu liên kết đều giữ credential', [giu.ok, giu.keyRefRemove, giuLienKet.ok, g.F.credentialRead().configured], [true, '', true, true]);
   const thieuMatKhau = g.luu({ binding: LIEN_KET_A, credential: { username: 'USERX' } });
   check(so, 'username khác bản lưu mà không có mật khẩu thì từ chối, không ghi gì', [thieuMatKhau.code, g.F.credentialRead().public.usernameHint], ['LOGIN_PASSWORD_REQUIRED', 'USERA']);
   const doiCoXacNhan = g.luu({ binding: Object.assign({}, LIEN_KET_A, { accountName: 'Tai khoan A moi' }), credential: { username: 'USERA' } });
   check(so, 'đổi liên kết mà form xác nhận đúng username của credential thì giữ credential', [doiCoXacNhan.ok, g.F.credentialRead().configured, doiCoXacNhan.keyRefRemove], [true, true, '']);
-  const doiLienKet = g.F.controlDispatch('save_identity_binding', { binding: LIEN_KET_B }, 'sidebar');
+  const doiLienKet = g.F.controlDispatch('save_credential', { binding: LIEN_KET_B }, 'sidebar');
   check(so, 'đổi sang tài khoản khác mà không xác nhận credential thì xóa credential (không đăng nhập B bằng mật khẩu A), ghi bản trống cùng lần ghi và trả mã khóa cũ', [
     doiLienKet.ok, g.F.bindingRead().userId, g.F.credentialRead().configured, g.data.FBM_CREDENTIAL_V1, doiLienKet.keyRefRemove, doiLienKet.login.configured
   ], [true, 'user-b', false, '{}', 'cred-a-999999', false]);

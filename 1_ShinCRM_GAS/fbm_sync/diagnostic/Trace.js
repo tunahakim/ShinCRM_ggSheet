@@ -80,7 +80,7 @@ FbmSync.traceResponse = function (raw) {
   return { httpStatus: status, responseLength: length };
 };
 
-/** Nhận trace của client/Extension nhưng chỉ giữ các field an toàn và giới hạn số lượng. */
+/** Nhận `transport.trace` của Extension, chỉ giữ field an toàn, giới hạn số lượng. */
 FbmSync.traceImport = function (state, events, fallback) {
   if (!Array.isArray(events)) { return 0; }
   var base = fallback || {}, context = FbmSync.traceContext(state, base), imported = [];
