@@ -245,21 +245,18 @@ FbmSync.issueThroughGate = function (state, build, gateMessage) {
 FbmSync.issueEnvelope = function (state, build, gateMessage) {
   var sidebar = !!(FbmSync.issueContext && FbmSync.issueContext.channel !== 'relay');
   // Cổng sẽ mở thì request gửi đi là request hỏi phiên: không dựng request nghiệp vụ (có cursor chưa đủ dữ liệu để dựng trước khi phiên được xác minh).
-  var gated = !sidebar && FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
+  // Kênh Sidebar cũng qua cổng: lượt mở thẳng ở cursor cần phiên (mở xung đột) giữ chỗ ở chặng phiên.
+  var gated = FbmSync.cursorTable(String(state.cursor && state.cursor.kind || '')).gate && !FbmSync.sessionIdentityIsVerified(state);
   var request = gated ? null : build(state);
   if (!gated && !request) { return null; }
-  if (sidebar) { return FbmSync.envelopeHold(state, request); }
-  if (!settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) {
-    FbmSync.stopPendingApply(true);
-    return null;
-  }
-  // Chạm trần thì tạm dừng với cursor nghiệp vụ còn nguyên (Log và Sidebar thấy đúng chỗ dừng), không mở chặng phiên chỉ để dừng.
-  if (FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(state); }
+  if (!sidebar && !settingsValue(FbmSync.SETTING_SECTIONS.master, 'enabled')) { FbmSync.stopPendingApply(true); return null; }
+  // Chạm trần thì tạm dừng ngay, cursor nghiệp vụ còn nguyên (không mở chặng phiên).
+  if (!sidebar && FbmSync.budgetCallExhausted()) { return FbmSync.pauseForRuntimeLimit(state); }
   if (gated) {
     FbmSync.stagePatchApply(state, FbmSync.sessionGateOpen(state, 'issue', gateMessage || 'Đang kiểm tra tab và tài khoản FBM...', false));
     request = FbmSync.cursorRequest(state);
   }
-  return FbmSync.requestIssue(state, request, Date.now());
+  return sidebar ? FbmSync.envelopeHold(state, request) : FbmSync.requestIssue(state, request, Date.now());
 };
 /**
  * Chạy một công cụ theo hợp đồng chung trên bản sao ô lượt (công cụ không sửa được ô lượt thật) rồi gộp patch nó trả. Công cụ ném lỗi có thể kèm `logs` đã gom (ví dụ dòng quá cỡ của gói cuối): ghi chúng rồi ném tiếp để `runSlice` đóng lượt, không để mất dòng Log nào.

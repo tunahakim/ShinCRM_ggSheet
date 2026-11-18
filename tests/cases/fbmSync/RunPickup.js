@@ -128,6 +128,18 @@ async function chay(so) {
   ], [['login_step', 'page'], false, true, 'cred-1']);
   check(so, 'cursor đọc lại xung đột dựng lại đúng request đọc theo ID FBM', FbmSync.cursorRequest({ cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' } }).meta.kind, 'conflict_refresh_grid');
 
+  // Lượt mở thẳng ở cursor cần phiên đã xác minh (mở xung đột) từ Sidebar: chỗ giữ là chặng phiên, cursor nghiệp vụ chờ trong `resume`; không dựng request đọc khách khi chưa có mã người dùng.
+  const luotXungDot = FbmSync.runOpen({ origin: 'manual', kindLabel: FbmSync.RUN_PLANS.conflict_refresh.label, cursor: { kind: 'conflict_refresh', entity: 'customer', id: 'KH1', fbmId: 'F1' }, message: 'Đang đọc FBM để mở xung đột KH1...' });
+  luotXungDot.session = { expired: false, sessionId: 's-moi', identityVerified: false, identitySessionId: '', userId: '' };
+  const ngCanh = FbmSync.issueContext;
+  FbmSync.issueContext = { channel: 'sidebar', machineId: 'may-A' };
+  const giuXungDot = (() => { try { return FbmSync.sliceIssue(luotXungDot, { url: FbmSync.FBM_BASE_URL + '/x', meta: { kind: 'conflict_refresh_grid' } }); } catch (error) { return { code: String(error && error.code || '') }; } })();
+  FbmSync.issueContext = ngCanh;
+  const oXungDot = FbmSync.stateRead();
+  check(so, 'mở xung đột từ Sidebar khi phiên lượt mới chưa xác minh: giữ chỗ nhận ở chặng phiên, cursor xung đột nằm trong resume, không ném FBM_USER_ID_MISSING', [giuXungDot && giuXungDot.code || '', !!(giuXungDot && giuXungDot.pickup), oXungDot.cursor.kind, oXungDot.cursor.resume && oXungDot.cursor.resume.cursor.kind], ['', true, 'session', 'conflict_refresh']);
+  const nhanXungDot = hoi('may-A');
+  check(so, 'Extension nhận lượt mở xung đột thì request đầu là request hỏi phiên', nhanXungDot.request && nhanXungDot.request.meta.kind, 'session_probe');
+
   FbmSync.credentialRead = () => ({ configured: true, credentialRef: 'cred-test-1234', ciphertext: null, public: {} });
   FbmSync.credentialRead = () => FbmSync.credentialShape({ credentialRef: 'cred-test-1234', ciphertext: banNhap.ciphertext });
   documentProperties.deleteProperty(FbmSync.STATE_KEY);
